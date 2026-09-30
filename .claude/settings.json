@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(~/Documents/workspace/IT/udevs/ucode/ucode_backend/**)",
+      "Write(~/Documents/workspace/IT/udevs/ucode/ucode_backend/**)",
+      "Edit(~/Documents/workspace/IT/udevs/ucode/ucode-frontend/**)",
+      "Write(~/Documents/workspace/IT/udevs/ucode/ucode-frontend/**)",
+      "Edit(~/Documents/workspace/IT/udevs/ucode-frontend/**)",
+      "Write(~/Documents/workspace/IT/udevs/ucode-frontend/**)",
+      "Edit(~/Documents/workspace/IT/udevs/ucode/omni4_core/crm/**)",
+      "Write(~/Documents/workspace/IT/udevs/ucode/omni4_core/crm/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/no-write-to-readonly-repos.py\"",
+            "statusMessage": "Проверяю, не пишем ли в чужой репозиторий"
+          }
+        ]
+      }
+    ]
+  }
+}
