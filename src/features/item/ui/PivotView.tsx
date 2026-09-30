@@ -360,7 +360,7 @@ export function PivotView({
               {/* Итог отделён двойной линией и фоном: это не ещё одна
                   строка данных, а черта под ними. */}
               <tr className="bg-surface-active font-semibold">
-                <th className="sticky left-0 border-t-2 border-r border-border-strong bg-surface-active px-3 py-1.5 text-left">
+                <th className="sticky left-0 border-t-2 border-r border-border-strong bg-surface tint-surface-active px-3 py-1.5 text-left">
                   {t("pivot.total")}
                 </th>
                 {table.columns.map((column) => (

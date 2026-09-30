@@ -771,7 +771,7 @@ function Result({ result }: { result: SqlResult }) {
                         }}
                         aria-label={t("cell.copy")}
                         title={t("cell.copy")}
-                        className="absolute top-1/2 right-1 grid size-5 -translate-y-1/2 place-items-center rounded bg-surface text-fg-muted opacity-0 shadow-raised transition group-hover/row:opacity-100 hover:bg-surface-active hover:text-fg focus-visible:opacity-100"
+                        className="absolute top-1/2 right-1 grid size-5 -translate-y-1/2 place-items-center rounded bg-surface text-fg-muted opacity-0 shadow-raised transition group-hover/row:opacity-100 hover:tint-surface-active hover:text-fg focus-visible:opacity-100"
                       >
                         <Icon as={IconCopy} size={12} />
                       </button>

@@ -1519,7 +1519,7 @@ function ColorEditor({
         <input
           autoFocus
           value={draft}
-          placeholder="#45aeff"
+          placeholder="#2383e2"
           onChange={(event) => set(event.target.value)}
           onKeyDown={(event) => event.key === "Enter" && commit()}
           className="h-8 min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 font-mono text-sm text-fg outline-none focus:border-accent"

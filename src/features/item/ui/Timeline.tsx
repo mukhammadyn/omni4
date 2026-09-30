@@ -507,7 +507,7 @@ export function Timeline({
           style={behind ? { left: leftWidth + 4 } : undefined}
           /* Стрелка вперёд собирается задом наперёд: подпись должна
              оказаться со стороны экрана, а не за его краем. */
-          className={`group/jump sticky z-10 flex items-center gap-1.5 rounded-md border border-border bg-surface px-1 py-0.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg ${
+          className={`group/jump sticky z-10 flex items-center gap-1.5 rounded-md border border-border bg-surface px-1 py-0.5 text-fg-muted transition-colors hover:tint-surface-hover hover:text-fg ${
             behind ? "mr-auto" : "right-1 ml-auto flex-row-reverse"
           }`}
         >
@@ -993,7 +993,7 @@ export function Timeline({
             {onCreate && (
               <div className="group/row flex" style={{ height: ROW_HEIGHT }}>
                 <div
-                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-r border-b border-border bg-surface px-2 text-xs text-fg-subtle transition-colors group-hover/row:bg-surface-hover"
+                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-r border-b border-border bg-surface px-2 text-xs text-fg-subtle transition-colors group-hover/row:tint-surface-hover"
                   style={{ width: leftWidth }}
                 >
                   <Icon as={IconPlus} size={14} className="shrink-0" />
@@ -1119,7 +1119,7 @@ function RowLabel({
     <button
       type="button"
       onClick={onOpen}
-      className={`sticky left-0 z-20 flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-b border-border bg-surface text-left text-xs transition-colors group-hover/row:bg-surface-hover ${
+      className={`sticky left-0 z-20 flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-b border-border bg-surface text-left text-xs transition-colors group-hover/row:tint-surface-hover ${
         collapsed ? "justify-center px-1" : "pr-2"
       }`}
       /* Отступ по уровню группы: иначе строки стоят вровень со своим
@@ -1194,7 +1194,7 @@ function SectionRow({
           onClick={onToggle}
           aria-expanded={!folded}
           title={t(folded ? "timeline.groupExpand" : "timeline.groupCollapse")}
-          className="sticky left-0 z-20 flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-b border-border bg-bg pr-2 text-2xs font-medium text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+          className="sticky left-0 z-20 flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-b border-border bg-bg pr-2 text-2xs font-medium text-fg-muted transition-colors hover:tint-surface-hover hover:text-fg"
           style={{ width: left, paddingLeft: 8 + level * 14 }}
         >
           {inner}

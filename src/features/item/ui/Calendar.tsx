@@ -753,7 +753,7 @@ function MonthGrid({
                         onClick={() => onCreate(day, day)}
                         aria-label={t("table.addRow")}
                         title={t("table.addRow")}
-                        className="absolute top-1 left-1 grid size-6 place-items-center rounded-md border border-border bg-surface text-fg-subtle opacity-0 transition hover:bg-surface-hover hover:text-fg focus-visible:opacity-100 group-hover/day:opacity-100"
+                        className="absolute top-1 left-1 grid size-6 place-items-center rounded-md border border-border bg-surface text-fg-subtle opacity-0 transition hover:tint-surface-hover hover:text-fg focus-visible:opacity-100 group-hover/day:opacity-100"
                       >
                         <Icon as={IconPlus} size={14} />
                       </button>

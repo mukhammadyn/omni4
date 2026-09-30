@@ -407,7 +407,7 @@ export function Board({
                               }}
                               aria-label={t(editing === row.guid ? "action.close" : "action.edit")}
                               title={t(editing === row.guid ? "action.close" : "action.edit")}
-                              className={`absolute top-1.5 right-1.5 z-10 grid size-6 place-items-center rounded-md border border-border bg-surface text-fg-muted transition hover:bg-surface-hover hover:text-fg ${
+                              className={`absolute top-1.5 right-1.5 z-10 grid size-6 place-items-center rounded-md border border-border bg-surface text-fg-muted transition hover:tint-surface-hover hover:text-fg ${
                                 editing === row.guid
                                   ? ""
                                   : "opacity-0 focus-visible:opacity-100 group-hover/card:opacity-100"

@@ -777,12 +777,14 @@ export function DataGrid({
             /*
              * Фон отмеченной строки задаётся и на закреплённых ячейках:
              * у них собственный непрозрачный фон, и подсветка строки
-             * из-под них не видна.
+             * из-под них не видна. Подсветка кладётся tint-*, а не
+             * фоном: она полупрозрачная, и под ней проезжали бы
+             * соседние колонки.
              */
             const pinBg = isSelected
-              ? "bg-accent-subtle"
+              ? "bg-surface tint-accent-subtle"
               : inSubtree
-                ? "bg-surface-hover"
+                ? "bg-surface tint-surface-hover"
                 : "bg-surface";
 
             return (
@@ -844,11 +846,11 @@ export function DataGrid({
                          текст поверх текста. */
                       style={left === undefined ? undefined : { left }}
                       className={`${cell} cursor-default border-r ${
-                        isActive ? "bg-accent-subtle" : ""
+                        isActive && left === undefined ? "bg-accent-subtle" : ""
                       } ${
                         left === undefined
                           ? ""
-                          : `sticky z-10 ${isActive ? "" : pinBg} ${
+                          : `sticky z-10 ${isActive ? "bg-surface tint-accent-subtle" : pinBg} ${
                               columnIndex === pinnedCount - 1
                                 ? "shadow-[1px_0_0_0_var(--color-border)]"
                                 : ""

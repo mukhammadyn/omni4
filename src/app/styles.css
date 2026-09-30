@@ -10,9 +10,8 @@
 @import "tailwindcss";
 
 /*
- * Фон приложения — плоская заливка --color-bg в обеих темах: F4F5F7
- * светлая, 10141D тёмная. Уклон в фирменный синий здесь был, но на
- * обоих фонах читался цветным пятном, а не «чуть теплее».
+ * Фон приложения — плоская заливка --color-bg в обеих темах: это цвет
+ * сайдбара прототипа (docs/REDESIGN.md), F7F7F5 светлая, 202020 тёмная.
  *
  * Вне слоёв намеренно: слой `remote` выше `base`, и `body { font-family:
  * Inter; color }` из CSS микрофронтенда иначе перекрасил бы всю админку.
@@ -38,11 +37,27 @@ body {
  * Значения по умолчанию = светлая тема. Тёмная переопределяет их ниже.
  */
 @theme {
+  /*
+   * Палитра — прототип omni4 (Notion). Сопоставление и отклонения
+   * ради контраста — docs/REDESIGN.md, шаг 1; проверяет их
+   * styles.test.ts.
+   *
+   * Наведение, выделение и границы ПОЛУПРОЗРАЧНЫЕ: одна и та же линия
+   * и подсветка читаются одинаково на контенте, на сайдбаре и
+   * в поповере. Цена — там, где под элементом прокручивается чужое
+   * содержимое (закреплённые колонки, липкие шапки), полупрозрачный
+   * фон просвечивает. Там фон сплошной, а подсветка кладётся сверху
+   * утилитой tint-* (ниже).
+   *
+   * Текст — СПЛОШНОЙ: полупрозрачность прототипа сведена с `surface`.
+   * Тексту она ничего не даёт, а `fg` бывает и фоном (тултип).
+   */
+
   /* ── Поверхности ─────────────────────────────────────────────── */
-  --color-bg: #f4f5f7;           /* фон приложения и сайдбара */
+  --color-bg: #f7f7f5;           /* фон приложения и сайдбара */
   --color-surface: #ffffff;      /* контент, карточки, поповеры */
-  --color-surface-hover: #f4f4f3;
-  --color-surface-active: #ededec;
+  --color-surface-hover: rgba(55, 53, 47, 0.06);
+  --color-surface-active: rgba(55, 53, 47, 0.09);
   --color-overlay: #00000059;    /* затемнение под модалкой */
   /* Под просмотром файла: там поверх лежат картинка и белые кнопки,
      и лёгкое затемнение диалога их не держит — текст читается по фону
@@ -51,8 +66,8 @@ body {
   --color-overlay-strong: #000000d9;
 
   /* ── Границы ─────────────────────────────────────────────────── */
-  --color-border: #eaeae8;       /* волосяная линия: таблица, разделители */
-  --color-border-strong: #dcdcd9; /* поля ввода, обводка кнопок */
+  --color-border: rgba(55, 53, 47, 0.09);        /* волосяная линия: таблица, разделители */
+  --color-border-strong: rgba(55, 53, 47, 0.16); /* поля ввода, обводка кнопок */
   /* Край карточки контента. В светлой теме карточка и так видна по
      белой заливке на фоне приложения — граница тут лишняя. В тёмной
      (переопределяется ниже) обе поверхности почти одного цвета, и без
@@ -60,23 +75,23 @@ body {
   --color-border-card: transparent;
 
   /* ── Текст ───────────────────────────────────────────────────── */
-  --color-fg: #1b1b18;           /* основной */
-  --color-fg-muted: #6f6e6b;     /* подписи, заголовки колонок, иконки */
-  --color-fg-subtle: #9b9a96;    /* плейсхолдеры, «Empty» */
+  --color-fg: #37352f;           /* основной */
+  --color-fg-muted: #6b6a65;     /* подписи, заголовки колонок, иконки; прототип .65 темнее: 4.5:1 и на сайдбаре под наведением */
+  --color-fg-subtle: #a5a4a1;    /* плейсхолдеры, «Empty»; 2.49:1, как в прототипе — решено */
 
   /* ── Бренд ───────────────────────────────────────────────────── */
-  /* Одна шкала (206°, S=100%), три роли. Белый текст требует 4.5:1,
-     а сам бренд даёт с белым только 2.40:1 — поэтому заливка кнопки
-     берётся с тёмной ступени той же шкалы, а не с бренда.
-       500 #45aeff  бренд: на тёмном 7.33:1, фокус, выделение
-       800 #0075cf  заливка: белый текст 4.72:1
-       850 #0068ba  наведение: белый текст 5.69:1 */
-  --color-accent: #45aeff;         /* опознавательный цвет: фокус, активное */
-  --color-accent-solid: #0075cf;   /* заливка кнопок под белый текст */
-  --color-accent-solid-hover: #0068ba;
+  /* Синий прототипа, три роли. Прототип заливает кнопку самим #2383e2,
+     но белый текст на нём 3.88:1 — заливка берётся с его же цвета
+     наведения.
+       #2383e2  бренд: фокус, выделение
+       #0077d4  заливка: белый текст 4.58:1
+       #006bbf  наведение и ссылки: 5.45:1, на accent-subtle 4.72:1 */
+  --color-accent: #2383e2;         /* опознавательный цвет: фокус, активное */
+  --color-accent-solid: #0077d4;   /* заливка кнопок под белый текст */
+  --color-accent-solid-hover: #006bbf;
   --color-accent-fg: #ffffff;      /* текст поверх заливки */
-  --color-accent-subtle: #eaf6ff;  /* мягкий фон: выделенная строка, бейдж */
-  --color-accent-text: #0a6fc0;    /* ссылки и акцентный текст на светлом */
+  --color-accent-subtle: rgba(35, 131, 226, 0.12); /* мягкий фон: выделенная строка, бейдж */
+  --color-accent-text: #006bbf;    /* ссылки и акцентный текст на светлом */
 
   /* Единственный градиент в системе — фон панели входа.
      Границы подобраны так, что белый текст проходит и на САМОЙ СВЕТЛОЙ
@@ -113,34 +128,39 @@ body {
   );
 
   /* ── Смысловые ───────────────────────────────────────────────── */
-  --color-success: #2f855a;
-  --color-success-subtle: #e6f4ea;
-  --color-warning: #b45309;
-  --color-warning-subtle: #fdf3e3;
-  --color-danger: #c53030;
-  --color-danger-subtle: #fdecec;
+  /* Оттенки прототипа, ступень темнее: его #448361, #d9730d, #eb5757
+     дают текстом 4.50, 3.28 и 3.48. Подложка — тот же цвет на 12%:
+     мягкие фоны прототипа под текстом не проходят. Текст обязан
+     читаться и на белом, и на своей подложке. */
+  --color-success: #2b7550;
+  --color-success-subtle: #2b75501f;
+  --color-warning: #9c5400;
+  --color-warning-subtle: #9c54001f;
+  --color-danger: #b8322d;
+  --color-danger-subtle: #b8322d1f;
 
   /* ── Палитра чипов ───────────────────────────────────────────── */
   /* Для Status и Multiselect. Пользователь выбирает оттенок, а не HEX,
-     поэтому набор фиксирован и одинаково читается в обеих темах. */
-  --color-chip-gray-bg: #ecebe9;
-  --color-chip-gray-fg: #3c3b38;
-  --color-chip-blue-bg: #dfeefc;
-  --color-chip-blue-fg: #1b4f78;
-  --color-chip-green-bg: #dff0e4;
-  --color-chip-green-fg: #1f4f33;
-  --color-chip-yellow-bg: #faeecd;
-  --color-chip-yellow-fg: #5c451a;
-  --color-chip-orange-bg: #fbe6d5;
-  --color-chip-orange-fg: #6b3a1a;
-  --color-chip-red-bg: #fadedd;
-  --color-chip-red-fg: #6e2a2a;
-  --color-chip-purple-bg: #ebe4f8;
-  --color-chip-purple-fg: #46316e;
-  --color-chip-pink-bg: #fadeee;
-  --color-chip-pink-fg: #6e2a55;
-  --color-chip-brown-bg: #eee5dd;
-  --color-chip-brown-fg: #503b2b;
+     поэтому набор фиксирован и одинаково читается в обеих темах.
+     Теги прототипа (--t-*) как есть: проходят в обеих темах. */
+  --color-chip-gray-bg: #e3e2e0;
+  --color-chip-gray-fg: #32302c;
+  --color-chip-blue-bg: #d3e5ef;
+  --color-chip-blue-fg: #183347;
+  --color-chip-green-bg: #dbeddb;
+  --color-chip-green-fg: #1c3829;
+  --color-chip-yellow-bg: #fdecc8;
+  --color-chip-yellow-fg: #402c1b;
+  --color-chip-orange-bg: #fadec9;
+  --color-chip-orange-fg: #49290e;
+  --color-chip-red-bg: #ffe2dd;
+  --color-chip-red-fg: #5d1715;
+  --color-chip-purple-bg: #e8deee;
+  --color-chip-purple-fg: #412454;
+  --color-chip-pink-bg: #f5e0e9;
+  --color-chip-pink-fg: #4c2337;
+  --color-chip-brown-bg: #eee0da;
+  --color-chip-brown-fg: #442a1e;
 
   /* ── Палитра графиков ────────────────────────────────────────── */
   /*
@@ -245,6 +265,19 @@ body {
   --spacing-header: 44px;   /* шапка страницы */
 }
 
+/*
+ * Подсветка поверх сплошного фона: `bg-surface tint-surface-hover`.
+ *
+ * Наведение и выделение полупрозрачные (см. палитру выше), и у липкой
+ * ячейки такой фон просвечивает — под ней прокручиваются соседние
+ * колонки. Здесь фон элемента остаётся непрозрачным, а цвет ложится
+ * сверху картинкой: результат тот же, что у полупрозрачного фона
+ * на `surface`, но ничего не просвечивает.
+ */
+@utility tint-* {
+  background-image: linear-gradient(--value(--color-*), --value(--color-*));
+}
+
 @keyframes page-in {
   from {
     opacity: 0;
@@ -267,63 +300,68 @@ body {
  */
 @layer base {
   .dark {
-    --color-bg: #10141d;
-    --color-surface: #202020;
-    --color-surface-hover: #2a2a2a;
-    --color-surface-active: #313131;
+    --color-bg: #202020;
+    --color-surface: #191919;
+    --color-surface-hover: rgba(255, 255, 255, 0.055);
+    --color-surface-active: rgba(255, 255, 255, 0.085);
     --color-overlay: #00000099;
 
-    --color-border: #2e2e2e;
+    --color-border: rgba(255, 255, 255, 0.094);
     /* Полупрозрачный белый, а не свой оттенок серого: граница остаётся
        «чуть светлее фона», а не серая линия обычных разделителей. */
     --color-border-card: #ffffff14;
-    --color-border-strong: #3d3d3d;
+    --color-border-strong: rgba(255, 255, 255, 0.15);
 
     /* Плоская заливка — как и в светлой теме: --gradient-app остаётся
        "none" из @theme, здесь переопределять нечего. */
 
-    --color-fg: #ededed;
-    --color-fg-muted: #9b9b9b;
-    --color-fg-subtle: #6f6f6f;
+    /* Прототип: белый на .81 / .52 / .34, сведённый с #191919.
+       fg-muted на ступень светлее: .52 под наведением в сайдбаре 4.41. */
+    --color-fg: #d3d3d3;
+    --color-fg-muted: #969696;
+    --color-fg-subtle: #676767;
 
-    /* На тёмном бренд читается сам по себе — 7.33:1, поэтому он и есть
-       акцентный текст. Заливка остаётся тёмной ступенью: белый текст
-       на ней 4.72:1 в любой теме. */
-    --color-accent: #45aeff;
-    --color-accent-solid: #0075cf;
-    --color-accent-solid-hover: #0086ed;
+    /* Заливка та же, что в светлой: белый текст на ней 4.58:1 в любой
+       теме. Акцентный текст — свой у прототипа, 5.83:1 на фоне. */
+    --color-accent: #2383e2;
+    --color-accent-solid: #0077d4;
+    --color-accent-solid-hover: #006bbf;
     --color-accent-fg: #ffffff;
-    --color-accent-subtle: #45aeff1f;
-    --color-accent-text: #45aeff;
+    --color-accent-subtle: rgba(35, 131, 226, 0.2);
+    --color-accent-text: #529cca;
 
-    --color-success: #4dab6d;
-    --color-success-subtle: #4dab6d26;
-    --color-warning: #d99a3f;
-    --color-warning-subtle: #d99a3f26;
-    --color-danger: #e5646a;
-    --color-danger-subtle: #e5646a26;
+    /* Светлее прототипных (#529e72, #c77d48, #df5452): те на своей
+       подложке 15% не добирают 4.5:1. */
+    --color-success: #5bb07f;
+    --color-success-subtle: #5bb07f26;
+    --color-warning: #d98c52;
+    --color-warning-subtle: #d98c5226;
+    --color-danger: #ff7369;
+    --color-danger-subtle: #ff736926;
 
-    --color-chip-gray-bg: #373737;
-    --color-chip-gray-fg: #d4d4d4;
-    --color-chip-blue-bg: #2c4a63;
-    --color-chip-blue-fg: #cfe6f9;
-    --color-chip-green-bg: #2b4a38;
-    --color-chip-green-fg: #cfead9;
-    --color-chip-yellow-bg: #574626;
-    --color-chip-yellow-fg: #f5e3bd;
-    --color-chip-orange-bg: #5b3c25;
-    --color-chip-orange-fg: #f7dcc4;
-    --color-chip-red-bg: #5c3134;
-    --color-chip-red-fg: #f7d2d3;
-    --color-chip-purple-bg: #453764;
-    --color-chip-purple-fg: #e0d5f5;
-    --color-chip-pink-bg: #5c3149;
-    --color-chip-pink-fg: #f7d2e7;
-    --color-chip-brown-bg: #4a3b30;
-    --color-chip-brown-fg: #e6d8cb;
+    --color-chip-gray-bg: #5a5a5a;
+    --color-chip-gray-fg: rgba(255, 255, 255, 0.88);
+    --color-chip-blue-bg: #28456c;
+    --color-chip-blue-fg: rgba(255, 255, 255, 0.88);
+    --color-chip-green-bg: #2b593f;
+    --color-chip-green-fg: rgba(255, 255, 255, 0.88);
+    --color-chip-yellow-bg: #89632a;
+    --color-chip-yellow-fg: rgba(255, 255, 255, 0.88);
+    --color-chip-orange-bg: #854c1d;
+    --color-chip-orange-fg: rgba(255, 255, 255, 0.88);
+    --color-chip-red-bg: #6e3630;
+    --color-chip-red-fg: rgba(255, 255, 255, 0.88);
+    --color-chip-purple-bg: #492f64;
+    --color-chip-purple-fg: rgba(255, 255, 255, 0.88);
+    --color-chip-pink-bg: #69314c;
+    --color-chip-pink-fg: rgba(255, 255, 255, 0.88);
+    --color-chip-brown-bg: #603b2c;
+    --color-chip-brown-fg: rgba(255, 255, 255, 0.88);
 
     /* Свои ступени, а не осветлённые светлые: тёмная тема проверена
-       тем же набором проверок против подложки #202020, и там, где
+       тем же набором проверок против подложки #202020 (прежний
+       surface; нынешний #191919 темнее, и контраст светлых серий с ним
+       только выше), и там, где
        светлая ступень её не проходила, взята соседняя. Зелёный один
        на обе темы — он проходит и там, и там. */
     --color-chart-1: #3987e5;
