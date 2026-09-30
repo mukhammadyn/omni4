@@ -13,7 +13,7 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { logout } from "@/features/auth";
-import { SettingsDialog, useProject } from "@/features/settings";
+import { SettingsDialog, useWorkspaceTitle } from "@/features/settings";
 import { WorkspaceSwitcher } from "@/features/workspace";
 import { useSession } from "@/shared/api/use-session";
 import { LOCALES, setLocale, type Locale } from "@/shared/lib/i18n";
@@ -25,16 +25,17 @@ import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 
 /**
  * Шапка сайдбара — `.sb-workspace` прототипа (docs/REDESIGN.md, 4.2):
- * одна строка 36px, плитка с инициалами компании, её имя и кнопка
- * «свернуть».
+ * одна строка 36px, плитка с инициалами текущего проекта, его имя и
+ * кнопка «свернуть». Пространство — это проект, а не компания: у одной
+ * компании их несколько, и переключаются именно они.
  *
  * Меню — «Рабочее пространство», как `wsMenu` прототипа: карточка
- * компании, её настройки, приглашение. Переключатель проектов остаётся
+ * проекта, его настройки, приглашение. Переключатель проектов остаётся
  * здесь же: в прототипе его нет, но без него проект не сменить. Ниже —
  * тема, язык (подменю, как `themeMenu` прототипа) и выход.
  *
- * Подписи берутся из ответа логина — он уже содержит имя пользователя,
- * роль и название компании. Отдельного запроса за профилем нет.
+ * Имя пользователя и роль — из ответа логина, отдельного запроса за
+ * профилем нет. Имя проекта — из его карточки (useWorkspaceTitle).
  */
 export function WorkspaceHeader({ floating = false }: { floating?: boolean }) {
   /*
@@ -45,14 +46,12 @@ export function WorkspaceHeader({ floating = false }: { floating?: boolean }) {
   const { t } = useTranslation();
   const profile = useSession().getProfile();
 
-  const title = profile?.company || t("app.name");
   /*
-   * Логотип проекта — из настроек проекта. Запрос уже сделан там же
-   * и живёт в кэше пять минут; своего здесь не появляется.
+   * Имя и логотип — текущего проекта, а не компании. Запрос проекта уже
+   * сделан настройками и живёт в кэше пять минут; своего здесь нет.
    */
-  const { project } = useProject();
-  const logo = project?.logo ?? "";
-  const tile = { title, image: logo, brand: !profile?.company };
+  const { title, logo, brand } = useWorkspaceTitle();
+  const tile = { title, image: logo, brand };
 
   return (
     <>
@@ -90,7 +89,7 @@ export function WorkspaceHeader({ floating = false }: { floating?: boolean }) {
               <WorkspaceTile {...tile} size="lg" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-fg">{title}</p>
-                {/* Кто вошёл — строкой под компанией: отдельной карточки
+                {/* Кто вошёл — строкой под проектом: отдельной карточки
                     профиля в этом меню больше нет. */}
                 <p className="truncate text-xs text-fg-muted">
                   {[profile?.name || t("workspace.noName"), profile?.role].filter(Boolean).join(" · ")}
@@ -121,7 +120,8 @@ export function WorkspaceHeader({ floating = false }: { floating?: boolean }) {
 
             <PopoverSeparator />
 
-            <WorkspaceSwitcher current={title} onSwitched={close} />
+            {/* Ряд переключателя — компания, над списком её проектов. */}
+            <WorkspaceSwitcher current={profile?.company || t("app.name")} onSwitched={close} />
 
             <PopoverSeparator />
 

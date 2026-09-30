@@ -75,7 +75,7 @@ import {
   showsTable,
   useMenu,
 } from "@/features/sidebar";
-import { useProject } from "@/features/settings";
+import { useWorkspaceTitle } from "@/features/settings";
 import {
   FieldEditor,
   TableActions,
@@ -270,8 +270,7 @@ function MenuPage() {
   const menu = useMenu(menuId);
   /* Крошки: та же подпись и тот же логотип, что в шапке сайдбара. Запрос
      проекта уже сделан сайдбаром и лежит в кэше. */
-  const company = session.getProfile()?.company || t("app.name");
-  const { project } = useProject();
+  const workspace = useWorkspaceTitle();
   // Язык ДАННЫХ — не локаль интерфейса: подписи вариантов и мультиязычных
   // полей хранятся на языках проекта, см. features/workspace.
   const { languages, current: language, setCurrent: setLanguage } = useDataLanguages();
@@ -1210,12 +1209,12 @@ function MenuPage() {
               className="flex min-w-0 shrink items-center gap-1.5 rounded-[5px] px-1.5 py-0.5 text-sm text-fg transition-colors hover:bg-surface-hover"
             >
               <WorkspaceTile
-                title={company}
-                image={project?.logo ?? ""}
-                brand={!session.getProfile()?.company}
+                title={workspace.title}
+                image={workspace.logo}
+                brand={workspace.brand}
                 size="sm"
               />
-              <span className="truncate">{company}</span>
+              <span className="truncate">{workspace.title}</span>
             </Link>
             <span className="text-sm text-fg-subtle">/</span>
             {menu ? (
