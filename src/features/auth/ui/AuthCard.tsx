@@ -55,7 +55,7 @@ function Logo() {
       </svg>
 
       <div className="relative">
-        <BrandMark haloColor="var(--color-surface-active)" />
+        <BrandMark />
       </div>
     </div>
   );
