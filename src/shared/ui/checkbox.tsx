@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ComponentProps } from "react";
-import { IconCheck, IconMinus } from "@tabler/icons-react";
+import { CheckIcon, MinusIcon } from "lucide-react";
 
 /**
  * Чекбокс. Внутри — нативный <input type="checkbox">, у которого снят
@@ -39,14 +39,14 @@ export function Checkbox({
         достаётся самому input'у. Толщина 3: на 12px наша обычная 1.6
         превращается в еле заметную линию.
       */}
-      <IconCheck
+      <CheckIcon
         aria-hidden
-        stroke={3}
+        strokeWidth={3}
         className="pointer-events-none absolute hidden size-3 text-accent-fg peer-checked:block peer-indeterminate:hidden"
       />
-      <IconMinus
+      <MinusIcon
         aria-hidden
-        stroke={3}
+        strokeWidth={3}
         className="pointer-events-none absolute hidden size-3 text-accent-fg peer-indeterminate:block"
       />
     </span>

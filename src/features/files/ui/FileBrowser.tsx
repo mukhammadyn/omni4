@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { IconFile, IconSearch, IconTrash, IconUpload } from "@tabler/icons-react";
+import {
+  FileIcon,
+  SearchIcon,
+  Trash2Icon,
+  UploadIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { fileUrl, useUploadFiles } from "@/features/item";
 import { Icon } from "@/shared/ui/icon";
@@ -81,7 +86,7 @@ export function FileBrowser({ folder, canWrite }: { folder: string; canWrite: bo
         <div className="ml-auto flex items-center gap-2">
           <label className="relative">
             <Icon
-              as={IconSearch}
+              as={SearchIcon}
               size={14}
               className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-fg-subtle"
             />
@@ -103,7 +108,7 @@ export function FileBrowser({ folder, canWrite }: { folder: string; canWrite: bo
               disabled={remove.isPending}
               className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-danger transition-colors hover:bg-danger-subtle disabled:opacity-50"
             >
-              <Icon as={IconTrash} size={14} />
+              <Icon as={Trash2Icon} size={14} />
               {t("files.deleteSelected", { count: chosen.length })}
             </button>
           )}
@@ -117,7 +122,7 @@ export function FileBrowser({ folder, canWrite }: { folder: string; canWrite: bo
                 disabled={upload.isPending}
                 className="flex h-7 items-center gap-1.5 rounded-md bg-accent-solid px-3 text-sm font-medium text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                <Icon as={IconUpload} size={14} />
+                <Icon as={UploadIcon} size={14} />
                 {upload.isPending ? t("files.uploading") : t("files.upload")}
               </button>
             </>
@@ -201,7 +206,7 @@ function FileCard({
         {IMAGES.has(file.extension) ? (
           <img src={url} alt={file.title} loading="lazy" className="h-full w-full object-cover" />
         ) : (
-          <Icon as={IconFile} size={24} className="text-fg-subtle" />
+          <Icon as={FileIcon} size={24} className="text-fg-subtle" />
         )}
       </a>
 

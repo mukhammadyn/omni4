@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type UIEvent } from "react";
-import { IconPencil, IconPlus, IconX } from "@tabler/icons-react";
+import { PencilIcon, PlusIcon, XIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, optionOf, type Field, type Relation } from "@/features/table";
 import { CHIP_SURFACE, Chip, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
@@ -291,7 +291,7 @@ export function Board({
                           title={t("table.addRow")}
                           className="ml-auto grid size-6 shrink-0 place-items-center rounded-md text-fg-subtle opacity-0 transition hover:bg-surface hover:text-fg focus-visible:opacity-100 group-hover/column:opacity-100"
                         >
-                          <Icon as={IconPlus} size={16} />
+                          <Icon as={PlusIcon} size={16} />
                         </button>
                       )}
                     </header>
@@ -413,7 +413,7 @@ export function Board({
                                   : "opacity-0 focus-visible:opacity-100 group-hover/card:opacity-100"
                               }`}
                             >
-                              <Icon as={editing === row.guid ? IconX : IconPencil} size={14} />
+                              <Icon as={editing === row.guid ? XIcon : PencilIcon} size={14} />
                             </button>
                           )}
 
@@ -442,7 +442,7 @@ export function Board({
                         onClick={() => onAddCard(cellValues(lane.id, column.id))}
                         className="flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-fg-subtle transition-colors hover:bg-surface hover:text-fg"
                       >
-                        <Icon as={IconPlus} size={16} />
+                        <Icon as={PlusIcon} size={16} />
                         {t("table.addRow")}
                       </button>
                     )}

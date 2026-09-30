@@ -1,13 +1,13 @@
 import { useState } from "react";
 import {
-  IconBolt,
-  IconChevronLeft,
-  IconLoader2,
-  IconPlus,
-  IconSettings,
-  IconTrash,
-  IconX,
-} from "@tabler/icons-react";
+  ChevronLeftIcon,
+  LoaderCircleIcon,
+  PlusIcon,
+  SettingsIcon,
+  Trash2Icon,
+  XIcon,
+  ZapIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconPicker } from "@/features/icons";
 import { MicrofrontendPage, useMicrofrontends } from "@/features/microfrontend";
@@ -91,7 +91,7 @@ export function TableActions({
         align="end"
         trigger={({ open: shown, toggle }) => (
           <ToolButton
-            icon={IconBolt}
+            icon={ZapIcon}
             label={t("actions.title")}
             open={shown}
             on={selected.length > 0 && actions.length > 0}
@@ -130,7 +130,7 @@ export function TableActions({
                 aria-label={t("action.close")}
                 className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
               >
-                <Icon as={IconX} size={16} />
+                <Icon as={XIcon} size={16} />
               </button>
             </div>
 
@@ -224,7 +224,7 @@ function Panel({
               <DynamicIcon
                 name={action.icon}
                 size={16}
-                fallback={<Icon as={IconBolt} size={16} className="shrink-0 text-fg-muted" />}
+                fallback={<Icon as={ZapIcon} size={16} className="shrink-0 text-fg-muted" />}
               />
             }
             onClick={() => {
@@ -267,7 +267,7 @@ function Panel({
               title={t("actions.settings")}
               className="grid size-7 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
             >
-              <Icon as={IconSettings} size={14} />
+              <Icon as={SettingsIcon} size={14} />
             </button>
           )}
         </div>
@@ -283,7 +283,7 @@ function Panel({
         <>
           <PopoverSeparator />
           <PopoverItem
-            icon={<Icon as={IconPlus} size={16} className="shrink-0 text-fg-muted" />}
+            icon={<Icon as={PlusIcon} size={16} className="shrink-0 text-fg-muted" />}
             onClick={() => setPage({ action: null })}
           >
             {t("actions.create")}
@@ -375,12 +375,12 @@ function ActionForm({
           aria-label={t("action.back")}
           className="grid size-6 shrink-0 place-items-center rounded text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
         >
-          <Icon as={IconChevronLeft} size={16} />
+          <Icon as={ChevronLeftIcon} size={16} />
         </button>
         <span className="flex-1 truncate px-1 text-xs font-medium text-fg-muted">
           {t(action ? "actions.edit" : "actions.create")}
         </span>
-        {busy && <Icon as={IconLoader2} size={12} className="shrink-0 animate-spin text-fg-subtle" />}
+        {busy && <Icon as={LoaderCircleIcon} size={12} className="shrink-0 animate-spin text-fg-subtle" />}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-1">
@@ -486,7 +486,7 @@ function ActionForm({
             title={t("action.delete")}
             className="grid size-8 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
           >
-            <Icon as={IconTrash} size={16} />
+            <Icon as={Trash2Icon} size={16} />
           </button>
         )}
 

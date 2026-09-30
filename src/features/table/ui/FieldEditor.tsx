@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  IconCheck,
-  IconChevronLeft,
-  IconChevronRight,
-  IconPlus,
-  IconSearch,
-  IconTrash,
-  type Icon as TablerIcon,
-} from "@tabler/icons-react";
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  SearchIcon,
+  Trash2Icon,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Anchored } from "@/shared/ui/anchored";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -102,7 +102,7 @@ export function FieldEditor({
   languages: { code: string; nativeName: string }[];
   anchor: DOMRect;
   /** Иконка типа. Параметром, а не импортом — см. TypeList. */
-  icon: (type: string) => TablerIcon;
+  icon: (type: string) => LucideIcon;
   onSubmit: (draft: FieldDraft) => void;
   /**
    * Завести связь, а не поле. Связь — отдельная сущность с отдельной
@@ -742,7 +742,7 @@ export function FieldEditor({
                       }}
                       className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
                     >
-                      <Icon as={IconTrash} size={16} />
+                      <Icon as={Trash2Icon} size={16} />
                       <span className="truncate">{t("column.delete")}</span>
                     </button>
                   </>
@@ -809,7 +809,7 @@ function OptionScreen({
         onClick={onDelete}
         className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
       >
-        <Icon as={IconTrash} size={16} />
+        <Icon as={Trash2Icon} size={16} />
         <span className="truncate">{t("action.delete")}</span>
       </button>
 
@@ -829,7 +829,7 @@ function OptionScreen({
             <Chip color={color}>&nbsp;&nbsp;</Chip>
             <span className="flex-1 truncate">{t(`color.${color}`)}</span>
             {option.color === color && (
-              <Icon as={IconCheck} size={14} className="shrink-0 text-accent-text" />
+              <Icon as={CheckIcon} size={14} className="shrink-0 text-accent-text" />
             )}
           </button>
         ))}
@@ -850,7 +850,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
       title={t("action.back")}
       className="grid size-7 shrink-0 place-items-center rounded-md border border-border text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
     >
-      <Icon as={IconChevronLeft} size={14} />
+      <Icon as={ChevronLeftIcon} size={14} />
     </button>
   );
 }
@@ -953,7 +953,7 @@ function RelationForm({
           aria-label={t("action.back")}
           className="grid size-5 shrink-0 place-items-center rounded transition-colors hover:bg-surface-hover hover:text-fg"
         >
-          <Icon as={IconChevronLeft} size={14} />
+          <Icon as={ChevronLeftIcon} size={14} />
         </button>
         <span className="flex-1 text-2xs">
           {t(editing ? "relationForm.editTitle" : "relationForm.title")}
@@ -1060,7 +1060,7 @@ function RelationForm({
                 }
                 className="flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-2xs text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
               >
-                <Icon as={IconPlus} size={12} />
+                <Icon as={PlusIcon} size={12} />
                 {t("relationForm.addAutoFilter")}
               </button>
             </div>
@@ -1204,7 +1204,7 @@ function AutoFilterRow({
         aria-label={t("action.delete")}
         className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
       >
-        <Icon as={IconTrash} size={14} />
+        <Icon as={Trash2Icon} size={14} />
       </button>
     </div>
   );
@@ -1219,7 +1219,7 @@ function Row({ label, value, onClick }: { label: string; value: string; onClick:
     >
       <span className="flex-1 truncate">{label}</span>
       <span className="truncate text-fg-muted">{value}</span>
-      <Icon as={IconChevronRight} size={14} className="shrink-0 text-fg-subtle" />
+      <Icon as={ChevronRightIcon} size={14} className="shrink-0 text-fg-subtle" />
     </button>
   );
 }
@@ -1259,7 +1259,7 @@ function TypeList({
   withRelation,
 }: {
   value: string;
-  icon: (type: string) => TablerIcon;
+  icon: (type: string) => LucideIcon;
   onPick: (type: string) => void;
   /** Вернуться, не меняя тип. null — возвращаться некуда (новое поле). */
   onBack: (() => void) | null;
@@ -1327,10 +1327,10 @@ function TypeList({
             title={t("action.back")}
             className="grid size-5 shrink-0 place-items-center rounded-md transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconChevronLeft} size={14} />
+            <Icon as={ChevronLeftIcon} size={14} />
           </button>
         ) : (
-          <Icon as={IconSearch} size={14} />
+          <Icon as={SearchIcon} size={14} />
         )}
 
         <input
@@ -1399,7 +1399,7 @@ function AddOption({ onClick }: { onClick: () => void }) {
       title={t("fieldForm.addOption")}
       className="grid size-5 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
     >
-      <Icon as={IconPlus} size={14} />
+      <Icon as={PlusIcon} size={14} />
     </button>
   );
 }
@@ -1437,7 +1437,7 @@ function OptionList({
             {option.label.trim() || t("fieldForm.optionPlaceholder")}
           </Chip>
 
-          <Icon as={IconChevronRight} size={14} className="ml-auto shrink-0 text-fg-subtle" />
+          <Icon as={ChevronRightIcon} size={14} className="ml-auto shrink-0 text-fg-subtle" />
         </button>
       ))}
     </div>

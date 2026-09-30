@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { IconCalendar, IconX } from "@tabler/icons-react";
+import { CalendarIcon, XIcon } from "lucide-react";
 import { Icon } from "./icon";
 import { Popover } from "./popover";
 
@@ -64,7 +64,7 @@ export function DatePicker({
             open ? "border-accent" : "border-border-strong hover:border-fg-subtle"
           } ${className}`}
         >
-          <Icon as={IconCalendar} size={14} className="shrink-0 text-fg-subtle" />
+          <Icon as={CalendarIcon} size={14} className="shrink-0 text-fg-subtle" />
           <span className={`flex-1 truncate ${chosen ? "text-fg" : "text-fg-subtle"}`}>
             {chosen ? chosen.toLocaleDateString(locale) : placeholder}
           </span>
@@ -92,7 +92,7 @@ export function DatePicker({
               }}
               className="flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
             >
-              <Icon as={IconX} size={14} />
+              <Icon as={XIcon} size={14} />
               {clearLabel}
             </button>
           )}

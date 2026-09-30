@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ChangeEvent } from "react";
-import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import { ru, uz } from "react-day-picker/locale";
 import { Dropdown } from "./dropdown";
@@ -70,7 +70,7 @@ export function Calendar({
       weekStartsOn={1}
       components={{
         Chevron: ({ orientation }) => (
-          <Icon as={orientation === "left" ? IconChevronLeft : IconChevronRight} size={16} />
+          <Icon as={orientation === "left" ? ChevronLeftIcon : ChevronRightIcon} size={16} />
         ),
         /*
          * Месяц и год — нашим списком, а не родным `<select>`, который

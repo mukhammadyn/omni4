@@ -1,5 +1,6 @@
 export {
   useCreateField,
+  useCreateTextFields,
   useDeleteField,
   useUpdateField,
   useUpdateSearchFields,

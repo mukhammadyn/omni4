@@ -96,3 +96,14 @@ export function setLocale(next: Locale) {
 }
 
 export default i18next;
+
+/**
+ * Ключ на языке данных — `label_<код>`, `name_<код>` — только если язык
+ * есть. Пустой код значит «у проекта языков данных нет»: значение тогда
+ * живёт одной базовой колонкой (`label`, `name`), а ключ `label_` без
+ * кода был бы мусором в attributes.
+ */
+export function perLanguage<T>(prefix: string, code: string, value: T): Record<string, T> {
+  return code ? { [`${prefix}${code}`]: value } : {};
+}
+

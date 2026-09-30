@@ -1,4 +1,4 @@
-import { IconAlertTriangle, IconCheck, IconX } from "@tabler/icons-react";
+import { CheckIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useToasts } from "../lib/toast";
 import { Icon } from "./icon";
@@ -24,8 +24,8 @@ const TONES = {
 };
 
 const ICONS = {
-  error: IconAlertTriangle,
-  success: IconCheck,
+  error: TriangleAlertIcon,
+  success: CheckIcon,
 };
 
 export function Toaster() {
@@ -58,7 +58,7 @@ export function Toaster() {
             aria-label={t("action.close")}
             className="-m-1 grid size-6 shrink-0 place-items-center rounded-md opacity-60 transition-opacity hover:opacity-100"
           >
-            <Icon as={IconX} size={14} />
+            <Icon as={XIcon} size={14} />
           </button>
         </div>
       ))}

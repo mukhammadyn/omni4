@@ -104,7 +104,7 @@ export function toNodes(menus: MenuDto[], languages: string | string[]): MenuNod
 const MAX_DEPTH = 8;
 
 /**
- * Всё дерево меню — для поиска.
+ * Всё дерево меню — для поиска папки в окне «Переместить» (MoveMenuDialog).
  *
  * Поиском занимается клиент, потому что ручка его не умеет: `search`
  * шлюз принимает и передаёт дальше (api/handlers/v3/menu.go:249), но

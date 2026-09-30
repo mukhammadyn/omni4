@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { IconDatabase, IconLoader2, IconPlus } from "@tabler/icons-react";
+import { DatabaseIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -45,7 +45,7 @@ export function ConnectionSettings() {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <SectionHeader title={t("connections.title")} hint={t("connections.hint")}>
         <Button size="sm" onClick={() => setAdding(true)}>
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("connections.create")}
         </Button>
       </SectionHeader>
@@ -78,7 +78,7 @@ export function ConnectionSettings() {
                   : "text-fg-muted hover:bg-surface-hover hover:text-fg"
               }`}
             >
-              <Icon as={IconDatabase} size={14} className="shrink-0" />
+              <Icon as={DatabaseIcon} size={14} className="shrink-0" />
               <span className="truncate">{connection.name}</span>
             </button>
           ))}
@@ -267,7 +267,7 @@ function ConnectionDialog({ onClose }: { onClose: () => void }) {
             {t("action.cancel")}
           </Button>
           <Button type="submit" disabled={create.isPending || !name.trim() || !connectionString.trim()}>
-            {create.isPending && <Icon as={IconLoader2} size={14} className="animate-spin" />}
+            {create.isPending && <Icon as={LoaderCircleIcon} size={14} className="animate-spin" />}
             {create.isPending ? t("common.saving") : t("action.create")}
           </Button>
         </div>

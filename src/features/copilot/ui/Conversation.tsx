@@ -1,26 +1,26 @@
 import { useEffect, useRef } from "react";
 import {
-  IconAlertCircle,
-  IconAlertTriangle,
-  IconBrain,
-  IconCircleCheck,
-  IconCircleMinus,
-  IconCirclePlus,
-  IconColumns,
-  IconCopy,
-  IconCpu,
-  IconDatabase,
-  IconFolder,
-  IconLink,
-  IconLoader2,
-  IconPlayerStop,
-  IconPoint,
-  IconSearch,
-  IconShield,
-  IconSparkles,
-  IconUsers,
-  type Icon as TablerIcon,
-} from "@tabler/icons-react";
+  BrainIcon,
+  CircleAlertIcon,
+  CircleCheckIcon,
+  CircleMinusIcon,
+  CirclePlusIcon,
+  Columns2Icon,
+  CopyIcon,
+  CpuIcon,
+  DatabaseIcon,
+  DotIcon,
+  FolderIcon,
+  LinkIcon,
+  LoaderCircleIcon,
+  SearchIcon,
+  ShieldIcon,
+  SparklesIcon,
+  SquareIcon,
+  TriangleAlertIcon,
+  UsersIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "@/shared/lib/toast";
 import { Icon } from "@/shared/ui/icon";
@@ -95,7 +95,7 @@ function Answer({ run, content }: { run: Run | null; content: string }) {
       {text && <RichText source={text} />}
       {run?.error && (
         <div className="flex items-start gap-2 rounded-lg bg-danger-subtle px-3 py-2 text-xs text-danger">
-          <Icon as={IconAlertCircle} size={14} className="mt-px" />
+          <Icon as={CircleAlertIcon} size={14} className="mt-px" />
           <span className="break-words">{run.error}</span>
         </div>
       )}
@@ -116,7 +116,7 @@ function Answer({ run, content }: { run: Run | null; content: string }) {
           title={t("cell.copy")}
           className="grid size-6 cursor-pointer place-items-center self-start rounded-md text-fg-subtle opacity-0 transition hover:bg-surface-hover hover:text-fg group-hover/answer:opacity-100 focus-visible:opacity-100"
         >
-          <Icon as={IconCopy} size={14} />
+          <Icon as={CopyIcon} size={14} />
         </button>
       )}
     </div>
@@ -139,14 +139,14 @@ function Timeline({ run }: { run: Run }) {
     <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-2">
       {run.provider && (
         <div className="flex items-center gap-1.5 text-2xs text-fg-subtle">
-          <Icon as={IconCpu} size={12} />
+          <Icon as={CpuIcon} size={12} />
           <span className="truncate">{run.provider}</span>
         </div>
       )}
 
       {run.steps.length === 0 && run.active && (
         <div className="flex items-center gap-2 text-xs text-fg-muted">
-          <Icon as={IconSparkles} size={14} className="animate-spin" />
+          <Icon as={SparklesIcon} size={14} className="animate-spin" />
           <span>{t("copilot.thinking")}</span>
         </div>
       )}
@@ -160,7 +160,7 @@ function Timeline({ run }: { run: Run }) {
           и человек не поймёт, откуда взялась таблица. */}
       {run.stopped && (
         <div className="flex items-start gap-2 text-2xs text-fg-subtle">
-          <Icon as={IconPlayerStop} size={12} className="mt-px" />
+          <Icon as={SquareIcon} size={12} className="mt-px" />
           <span>{t("copilot.stopped")}</span>
         </div>
       )}
@@ -203,13 +203,13 @@ function StepRow({ step }: { step: Step }) {
 function StatusGlyph({ status }: { status: string | undefined }) {
   switch (status) {
     case "started":
-      return <Icon as={IconLoader2} size={13} className="ml-auto animate-spin text-fg-subtle" />;
+      return <Icon as={LoaderCircleIcon} size={13} className="ml-auto animate-spin text-fg-subtle" />;
     case "done":
-      return <Icon as={IconCircleCheck} size={13} className="ml-auto text-success" />;
+      return <Icon as={CircleCheckIcon} size={13} className="ml-auto text-success" />;
     case "skipped":
-      return <Icon as={IconCircleMinus} size={13} className="ml-auto text-fg-subtle" />;
+      return <Icon as={CircleMinusIcon} size={13} className="ml-auto text-fg-subtle" />;
     case "failed":
-      return <Icon as={IconAlertTriangle} size={13} className="ml-auto text-danger" />;
+      return <Icon as={TriangleAlertIcon} size={13} className="ml-auto text-danger" />;
     default:
       return null;
   }
@@ -305,26 +305,27 @@ function Inline({ source }: { source: string }) {
 }
 
 /**
- * Значки шагов приходят из потока именами Lucide (`generation_stream.go:40`),
- * а рисуем мы Tabler. Перевод один и здесь; незнакомое имя — точка,
+ * Значки шагов приходят из потока именами Lucide (`generation_stream.go:40`)
+ * — той же библиотеки, что у нас. Список явный, а не поиск по имени во всём
+ * пакете: так в бандл идут только эти значки. Незнакомое имя — точка,
  * а не пустое место: новый шаг на бэкенде не должен ломать список.
  */
-const ICONS: Record<string, TablerIcon> = {
-  cpu: IconCpu,
-  sparkles: IconSparkles,
-  brain: IconBrain,
-  "scan-search": IconSearch,
-  database: IconDatabase,
-  columns: IconColumns,
-  link: IconLink,
-  folder: IconFolder,
-  "plus-circle": IconCirclePlus,
-  shield: IconShield,
-  "shield-check": IconShield,
-  users: IconUsers,
-  "alert-triangle": IconAlertTriangle,
-  "alert-circle": IconAlertCircle,
-  "check-circle": IconCircleCheck,
+const ICONS: Record<string, LucideIcon> = {
+  cpu: CpuIcon,
+  sparkles: SparklesIcon,
+  brain: BrainIcon,
+  "scan-search": SearchIcon,
+  database: DatabaseIcon,
+  columns: Columns2Icon,
+  link: LinkIcon,
+  folder: FolderIcon,
+  "plus-circle": CirclePlusIcon,
+  shield: ShieldIcon,
+  "shield-check": ShieldIcon,
+  users: UsersIcon,
+  "alert-triangle": TriangleAlertIcon,
+  "alert-circle": CircleAlertIcon,
+  "check-circle": CircleCheckIcon,
 };
 
-const stepIcon = (name: string): TablerIcon => ICONS[name] ?? IconPoint;
+const stepIcon = (name: string): LucideIcon => ICONS[name] ?? DotIcon;

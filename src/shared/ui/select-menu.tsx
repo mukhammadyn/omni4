@@ -1,5 +1,10 @@
 import { useState, type UIEvent } from "react";
-import { IconCheck, IconChevronDown, IconSearch, IconTable } from "@tabler/icons-react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  SearchIcon,
+  Table2Icon,
+} from "lucide-react";
 import { Checkbox } from "./checkbox";
 import { DynamicIcon } from "./dynamic-icon";
 import { Icon } from "./icon";
@@ -106,7 +111,7 @@ export function SelectMenu({
           {summary || placeholder}
         </span>
         <Icon
-          as={IconChevronDown}
+          as={ChevronDownIcon}
           size={14}
           className={`shrink-0 text-fg-subtle transition-transform ${open ? "rotate-180" : ""}`}
         />
@@ -115,7 +120,7 @@ export function SelectMenu({
       {open && (
         <div className="mx-1 mt-1 rounded-md border border-border">
           <label className="flex h-7 items-center gap-1.5 border-b border-border px-2 text-sm">
-            <Icon as={IconSearch} size={14} className="shrink-0 text-fg-subtle" />
+            <Icon as={SearchIcon} size={14} className="shrink-0 text-fg-subtle" />
             <input
               autoFocus
               value={search}
@@ -147,7 +152,7 @@ export function SelectMenu({
                   {multiple && <Checkbox checked={picked} onChange={() => onPick(item.value)} />}
                   {!multiple && <OptionIcon icon={item.icon} />}
                   <span className="flex-1 truncate">{item.label}</span>
-                  {picked && !multiple && <Icon as={IconCheck} size={14} className="shrink-0" />}
+                  {picked && !multiple && <Icon as={CheckIcon} size={14} className="shrink-0" />}
                 </button>
               );
             })}
@@ -177,7 +182,7 @@ function OptionIcon({ icon }: { icon?: string | undefined }) {
       <DynamicIcon
         name={icon ?? ""}
         size={14}
-        fallback={<Icon as={IconTable} size={14} />}
+        fallback={<Icon as={Table2Icon} size={14} />}
       />
     </span>
   );

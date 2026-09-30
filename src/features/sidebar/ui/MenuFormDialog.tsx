@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { IconTrash } from "@tabler/icons-react";
+import { Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconPicker } from "@/features/icons";
 import { useMicrofrontends } from "@/features/microfrontend";
@@ -183,31 +183,40 @@ export function MenuFormDialog({
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-fg-muted">{t("menuForm.label")}</span>
 
-          <LanguageInput
-            autoFocus
-            languages={languages}
-            values={value.labels}
-            label={t("menuForm.label")}
-            onChange={(code, label) =>
-              setValue((v) => ({
-                ...v,
-                labels: { ...v.labels, [code]: label },
-                /*
-                 * Слаг подставляется из названия — с транслитерацией:
-                 * названия в проектах русские и узбекские, а слаг
-                 * становится ИМЕНЕМ ТАБЛИЦЫ в SQL. Раньше это поле
-                 * оставалось пустым, и латиницу набирали руками
-                 * на каждой таблице.
-                 *
-                 * Берётся первый язык, на котором что-то написано:
-                 * набирают обычно один, а какой именно — дело проекта.
-                 */
-                ...(needsSlug && !slugTouched
-                  ? { slug: slugify(firstLabel({ ...v.labels, [code]: label })) }
-                  : {}),
-              }))
-            }
-          />
+          {/* Иконка — слева от названия, одной строкой: это часть имени
+              пункта, как у Notion, а не отдельная настройка ниже. */}
+          <div className="flex items-center gap-2">
+            <IconPicker
+              value={value.icon}
+              type={type}
+              onChange={(icon) => setValue((v) => ({ ...v, icon }))}
+            />
+            <LanguageInput
+              autoFocus
+              languages={languages}
+              values={value.labels}
+              label={t("menuForm.label")}
+              onChange={(code, label) =>
+                setValue((v) => ({
+                  ...v,
+                  labels: { ...v.labels, [code]: label },
+                  /*
+                   * Слаг подставляется из названия — с транслитерацией:
+                   * названия в проектах русские и узбекские, а слаг
+                   * становится ИМЕНЕМ ТАБЛИЦЫ в SQL. Раньше это поле
+                   * оставалось пустым, и латиницу набирали руками
+                   * на каждой таблице.
+                   *
+                   * Берётся первый язык, на котором что-то написано:
+                   * набирают обычно один, а какой именно — дело проекта.
+                   */
+                  ...(needsSlug && !slugTouched
+                    ? { slug: slugify(firstLabel({ ...v.labels, [code]: label })) }
+                    : {}),
+                }))
+              }
+            />
+          </div>
         </div>
 
         {needsTable && (
@@ -301,13 +310,6 @@ export function MenuFormDialog({
           />
         )}
 
-        <Field label={t("menuForm.icon")} hint={t("menuForm.iconHint")}>
-          <IconPicker
-            value={value.icon}
-            type={type}
-            onChange={(icon) => setValue((v) => ({ ...v, icon }))}
-          />
-        </Field>
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
@@ -449,7 +451,7 @@ function RemoteFields({
                 }
                 className="grid size-8 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-danger"
               >
-                <Icon as={IconTrash} size={14} />
+                <Icon as={Trash2Icon} size={14} />
               </button>
             </div>
           ))}

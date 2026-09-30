@@ -8,7 +8,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { IconChevronLeft, IconChevronRight, IconPlus } from "@tabler/icons-react";
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { optionOf, type Field, type Relation } from "@/features/table";
 import { toast } from "@/shared/lib/toast";
@@ -279,7 +279,7 @@ export function CalendarView({
             aria-label={t("action.previous")}
             className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconChevronLeft} size={16} />
+            <Icon as={ChevronLeftIcon} size={16} />
           </button>
           <button
             type="button"
@@ -287,7 +287,7 @@ export function CalendarView({
             aria-label={t("action.next")}
             className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconChevronRight} size={16} />
+            <Icon as={ChevronRightIcon} size={16} />
           </button>
         </div>
 
@@ -756,7 +756,7 @@ function MonthGrid({
                         title={t("table.addRow")}
                         className="absolute top-1 left-1 grid size-6 place-items-center rounded-md border border-border bg-surface text-fg-subtle opacity-0 transition hover:tint-surface-hover hover:text-fg focus-visible:opacity-100 group-hover/day:opacity-100"
                       >
-                        <Icon as={IconPlus} size={14} />
+                        <Icon as={PlusIcon} size={14} />
                       </button>
                     )}
 

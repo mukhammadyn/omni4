@@ -1,12 +1,12 @@
 import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
-  IconCopy,
-  IconDeviceFloppy,
-  IconLoader2,
-  IconPlayerPlay,
-  IconPlus,
-  IconTrash,
-} from "@tabler/icons-react";
+  CopyIcon,
+  LoaderCircleIcon,
+  PlayIcon,
+  PlusIcon,
+  SaveIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useTables } from "@/features/table";
 import { errorMessage, toast } from "@/shared/lib/toast";
@@ -134,7 +134,7 @@ export function SqlConsole() {
             единственный видимый признак, что правка не записана. */}
         <Button size="sm" variant="ghost" disabled={saving || !dirty} onClick={store}>
           <Icon
-            as={saving ? IconLoader2 : IconDeviceFloppy}
+            as={saving ? LoaderCircleIcon : SaveIcon}
             size={14}
             className={saving ? "animate-spin" : ""}
           />
@@ -143,7 +143,7 @@ export function SqlConsole() {
 
         <Button size="sm" disabled={run.isPending || !sql.trim()} onClick={submit}>
           <Icon
-            as={run.isPending ? IconLoader2 : IconPlayerPlay}
+            as={run.isPending ? LoaderCircleIcon : PlayIcon}
             size={14}
             className={run.isPending ? "animate-spin" : ""}
           />
@@ -268,7 +268,7 @@ function SavedQueries({
         onClick={onNew}
         className="flex h-7.5 shrink-0 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
       >
-        <Icon as={IconPlus} size={14} className="shrink-0" />
+        <Icon as={PlusIcon} size={14} className="shrink-0" />
         {t("sql.new")}
       </button>
 
@@ -313,7 +313,7 @@ function SavedQueries({
             title={t("action.delete")}
             className="mr-1 grid size-6 shrink-0 place-items-center rounded text-fg-subtle opacity-0 transition group-hover/query:opacity-100 group-focus-within/query:opacity-100 hover:bg-danger-subtle hover:text-danger focus-visible:opacity-100"
           >
-            <Icon as={IconTrash} size={13} />
+            <Icon as={Trash2Icon} size={13} />
           </button>
         </div>
       ))}
@@ -390,7 +390,7 @@ function NameDialog({
             {t("action.cancel")}
           </Button>
           <Button type="submit" disabled={busy || !name.trim()}>
-            {busy && <Icon as={IconLoader2} size={14} className="animate-spin" />}
+            {busy && <Icon as={LoaderCircleIcon} size={14} className="animate-spin" />}
             {busy ? t("common.saving") : t("action.save")}
           </Button>
         </div>
@@ -773,7 +773,7 @@ function Result({ result }: { result: SqlResult }) {
                         title={t("cell.copy")}
                         className="absolute top-1/2 right-1 grid size-5 -translate-y-1/2 place-items-center rounded bg-surface text-fg-muted opacity-0 shadow-raised transition group-hover/row:opacity-100 hover:tint-surface-active hover:text-fg focus-visible:opacity-100"
                       >
-                        <Icon as={IconCopy} size={12} />
+                        <Icon as={CopyIcon} size={12} />
                       </button>
                     </Td>
                   );

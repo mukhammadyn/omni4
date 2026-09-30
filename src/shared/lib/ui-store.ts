@@ -7,6 +7,9 @@ type UiState = {
   theme: Theme;
   sidebarCollapsed: boolean;
   sidebarWidth: number;
+  /** Выбранный модуль ERP — id его папки в корне меню. Пусто — первый. */
+  moduleId: string;
+  setModule: (id: string) => void;
   drawerWidth: number;
   drawerMode: DrawerMode;
   /**
@@ -109,7 +112,7 @@ export const SIDEBAR_DEFAULT_WIDTH = 256;
 
 export const DRAWER_MIN_WIDTH = 400;
 export const DRAWER_MAX_WIDTH = 1200;
-export const DRAWER_DEFAULT_WIDTH = 520;
+export const DRAWER_DEFAULT_WIDTH = 600; // .peek прототипа
 
 /**
  * Панель помощника. Уже 320px переписка становится колонкой в пять слов,
@@ -142,6 +145,7 @@ export const useUi = create<UiState>()(
       theme: "system",
       sidebarCollapsed: false,
       sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
+      moduleId: "",
       drawerWidth: DRAWER_DEFAULT_WIDTH,
       drawerMode: "side",
       tableLimits: {},
@@ -168,6 +172,7 @@ export const useUi = create<UiState>()(
       expandMenus: (ids) =>
         set((s) => ({ expandedMenus: [...new Set([...s.expandedMenus, ...ids])] })),
       setSidebarWidth: (width) => set({ sidebarWidth: clampSidebarWidth(width) }),
+      setModule: (moduleId) => set({ moduleId }),
       setDrawerWidth: (width) => set({ drawerWidth: clampDrawerWidth(width) }),
       setDrawerMode: (drawerMode) => set({ drawerMode }),
       setTableLimit: (tableSlug, limit) =>

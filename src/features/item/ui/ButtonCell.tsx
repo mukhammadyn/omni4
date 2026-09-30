@@ -1,4 +1,4 @@
-import { IconBolt, IconLoader2 } from "@tabler/icons-react";
+import { LoaderCircleIcon, ZapIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Field } from "@/features/table";
 import { DynamicIcon } from "@/shared/ui/dynamic-icon";
@@ -47,12 +47,12 @@ export function ButtonCell({
       className="grid size-7 shrink-0 place-items-center rounded-md border border-border-strong text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-40"
     >
       {invoke.isPending ? (
-        <Icon as={IconLoader2} size={14} className="animate-spin" />
+        <Icon as={LoaderCircleIcon} size={14} className="animate-spin" />
       ) : (
         /* Иконку задаёт админ; не задал — молния, как у действия
            вообще. Своей подписи у кнопки в ячейке нет: колонка узкая,
            и подпись поля уже стоит в её заголовке. */
-        <DynamicIcon name={icon} fallback={<Icon as={IconBolt} size={14} />} />
+        <DynamicIcon name={icon} fallback={<Icon as={ZapIcon} size={14} />} />
       )}
     </button>
   );

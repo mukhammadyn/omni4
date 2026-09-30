@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { IconEye, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import {
+  EyeIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
@@ -46,7 +51,7 @@ export function ResourceSettings() {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <SectionHeader title={t("resources.title")} hint={t("resources.hint")}>
         <Button size="sm" onClick={() => setPicking(true)}>
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("resources.create")}
         </Button>
       </SectionHeader>
@@ -110,7 +115,7 @@ export function ResourceSettings() {
                         title={t(managed ? "action.open" : "action.edit")}
                         className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
                       >
-                        <Icon as={managed ? IconEye : IconPencil} size={14} />
+                        <Icon as={managed ? EyeIcon : PencilIcon} size={14} />
                       </button>
 
                       {/* Удаления нет там, где оно не сработает: строку
@@ -124,7 +129,7 @@ export function ResourceSettings() {
                           title={t("action.delete")}
                           className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
                         >
-                          <Icon as={IconTrash} size={14} />
+                          <Icon as={Trash2Icon} size={14} />
                         </button>
                       )}
                     </span>

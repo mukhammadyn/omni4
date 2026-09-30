@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconLanguage } from "@tabler/icons-react";
+import { LanguagesIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CommitInput } from "./commit-input";
 import { Icon } from "./icon";
@@ -58,6 +58,8 @@ type Committed = {
   allowEmpty?: boolean;
 };
 
+const BASE: InputLanguage = { code: "", nativeName: "" };
+
 export function LanguageInput({
   languages,
   values,
@@ -69,8 +71,12 @@ export function LanguageInput({
   const { t } = useTranslation();
   const [at, setAt] = useState(0);
 
-  const current = languages[at] ?? languages[0];
-  if (!current) return null;
+  /*
+   * Без языков данных — одно обычное поле с кодом "": значение идёт
+   * в базовое название (см. perLanguage). Раньше здесь был `null`, и
+   * у нового проекта без языков у формы пропадало поле имени целиком.
+   */
+  const current = languages[at] ?? languages[0] ?? BASE;
 
   const value = values[current.code] ?? "";
   /* Место под кнопку: без отступа текст уезжает под неё. */
@@ -118,7 +124,7 @@ export function LanguageInput({
           title={t("common.inputLanguage", { language: current.nativeName })}
           className="absolute right-1 flex h-6 shrink-0 items-center gap-1 rounded px-1.5 text-2xs text-fg-muted uppercase transition-colors hover:bg-surface-hover hover:text-fg"
         >
-          <Icon as={IconLanguage} size={14} />
+          <Icon as={LanguagesIcon} size={14} />
           {current.code}
         </button>
       )}

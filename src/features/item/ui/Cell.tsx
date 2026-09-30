@@ -1,4 +1,10 @@
-import { IconCopy, IconExternalLink, IconMapPin, IconPaperclip, IconPlus } from "@tabler/icons-react";
+import {
+  CopyIcon,
+  ExternalLinkIcon,
+  MapPinIcon,
+  PaperclipIcon,
+  PlusIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, optionOf, type Field, type FieldOption, type Relation } from "@/features/table";
 import { fileName } from "@/shared/lib/file-kind";
@@ -300,7 +306,7 @@ function LongTextCell({ value, line, rich }: { value: unknown; line: string; ric
         title={t("cell.copy")}
         className="ml-auto hidden size-6 shrink-0 place-items-center rounded-md text-fg-muted transition-colors group-hover/row:grid hover:bg-surface-active hover:text-fg"
       >
-        <Icon as={IconCopy} size={14} />
+        <Icon as={CopyIcon} size={14} />
       </button>
     </span>
   );
@@ -326,7 +332,7 @@ function MapCell({ value, line }: { value: unknown; line: string }) {
 
   return (
     <span className="flex w-full min-w-0 items-center gap-1.5">
-      <Icon as={IconMapPin} size={14} className="shrink-0 text-fg-muted" />
+      <Icon as={MapPinIcon} size={14} className="shrink-0 text-fg-muted" />
       <span className={`tabular-nums ${line}`}>{`${point.lat}, ${point.lon}`}</span>
 
       <a
@@ -339,7 +345,7 @@ function MapCell({ value, line }: { value: unknown; line: string }) {
         title={t("cell.openMap")}
         className="ml-auto hidden size-6 shrink-0 place-items-center rounded-md text-fg-muted transition-colors group-hover/row:grid hover:bg-surface-active hover:text-fg"
       >
-        <Icon as={IconExternalLink} size={14} />
+        <Icon as={ExternalLinkIcon} size={14} />
       </a>
     </span>
   );
@@ -460,7 +466,7 @@ function LinkCell({ value, line }: { value: unknown; line: string }) {
           title={href}
           className="ml-auto hidden size-6 shrink-0 place-items-center rounded-md text-fg-muted transition-colors group-hover/row:grid hover:bg-surface-active hover:text-fg"
         >
-          <Icon as={IconExternalLink} size={14} />
+          <Icon as={ExternalLinkIcon} size={14} />
         </a>
       )}
     </span>
@@ -518,7 +524,7 @@ function RelationCell({
   if (slugs?.length && editorKind(field)) {
     return (
       <span className="flex items-center gap-1 text-fg-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
-        <Icon as={IconPlus} size={14} />
+        <Icon as={PlusIcon} size={14} />
         <span className="truncate">{t("cell.createRelation")}</span>
       </span>
     );
@@ -631,7 +637,7 @@ function FileCell({ value, wrap }: { value: unknown; wrap?: boolean }) {
           }}
           className="flex min-w-0 items-center gap-1 text-accent-text hover:underline"
         >
-          <Icon as={IconPaperclip} size={14} />
+          <Icon as={PaperclipIcon} size={14} />
           <span className="truncate">{fileName(url)}</span>
         </a>
       ))}

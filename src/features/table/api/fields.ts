@@ -7,6 +7,7 @@ import { reportError, toast } from "@/shared/lib/toast";
 import type { Field } from "../model/types";
 import {
   DEFAULT_LENGTH,
+  EMPTY_DRAFT,
   MAX_LENGTH,
   hasDefaultValue,
   hasLength,
@@ -22,6 +23,7 @@ import {
   type FieldDraft,
 } from "../model/field-draft";
 import { slugify } from "@/shared/lib/slug";
+import { perLanguage } from "@/shared/lib/i18n";
 
 /**
  * Создание поля.
@@ -60,6 +62,50 @@ export function useCreateField(tableSlug: string | undefined) {
       invalidateSchema(queryClient);
     },
   });
+}
+
+/**
+ * Текстовые поля под столбцы файла — для импорта из Excel.
+ *
+ * По очереди, а не разом: каждое создание — это ALTER TABLE одной и той
+ * же таблицы. Возвращает id в порядке подписей: по ним импорт раскладывает
+ * столбцы. Без уведомления на каждое поле — итог скажет сам импорт.
+ */
+export function useCreateTextFields(tableSlug: string | undefined) {
+  const queryClient = useQueryClient();
+  const slug = tableSlug ?? "";
+
+  return useMutation({
+    mutationFn: async ({ labels, taken, language }: { labels: string[]; taken: string[]; language: string }) => {
+      const used = new Set(taken);
+      const ids: string[] = [];
+
+      for (const label of labels) {
+        const id = crypto.randomUUID();
+        const draft = { ...EMPTY_DRAFT, label, slug: freeSlug(label, used) };
+        await api.post<unknown>(`/v2/fields/${slug}`, toCreateBody(draft, { tableSlug: slug, language, id }));
+        ids.push(id);
+      }
+
+      return ids;
+    },
+    onError: (error) => reportError(error, "common.createFailed"),
+    // И при ошибке: часть полей могла успеть создаться.
+    onSettled: () => invalidateSchema(queryClient),
+  });
+}
+
+/**
+ * Слаг, которого ещё нет у таблицы. Два столбца «Цена» и «цена» или
+ * столбец, совпавший со слагом поля, которое оставили незаполненным,
+ * иначе упали бы на дубликате колонки. Занятый слаг попадает в `used`.
+ */
+export function freeSlug(label: string, used: Set<string>) {
+  const base = slugify(label) || "field";
+  let slug = base;
+  for (let n = 2; used.has(slug); n++) slug = `${base}_${n}`;
+  used.add(slug);
+  return slug;
 }
 
 /**
@@ -233,10 +279,10 @@ function labelAttributes(
 
   for (const [code, text] of Object.entries(draft.labels)) {
     const value = text.trim();
-    if (value) attributes[`label_${code}`] = value;
+    if (value) Object.assign(attributes, perLanguage("label_", code, value));
   }
 
-  if (label) attributes[`label_${language}`] = label;
+  if (label) Object.assign(attributes, perLanguage("label_", language, label));
 
   return attributes;
 }
@@ -555,7 +601,7 @@ function toFlatOption(option: DraftOption, language: string): Record<string, unk
     slug: option.value ?? (slugify(label) || label),
     value: label,
     label,
-    [`label_${language}`]: label,
+    ...perLanguage("label_", language, label),
     color: CHIP_HEX[option.color],
   };
 }
@@ -572,7 +618,7 @@ function toValueOption(option: DraftOption, language: string): Record<string, un
     // вариант подписи, если в проекте появится ещё один язык данных.
     // У PICK_LIST он же — подпись варианта в старой админке.
     label,
-    [`label_${language}`]: label,
+    ...perLanguage("label_", language, label),
     color: CHIP_HEX[option.color],
   };
 }

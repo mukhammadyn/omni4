@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useEnvironments, type Environment } from "@/features/workspace";
 import { useSession } from "@/shared/api/use-session";
@@ -52,7 +52,7 @@ export function EnvironmentSettings() {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <SectionHeader title={t("environments.title")} hint={t("environments.hint")}>
         <Button size="sm" onClick={() => setEditing("new")}>
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("environments.create")}
         </Button>
       </SectionHeader>
@@ -105,7 +105,7 @@ export function EnvironmentSettings() {
                       title={t("action.edit")}
                       className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
                     >
-                      <Icon as={IconPencil} size={14} />
+                      <Icon as={PencilIcon} size={14} />
                     </button>
 
                     <button
@@ -120,7 +120,7 @@ export function EnvironmentSettings() {
                       }
                       className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger disabled:pointer-events-none disabled:opacity-30"
                     >
-                      <Icon as={IconTrash} size={14} />
+                      <Icon as={Trash2Icon} size={14} />
                     </button>
                   </span>
                 </Td>

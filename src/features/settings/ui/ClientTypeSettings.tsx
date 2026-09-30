@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { IconPencil, IconPlus, IconTable, IconTrash } from "@tabler/icons-react";
+import {
+  PencilIcon,
+  PlusIcon,
+  Table2Icon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, useTableFields, useTables } from "@/features/table";
 import { useDataLanguages } from "@/features/workspace";
@@ -62,7 +67,7 @@ export function ClientTypeSettings() {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <SectionHeader title={t("clientTypes.title")} hint={t("clientTypes.hint")}>
         <Button size="sm" onClick={() => setEditing("new")}>
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("clientTypes.create")}
         </Button>
       </SectionHeader>
@@ -106,7 +111,7 @@ export function ClientTypeSettings() {
                     onClick={() => setConnecting(clientType)}
                     className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-fg-muted transition-colors hover:bg-surface-active hover:text-fg"
                   >
-                    <Icon as={IconTable} size={14} />
+                    <Icon as={Table2Icon} size={14} />
                     {t("clientConnections.open")}
                   </button>
                 </Td>
@@ -120,7 +125,7 @@ export function ClientTypeSettings() {
                       title={t("action.edit")}
                       className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
                     >
-                      <Icon as={IconPencil} size={14} />
+                      <Icon as={PencilIcon} size={14} />
                     </button>
 
                     <button
@@ -130,7 +135,7 @@ export function ClientTypeSettings() {
                       title={t("action.delete")}
                       className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
                     >
-                      <Icon as={IconTrash} size={14} />
+                      <Icon as={Trash2Icon} size={14} />
                     </button>
                   </span>
                 </Td>
@@ -429,7 +434,7 @@ function ConnectionsDialog({
 
           {!editing && (
             <Button size="sm" onClick={() => setEditing("new")}>
-              <Icon as={IconPlus} size={14} />
+              <Icon as={PlusIcon} size={14} />
               {t("action.create")}
             </Button>
           )}
@@ -476,7 +481,7 @@ function ConnectionsDialog({
                           title={t("action.edit")}
                           className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
                         >
-                          <Icon as={IconPencil} size={14} />
+                          <Icon as={PencilIcon} size={14} />
                         </button>
 
                         <button
@@ -486,7 +491,7 @@ function ConnectionsDialog({
                           title={t("action.delete")}
                           className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
                         >
-                          <Icon as={IconTrash} size={14} />
+                          <Icon as={Trash2Icon} size={14} />
                         </button>
                       </span>
                     </Td>

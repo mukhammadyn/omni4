@@ -1,11 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
-  IconChevronRight,
-  IconPlus,
-  IconSortAscending,
-  IconSortDescending,
-  IconX,
-} from "@tabler/icons-react";
+  ArrowDownWideNarrowIcon,
+  ArrowUpNarrowWideIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, type Field } from "@/features/table";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -140,7 +140,7 @@ export function PivotView({
             className="flex min-w-0 items-center gap-1.5 rounded-md text-left text-xs text-fg-muted transition-colors hover:text-fg"
           >
             <Icon
-              as={IconChevronRight}
+              as={ChevronRightIcon}
               size={12}
               className={`shrink-0 transition-transform ${settingsOpen ? "rotate-90" : ""}`}
             />
@@ -191,7 +191,7 @@ export function PivotView({
                         onClick={() => setRows(rowSlugs.filter((_, at) => at !== index))}
                         className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-danger"
                       >
-                        <Icon as={IconX} size={14} />
+                        <Icon as={XIcon} size={14} />
                       </button>
                     )}
                   </div>
@@ -205,7 +205,7 @@ export function PivotView({
                     onClick={() => setRows([...rowSlugs, firstUnused(columns, rowSlugs)])}
                     className="flex h-8 items-center justify-center gap-1 rounded-md border border-dashed border-border-strong text-xs text-fg-muted transition-colors hover:border-fg-subtle hover:text-fg"
                   >
-                    <Icon as={IconPlus} size={12} />
+                    <Icon as={PlusIcon} size={12} />
                     {t("pivot.addLevel")}
                   </button>
                 )}
@@ -324,7 +324,7 @@ export function PivotView({
                           >
                             {/* Вправо — свёрнуто, вниз — развёрнуто. */}
                             <Icon
-                              as={IconChevronRight}
+                              as={ChevronRightIcon}
                               size={12}
                               className={`transition-transform ${collapsed.has(key) ? "" : "rotate-90"}`}
                             />
@@ -433,7 +433,7 @@ function Header({
         <span className="truncate">{children}</span>
         {active && (
           <Icon
-            as={sort.desc ? IconSortDescending : IconSortAscending}
+            as={sort.desc ? ArrowDownWideNarrowIcon : ArrowUpNarrowWideIcon}
             size={12}
             className="shrink-0 text-accent-text"
           />

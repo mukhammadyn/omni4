@@ -1,4 +1,4 @@
-import { IconExternalLink } from "@tabler/icons-react";
+import { ExternalLinkIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/shared/ui/icon";
 import { mapLink } from "../model/coords";
@@ -89,7 +89,7 @@ export function PolygonCell({ value, wrap }: { value: unknown; wrap?: boolean })
           onClick={(event) => event.stopPropagation()}
           className="flex items-center gap-1 text-xs text-accent-text hover:underline"
         >
-          <Icon as={IconExternalLink} size={14} />
+          <Icon as={ExternalLinkIcon} size={14} />
           {t("cell.openMap")}
         </a>
       )}

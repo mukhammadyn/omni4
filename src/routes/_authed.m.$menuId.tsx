@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { IconTrash } from "@tabler/icons-react";
+import { ChevronDownIcon, FileIcon, FileInputIcon, Trash2Icon } from "lucide-react";
 import { z } from "zod";
 import {
   BOARD_ORDER,
@@ -66,7 +66,16 @@ import { useTablePermissions } from "@/features/auth";
 import { CopilotButton } from "@/features/copilot";
 import { FileBrowser } from "@/features/files";
 import { MicrofrontendPage } from "@/features/microfrontend";
-import { EmbeddedPage, SidebarToggleButton, showsTable, useMenu } from "@/features/sidebar";
+import {
+  EmbeddedPage,
+  MenuIcon,
+  SidebarToggleButton,
+  TopbarActions,
+  WorkspaceTile,
+  showsTable,
+  useMenu,
+} from "@/features/sidebar";
+import { useProject } from "@/features/settings";
 import {
   FieldEditor,
   TableActions,
@@ -129,6 +138,7 @@ import type { TranslationKey } from "@/shared/lib/i18n";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
+import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
 
 /**
@@ -258,6 +268,10 @@ function MenuPage() {
   const session = useSession();
 
   const menu = useMenu(menuId);
+  /* Крошки: та же подпись и тот же логотип, что в шапке сайдбара. Запрос
+     проекта уже сделан сайдбаром и лежит в кэше. */
+  const company = session.getProfile()?.company || t("app.name");
+  const { project } = useProject();
   // Язык ДАННЫХ — не локаль интерфейса: подписи вариантов и мультиязычных
   // полей хранятся на языках проекта, см. features/workspace.
   const { languages, current: language, setCurrent: setLanguage } = useDataLanguages();
@@ -1049,6 +1063,13 @@ function MenuPage() {
    * «дочерняя» в дереве, «+» в колонке доски): здесь же закрывается
    * открытая карточка строки — панель на экране одна.
    */
+  /* Адрес из настроек view важнее карточки: «Создать» ведёт на страницу
+     проекта, если админ её задал (`attributes.url_object`). */
+  const createRecord = () => {
+    if (view && openCreateUrl(view)) return;
+    startDraft(blankItem(drawerColumns, newRowDefaults));
+  };
+
   const startDraft = (item: Item) => {
     setShowErrors(false);
     setDraft(item);
@@ -1175,28 +1196,51 @@ function MenuPage() {
           он возвращается своей кнопкой при наведении (WorkspaceHeader,
           CollapseButton), а не только этой. */}
       {!isMicrofrontend && (
-        <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
+        /* Верхняя полоса — `.topbar` прототипа (docs/REDESIGN.md, 4.3):
+           без линии снизу (она у строки вкладок), крошки слева, действия
+           рабочего места справа. */
+        <header className="flex h-header shrink-0 items-center gap-2 px-3">
           <SidebarToggleButton />
-          {menu ? (
-            <span className="text-sm font-medium">{menu.label || t("menu.title")}</span>
-          ) : (
-            <Bar className="h-3.5 w-32" />
-          )}
-          {/* Число без слова: «16 записей» требует согласования по падежу
-              в русском и узбекском, а множественные формы i18next стоят
-              трёх ключей на язык ради одного счётчика. */}
-          {supportedView && !treeView && (
-            <span className="text-xs text-fg-muted">· {rows.count}</span>
-          )}
-          {isFetching && !rowsLoading && (
-            <span className="text-xs text-fg-subtle">{t("common.loading")}</span>
-          )}
+          {/* Хлебные крошки — `.crumbs`: компания с плиткой (ссылка на
+              главную) и раздел со своим значком. Компания — та же подпись
+              и та же плитка, что в шапке сайдбара. */}
+          <nav aria-label={t("topbar.breadcrumbs")} className="flex min-w-0 flex-1 items-center gap-0.5">
+            <Link
+              to="/"
+              className="flex min-w-0 shrink items-center gap-1.5 rounded-[5px] px-1.5 py-0.5 text-sm text-fg transition-colors hover:bg-surface-hover"
+            >
+              <WorkspaceTile
+                title={company}
+                image={project?.logo ?? ""}
+                brand={!session.getProfile()?.company}
+                size="sm"
+              />
+              <span className="truncate">{company}</span>
+            </Link>
+            <span className="text-sm text-fg-subtle">/</span>
+            {menu ? (
+              <span className="flex min-w-0 items-center gap-1.5 rounded-[5px] px-1.5 py-0.5 text-sm text-fg">
+                <MenuIcon name={menu.icon} type={menu.type} />
+                <span className="truncate">{menu.label || t("menu.title")}</span>
+              </span>
+            ) : (
+              <Bar className="h-3.5 w-32" />
+            )}
+            {/* Число без слова: «16 записей» требует согласования по падежу
+                в русском и узбекском, а множественные формы i18next стоят
+                трёх ключей на язык ради одного счётчика. */}
+            {supportedView && !treeView && (
+              <span className="shrink-0 pl-1 text-xs text-fg-muted">· {rows.count}</span>
+            )}
+            {isFetching && !rowsLoading && (
+              <span className="shrink-0 pl-1 text-xs text-fg-subtle">{t("common.loading")}</span>
+            )}
+          </nav>
 
-          {/* Помощник — справа в шапке, как и в старой админке. Сама панель
-              живёт в оболочке приложения: она шире одной страницы. */}
-          <div className="ml-auto">
-            <CopilotButton />
-          </div>
+          {/* Помощник — справа, перед действиями рабочего места. Сама
+              панель живёт в оболочке приложения: она шире одной страницы. */}
+          <CopilotButton />
+          <TopbarActions />
         </header>
       )}
 
@@ -1210,7 +1254,7 @@ function MenuPage() {
           справа. Не «пусто, а потом всё сразу» — иначе полоса дёргается
           дважды: сначала под вкладками, потом под «Новой записью». */}
       {supported && chromeLoading && (
-        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+        <div className="flex h-11.5 shrink-0 items-center gap-2 border-b border-border px-3">
           <Bar className="h-3.5 w-20" />
           <Bar className="h-3.5 w-16" />
           <div className="ml-auto flex items-center gap-1.5">
@@ -1224,7 +1268,9 @@ function MenuPage() {
       )}
 
       {supported && !chromeLoading && (tabs.length > 0 || (can.viewCreate && tableSlug)) && (
-        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3 transition-opacity duration-200 ease-out starting:opacity-0">
+        /* Строка вкладок — `.viewbar` прототипа: 46px, линия снизу;
+           справа тулбар (`.view-actions`) с зазором 2px между кнопками. */
+        <div className="flex h-11.5 shrink-0 items-center gap-1 border-b border-border px-3 transition-opacity duration-200 ease-out starting:opacity-0">
           <ViewTabs
             views={tabs}
             activeId={view?.id ?? ""}
@@ -1326,40 +1372,85 @@ function MenuPage() {
                   onClick={() => setConfirming(true)}
                   className="ml-2"
                 >
-                  <Icon as={IconTrash} size={14} />
+                  <Icon as={Trash2Icon} size={14} />
                   {t("table.deleteSelected", { count: selected.size })}
                 </Button>
               )}
 
-              {/* «Новая запись» карточкой, а не строкой в таблице:
-                  у таблицы в сорок колонок заполнять запись вбок —
-                  это горизонтальная прокрутка на каждое поле. Строкой
-                  она по-прежнему заводится тоже, в подвале таблицы. */}
-              {supportedView && can.write && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    /* Адрес из настроек view важнее карточки: «Новая
-                       запись» ведёт на страницу проекта, если админ её
-                       задал (`attributes.url_object`). */
-                    if (view && openCreateUrl(view)) return;
-
-                    startDraft(blankItem(drawerColumns, newRowDefaults));
-                  }}
-                  className="mr-1 h-7 shrink-0 rounded-md bg-accent-solid px-3 text-sm font-medium text-accent-fg transition-opacity hover:opacity-90"
-                >
-                  {t("table.addRow")}
-                </button>
-              )}
-
-              {/* Настройки — последними в ряду: это не действие над строками,
-                  а вход в настройку всего экрана, и стоять он должен с краю,
-                  а не между поиском и фильтром.
+              {/* Настройки — самые правые в ряду: «Свойства», затем «Создать»
+                  (кнопку передаём внутрь, beforeMenu), затем «⋮». Это вход
+                  в настройку всего экрана, а не действие над строками.
 
                   Открыты и у view, который мы не рисуем: иначе смена типа
                   на доску запирает view навсегда — панель, из которой тип
                   меняют, исчезает вместе с таблицей. */}
               <ViewOptions
+                beforeMenu={
+                  <>
+                    {/* «Создать» — `.new-btn` прототипа: 28px, справа стрелка
+                        за тонкой чертой. Запись заводится карточкой, а не строкой
+                        в таблице: у таблицы в сорок колонок заполнять запись вбок —
+                        это горизонтальная прокрутка на каждое поле. Строкой она
+                        по-прежнему заводится тоже, в подвале таблицы. */}
+                    {supportedView && can.write && (
+                      <span className="mx-1.5 inline-flex h-7 shrink-0 items-stretch overflow-hidden rounded-md bg-accent-solid text-sm font-medium text-accent-fg">
+                        <button
+                          type="button"
+                          onClick={createRecord}
+                          className="flex items-center px-2.5 transition-colors hover:bg-accent-solid-hover"
+                        >
+                          {t("table.create")}
+                        </button>
+                        <Popover
+                          align="end"
+                          className="flex"
+                          trigger={({ open, toggle }) => (
+                            <button
+                              type="button"
+                              onClick={toggle}
+                              aria-expanded={open}
+                              aria-label={t("table.createMore")}
+                              title={t("table.createMore")}
+                              className={`flex items-center border-l border-accent-fg/25 px-1.5 transition-colors hover:bg-accent-solid-hover ${
+                                open ? "bg-accent-solid-hover" : ""
+                              }`}
+                            >
+                              <Icon as={ChevronDownIcon} size={14} />
+                            </button>
+                          )}
+                        >
+                          {(close) => (
+                            <>
+                              <PopoverItem
+                                icon={<Icon as={FileIcon} />}
+                                onClick={() => {
+                                  close();
+                                  createRecord();
+                                }}
+                              >
+                                {t("table.blankRecord")}
+                              </PopoverItem>
+                              {can.excelMenu && (
+                                <>
+                                  <PopoverSeparator />
+                                  <PopoverItem
+                                    icon={<Icon as={FileInputIcon} />}
+                                    onClick={() => {
+                                      close();
+                                      setImporting(true);
+                                    }}
+                                  >
+                                    {t("view.import")}
+                                  </PopoverItem>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </Popover>
+                      </span>
+                    )}
+                  </>
+                }
                 view={view}
                 // Все поля таблицы, а не колонки view: скрытые нужно
                 // показать, иначе вернуть их будет неоткуда.
@@ -1404,6 +1495,9 @@ function MenuPage() {
                     setSearch({ group: undefined, page: 1 });
                   },
                   onEditField: (field, anchor) => setFieldPanel({ field, anchor }),
+                  ...(can.addField
+                    ? { onAddField: (anchor: DOMRect) => setFieldPanel({ field: null, anchor }) }
+                    : {}),
                   // Тот же диалог подтверждения, что и у меню колонки:
                   // удаление поля сносит его во всех view вместе с данными.
                   onDeleteField: setDeletingField,
@@ -1427,6 +1521,7 @@ function MenuPage() {
                   ...(rightsOf(view.id).delete ? { onDelete: () => setDeletingView(view) } : {}),
                 }}
               />
+
             </div>
           )}
         </div>

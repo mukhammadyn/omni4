@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import {
-  IconArrowUp,
-  IconPlayerStopFilled,
-  IconDatabase,
-  IconFolder,
-  IconHistory,
-  IconLink,
-  IconMessage,
-  IconPlus,
-  IconSearch,
-  IconSparkles,
-  IconTable,
-  IconX,
-  type Icon as TablerIcon,
-} from "@tabler/icons-react";
+  ArrowUpIcon,
+  DatabaseIcon,
+  FolderIcon,
+  HistoryIcon,
+  LinkIcon,
+  MessageSquareIcon,
+  PlusIcon,
+  SearchIcon,
+  SparklesIcon,
+  SquareIcon,
+  Table2Icon,
+  XIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useGlobalRight } from "@/features/auth";
 import { COPILOT_MAX_WIDTH, COPILOT_MIN_WIDTH, useUi } from "@/shared/lib/ui-store";
@@ -126,7 +126,7 @@ export function CopilotPanel() {
           фон, а не другая поверхность. */}
       <header className="flex h-header shrink-0 items-center gap-2 px-3">
         <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-subtle text-accent-text">
-          <Icon as={IconSparkles} size={14} />
+          <Icon as={SparklesIcon} size={14} />
         </span>
         <span className="truncate text-sm font-medium" title={chat.title}>
           {chat.title ? firstLine(chat.title) : t("copilot.newChat")}
@@ -136,7 +136,7 @@ export function CopilotPanel() {
           <Popover
             align="end"
             trigger={({ toggle }) => (
-              <HeaderButton icon={IconHistory} label={t("copilot.history")} onClick={toggle} />
+              <HeaderButton icon={HistoryIcon} label={t("copilot.history")} onClick={toggle} />
             )}
           >
             {/* Список висит внутри поповера, то есть монтируется вместе
@@ -145,8 +145,8 @@ export function CopilotPanel() {
             {(close) => <History onPick={chat.open} close={close} />}
           </Popover>
 
-          <HeaderButton icon={IconPlus} label={t("copilot.newChat")} onClick={startOver} />
-          <HeaderButton icon={IconX} label={t("action.close")} onClick={closeCopilot} />
+          <HeaderButton icon={PlusIcon} label={t("copilot.newChat")} onClick={startOver} />
+          <HeaderButton icon={XIcon} label={t("action.close")} onClick={closeCopilot} />
         </div>
       </header>
 
@@ -201,7 +201,7 @@ export function CopilotButton() {
           : "text-fg-muted [background-image:var(--gradient-ai-subtle)] hover:text-fg hover:[background-image:var(--gradient-ai-soft)]"
       }`}
     >
-      <Icon as={IconSparkles} size={16} />
+      <Icon as={SparklesIcon} size={16} />
       <span>{t("copilot.title")}</span>
     </button>
   );
@@ -212,7 +212,7 @@ export function HeaderButton({
   label,
   onClick,
 }: {
-  icon: TablerIcon;
+  icon: LucideIcon;
   label: string;
   onClick: () => void;
 }) {
@@ -234,12 +234,12 @@ export function HeaderButton({
  * шесть вещей (`ai_ucode_tools.go`), и без примеров человек этого не
  * узнает, а спросит то, чего он не может.
  */
-const SUGGESTIONS: { icon: TablerIcon; title: TranslationKey; prompt: TranslationKey }[] = [
-  { icon: IconTable, title: "copilot.hint.tableTitle", prompt: "copilot.hint.tablePrompt" },
-  { icon: IconLink, title: "copilot.hint.relationTitle", prompt: "copilot.hint.relationPrompt" },
-  { icon: IconFolder, title: "copilot.hint.menuTitle", prompt: "copilot.hint.menuPrompt" },
-  { icon: IconDatabase, title: "copilot.hint.itemsTitle", prompt: "copilot.hint.itemsPrompt" },
-  { icon: IconSearch, title: "copilot.hint.schemaTitle", prompt: "copilot.hint.schemaPrompt" },
+const SUGGESTIONS: { icon: LucideIcon; title: TranslationKey; prompt: TranslationKey }[] = [
+  { icon: Table2Icon, title: "copilot.hint.tableTitle", prompt: "copilot.hint.tablePrompt" },
+  { icon: LinkIcon, title: "copilot.hint.relationTitle", prompt: "copilot.hint.relationPrompt" },
+  { icon: FolderIcon, title: "copilot.hint.menuTitle", prompt: "copilot.hint.menuPrompt" },
+  { icon: DatabaseIcon, title: "copilot.hint.itemsTitle", prompt: "copilot.hint.itemsPrompt" },
+  { icon: SearchIcon, title: "copilot.hint.schemaTitle", prompt: "copilot.hint.schemaPrompt" },
 ];
 
 export function Greeting({ onPick }: { onPick: (prompt: string) => void }) {
@@ -252,7 +252,7 @@ export function Greeting({ onPick }: { onPick: (prompt: string) => void }) {
     <div className="flex flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-8">
       <div className="flex flex-col items-center text-center">
         <span className="grid size-11 place-items-center rounded-lg bg-accent-subtle text-accent-text">
-          <Icon as={IconSparkles} size={22} />
+          <Icon as={SparklesIcon} size={22} />
         </span>
         <div className="mt-3 text-lg font-medium">{t("copilot.greeting")}</div>
         <div className="mt-1 max-w-xs text-sm text-balance text-fg-muted">
@@ -277,7 +277,7 @@ export function Greeting({ onPick }: { onPick: (prompt: string) => void }) {
             />
             <span className="truncate text-sm">{t(item.title)}</span>
             <Icon
-              as={IconArrowUp}
+              as={ArrowUpIcon}
               size={14}
               className="ml-auto shrink-0 rotate-45 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100"
             />
@@ -320,7 +320,7 @@ export function History({
           }}
           className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-hover"
         >
-          <Icon as={IconMessage} size={14} className="text-fg-muted" />
+          <Icon as={MessageSquareIcon} size={14} className="text-fg-muted" />
           <span className="min-w-0 flex-1 truncate text-sm">
             {firstLine(session.title) || t("copilot.untitled")}
           </span>
@@ -407,7 +407,7 @@ export function Composer({
           title={label}
           className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md bg-accent-solid text-accent-fg transition-colors hover:bg-accent-solid-hover disabled:cursor-default disabled:opacity-30"
         >
-          <Icon as={busy ? IconPlayerStopFilled : IconArrowUp} size={busy ? 12 : 16} />
+          <Icon as={busy ? SquareIcon : ArrowUpIcon} size={busy ? 12 : 16} fill={busy ? "currentColor" : "none"} />
         </button>
       </div>
     </div>

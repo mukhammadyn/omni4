@@ -1,4 +1,4 @@
-import { IconTrash } from "@tabler/icons-react";
+import { Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/shared/ui/icon";
 import { Dropdown } from "@/shared/ui/dropdown";
@@ -156,7 +156,7 @@ function CascadeLevel({
           aria-label={t("action.delete")}
           className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
         >
-          <Icon as={IconTrash} size={12} />
+          <Icon as={Trash2Icon} size={12} />
         </button>
       )}
     </div>

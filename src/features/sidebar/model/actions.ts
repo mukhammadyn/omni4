@@ -1,15 +1,15 @@
 import {
-  IconBucket,
-  IconFolder,
-  IconFolderSymlink,
-  IconLayoutGrid,
-  IconLink,
-  IconPencil,
-  IconTable,
-  IconTemplate,
-  IconTrash,
-  type Icon as TablerIcon,
-} from "@tabler/icons-react";
+  FolderIcon,
+  FolderSymlinkIcon,
+  LayoutGridIcon,
+  LayoutTemplateIcon,
+  LinkIcon,
+  PaintBucketIcon,
+  PencilIcon,
+  Table2Icon,
+  Trash2Icon,
+  type LucideIcon,
+} from "lucide-react";
 import type { TranslationKey } from "@/shared/lib/i18n";
 import { showsTable, type MenuNode } from "./types";
 
@@ -46,27 +46,27 @@ export type MenuAction = {
   danger?: boolean;
   /** Та же иконка, что и у типа пункта в дереве (MenuIcon.byType) — где
    *  действие заводит пункт того же типа. */
-  icon: TablerIcon;
+  icon: LucideIcon;
 };
 
 const ALL: readonly MenuAction[] = [
-  { id: "create-table", labelKey: "menuAction.createTable", requires: "write", icon: IconTable },
+  { id: "create-table", labelKey: "menuAction.createTable", requires: "write", icon: Table2Icon },
   /*
    * Пункт на УЖЕ СУЩЕСТВУЮЩУЮ таблицу — старое «Add table»
    * (TableLinkModal.jsx). Не то же, что «создать таблицу»: таблица
    * остаётся одна, а открывать её начинают из двух мест.
    */
-  { id: "link-table", labelKey: "menuAction.linkTable", requires: "write", icon: IconTable },
-  { id: "create-folder", labelKey: "menuAction.createFolder", requires: "write", icon: IconFolder },
-  { id: "create-link", labelKey: "menuAction.createLink", requires: "write", icon: IconLink },
-  { id: "create-files", labelKey: "menuAction.createFiles", requires: "write", icon: IconBucket },
+  { id: "link-table", labelKey: "menuAction.linkTable", requires: "write", icon: Table2Icon },
+  { id: "create-folder", labelKey: "menuAction.createFolder", requires: "write", icon: FolderIcon },
+  { id: "create-link", labelKey: "menuAction.createLink", requires: "write", icon: LinkIcon },
+  { id: "create-files", labelKey: "menuAction.createFiles", requires: "write", icon: PaintBucketIcon },
   {
     id: "create-microfrontend",
     labelKey: "menuAction.createMicrofrontend",
     requires: "write",
-    icon: IconLayoutGrid,
+    icon: LayoutGridIcon,
   },
-  { id: "edit", labelKey: "menuAction.edit", requires: "update", icon: IconPencil },
+  { id: "edit", labelKey: "menuAction.edit", requires: "update", icon: PencilIcon },
   /*
    * «Перенести» — старое «Move table / Move microfrontend»
    * (MenuButtons.jsx:270, 432): выбрать новую папку списком, а не тащить
@@ -78,12 +78,12 @@ const ALL: readonly MenuAction[] = [
    * который в базе по умолчанию false, — и пункт не показывался никому,
    * кроме DEFAULT ADMIN, которому права не проверяли вовсе.
    */
-  { id: "move", labelKey: "menuAction.move", requires: "update", icon: IconFolderSymlink },
+  { id: "move", labelKey: "menuAction.move", requires: "update", icon: FolderSymlinkIcon },
   {
     id: "make-template",
     labelKey: "menuAction.makeTemplate",
     requires: "update",
-    icon: IconTemplate,
+    icon: LayoutTemplateIcon,
   },
   /*
    * «Настройки пункта» здесь была и ничего не делала: обработчика у неё
@@ -97,7 +97,7 @@ const ALL: readonly MenuAction[] = [
     requires: "delete",
     separated: true,
     danger: true,
-    icon: IconTrash,
+    icon: Trash2Icon,
   },
 ];
 

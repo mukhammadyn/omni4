@@ -1,12 +1,12 @@
 import { useDeferredValue, useState } from "react";
 import {
-  IconCode,
-  IconLoader2,
-  IconPencil,
-  IconPlayerPlay,
-  IconPlus,
-  IconTrash,
-} from "@tabler/icons-react";
+  CodeIcon,
+  LoaderCircleIcon,
+  PencilIcon,
+  PlayIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
@@ -78,7 +78,7 @@ export function FunctionSettings() {
         </div>
 
         <Button size="sm" onClick={() => setEditing("new")}>
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("functions.create")}
         </Button>
       </SectionHeader>
@@ -118,23 +118,23 @@ export function FunctionSettings() {
                         «function has no linked gitlab repository». */}
                     {item.type !== "WORKFLOW" && (
                       <RowButton
-                        icon={IconCode}
+                        icon={CodeIcon}
                         label={t("functions.code")}
                         onClick={() => setViewing(item)}
                       />
                     )}
                     <RowButton
-                      icon={IconPlayerPlay}
+                      icon={PlayIcon}
                       label={t("functions.run")}
                       onClick={() => setRunning(item)}
                     />
                     <RowButton
-                      icon={IconPencil}
+                      icon={PencilIcon}
                       label={t("action.edit")}
                       onClick={() => setEditing(item)}
                     />
                     <RowButton
-                      icon={IconTrash}
+                      icon={Trash2Icon}
                       label={t("action.delete")}
                       danger
                       onClick={() => setDeleting(item)}
@@ -188,7 +188,7 @@ function RowButton({
   danger,
   onClick,
 }: {
-  icon: typeof IconCode;
+  icon: typeof CodeIcon;
   label: string;
   danger?: boolean;
   onClick: () => void;
@@ -301,7 +301,7 @@ function FunctionDialog({ item, onClose }: { item: ProjectFunction | null; onClo
             {t("action.cancel")}
           </Button>
           <Button type="submit" disabled={busy || !draft.name.trim() || !draft.path.trim()}>
-            {busy && <Icon as={IconLoader2} size={14} className="animate-spin" />}
+            {busy && <Icon as={LoaderCircleIcon} size={14} className="animate-spin" />}
             {busy ? t("common.saving") : t(item ? "action.save" : "action.create")}
           </Button>
         </div>
@@ -380,7 +380,7 @@ function RunDialog({ item, onClose }: { item: ProjectFunction; onClose: () => vo
             {t("action.close")}
           </Button>
           <Button type="button" disabled={run.isPending} onClick={submit}>
-            {run.isPending && <Icon as={IconLoader2} size={14} className="animate-spin" />}
+            {run.isPending && <Icon as={LoaderCircleIcon} size={14} className="animate-spin" />}
             {run.isPending ? t("common.loading") : t("functions.run")}
           </Button>
         </div>

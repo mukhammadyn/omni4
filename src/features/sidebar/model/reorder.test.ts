@@ -16,6 +16,7 @@ const node = (id: string, over: Partial<MenuNode> = {}): MenuNode => ({
   params: {},
   order: 0,
   isStatic: false,
+  isModule: false,
   parentId: "root",
   children: [],
   raw: {},

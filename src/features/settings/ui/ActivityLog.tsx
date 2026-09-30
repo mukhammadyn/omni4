@@ -1,5 +1,5 @@
 import { Fragment, useDeferredValue, useState } from "react";
-import { IconChevronDown, IconChevronUp, IconFileSpreadsheet } from "@tabler/icons-react";
+import { ChevronDownIcon, ChevronUpIcon, FileSpreadsheetIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { DatePicker } from "@/shared/ui/date-picker";
@@ -105,7 +105,7 @@ function ChangesLog() {
           disabled={exportExcel.isPending}
           onClick={() => exportExcel.mutate(deferred)}
         >
-          <Icon as={IconFileSpreadsheet} size={14} />
+          <Icon as={FileSpreadsheetIcon} size={14} />
           {exportExcel.isPending ? t("common.loading") : t("activity.export")}
         </Button>
       </SectionHeader>
@@ -286,7 +286,7 @@ function ChangesLog() {
                       className="grid size-6 cursor-pointer place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
                     >
                       <Icon
-                        as={IconChevronDown}
+                        as={ChevronDownIcon}
                         size={14}
                         className={`transition-transform ${opened === entry.id ? "rotate-180" : ""}`}
                       />
@@ -447,7 +447,7 @@ function EntryDetails({ id }: { id: string }) {
       {parts.length > 0 && (
         <div>
           <Button size="sm" variant="ghost" onClick={() => setRaw(!raw)}>
-            <Icon as={raw ? IconChevronUp : IconChevronDown} size={14} />
+            <Icon as={raw ? ChevronUpIcon : ChevronDownIcon} size={14} />
             {raw ? t("activity.hideRaw") : t("activity.showRaw")}
           </Button>
         </div>

@@ -109,6 +109,12 @@ export type MenuNode = {
   order: number;
   /** Системный пункт: бэкенд запрещает его удалять (STATIC_MENU_IDS). */
   isStatic: boolean;
+  /**
+   * Модуль ERP (`attributes.is_tab`): папка в корне меню — CRM, HRMS,
+   * Склад… Такие папки не пункты дерева, а ряд модулей над ним;
+   * дерево показывает содержимое выбранной. См. CONTEXT.md, «Module».
+   */
+  isModule: boolean;
   parentId: string | null;
   children: MenuNode[];
   /** Права текущей роли на этот пункт. */

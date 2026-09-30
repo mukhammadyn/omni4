@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { IconCode, IconLoader2, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import {
+  CodeIcon,
+  LoaderCircleIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
@@ -36,7 +42,7 @@ export function HtmlTemplateRows({ tableSlug }: { tableSlug: string }) {
           key={template.id}
           className="flex h-7.5 items-center gap-2.5 rounded-md px-2.5 hover:bg-surface-hover"
         >
-          <Icon as={IconCode} size={14} className="shrink-0 text-fg-subtle" />
+          <Icon as={CodeIcon} size={14} className="shrink-0 text-fg-subtle" />
 
           <span className="min-w-0 flex-1 truncate text-sm text-fg">
             {template.title || t("docs.untitled")}
@@ -49,7 +55,7 @@ export function HtmlTemplateRows({ tableSlug }: { tableSlug: string }) {
             title={t("action.edit")}
             className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
           >
-            <Icon as={IconPencil} size={14} />
+            <Icon as={PencilIcon} size={14} />
           </button>
           <button
             type="button"
@@ -57,7 +63,7 @@ export function HtmlTemplateRows({ tableSlug }: { tableSlug: string }) {
             aria-label={t("action.delete")}
             className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
           >
-            <Icon as={IconTrash} size={14} />
+            <Icon as={Trash2Icon} size={14} />
           </button>
         </div>
       ))}
@@ -104,7 +110,7 @@ export function NewHtmlTemplateButton({ tableSlug }: { tableSlug: string }) {
         onClick={() => create.mutate(t("docs.htmlNew"), { onSuccess: setCreated })}
         className="flex h-8 items-center justify-center gap-1.5 rounded-md border border-border-strong text-sm text-fg transition-colors hover:bg-surface-hover disabled:opacity-40"
       >
-        <Icon as={create.isPending ? IconLoader2 : IconPlus} size={14} className={create.isPending ? "animate-spin" : ""} />
+        <Icon as={create.isPending ? LoaderCircleIcon : PlusIcon} size={14} className={create.isPending ? "animate-spin" : ""} />
         {t("docs.htmlCreate")}
       </button>
 

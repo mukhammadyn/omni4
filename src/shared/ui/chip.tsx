@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IconX } from "@tabler/icons-react";
+import { XIcon } from "lucide-react";
 
 /**
  * Чип для значений Status и Multiselect. Пользователь выбирает оттенок
@@ -201,7 +201,7 @@ export function Chip({
           aria-label={removeLabel}
           className="-mr-0.5 grid size-3.5 shrink-0 place-items-center rounded-sm opacity-60 transition-opacity hover:opacity-100"
         >
-          <IconX size={10} stroke={2.5} aria-hidden />
+          <XIcon size={10} strokeWidth={2.5} aria-hidden />
         </button>
       )}
     </span>

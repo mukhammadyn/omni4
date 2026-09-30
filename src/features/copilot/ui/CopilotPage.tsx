@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconHistory, IconPlus, IconSparkles } from "@tabler/icons-react";
+import { HistoryIcon, PlusIcon, SparklesIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useGlobalRight } from "@/features/auth";
 import { SidebarToggleButton } from "@/features/sidebar";
@@ -53,7 +53,7 @@ export function CopilotPage() {
       <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
         <SidebarToggleButton />
         <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-subtle text-accent-text">
-          <Icon as={IconSparkles} size={14} />
+          <Icon as={SparklesIcon} size={14} />
         </span>
         <span className="truncate text-sm font-medium" title={chat.title}>
           {chat.title ? firstLine(chat.title) : t("copilot.title")}
@@ -63,14 +63,14 @@ export function CopilotPage() {
           <Popover
             align="end"
             trigger={({ toggle }) => (
-              <HeaderButton icon={IconHistory} label={t("copilot.history")} onClick={toggle} />
+              <HeaderButton icon={HistoryIcon} label={t("copilot.history")} onClick={toggle} />
             )}
           >
             {(close) => <History onPick={chat.open} close={close} />}
           </Popover>
 
           <HeaderButton
-            icon={IconPlus}
+            icon={PlusIcon}
             label={t("copilot.newChat")}
             onClick={() => {
               chat.reset();

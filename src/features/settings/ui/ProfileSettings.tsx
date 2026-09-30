@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconDeviceDesktop, IconTrash } from "@tabler/icons-react";
+import { MonitorIcon, Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSession } from "@/shared/api/use-session";
 import { Button } from "@/shared/ui/button";
@@ -245,7 +245,7 @@ function SessionsSection() {
           key={item.id}
           className="flex items-center gap-3 rounded-md border border-border px-3 py-2"
         >
-          <Icon as={IconDeviceDesktop} size={16} className="shrink-0 text-fg-muted" />
+          <Icon as={MonitorIcon} size={16} className="shrink-0 text-fg-muted" />
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm text-fg">
@@ -269,7 +269,7 @@ function SessionsSection() {
               title={t("settings.closeSession")}
               className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
             >
-              <Icon as={IconTrash} size={14} />
+              <Icon as={Trash2Icon} size={14} />
             </button>
           )}
         </div>

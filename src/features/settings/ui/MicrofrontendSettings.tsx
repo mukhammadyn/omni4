@@ -1,5 +1,10 @@
 import { useDeferredValue, useState } from "react";
-import { IconExternalLink, IconHistory, IconPlus, IconTrash } from "@tabler/icons-react";
+import {
+  ExternalLinkIcon,
+  HistoryIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   isPipelineDone,
@@ -47,7 +52,7 @@ export function MicrofrontendSettings() {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <SectionHeader title={t("microfrontends.title")} hint={t("microfrontends.hint")}>
         <Button size="sm" onClick={() => setCreating(true)}>
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("microfrontends.create")}
         </Button>
       </SectionHeader>
@@ -82,7 +87,7 @@ export function MicrofrontendSettings() {
                       className="inline-flex items-center gap-1 hover:underline"
                     >
                       {item.url}
-                      <Icon as={IconExternalLink} size={12} />
+                      <Icon as={ExternalLinkIcon} size={12} />
                     </a>
                   ) : (
                     "—"
@@ -112,7 +117,7 @@ export function MicrofrontendSettings() {
                       title={t("microfrontends.versions")}
                       className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
                     >
-                      <Icon as={IconHistory} size={14} />
+                      <Icon as={HistoryIcon} size={14} />
                     </button>
 
                     <button
@@ -122,7 +127,7 @@ export function MicrofrontendSettings() {
                       title={t("action.delete")}
                       className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
                     >
-                      <Icon as={IconTrash} size={14} />
+                      <Icon as={Trash2Icon} size={14} />
                     </button>
                   </div>
                 </Td>

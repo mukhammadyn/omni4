@@ -1,5 +1,11 @@
 import { useDeferredValue, useState } from "react";
-import { IconCopy, IconPencil, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
+import {
+  CopyIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  XIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSession } from "@/shared/api/use-session";
 import { toast } from "@/shared/lib/toast";
@@ -94,7 +100,7 @@ export function UserSettings() {
         </div>
 
         <Button size="sm" onClick={() => setCreating(true)}>
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("users.create")}
         </Button>
       </SectionHeader>
@@ -144,12 +150,12 @@ export function UserSettings() {
                 <Td className="text-right">
                   <span className="inline-flex gap-1 opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100">
                     <IconButton
-                      icon={IconPencil}
+                      icon={PencilIcon}
                       label={t("action.edit")}
                       onClick={() => setEditing(user)}
                     />
                     <IconButton
-                      icon={IconTrash}
+                      icon={Trash2Icon}
                       label={t("action.delete")}
                       danger
                       onClick={() => setDeleting(user)}
@@ -217,7 +223,7 @@ function IconButton({
   danger = false,
   onClick,
 }: {
-  icon: typeof IconPencil;
+  icon: typeof PencilIcon;
   label: string;
   danger?: boolean;
   onClick: () => void;
@@ -451,7 +457,7 @@ function CreateUserDialog({
             title={t("action.close")}
             className="grid size-7 shrink-0 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconX} size={16} />
+            <Icon as={XIcon} size={16} />
           </button>
         </div>
 
@@ -503,7 +509,7 @@ function CreateUserDialog({
                   toast.success(t("cell.copied"));
                 }}
               >
-                <Icon as={IconCopy} size={14} />
+                <Icon as={CopyIcon} size={14} />
                 {t("cell.copy")}
               </Button>
             </div>

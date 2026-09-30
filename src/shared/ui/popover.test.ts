@@ -102,3 +102,23 @@ describe("placement", () => {
     expect(spot.maxHeight).toBeGreaterThanOrEqual(96);
   });
 });
+
+it("с minBelow держится снизу, пока там есть этот минимум, и ужимается по месту", () => {
+  const base = {
+    anchor: { top: 500, bottom: 536, left: 100, right: 136 },
+    width: 400,
+    height: 480,
+    view: { width: 1440, height: 900 },
+    align: "start" as const,
+  };
+
+  // Без minBelow: 352 снизу не хватает, сверху 488 — разворот вверх.
+  expect(placement(base).bottom).toBeDefined();
+  // С minBelow 260: снизу 352 — остаёмся под кнопкой, высота по месту.
+  const spot = placement({ ...base, minBelow: 260 });
+  expect(spot.top).toBe(540);
+  expect(spot.maxHeight).toBe(352);
+  // Совсем мало места снизу — всё-таки вверх.
+  expect(placement({ ...base, minBelow: 400 }).bottom).toBeDefined();
+});
+

@@ -3,7 +3,6 @@ import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { CopilotPanel } from "@/features/copilot";
 import { useProject } from "@/features/settings";
 import { Sidebar } from "@/features/sidebar";
-import { useUi } from "@/shared/lib/ui-store";
 import { ensureAccessToken } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 
@@ -30,7 +29,6 @@ export const Route = createFileRoute("/_authed")({
 });
 
 function AppShell() {
-  const { sidebarCollapsed } = useUi();
   useProjectBranding();
 
   return (
@@ -47,19 +45,10 @@ function AppShell() {
     <div className="flex h-dvh overflow-x-clip">
       <Sidebar />
       {/*
-        Контент — карточка на фоне приложения: отступ со всех сторон
-        и скругление. 12px — самый крупный радиус в системе, и он здесь
-        по правилу «чем крупнее поверхность, тем больше радиус»
-        (docs/DESIGN.md). Без тени: на градиентном фоне она читалась
-        как жёсткий шов вдоль всего края.
-
-        Граница — border-border-card, не border-border: в светлой теме
-        она прозрачна (карточка и так видна по белой заливке), в тёмной —
-        едва светлее фона сайдбара, а не серая линия обычных разделителей.
+        Раскладка плоская, как у прототипа (docs/REDESIGN.md, 4.1): контент
+        белый во всю высоту, сайдбар — на фоне приложения, линия между
+        ними — у сайдбара. Карточки с отступом и скруглением больше нет.
       */}
-      {/* Без сайдбара карточки нет: контент занимает экран целиком, и ни
-          скругление, ни тень не к чему прислонить — тень по краю экрана
-          не видна, зато обрезается вместе с ним. */}
       {/*
         overflow-clip, а не hidden. Разница не косметическая: `hidden`
         заводит контейнер прокрутки — без полосы, но прокручиваемый
@@ -76,9 +65,7 @@ function AppShell() {
         Лестница слоёв — в app/styles.css.
       */}
       <main
-        className={`relative z-10 flex min-w-0 flex-1 flex-col overflow-clip bg-surface ${
-          sidebarCollapsed ? "" : "m-2 rounded-xl border border-border-card"
-        }`}
+        className="relative z-10 flex min-w-0 flex-1 flex-col overflow-clip bg-surface"
       >
         <Outlet />
       </main>

@@ -1285,3 +1285,64 @@ Transcoder создаёт компанию и проект в перекодир
 (`Constructor/Tables/Form/Relations/FunctionPath.jsx`) не сохраняет
 ничего, а её же ветка чтения (`RelationField.jsx:265`) не срабатывает
 никогда. Настройки у нас нет по этой причине, а не по забывчивости.
+
+## MCP: `update_table` (`PUT /v1/table/{slug}/mcp`)
+
+Одна ручка создаёт пачку полей и связей за запрос
+(`ucode_go_admin_api_gateway/api/handlers/v1/table.go:1562`,
+`UpdateTableByMCP`), но для схемы, которую потом открывает человек,
+она не годится:
+
+- **Подпись поля не читается.** `label` из тела игнорируется, подпись
+  собирается из слага (`formatString`, `dbml.go:545`): «Название» →
+  `nazvanie` → «Nazvanie». Подписей на языках данных нет.
+- **Ошибки глотаются.** На неудаче создания — `continue`, а ответ
+  всегда «Table updated successfully». Поле могло не создаться, и
+  об этом не узнать без перечитывания.
+- **Тип — словарь Postgres, не ucode.** `GetFieldType` ищет по
+  `varchar`, `text`, `numeric`…; EMAIL, PHONE, NUMBER через неё
+  не завести, всё незнакомое становится `SINGLE_LINE`.
+- **Варианты списка без `slug`.** `enum` пишется как
+  `{value, label, icon, color}`, а значение в строке MULTISELECT мы
+  читаем по `slug` (features/table/api/fields.ts, `toFlatOption`).
+- **Поле показа у связи случайное — и из чужой таблицы.** Для связи
+  берётся `Field().ObtainRandomOne` с `TableSlug` таблицы-ИСТОЧНИКА
+  (`table.go`, ветка `relations`), а сам запрос —
+  `ORDER BY RANDOM() LIMIT 1` (`ucode_go_object_builder_service/
+  storage/postgres/field.go:1323`). В `view_fields` связи ложится id
+  поля, которого в целевой таблице нет.
+
+Поэтому схему CRM и HRMS (2026-09-30) заводили так: папки и таблицы —
+MCP `create_menu` и `create_table` (с `menu_id` она за один вызов
+делает таблицу, пункт меню TABLE, view TABLE + SECTION и layout —
+`storage/postgres/table.go:140-195`), поля — `POST /v2/fields/{slug}`
+телом `toCreateBody`, связи — `POST /v2/relations/{slug}` с явными
+`view_fields`, как их шлёт форма связи.
+
+## Порядок строк после импорта
+
+**Строки одного импорта «прыгают» после правки.** Список без явной
+сортировки идёт `ORDER BY created_at DESC`
+(`ucode_go_object_builder_service/pkg/helper/items.go:465`), а
+`excel_to_db` вставляет весь файл одной транзакцией — у всех строк
+один и тот же `created_at` (у «Сделок» omni4 — 888 строк с
+`09:49:54.469849`). Между равными Postgres порядка не обещает: после
+UPDATE строка получает новое место в куче и уезжает с первой
+страницы. Правка при этом сохраняется — но выглядит как «ничего
+не поменялось».
+
+Добавить второй ключ сортировки с фронта надёжно нельзя: `order`
+разбирается в Go-map (`items.go:486-506`), порядок ключей в ней
+случайный, и `{created_at: -1, guid: 1}` иногда станет
+`ORDER BY guid, created_at`.
+
+## Смена типа поля стирает значения всегда
+
+`UpdateField` при `resp.Type != req.Type` делает `DROP COLUMN` +
+`ADD COLUMN` (`storage/postgres/field.go:618-633`) — и тогда, когда
+оба типа хранятся одинаково (SINGLE_LINE → STATUS: оба VARCHAR).
+`ALTER COLUMN … TYPE` там не используется. 2026-09-30 так пропали
+статусы 882 из 888 строк «Сделок» omni4 после смены типа «Статуса»
+в форме поля. id загруженного Excel в журнал изменений не попадает
+(он в пути запроса, а журнал пишет тело), поэтому восстановить
+значения можно только из исходного файла.

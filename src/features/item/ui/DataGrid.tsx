@@ -7,19 +7,18 @@ import {
   type ReactNode,
 } from "react";
 import {
-  IconArrowNarrowDown,
-  IconArrowNarrowUp,
-  IconArrowsDiagonal,
-  IconCheck,
-  IconChevronDown,
-  IconChevronRight,
-  IconDotsVertical,
-  IconHash,
-  IconTrash,
-  IconPlus,
-  IconTablePlus,
-  IconX,
-} from "@tabler/icons-react";
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  EllipsisVerticalIcon,
+  HashIcon,
+  Maximize2Icon,
+  MoveDownIcon,
+  MoveUpIcon,
+  PlusIcon,
+  Trash2Icon,
+  XIcon,
+} from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import { localized, type Field, type Relation } from "@/features/table";
@@ -633,7 +632,7 @@ export function DataGrid({
                   checked.length ? "hidden" : "grid group-hover/all:hidden"
                 }`}
               >
-                <Icon as={IconHash} size={14} />
+                <Icon as={HashIcon} size={14} />
               </span>
               <span
                 className={`h-full place-items-center ${
@@ -685,7 +684,7 @@ export function DataGrid({
                   title={t("table.addField")}
                   className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg disabled:pointer-events-none disabled:opacity-40"
                 >
-                  <Icon as={IconTablePlus} />
+                  <Icon as={PlusIcon} />
                 </button>
               </span>
             </th>
@@ -732,7 +731,7 @@ export function DataGrid({
                       className="sticky left-0 flex h-row max-w-full items-center gap-1.5 pr-2 text-sm"
                     >
                       <Icon
-                        as={isFolded ? IconChevronRight : IconChevronDown}
+                        as={isFolded ? ChevronRightIcon : ChevronDownIcon}
                         size={14}
                         className="shrink-0 text-fg-muted"
                       />
@@ -889,7 +888,7 @@ export function DataGrid({
                             }}
                             className="ml-auto hidden h-6 shrink-0 items-center gap-1 rounded-md border border-border bg-surface px-1.5 text-xs text-fg-muted transition-colors group-hover/row:flex hover:bg-surface-hover hover:text-fg"
                           >
-                            <Icon as={IconArrowsDiagonal} size={12} />
+                            <Icon as={Maximize2Icon} size={12} />
                             {t("cell.open")}
                           </button>
                         )}
@@ -912,7 +911,7 @@ export function DataGrid({
                         title={t("tree.addChild")}
                         className="hidden size-6 place-items-center rounded-md text-fg-subtle transition-colors group-hover/row:grid hover:bg-surface-active hover:text-fg"
                       >
-                        <Icon as={IconPlus} size={14} />
+                        <Icon as={PlusIcon} size={14} />
                       </button>
                     )}
 
@@ -926,7 +925,7 @@ export function DataGrid({
                           tree && isSelected ? "grid" : "hidden group-hover/row:grid"
                         } size-6 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger`}
                       >
-                        <Icon as={IconTrash} size={14} />
+                        <Icon as={Trash2Icon} size={14} />
                       </button>
                     )}
                   </span>
@@ -953,7 +952,7 @@ export function DataGrid({
                     title={t("action.cancel")}
                     className="grid size-6 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
                   >
-                    <Icon as={IconX} size={14} />
+                    <Icon as={XIcon} size={14} />
                   </button>
                 </span>
               </td>
@@ -1019,7 +1018,7 @@ export function DataGrid({
                     title={t("table.saveRow")}
                     className="grid size-6 place-items-center rounded-md text-accent-text transition-colors hover:bg-accent-subtle disabled:opacity-40"
                   >
-                    <Icon as={IconCheck} size={14} />
+                    <Icon as={CheckIcon} size={14} />
                   </button>
                 </span>
               </td>
@@ -1038,7 +1037,7 @@ export function DataGrid({
                      она иначе уезжает из виду вместе с первой колонкой. */
                   className="sticky left-0 flex h-row items-center gap-1.5 px-3 text-sm text-fg-subtle transition-colors group-hover/add:text-fg"
                 >
-                  <Icon as={IconPlus} size={14} />
+                  <Icon as={PlusIcon} size={14} />
                   {t("table.addRow")}
                 </button>
               </td>
@@ -1181,7 +1180,7 @@ function TreeHandle({
           }}
           className="mr-0.5 grid size-5 shrink-0 place-items-center rounded text-fg-muted transition-colors hover:bg-surface-active hover:text-fg"
         >
-          <Icon as={open ? IconChevronDown : IconChevronRight} size={14} />
+          <Icon as={open ? ChevronDownIcon : ChevronRightIcon} size={14} />
         </button>
       ) : (
         /* Распорка вместо шеврона: значения одной глубины — в столбик. */
@@ -1301,7 +1300,7 @@ function HeaderCell({
           сортировать» на каждом заголовке — это шум в плотной шапке. */}
       {active && (
         <Icon
-          as={active.direction === "asc" ? IconArrowNarrowUp : IconArrowNarrowDown}
+          as={active.direction === "asc" ? MoveUpIcon : MoveDownIcon}
           size={14}
           className="text-accent-text"
         />
@@ -1350,7 +1349,7 @@ function HeaderCell({
             aria-label={t("column.menu")}
             className="ml-1 hidden size-6 shrink-0 place-items-center rounded-md text-fg-muted transition-colors group-hover/head:grid hover:bg-surface-active hover:text-fg"
           >
-            <Icon as={IconDotsVertical} size={14} />
+            <Icon as={EllipsisVerticalIcon} size={14} />
           </button>
         )}
       </span>

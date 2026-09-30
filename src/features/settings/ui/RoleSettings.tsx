@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
-  IconColumns,
-  IconDotsVertical,
-  IconPlus,
-  IconTrash,
-} from "@tabler/icons-react";
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Columns2Icon,
+  EllipsisVerticalIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TranslationKey } from "@/shared/lib/i18n";
 import { Button } from "@/shared/ui/button";
@@ -113,7 +113,7 @@ export function RoleSettings() {
           onClick={() => setCreating(true)}
           className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border px-3 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
         >
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("roles.create")}
         </button>
 
@@ -144,7 +144,7 @@ export function RoleSettings() {
                 title={t("roles.delete")}
                 className="hidden size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors group-hover/role:grid hover:bg-danger-subtle hover:text-danger"
               >
-                <Icon as={IconTrash} size={14} />
+                <Icon as={Trash2Icon} size={14} />
               </button>
             )}
           </div>
@@ -391,7 +391,7 @@ function OtherRights({
           title={t("roles.otherRights")}
           className="grid size-6 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
         >
-          <Icon as={IconDotsVertical} size={14} />
+          <Icon as={EllipsisVerticalIcon} size={14} />
         </button>
       )}
     >
@@ -420,7 +420,7 @@ function RowMenu({
           onClick={() => setPage("rights")}
           className="flex h-7.5 w-full items-center gap-1.5 rounded-md px-2.5 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
         >
-          <Icon as={IconChevronLeft} size={14} />
+          <Icon as={ChevronLeftIcon} size={14} />
           {t("action.back")}
         </button>
 
@@ -489,7 +489,7 @@ function RowMenu({
       <PopoverSeparator />
 
       <PopoverItem
-        icon={<Icon as={IconColumns} size={16} className="shrink-0 text-fg-muted" />}
+        icon={<Icon as={Columns2Icon} size={16} className="shrink-0 text-fg-muted" />}
         onClick={() => setPage("fields")}
       >
         {t("roles.fields", { count: table.fields.length })}
@@ -672,7 +672,7 @@ function MenuLevel({
                 }
                 className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:text-fg disabled:opacity-0"
               >
-                <Icon as={expanded ? IconChevronDown : IconChevronRight} size={14} />
+                <Icon as={expanded ? ChevronDownIcon : ChevronRightIcon} size={14} />
               </button>
 
               <span className="min-w-0 flex-1 truncate text-sm">{menu.label}</span>
@@ -819,7 +819,7 @@ function CustomRights({ roleId, clientTypeId }: { roleId: string; clientTypeId: 
             onClick={() => setAdding({ parentId: "", parentTitle: "" })}
             className="mt-1 flex h-7.5 items-center gap-1.5 rounded-md px-2.5 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconPlus} size={14} />
+            <Icon as={PlusIcon} size={14} />
             {t("customRights.create")}
           </button>
         </div>
@@ -922,7 +922,7 @@ function CustomLevel({
                 aria-label={t(expanded ? "tree.collapse" : "tree.expand")}
                 className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:text-fg"
               >
-                <Icon as={expanded ? IconChevronDown : IconChevronRight} size={14} />
+                <Icon as={expanded ? ChevronDownIcon : ChevronRightIcon} size={14} />
               </button>
 
               <span className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -952,7 +952,7 @@ function CustomLevel({
                   title={t("tree.addChild")}
                   className="grid size-6 place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
                 >
-                  <Icon as={IconPlus} size={14} />
+                  <Icon as={PlusIcon} size={14} />
                 </button>
 
                 <button
@@ -962,7 +962,7 @@ function CustomLevel({
                   title={t("action.delete")}
                   className="grid size-6 place-items-center rounded text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
                 >
-                  <Icon as={IconTrash} size={14} />
+                  <Icon as={Trash2Icon} size={14} />
                 </button>
               </span>
             </div>

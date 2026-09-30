@@ -5,6 +5,7 @@ import { keys } from "@/shared/lib/query-keys";
 import { errorMessage, reportError, toast } from "@/shared/lib/toast";
 import type { Labels } from "../model/types";
 import { pickLabels } from "./normalize";
+import { perLanguage } from "@/shared/lib/i18n";
 
 /**
  * Действия таблицы — то, что запускают над отмеченными строками.
@@ -303,7 +304,9 @@ export function useRunAction(tableSlug: string | undefined) {
  */
 function toBody(draft: ActionDraft, tableSlug: string): Record<string, unknown> {
   const labels = Object.fromEntries(
-    Object.entries(draft.labels).map(([code, value]) => [`label_${code}`, value.trim()]),
+    Object.entries(draft.labels).flatMap(([code, value]) =>
+      Object.entries(perLanguage("label_", code, value.trim())),
+    ),
   );
 
   return {

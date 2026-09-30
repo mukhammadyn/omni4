@@ -31,7 +31,7 @@ ERP на платформе ucode: модули CRM, HRMS, Склад, Фина�
 | Что | Путь | Зачем | Писать |
 |---|---|---|---|
 | Бэкенд ucode | `~/Documents/workspace/IT/udevs/ucode/ucode_backend/` | истина о ручках | нет |
-| new-ucode | `~/Documents/workspace/IT/udevs/ucode/ucode-frontend/new-ucode/frontend` | откуда форк; редизайн идёт и в нём | **да** |
+| new-ucode | `~/Documents/workspace/IT/udevs/ucode/ucode-frontend/new-ucode/frontend` | откуда форк | **только по прямой просьбе** |
 | Старая админка | `~/Documents/workspace/IT/udevs/ucode/ucode-frontend/ucode_admin_frontend` | спецификация поведения платформы | нет |
 | Прототип omni4 | `~/Documents/workspace/IT/udevs/ucode/omni4_core/crm/` | дизайн и состав ERP-модулей | нет |
 
@@ -67,11 +67,11 @@ ERP на платформе ucode: модули CRM, HRMS, Склад, Фина�
 сюда не приедет. Нужное переносится осознанно, со ссылкой на коммит
 new-ucode в сообщении.
 
-**Писать в него из omni4 можно** — ради редизайна, который идёт в обоих
-репозиториях ([docs/REDESIGN.md](docs/REDESIGN.md)): шаг делается здесь
-и тем же диффом переносится туда. Там свой `CLAUDE.md` и свои правила —
-они действуют на его файлы. Коммит в new-ucode — отдельный, в его
-репозитории, и только по просьбе.
+**Сейчас не меняется.** Шаги 1–4 редизайна в нём есть (последний —
+`56df01e`), дальше редизайн идёт только в omni4. Трогать new-ucode —
+правки, патчи, коммиты — только когда об этом прямо попросят. Хук
+защиты с него снят, поэтому держит это правило, а не техника. Если
+попросят: там свой `CLAUDE.md`, иконки Tabler, а не Lucide.
 
 ### Старая админка
 

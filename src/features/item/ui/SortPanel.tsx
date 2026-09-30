@@ -1,4 +1,9 @@
-import { IconChevronDown, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
+import {
+  ChevronDownIcon,
+  PlusIcon,
+  Trash2Icon,
+  XIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, type Field } from "@/features/table";
 import { Icon } from "@/shared/ui/icon";
@@ -61,7 +66,7 @@ export function SortPanel({
             onClick={() => onChange(sorts.filter((_, position) => position !== index))}
             className="grid size-6 shrink-0 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconX} size={14} />
+            <Icon as={XIcon} size={14} />
           </button>
         </div>
       ))}
@@ -76,7 +81,7 @@ export function SortPanel({
               onClick={toggle}
               className="flex h-7.5 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
             >
-              <Icon as={IconPlus} size={14} />
+              <Icon as={PlusIcon} size={14} />
               {t("table.addSort")}
             </button>
           )}
@@ -100,7 +105,7 @@ export function SortPanel({
           onClick={() => onChange([])}
           className="flex h-7.5 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
         >
-          <Icon as={IconTrash} size={14} />
+          <Icon as={Trash2Icon} size={14} />
           {t("table.clearSort")}
         </button>
       )}
@@ -131,7 +136,7 @@ function FieldPicker({
         >
           <Icon as={fieldIcon(icon)} size={14} className="text-fg-muted" />
           <span className="truncate">{value}</span>
-          <Icon as={IconChevronDown} size={12} className="ml-auto shrink-0 opacity-60" />
+          <Icon as={ChevronDownIcon} size={12} className="ml-auto shrink-0 opacity-60" />
         </button>
       )}
     >
@@ -192,7 +197,7 @@ function DirectionPicker({
           className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-border-strong bg-input px-2 text-sm text-fg transition-colors hover:bg-surface-hover"
         >
           {t(value === "asc" ? "table.sortAsc" : "table.sortDesc")}
-          <Icon as={IconChevronDown} size={12} className="opacity-60" />
+          <Icon as={ChevronDownIcon} size={12} className="opacity-60" />
         </button>
       )}
     >

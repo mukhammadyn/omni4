@@ -1,137 +1,123 @@
 import {
-  IconChevronDown,
-  IconChevronsLeft,
-  IconChevronsRight,
-  IconDeviceDesktop,
-  IconLanguage,
-  IconMoon,
-  IconSettings,
-  IconSun,
-} from "@tabler/icons-react";
-import { useState } from "react";
+  CheckIcon,
+  ChevronRightIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  LanguagesIcon,
+  LogOutIcon,
+  MoonIcon,
+  SettingsIcon,
+  UserPlusIcon,
+} from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { logout } from "@/features/auth";
 import { SettingsDialog, useProject } from "@/features/settings";
 import { WorkspaceSwitcher } from "@/features/workspace";
 import { useSession } from "@/shared/api/use-session";
 import { LOCALES, setLocale, type Locale } from "@/shared/lib/i18n";
 import { useUi } from "@/shared/lib/ui-store";
 import { BrandMark } from "@/shared/ui/brand-mark";
+import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
-import { Popover, PopoverSeparator } from "@/shared/ui/popover";
-import { LogoutButton } from "./LogoutButton";
+import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 
 /**
- * Шапка сайдбара: рабочее пространство, профиль и выход.
+ * Шапка сайдбара — `.sb-workspace` прототипа (docs/REDESIGN.md, 4.2):
+ * одна строка 36px, плитка с инициалами компании, её имя и кнопка
+ * «свернуть».
+ *
+ * Меню — «Рабочее пространство», как `wsMenu` прототипа: карточка
+ * компании, её настройки, приглашение. Переключатель проектов остаётся
+ * здесь же: в прототипе его нет, но без него проект не сменить. Ниже —
+ * тема, язык (подменю, как `themeMenu` прототипа) и выход.
  *
  * Подписи берутся из ответа логина — он уже содержит имя пользователя,
- * роль и название проекта. Отдельного запроса за профилем нет.
+ * роль и название компании. Отдельного запроса за профилем нет.
  */
 export function WorkspaceHeader({ floating = false }: { floating?: boolean }) {
   /*
    * Окно настроек живёт здесь, а не в поповере: поповер закрывается
    * щелчком по своей же кнопке, и окно исчезло бы вместе с ним.
    */
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState<string | null>(null);
   const { t } = useTranslation();
   const profile = useSession().getProfile();
 
   const title = profile?.company || t("app.name");
-  const letter = (title[0] ?? "U").toUpperCase();
   /*
    * Логотип проекта — из настроек проекта. Запрос уже сделан там же
    * и живёт в кэше пять минут; своего здесь не появляется.
    */
   const { project } = useProject();
   const logo = project?.logo ?? "";
+  const tile = { title, image: logo, brand: !profile?.company };
 
   return (
     <>
-    <Popover
-      trigger={({ open, toggle }) => (
-        /*
-         * Подсветка — на ряду целиком, а не на кнопке поповера: кнопка
-         * сворачивания стоит ВНУТРИ этой подсветки, и ряд обязан
-         * подсвечиваться, когда курсор на ней. Кнопки при этом две,
-         * а не одна: вложенных <button> не бывает, да и действия у них
-         * разные — открыть меню и убрать панель.
-         */
-        <div
-          className={`flex items-center gap-1 rounded-md p-1.5 transition-colors hover:bg-surface-hover ${
-            open ? "bg-surface-hover" : ""
-          }`}
-        >
-          <button
-            type="button"
-            onClick={toggle}
-            className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+      <Popover
+        trigger={({ open, toggle }) => (
+          /*
+           * Подсветка — на ряду целиком, а не на кнопке поповера: кнопка
+           * сворачивания стоит ВНУТРИ этой подсветки. Кнопки две, а не одна:
+           * вложенных <button> не бывает, да и действия у них разные.
+           */
+          <div
+            className={`flex h-9 items-center gap-1 rounded-md pr-1 transition-colors hover:bg-surface-hover ${
+              open ? "bg-surface-hover" : ""
+            }`}
           >
-            <Avatar
-              letter={letter}
-              brand={!profile?.company}
-              {...(logo ? { image: logo } : {})}
-            />
+            <button
+              type="button"
+              onClick={toggle}
+              className="flex h-full min-w-0 flex-1 items-center gap-2 pl-2 text-left"
+            >
+              <WorkspaceTile {...tile} />
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">{title}</span>
+            </button>
 
-            <span className="flex min-w-0 flex-1 flex-col leading-tight">
-              {profile?.name && (
-                <span className="truncate text-xs text-fg-muted">{profile.name}</span>
-              )}
-              <span className="truncate text-sm font-semibold text-fg">{title}</span>
-            </span>
-
-            <Icon
-              as={IconChevronDown}
-              size={14}
-              className={`shrink-0 text-fg-subtle transition-opacity group-hover/aside:opacity-100 ${
-                open ? "opacity-100" : "opacity-0"
-              }`}
-            />
-          </button>
-
-          <CollapseButton floating={floating} />
-        </div>
-      )}
-    >
+            <CollapseButton floating={floating} />
+          </div>
+        )}
+      >
         {(close) => (
-          <div className="w-64">
-            <div className="flex items-center gap-2.5 p-2">
-              <Avatar
-                letter={(profile?.name?.[0] ?? letter).toUpperCase()}
-                size="lg"
-                {...(profile?.photo ? { image: profile.photo } : {})}
-              />
+          <div className="w-72">
+            <p className="px-2.5 pt-0.5 pb-1 text-2xs font-semibold text-fg-subtle">
+              {t("workspace.menuTitle")}
+            </p>
+            <div className="flex items-center gap-2.5 px-2.5 py-1.5">
+              <WorkspaceTile {...tile} size="lg" />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-fg">
-                  {profile?.name || t("workspace.noName")}
+                <p className="truncate text-sm font-semibold text-fg">{title}</p>
+                {/* Кто вошёл — строкой под компанией: отдельной карточки
+                    профиля в этом меню больше нет. */}
+                <p className="truncate text-xs text-fg-muted">
+                  {[profile?.name || t("workspace.noName"), profile?.role].filter(Boolean).join(" · ")}
                 </p>
-                {profile?.role && (
-                  <p className="truncate text-xs tracking-wide text-fg-muted uppercase">
-                    {profile.role}
-                  </p>
-                )}
               </div>
             </div>
 
-            <div className="flex gap-1 px-1 pb-1">
-              {/* Настройки открываются окном, а не страницей: человек
-                  возвращается туда же, откуда пришёл. */}
-              <button
-                type="button"
-                onClick={() => {
-                  close();
-                  setSettingsOpen(true);
-                }}
-                className={POPOVER_BUTTON}
-              >
-                <Icon as={IconSettings} size={14} />
-                {t("workspace.settings")}
-              </button>
+            <PopoverSeparator />
 
-              <LanguageButton />
-            </div>
-
-            <div className="px-1 pb-1">
-              <ThemeSwitch />
-            </div>
+            <PopoverItem
+              icon={<Icon as={SettingsIcon} />}
+              onClick={() => {
+                close();
+                setSettings("project");
+              }}
+            >
+              {t("workspace.spaceSettings")}
+            </PopoverItem>
+            <PopoverItem
+              icon={<Icon as={UserPlusIcon} />}
+              onClick={() => {
+                close();
+                setSettings("users");
+              }}
+            >
+              {t("workspace.invite")}
+            </PopoverItem>
 
             <PopoverSeparator />
 
@@ -139,31 +125,21 @@ export function WorkspaceHeader({ floating = false }: { floating?: boolean }) {
 
             <PopoverSeparator />
 
-            <LogoutButton onDone={close} />
-        </div>
-      )}
-    </Popover>
+            <ThemeItem />
+            <LanguageItem />
+            <LogoutItem onDone={close} />
+          </div>
+        )}
+      </Popover>
 
-    {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {settings && <SettingsDialog initialSection={settings} onClose={() => setSettings(null)} />}
     </>
   );
 }
 
 /**
- * Кнопка в поповере профиля: 28px, а не 32px как обычная кнопка формы.
- *
- * Поповер узкий, и обведённых рамкой кнопок в нём подряд три. В полный
- * рост они спорили бы со строками списка под собой — а это действия
- * рядом, не главное в меню. 28px — тот же размер, что у кнопок-иконок
- * над таблицей (ToolButton): «компактное управление» в системе одно.
- */
-const POPOVER_BUTTON =
-  "flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md border border-border text-sm text-fg transition-colors hover:bg-surface-hover";
-
-/**
- * Кнопка сворачивания — в шапке, рядом с переключателем рабочего
- * пространства, и появляется только при наведении на сайдбар: место
- * она занимает всегда, а нужна редко.
+ * Кнопка сворачивания — видна всегда, как `.sb-iconbtn` прототипа:
+ * бледная, пока на неё не навели.
  */
 function CollapseButton({ floating }: { floating: boolean }) {
   const { t } = useTranslation();
@@ -180,112 +156,42 @@ function CollapseButton({ floating }: { floating: boolean }) {
       /* Наведение красит `surface-active`, а не `surface-hover`: кнопка
          лежит внутри подсвеченного ряда, и второй такой же заливкой
          она бы на нём не проступила. */
-      className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle opacity-0 transition-opacity group-hover/aside:opacity-100 hover:bg-surface-active hover:text-fg focus-visible:opacity-100"
+      className="grid size-6.5 shrink-0 place-items-center rounded-[5px] text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg-muted"
     >
       {/* Пара зеркальная: убрать панель — стрелки влево, вернуть —
-          вправо. Это про НАПРАВЛЕНИЕ, и читается без словаря; коробка
-          с панелью внутри на 16px спорила бы сама с собой — рисует
-          сайдбар там, где его сейчас нет. Тот же значок стоит на кнопке
-          в шапке контента: действие одно (и ключ подписи один). */}
-      <Icon as={floating ? IconChevronsRight : IconChevronsLeft} size={16} />
+          вправо. Тот же значок стоит на кнопке в шапке контента. */}
+      <Icon as={floating ? ChevronsRightIcon : ChevronsLeftIcon} size={16} />
     </button>
   );
 }
 
 /**
- * Тема живёт здесь, а не на отдельной странице настроек: её меняют
- * по настроению, а не один раз при заведении аккаунта.
- *
- * «Системная» — не то же самое, что светлая или тёмная: она следует
- * за настройкой ОС, поэтому это третий вариант, а не отсутствие выбора.
+ * Плитка рабочего пространства — `.ws-icon` прототипа: 22px, инициалы
+ * компании белым по тёмному (в тёмной теме наоборот — `bg-fg`/`text-bg`
+ * меняются сами). Логотип проекта, если загружен, — вместо инициалов.
+ * Без компании — знак продукта.
  */
-function ThemeSwitch() {
-  const { t } = useTranslation();
-  const { theme, setTheme } = useUi();
-
-  const options = [
-    { value: "light", icon: IconSun },
-    { value: "dark", icon: IconMoon },
-    { value: "system", icon: IconDeviceDesktop },
-  ] as const;
-
-  return (
-    /* Высота — как у соседних кнопок поповера (28px), считая рамку
-       и внутренний зазор: переключатель стоит с ними в одном столбце,
-       и на 34px он читался бы как что-то более важное. */
-    <div className="flex h-7 gap-1 rounded-md border border-border p-0.5">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => setTheme(option.value)}
-          aria-label={t(`theme.${option.value}`)}
-          title={t(`theme.${option.value}`)}
-          aria-pressed={theme === option.value}
-          className={`flex h-full flex-1 items-center justify-center rounded-sm transition-colors ${
-            theme === option.value
-              ? "bg-surface-active text-fg"
-              : "text-fg-subtle hover:bg-surface-hover hover:text-fg"
-          }`}
-        >
-          <Icon as={option.icon} size={15} />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** Язык переключается по кругу — трёх языков мало для отдельного меню. */
-function LanguageButton() {
-  const { i18n } = useTranslation();
-  const current = (LOCALES as readonly string[]).includes(i18n.language)
-    ? (i18n.language as Locale)
-    : LOCALES[0];
-
-  const next = LOCALES[(LOCALES.indexOf(current) + 1) % LOCALES.length]!;
-
-  return (
-    <button
-      type="button"
-      onClick={() => setLocale(next)}
-      className={`${POPOVER_BUTTON} uppercase`}
-    >
-      {current}
-      <Icon as={IconLanguage} size={14} />
-    </button>
-  );
-}
-
-/**
- * Знак рабочего пространства: картинка, если её загрузили, иначе буква.
- *
- * Картинка — логотип проекта у компании и фотография у человека; обе
- * задаются в настройках. Буква остаётся запасным вариантом: логотип
- * есть далеко не у каждого проекта, и пустой квадрат хуже буквы.
- *
- * `brand` — частный случай буквы: рабочее пространство без своей
- * компании и своего логотипа показывает знак ucode вместо буквы «U»,
- * а не собственный бренд-цвет для чужого проекта.
- */
-function Avatar({
-  letter,
+export function WorkspaceTile({
+  title,
   image,
-  brand = false,
+  brand,
   size = "md",
-  tone = "accent",
 }: {
-  letter: string;
-  image?: string | undefined;
-  brand?: boolean;
-  size?: "md" | "lg";
-  tone?: "accent" | "muted";
+  title: string;
+  image: string;
+  brand: boolean;
+  /** sm — 18px в крошках верхней полосы, как `.ws-icon` там у прототипа. */
+  size?: "sm" | "md" | "lg";
 }) {
-  const px = size === "lg" ? 36 : 28;
-  const box = size === "lg" ? "size-9 text-base" : "size-7 text-xs";
+  const box = {
+    sm: "size-4.5 rounded-[4px] text-[8.5px]",
+    md: "size-5.5 rounded-[5px] text-[10.5px]",
+    lg: "size-9 rounded-lg text-sm",
+  }[size];
 
   if (image) {
     return (
-      <span className={`grid shrink-0 place-items-center overflow-hidden rounded-md ${box}`}>
+      <span className={`grid shrink-0 place-items-center overflow-hidden ${box}`}>
         <img src={image} alt="" className="size-full object-cover" />
       </span>
     );
@@ -293,19 +199,154 @@ function Avatar({
 
   if (brand) {
     return (
-      <span className={`grid shrink-0 place-items-center rounded-md ${box}`}>
-        <BrandMark size={px} />
+      <span className={`grid shrink-0 place-items-center text-fg ${box}`}>
+        <BrandMark size={{ sm: 18, md: 22, lg: 36 }[size]} />
       </span>
     );
   }
 
   return (
     <span
-      className={`grid shrink-0 place-items-center rounded-md font-semibold ${box} ${
-        tone === "accent" ? "bg-accent-solid text-accent-fg" : "bg-surface-active text-fg-muted"
-      }`}
+      className={`grid shrink-0 place-items-center bg-fg font-bold tracking-[0.3px] text-bg ${box}`}
     >
-      {letter}
+      {initials(title)}
     </span>
+  );
+}
+
+/** «Tech Market» → «TM», «Test123» → «T»: как «TM» у прототипа. */
+function initials(title: string) {
+  const words = title.trim().split(/\s+/).filter(Boolean);
+  return (words.length > 1 ? words[0]![0]! + words[1]![0]! : (words[0]?.[0] ?? "")).toUpperCase();
+}
+
+/** Имена языков — на них самих: их не переводят. */
+const LOCALE_NAMES: Record<Locale, string> = { ru: "Русский", en: "English", uz: "O‘zbekcha" };
+
+/**
+ * Пункт с подменю: справа текущее значение и стрелка, варианты — отдельным
+ * меню рядом, как `themeMenu` у прототипа. Выбор закрывает только подменю:
+ * основное меню остаётся, и видно, что значение сменилось.
+ */
+function ChoiceItem<T extends string>({
+  icon,
+  label,
+  value,
+  options,
+  onPick,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onPick: (value: T) => void;
+}) {
+  const current = options.find((option) => option.value === value)?.label ?? value;
+
+  return (
+    <Popover
+      trigger={({ toggle }) => (
+        <PopoverItem
+          icon={icon}
+          onClick={toggle}
+          trailing={
+            <span className="flex items-center gap-1 text-xs text-fg-subtle">
+              {current}
+              <Icon as={ChevronRightIcon} size={14} />
+            </span>
+          }
+        >
+          {label}
+        </PopoverItem>
+      )}
+    >
+      {(close) =>
+        options.map((option) => (
+          <PopoverItem
+            key={option.value}
+            onClick={() => {
+              onPick(option.value);
+              close();
+            }}
+            {...(option.value === value ? { trailing: <Icon as={CheckIcon} size={14} /> } : {})}
+          >
+            {option.label}
+          </PopoverItem>
+        ))
+      }
+    </Popover>
+  );
+}
+
+/**
+ * Тема живёт здесь, а не в настройках: её меняют по настроению, а не
+ * один раз при заведении аккаунта.
+ */
+function ThemeItem() {
+  const { t } = useTranslation();
+  const { theme, setTheme } = useUi();
+
+  return (
+    <ChoiceItem
+      icon={<Icon as={MoonIcon} />}
+      label={t("sidebar.theme")}
+      value={theme}
+      options={(["light", "dark", "system"] as const).map((option) => ({
+        value: option,
+        label: t(`theme.${option}`),
+      }))}
+      onPick={setTheme}
+    />
+  );
+}
+
+function LanguageItem() {
+  const { t, i18n } = useTranslation();
+  const current = (LOCALES as readonly string[]).includes(i18n.language)
+    ? (i18n.language as Locale)
+    : LOCALES[0];
+
+  return (
+    <ChoiceItem
+      icon={<Icon as={LanguagesIcon} />}
+      label={t("sidebar.language")}
+      value={current}
+      options={LOCALES.map((option) => ({ value: option, label: LOCALE_NAMES[option] }))}
+      onPick={setLocale}
+    />
+  );
+}
+
+/**
+ * Выход — с подтверждением: одно касание в конце меню не должно
+ * выбрасывать из рабочего места посреди правки.
+ */
+function LogoutItem({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [asking, setAsking] = useState(false);
+
+  return (
+    <>
+      <PopoverItem danger icon={<Icon as={LogOutIcon} />} onClick={() => setAsking(true)}>
+        {t("auth.signOut")}
+      </PopoverItem>
+
+      {asking && (
+        <ConfirmDialog
+          title={t("auth.signOutTitle")}
+          description={t("auth.signOutDescription")}
+          confirmLabel={t("auth.signOut")}
+          busy={false}
+          onConfirm={() => {
+            setAsking(false);
+            onDone();
+            logout();
+            void navigate({ to: "/login" });
+          }}
+          onClose={() => setAsking(false)}
+        />
+      )}
+    </>
   );
 }

@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { IconPrinter } from "@tabler/icons-react";
+import { PrinterIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/shared/ui/icon";
 import { barcodeFormat } from "../model/cell-kind";
@@ -144,7 +144,7 @@ function PrintCodes({ type, value, qr }: { type: string; value: string; qr: bool
         }}
         className="flex h-6 items-center gap-1 rounded-md px-1.5 text-xs text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
       >
-        <Icon as={IconPrinter} size={14} />
+        <Icon as={PrinterIcon} size={14} />
         {t("cell.print")}
       </button>
 

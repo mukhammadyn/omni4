@@ -1,16 +1,15 @@
 import {
-  IconApi,
-  IconBrandGithub,
-  IconBrandGitlab,
-  IconChartBar,
-  IconChartHistogram,
-  IconDatabase,
-  IconMail,
-  IconMailFast,
-  IconMessage2,
-  IconPlug,
-  IconVideo,
-} from "@tabler/icons-react";
+  ChartColumnBigIcon,
+  ChartColumnIcon,
+  DatabaseIcon,
+  GitBranchIcon,
+  MailIcon,
+  MessageSquareTextIcon,
+  PlugIcon,
+  SendIcon,
+  VideoIcon,
+  WebhookIcon,
+} from "lucide-react";
 import { Icon } from "@/shared/ui/icon";
 
 /**
@@ -25,21 +24,21 @@ import { Icon } from "@/shared/ui/icon";
  * Значок говорит О ПОВОДЕ (письмо, репозиторий, график), а имя службы
  * написано рядом словами.
  */
-const ICONS: Record<string, typeof IconApi> = {
-  SMS: IconMessage2,
-  SMTP: IconMail,
-  MAILCHIMP: IconMailFast,
-  GITHUB: IconBrandGithub,
-  GITLAB: IconBrandGitlab,
-  SUPERSET: IconChartBar,
-  METABASE: IconChartHistogram,
-  TRANSCODER: IconVideo,
-  REST: IconApi,
-  MONGODB: IconDatabase,
-  CLICKHOUSE: IconDatabase,
-  POSTGRESQL: IconDatabase,
+const ICONS: Record<string, typeof WebhookIcon> = {
+  SMS: MessageSquareTextIcon,
+  SMTP: MailIcon,
+  MAILCHIMP: SendIcon,
+  GITHUB: GitBranchIcon,
+  GITLAB: GitBranchIcon,
+  SUPERSET: ChartColumnIcon,
+  METABASE: ChartColumnBigIcon,
+  TRANSCODER: VideoIcon,
+  REST: WebhookIcon,
+  MONGODB: DatabaseIcon,
+  CLICKHOUSE: DatabaseIcon,
+  POSTGRESQL: DatabaseIcon,
 };
 
 export function ResourceIcon({ kind, size = 16 }: { kind: string; size?: number }) {
-  return <Icon as={ICONS[kind] ?? IconPlug} size={size} />;
+  return <Icon as={ICONS[kind] ?? PlugIcon} size={size} />;
 }

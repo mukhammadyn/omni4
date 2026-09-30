@@ -15,8 +15,13 @@ import { reportError, toast } from "@/shared/lib/toast";
  * третьим шагом обязательно стоит человек.
  */
 
-/** Ответ выгрузки: путь в хранилище, иногда уже со схемой. */
-type ExcelLinkDto = { link?: string };
+/**
+ * Ответ выгрузки: путь в хранилище, иногда уже со схемой. Шлюз отдаёт
+ * CommonMessage как есть (ucode_go_admin_api_gateway,
+ * api/handlers/v1/object.go:1520 GetListInExcel), поэтому после конверта
+ * остаётся ещё один уровень: `{ table_slug, data: { link } }`.
+ */
+type ExcelLinkDto = { data?: { link?: string } };
 
 /** Ответ чтения файла: заголовки столбцов, в порядке файла. */
 type ExcelRowsDto = { rows?: string[] };
@@ -58,7 +63,7 @@ export function useExportExcel(tableSlug: string | undefined) {
         },
       });
 
-      const link = dto.link ?? "";
+      const link = dto.data?.link ?? "";
       if (!link) throw new Error("Бэкенд не вернул ссылку на файл");
 
       return /^https?:\/\//i.test(link) ? link : `https://${link}`;

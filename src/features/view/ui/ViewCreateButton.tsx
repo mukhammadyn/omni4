@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconChevronLeft, IconPlus } from "@tabler/icons-react";
+import { ChevronLeftIcon, PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Field } from "@/features/table";
 import type { TranslationKey } from "@/shared/lib/i18n";
@@ -66,9 +66,11 @@ export function ViewCreateButton({
           aria-expanded={open}
           aria-label={t("view.create")}
           title={t("view.create")}
-          className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-50"
+          className={`grid size-7 shrink-0 place-items-center rounded-[5px] text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-50 ${
+            open ? "bg-surface-hover text-fg" : ""
+          }`}
         >
-          <Icon as={IconPlus} size={16} />
+          <Icon as={PlusIcon} size={16} />
         </button>
       )}
     >
@@ -129,7 +131,7 @@ function CreateForm({
             aria-label={t("action.back")}
             className="grid size-7 shrink-0 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconChevronLeft} size={16} />
+            <Icon as={ChevronLeftIcon} size={16} />
           </button>
           <span className="truncate text-sm font-medium">{t("view.calendarFields")}</span>
         </div>

@@ -69,6 +69,7 @@ const PAIRS: [fg: string, stack: string[], min: number][] = [
   // Решено оставить как в прототипе (2.49). Порог — чтобы не опустился ниже.
   ["fg-subtle", ["surface"], 2.4],
   ["fg-subtle", ["surface", "input"], 2.3],
+  ["fg-subtle", ["bg", "sidebar-field"], 2.4],
   ["accent-fg", ["accent-solid"], 4.5],
   ["accent-fg", ["accent-solid-hover"], 4.5],
   ["accent-text", ["surface"], 4.5],

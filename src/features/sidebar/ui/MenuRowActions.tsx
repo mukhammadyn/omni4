@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconDots } from "@tabler/icons-react";
+import { EllipsisIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useIsSuperRole } from "@/features/auth";
 import { Icon } from "@/shared/ui/icon";
@@ -117,7 +117,7 @@ export function MenuRowActions({ node }: { node: MenuNode }) {
               open ? "bg-surface-active text-fg" : "opacity-0 group-hover/row:opacity-100"
             }`}
           >
-            <Icon as={IconDots} size={14} />
+            <Icon as={EllipsisIcon} size={14} />
           </button>
         )}
       >

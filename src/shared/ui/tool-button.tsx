@@ -1,5 +1,5 @@
 import { Icon } from "@/shared/ui/icon";
-import type { Icon as TablerIcon } from "@tabler/icons-react";
+import { type LucideIcon } from "lucide-react";
 
 /**
  * Кнопка-иконка в строке над таблицей: фильтр, сортировка, поиск,
@@ -22,7 +22,7 @@ export function ToolButton({
   spin = false,
   onClick,
 }: {
-  icon: TablerIcon;
+  icon: LucideIcon;
   label: string;
   open?: boolean;
   on?: boolean;
@@ -32,6 +32,10 @@ export function ToolButton({
 }) {
   const color = on ? "text-accent-text" : open ? "text-fg" : "text-fg-muted hover:text-fg";
 
+  /* Размеры — `.va-btn` прототипа (docs/REDESIGN.md): 28px, поля 7px,
+     радиус 5. Раскрытую панель отмечает нейтральная подложка наведения,
+     а не цветная: цвет остаётся за «отбор задан» (`on`). */
+
   return (
     <button
       type="button"
@@ -40,8 +44,8 @@ export function ToolButton({
       aria-label={label}
       aria-pressed={open}
       title={label}
-      className={`grid size-7 shrink-0 place-items-center rounded-md transition-colors ${color} ${
-        open ? "bg-accent-subtle" : "hover:bg-surface-hover"
+      className={`grid h-7 min-w-7 shrink-0 place-items-center rounded-[5px] px-1.5 transition-colors ${color} ${
+        open ? "bg-surface-hover" : "hover:bg-surface-hover"
       }`}
     >
       <Icon as={icon} size={16} className={spin ? "animate-spin" : ""} />

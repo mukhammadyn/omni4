@@ -1,19 +1,19 @@
 import { Fragment, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from "react";
 import {
-  IconChartBar,
-  IconChartDonut,
-  IconChartFunnel,
-  IconChartLine,
-  IconColumns3,
-  IconGridDots,
-  IconGripVertical,
-  IconLayoutColumns,
-  IconNumber123,
-  IconPlus,
-  IconTrash,
-  IconWaveSine,
-  type Icon as TablerIcon,
-} from "@tabler/icons-react";
+  AudioWaveformIcon,
+  BinaryIcon,
+  ChartColumnIcon,
+  ChartLineIcon,
+  ChartPieIcon,
+  Columns3Icon,
+  FunnelIcon,
+  GripIcon,
+  GripVerticalIcon,
+  KanbanIcon,
+  PlusIcon,
+  Trash2Icon,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, type Field, type Relation } from "@/features/table";
 import i18n, { type TranslationKey } from "@/shared/lib/i18n";
@@ -167,14 +167,14 @@ export function ChartView({
               variant={editMode ? "primary" : "secondary"}
               onClick={() => setEditing((open) => !open)}
             >
-              <Icon as={IconLayoutColumns} size={14} />
+              <Icon as={KanbanIcon} size={14} />
               {t(editMode ? "chart.done" : "chart.edit")}
             </Button>
 
             {editMode && (
               <>
                 <Button type="button" size="sm" variant="secondary" onClick={add}>
-                  <Icon as={IconPlus} size={14} />
+                  <Icon as={PlusIcon} size={14} />
                   {t("chart.add")}
                 </Button>
 
@@ -470,7 +470,7 @@ function AddTile({ onClick, full = false }: { onClick: () => void; full?: boolea
         full ? "w-full" : ""
       }`}
     >
-      <Icon as={IconPlus} size={20} />
+      <Icon as={PlusIcon} size={20} />
       {t("chart.add")}
     </button>
   );
@@ -659,7 +659,7 @@ function ChartCard({
             }}
             className="grid size-5 shrink-0 cursor-grab place-items-center rounded text-fg-subtle transition-colors hover:text-fg"
           >
-            <Icon as={IconGripVertical} size={14} />
+            <Icon as={GripVerticalIcon} size={14} />
           </button>
         )}
 
@@ -701,7 +701,7 @@ function ChartCard({
             onClick={onRemove}
             className="grid size-6 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-danger"
           >
-            <Icon as={IconTrash} size={14} />
+            <Icon as={Trash2Icon} size={14} />
           </button>
         )}
       </header>
@@ -1550,25 +1550,25 @@ function Stat({ series, locale }: { series: ChartSeries; locale: string }) {
  * не отличить.
  *
  * Проверено в списке на настоящем размере, как и значки типов view:
- *   stack   — рамка, разрезанная на три доли (`IconColumns3`). Первым
+ *   stack   — рамка, разрезанная на три доли (`Columns3Icon`). Первым
  *             стоял `IconLayoutDistributeVertical` — две палки со скобкой
  *             посередине, читается как «выровнять», а не «разделить
  *             на части».
  *   heatmap — сетка точек: клетки, а не график.
  *   stat    — «123»: цифры и есть форма.
  */
-const KIND_ICONS: Record<ChartKind, TablerIcon> = {
-  bar: IconChartBar,
-  stack: IconColumns3,
-  line: IconChartLine,
-  heatmap: IconGridDots,
-  /* Воронка — свой значок Tabler, хотя силуэт у него тот же, что
+const KIND_ICONS: Record<ChartKind, LucideIcon> = {
+  bar: ChartColumnIcon,
+  stack: Columns3Icon,
+  line: ChartLineIcon,
+  heatmap: GripIcon,
+  /* Воронка — свой значок, хотя силуэт у него тот же, что
      у кнопки отбора в шапке. Спутать негде: этот список показывает
      формы графика, а не действия. */
-  funnel: IconChartFunnel,
-  stream: IconWaveSine,
-  donut: IconChartDonut,
-  stat: IconNumber123,
+  funnel: FunnelIcon,
+  stream: AudioWaveformIcon,
+  donut: ChartPieIcon,
+  stat: BinaryIcon,
 };
 
 /**

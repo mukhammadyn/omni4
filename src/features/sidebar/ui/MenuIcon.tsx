@@ -1,19 +1,19 @@
 import {
-  IconApi,
-  IconBucket,
-  IconCalendar,
-  IconChartBar,
-  IconChevronDown,
-  IconFile,
-  IconFolder,
-  IconLayoutGrid,
-  IconLink,
-  IconSettings,
-  IconTable,
-  IconTablePlus,
-  IconUsers,
-  type Icon as TablerIcon,
-} from "@tabler/icons-react";
+  CalendarIcon,
+  ChartColumnIcon,
+  ChevronDownIcon,
+  FileIcon,
+  FolderIcon,
+  LayoutGridIcon,
+  LinkIcon,
+  PaintBucketIcon,
+  SettingsIcon,
+  Table2Icon,
+  TablePropertiesIcon,
+  UsersIcon,
+  WebhookIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { DynamicIcon } from "@/shared/ui/dynamic-icon";
 import { Icon } from "@/shared/ui/icon";
 import { kindOf } from "../model/types";
@@ -31,28 +31,28 @@ import { kindOf } from "../model/types";
  * Экспортирован: тот же маппинг рисует пункты меню создания
  * (AddMenuButton) — второй список типов рядом был бы второй правдой.
  */
-export const byType: Record<string, TablerIcon> = {
-  FOLDER: IconFolder,
-  WIKI_FOLDER: IconFolder,
-  MINIO_FOLDER: IconBucket,
-  TABLE: IconTable,
-  LINK: IconLink,
-  MICROFRONTEND: IconLayoutGrid,
-  PIVOT: IconTablePlus,
-  REST: IconApi,
-  USER: IconUsers,
-  WEBPAGE: IconFile,
-  WIKI: IconFile,
+export const byType: Record<string, LucideIcon> = {
+  FOLDER: FolderIcon,
+  WIKI_FOLDER: FolderIcon,
+  MINIO_FOLDER: PaintBucketIcon,
+  TABLE: Table2Icon,
+  LINK: LinkIcon,
+  MICROFRONTEND: LayoutGridIcon,
+  PIVOT: TablePropertiesIcon,
+  REST: WebhookIcon,
+  USER: UsersIcon,
+  WEBPAGE: FileIcon,
+  WIKI: FileIcon,
 };
 
 /** Популярные имена, которые присылает бэкенд, — на случай отказа CDN. */
-const byName: Record<string, TablerIcon> = {
-  settings: IconSettings,
-  chart: IconChartBar,
-  calendar: IconCalendar,
-  table: IconTable,
-  folder: IconFolder,
-  users: IconUsers,
+const byName: Record<string, LucideIcon> = {
+  settings: SettingsIcon,
+  chart: ChartColumnIcon,
+  calendar: CalendarIcon,
+  table: Table2Icon,
+  folder: FolderIcon,
+  users: UsersIcon,
 };
 
 export function MenuIcon({ name, type }: { name: string; type: string }) {
@@ -60,7 +60,7 @@ export function MenuIcon({ name, type }: { name: string; type: string }) {
 }
 
 function BuiltinIcon({ name, type }: { name: string; type: string }) {
-  const fallback = kindOf(type) === "group" ? IconFolder : IconTable;
+  const fallback = kindOf(type) === "group" ? FolderIcon : Table2Icon;
   const component = byName[name] ?? byType[type] ?? fallback;
 
   return <Icon as={component} />;
@@ -69,7 +69,7 @@ function BuiltinIcon({ name, type }: { name: string; type: string }) {
 export function Chevron({ open }: { open: boolean }) {
   return (
     <Icon
-      as={IconChevronDown}
+      as={ChevronDownIcon}
       size={14}
       className={`transition-transform ${open ? "" : "-rotate-90"}`}
     />

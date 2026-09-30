@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconCheck, IconChevronRight, IconPlus } from "@tabler/icons-react";
+import { CheckIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/shared/api/client";
@@ -73,7 +73,7 @@ export function WorkspaceSwitcher({
         </span>
         <span className="min-w-0 flex-1 truncate text-sm text-fg">{current}</span>
         <Icon
-          as={IconChevronRight}
+          as={ChevronRightIcon}
           size={14}
           className={`text-fg-subtle transition-transform ${open ? "rotate-90" : ""}`}
         />
@@ -115,7 +115,7 @@ export function WorkspaceSwitcher({
            столбце, и разнобой в высоте виден сразу. */
         className="mt-1 mb-1 flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-border text-sm text-fg transition-colors hover:bg-surface-hover"
       >
-        <Icon as={IconPlus} size={14} />
+        <Icon as={PlusIcon} size={14} />
         {t("workspace.addOrganization")}
       </button>
 
@@ -201,7 +201,7 @@ function ProjectRow({
         className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
       >
         <Icon
-          as={IconChevronRight}
+          as={ChevronRightIcon}
           size={14}
           className={`text-fg-subtle transition-transform ${open ? "rotate-90" : ""}`}
         />
@@ -234,7 +234,7 @@ function ProjectRow({
                   style={{ background: environment.color || "var(--color-border-strong)" }}
                 />
                 <span className="flex-1 truncate">{environment.name}</span>
-                {active && <Icon as={IconCheck} size={14} className="text-accent-text" />}
+                {active && <Icon as={CheckIcon} size={14} className="text-accent-text" />}
               </button>
             );
           })

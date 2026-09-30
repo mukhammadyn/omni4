@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { IconLoader2, IconTrash, IconUpload } from "@tabler/icons-react";
+import { LoaderCircleIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useUploadFiles } from "@/features/item";
 import { Button } from "@/shared/ui/button";
@@ -66,7 +66,7 @@ export function ImagePicker({
             onClick={() => input.current?.click()}
           >
             <Icon
-              as={upload.isPending ? IconLoader2 : IconUpload}
+              as={upload.isPending ? LoaderCircleIcon : UploadIcon}
               size={14}
               className={upload.isPending ? "animate-spin" : ""}
             />
@@ -75,7 +75,7 @@ export function ImagePicker({
 
           {value && (
             <Button type="button" size="sm" variant="ghost" onClick={() => onChange("")}>
-              <Icon as={IconTrash} size={14} />
+              <Icon as={Trash2Icon} size={14} />
               {t("action.delete")}
             </Button>
           )}

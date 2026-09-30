@@ -1,5 +1,5 @@
 import type { ReactNode, UIEvent } from "react";
-import { IconCheck, IconChevronDown, IconSearch } from "@tabler/icons-react";
+import { CheckIcon, ChevronDownIcon, SearchIcon } from "lucide-react";
 import { Icon } from "./icon";
 import { Popover, PopoverItem } from "./popover";
 
@@ -125,7 +125,7 @@ export function Dropdown({
             {chosen?.label ?? placeholder}
           </span>
           <Icon
-            as={IconChevronDown}
+            as={ChevronDownIcon}
             size={14}
             className={`shrink-0 text-fg-subtle transition-transform ${open ? "rotate-180" : ""}`}
           />
@@ -139,7 +139,7 @@ export function Dropdown({
               ему незачем. */}
           {onSearch && (
             <label className="mb-1 flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border px-2 text-sm">
-              <Icon as={IconSearch} size={14} className="shrink-0 text-fg-subtle" />
+              <Icon as={SearchIcon} size={14} className="shrink-0 text-fg-subtle" />
               <input
                 autoFocus
                 value={search ?? ""}
@@ -160,7 +160,7 @@ export function Dropdown({
                 active={item.value === value}
                 {...(item.icon ? { icon: item.icon } : {})}
                 {...(item.value === value
-                  ? { trailing: <Icon as={IconCheck} size={14} className="shrink-0" /> }
+                  ? { trailing: <Icon as={CheckIcon} size={14} className="shrink-0" /> }
                   : {})}
                 onClick={() => {
                   onChange(item.value);

@@ -123,3 +123,12 @@ test("params без списка — пустая карта, а не паден
       .params,
   ).toEqual({});
 });
+
+test("модуль — только папка с is_tab: true, а не любое похожее значение", () => {
+  const node = (attributes: Record<string, unknown>) =>
+    toMenuNode({ id: "m1", type: "FOLDER", label: "CRM", attributes }, "ru");
+
+  expect(node({ is_tab: true }).isModule).toBe(true);
+  expect(node({ is_tab: "true" }).isModule).toBe(false);
+  expect(node({}).isModule).toBe(false);
+});

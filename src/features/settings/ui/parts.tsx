@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 /* Размеры страницы — те же, что у таблицы данных: это один и тот же
    вопрос «сколько строк показывать», и два разных набора значений
@@ -161,7 +161,7 @@ export function Pager({
             aria-label={t("table.prevPage")}
             className={`${button} text-fg-muted hover:bg-surface-hover hover:text-fg disabled:opacity-30`}
           >
-            <Icon as={IconChevronLeft} size={14} />
+            <Icon as={ChevronLeftIcon} size={14} />
           </button>
 
           {pageItems(page, pages).map((item, index) =>
@@ -193,7 +193,7 @@ export function Pager({
             aria-label={t("table.nextPage")}
             className={`${button} text-fg-muted hover:bg-surface-hover hover:text-fg disabled:opacity-30`}
           >
-            <Icon as={IconChevronRight} size={14} />
+            <Icon as={ChevronRightIcon} size={14} />
           </button>
         </nav>
       )}

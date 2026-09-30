@@ -1,6 +1,12 @@
 import { useEffect } from "react";
 import { create } from "zustand";
-import { IconChevronLeft, IconChevronRight, IconDownload, IconFile, IconX } from "@tabler/icons-react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  DownloadIcon,
+  FileIcon,
+  XIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { fileKind, fileName, type FileKind } from "@/shared/lib/file-kind";
 import { Icon } from "@/shared/ui/icon";
@@ -109,11 +115,11 @@ export function FilePreview() {
           title={t("cell.download")}
           className={button}
         >
-          <Icon as={IconDownload} size={18} />
+          <Icon as={DownloadIcon} size={18} />
         </a>
 
         <button type="button" onClick={close} aria-label={t("action.close")} className={button}>
-          <Icon as={IconX} size={18} />
+          <Icon as={XIcon} size={18} />
         </button>
       </header>
 
@@ -131,7 +137,7 @@ export function FilePreview() {
             aria-label={t("action.previous")}
             className={`${button} self-center`}
           >
-            <Icon as={IconChevronLeft} size={20} />
+            <Icon as={ChevronLeftIcon} size={20} />
           </button>
         )}
 
@@ -149,7 +155,7 @@ export function FilePreview() {
             aria-label={t("action.next")}
             className={`${button} self-center`}
           >
-            <Icon as={IconChevronRight} size={20} />
+            <Icon as={ChevronRightIcon} size={20} />
           </button>
         )}
       </div>
@@ -199,7 +205,7 @@ function Content({ url, kind }: { url: string; kind: FileKind }) {
           rel="noreferrer noopener"
           className="flex flex-col items-center gap-3 rounded-lg bg-surface p-8 text-sm text-fg"
         >
-          <Icon as={IconFile} size={40} className="text-fg-muted" />
+          <Icon as={FileIcon} size={40} className="text-fg-muted" />
           <span className="max-w-xs truncate">{fileName(url)}</span>
           <span className="text-accent-text underline">{t("cell.download")}</span>
         </a>

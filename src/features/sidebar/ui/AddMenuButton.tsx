@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconPlus, IconTemplate } from "@tabler/icons-react";
+import { LayoutTemplateIcon, PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useGlobalRight } from "@/features/auth";
 import { Button } from "@/shared/ui/button";
@@ -74,7 +74,7 @@ export function AddMenuButton({ parentId, label }: { parentId: string; label?: s
         trigger={({ open, toggle }) =>
           label ? (
             <Button type="button" onClick={toggle}>
-              <Icon as={IconPlus} size={16} />
+              <Icon as={PlusIcon} size={16} />
               {label}
             </Button>
           ) : (
@@ -86,7 +86,7 @@ export function AddMenuButton({ parentId, label }: { parentId: string; label?: s
                 open ? "bg-surface-active text-fg" : ""
               }`}
             >
-              <Icon as={IconPlus} size={14} />
+              <Icon as={PlusIcon} size={14} />
             </button>
           )
         }
@@ -148,7 +148,7 @@ export function AddMenuButton({ parentId, label }: { parentId: string; label?: s
               {t("menuAction.createMicrofrontend")}
             </PopoverItem>
             <PopoverItem
-              icon={itemIcon(IconTemplate)}
+              icon={itemIcon(LayoutTemplateIcon)}
               onClick={() => {
                 close();
                 setTemplates(true);

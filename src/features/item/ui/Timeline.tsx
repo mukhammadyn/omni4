@@ -8,15 +8,15 @@ import {
   type ReactNode,
 } from "react";
 import {
-  IconArrowLeft,
-  IconArrowRight,
-  IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsLeft,
-  IconChevronsRight,
-  IconPlus,
-} from "@tabler/icons-react";
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  PlusIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { optionOf, type Field, type Relation } from "@/features/table";
 import { toast } from "@/shared/lib/toast";
@@ -511,7 +511,7 @@ export function Timeline({
             behind ? "mr-auto" : "right-1 ml-auto flex-row-reverse"
           }`}
         >
-          <Icon as={behind ? IconArrowLeft : IconArrowRight} size={14} className="shrink-0" />
+          <Icon as={behind ? ArrowLeftIcon : ArrowRightIcon} size={14} className="shrink-0" />
           {/* Дата видна на наведении: в ряду одинаковых стрелок только
               она и отличает одну строку от другой. */}
           <span className="text-2xs hidden whitespace-nowrap group-hover/jump:inline">
@@ -636,7 +636,7 @@ export function Timeline({
         style={{ left: daysBetween(days[0], hover.day) * width, width }}
         className="pointer-events-none absolute inset-y-1.5 flex items-center justify-center rounded-sm border border-dashed border-border-strong text-fg-subtle"
       >
-        <Icon as={IconPlus} size={12} className="shrink-0" />
+        <Icon as={PlusIcon} size={12} className="shrink-0" />
         {/* Подпись вылезает за призрак: в колонку она не влезет, а знать,
             на какое число ставишь, надо. */}
         <span className="text-2xs absolute left-full ml-1 whitespace-nowrap">
@@ -751,7 +751,7 @@ export function Timeline({
             aria-label={t("action.previous")}
             className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconChevronLeft} size={16} />
+            <Icon as={ChevronLeftIcon} size={16} />
           </button>
           <button
             type="button"
@@ -759,7 +759,7 @@ export function Timeline({
             aria-label={t("action.next")}
             className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconChevronRight} size={16} />
+            <Icon as={ChevronRightIcon} size={16} />
           </button>
         </div>
 
@@ -839,7 +839,7 @@ export function Timeline({
                 title={t(collapsed ? "timeline.expand" : "timeline.collapse")}
                 className="m-0.5 grid size-6 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
               >
-                <Icon as={collapsed ? IconChevronsRight : IconChevronsLeft} size={14} />
+                <Icon as={collapsed ? ChevronsRightIcon : ChevronsLeftIcon} size={14} />
               </button>
             </div>
 
@@ -997,7 +997,7 @@ export function Timeline({
                   className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-r border-b border-border bg-surface px-2 text-xs text-fg-subtle transition-colors group-hover/row:tint-surface-hover"
                   style={{ width: leftWidth }}
                 >
-                  <Icon as={IconPlus} size={14} className="shrink-0" />
+                  <Icon as={PlusIcon} size={14} className="shrink-0" />
                   {!collapsed && <span className="truncate">{t("timeline.newRow")}</span>}
                 </div>
 
@@ -1178,7 +1178,7 @@ function SectionRow({
     <>
       {onToggle && (
         <Icon
-          as={folded ? IconChevronRight : IconChevronDown}
+          as={folded ? ChevronRightIcon : ChevronDownIcon}
           size={14}
           className="shrink-0 text-fg-muted"
         />

@@ -1,4 +1,4 @@
-import type { Icon as TablerIcon } from "@tabler/icons-react";
+import { type LucideIcon } from "lucide-react";
 import { Icon } from "@/shared/ui/icon";
 
 /**
@@ -23,7 +23,7 @@ import { Icon } from "@/shared/ui/icon";
 export type TabItem = {
   id: string;
   label: string;
-  icon?: TablerIcon;
+  icon?: LucideIcon;
   /** Подсказка под курсором. Нужна там, где подпись сокращена до кода. */
   title?: string;
 };
@@ -44,14 +44,14 @@ const STYLES = {
   underline: {
     track:
       "flex min-w-0 max-w-full gap-1 self-stretch overflow-x-auto [scrollbar-width:none]",
-    tab: "relative inline-flex min-h-9 shrink-0 items-center gap-1.5 px-2 text-sm font-medium transition-colors",
+    tab: "group/tab relative inline-flex min-h-9 shrink-0 items-center px-2 text-sm font-medium transition-colors",
     active:
       "text-fg after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-fg",
     idle: "text-fg-muted hover:text-fg",
   },
   segment: {
     track: "flex w-fit min-w-0 max-w-full items-center overflow-x-auto rounded-md bg-surface-hover p-0.5",
-    tab: "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-[5px] px-2.5 text-xs transition-colors",
+    tab: "inline-flex h-6 shrink-0 items-center rounded-[5px] px-2.5 text-xs transition-colors",
     active: "bg-surface text-fg shadow-raised",
     idle: "text-fg-muted hover:text-fg",
   },
@@ -86,8 +86,20 @@ export function Tabs({
             {...(item.title ? { title: item.title } : {})}
             className={`${style.tab} whitespace-nowrap ${active ? style.active : style.idle}`}
           >
-            {item.icon && <Icon as={item.icon} size={14} />}
-            {item.label}
+            {/* Подпись в своей плашке: у подчёркнутой вкладки наведение
+                подсвечивает её, а не всю высоту полосы — `span.in`
+                у `.view-tab` прототипа. У сегмента плашкой служит сама
+                кнопка, и эта обёртка ничего не красит. */}
+            <span
+              className={`inline-flex items-center gap-1.5 ${
+                variant === "underline"
+                  ? "rounded-[5px] px-1.5 py-0.75 transition-colors group-hover/tab:bg-surface-hover"
+                  : ""
+              }`}
+            >
+              {item.icon && <Icon as={item.icon} size={14} />}
+              {item.label}
+            </span>
           </button>
         );
       })}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconLoader2, IconTrash } from "@tabler/icons-react";
+import { LoaderCircleIcon, Trash2Icon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { TranslationKey } from "@/shared/lib/i18n";
@@ -172,7 +172,7 @@ export function TableSettings({
 
       {update.isPending && (
         <p className="flex items-center gap-1 px-0.5 text-2xs text-fg-subtle">
-          <Icon as={IconLoader2} size={12} className="animate-spin" />
+          <Icon as={LoaderCircleIcon} size={12} className="animate-spin" />
           {t("common.saving")}
         </p>
       )}
@@ -188,7 +188,7 @@ export function TableSettings({
           onClick={() => setConfirming(true)}
           className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-sm text-danger transition-colors hover:bg-danger-subtle"
         >
-          <Icon as={IconTrash} size={16} className="shrink-0" />
+          <Icon as={Trash2Icon} size={16} className="shrink-0" />
           {t("tableSettings.delete")}
         </button>
       </div>

@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { hexToChipColor } from "@/shared/ui/chip";
 import { EMPTY_DRAFT, toDraft } from "../model/field-draft";
 import { toField } from "./normalize";
-import { toCreateBody, toUpdateBodies, toUpdateBody } from "./fields";
+import { freeSlug, toCreateBody, toUpdateBodies, toUpdateBody } from "./fields";
 
 const AT = { tableSlug: "bookings", language: "en", id: "11111111-2222-3333-4444-555555555555" };
 
@@ -463,4 +463,13 @@ test("переименование колонки: один запрос, а в�
     { id: "f1", slug: "cost", type: "NUMBER" },
     { id: "f1", slug: "cost", type: "SINGLE_LINE" },
   ]);
+});
+
+test("слаг нового поля не повторяет занятые", () => {
+  const used = new Set(["guid", "cena"]);
+
+  expect(freeSlug("Цена", used)).toBe("cena_2");
+  expect(freeSlug("цена", used)).toBe("cena_3");
+  expect(freeSlug("№", used)).toBe("field");
+  expect(used.has("field")).toBe(true);
 });

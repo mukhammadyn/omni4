@@ -1,11 +1,11 @@
 import { useState } from "react";
 import {
-  IconAdjustments,
-  IconFilter,
-  IconSortAscending,
-  IconSortDescending,
-  IconTrash,
-} from "@tabler/icons-react";
+  ArrowDownWideNarrowIcon,
+  ArrowUpNarrowWideIcon,
+  ListFilterIcon,
+  SlidersHorizontalIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, type Field } from "@/features/table";
 import { Anchored } from "@/shared/ui/anchored";
@@ -125,7 +125,7 @@ export function ColumnMenu({
         )}
 
         <MenuItem
-          icon={IconAdjustments}
+          icon={SlidersHorizontalIcon}
           onClick={() => run(() => actions.settings(field, anchor))}
           label={t("column.settings")}
         />
@@ -138,12 +138,12 @@ export function ColumnMenu({
         {onSort && (
           <>
             <MenuItem
-              icon={IconSortAscending}
+              icon={ArrowUpNarrowWideIcon}
               onClick={() => run(() => onSort(field.slug, "asc"))}
               label={t("table.sortAsc")}
             />
             <MenuItem
-              icon={IconSortDescending}
+              icon={ArrowDownWideNarrowIcon}
               onClick={() => run(() => onSort(field.slug, "desc"))}
               label={t("table.sortDesc")}
             />
@@ -151,7 +151,7 @@ export function ColumnMenu({
         )}
         {filterable && (
           <MenuItem
-            icon={IconFilter}
+            icon={ListFilterIcon}
             onClick={() => run(() => actions.filter?.(field))}
             label={t("table.addFilter")}
           />
@@ -160,7 +160,7 @@ export function ColumnMenu({
         <div className="my-1 h-px bg-border" />
 
         <MenuItem
-          icon={IconTrash}
+          icon={Trash2Icon}
           danger
           onClick={() => run(() => actions.remove(field))}
           label={t("column.delete")}
@@ -176,7 +176,7 @@ function MenuItem({
   danger,
   onClick,
 }: {
-  icon: typeof IconTrash;
+  icon: typeof Trash2Icon;
   label: string;
   danger?: boolean;
   onClick: () => void;

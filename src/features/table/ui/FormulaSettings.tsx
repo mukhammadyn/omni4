@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useRef, useState } from "react";
-import { IconCheck, IconPlus, IconTrash } from "@tabler/icons-react";
+import { CheckIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Chip } from "@/shared/ui/chip";
@@ -342,7 +342,7 @@ function FilterList({
           title={t("formula.addFilter")}
           className="grid size-5 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-40"
         >
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
         </button>
       </div>
 
@@ -373,7 +373,7 @@ function FilterList({
                 aria-label={t("action.delete")}
                 className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
               >
-                <Icon as={IconTrash} size={14} />
+                <Icon as={Trash2Icon} size={14} />
               </button>
             </div>
 
@@ -569,7 +569,7 @@ function RelationPicker({
             {/* Галка значком, а не флажком: строка списка — уже кнопка,
                 а <input> внутри <button> это вложенный интерактив. */}
             <Icon
-              as={IconCheck}
+              as={CheckIcon}
               size={14}
               className={`shrink-0 ${picked.includes(row.guid) ? "text-accent" : "opacity-0"}`}
             />

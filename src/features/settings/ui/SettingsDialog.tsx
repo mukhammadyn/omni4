@@ -1,21 +1,21 @@
 import { useEffect, useState } from "react";
 import {
-  IconApi,
-  IconBuilding,
-  IconDatabase,
-  IconFunction,
-  IconHistory,
-  IconIdBadge2,
-  IconLayoutGrid,
-  IconPlug,
-  IconRoute,
-  IconServer2,
-  IconShieldLock,
-  IconTerminal2,
-  IconUser,
-  IconUsers,
-  IconX,
-} from "@tabler/icons-react";
+  BuildingIcon,
+  DatabaseIcon,
+  HistoryIcon,
+  IdCardIcon,
+  LayoutGridIcon,
+  PlugIcon,
+  RouteIcon,
+  ServerIcon,
+  ShieldCheckIcon,
+  SquareFunctionIcon,
+  SquareTerminalIcon,
+  UserIcon,
+  UsersIcon,
+  WebhookIcon,
+  XIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useGlobalRight } from "@/features/auth";
 import type { TranslationKey } from "@/shared/lib/i18n";
@@ -62,7 +62,7 @@ import { ResourceSettings } from "./resources/ResourceSettings";
 type Section = {
   id: string;
   labelKey: TranslationKey;
-  icon: typeof IconUser;
+  icon: typeof UserIcon;
   /**
    * Глобальное право роли, без которого раздела не видно. Совпадает
    * с именами кнопок из прав (`GLOBAL_RIGHTS`): это те самые галки,
@@ -94,7 +94,7 @@ const GROUPS: {
   {
     titleKey: "settings.groupAccount",
     items: [
-      { id: "profile", labelKey: "settings.profile", icon: IconUser },
+      { id: "profile", labelKey: "settings.profile", icon: UserIcon },
     ],
   },
   {
@@ -104,24 +104,24 @@ const GROUPS: {
       {
         id: "project",
         labelKey: "settings.project",
-        icon: IconBuilding,
+        icon: BuildingIcon,
         right: "project_settings_button",
       },
       {
         id: "environments",
         labelKey: "environments.title",
-        icon: IconServer2,
+        icon: ServerIcon,
         right: "environments_button",
         wide: true,
       },
       {
         id: "clientTypes",
         labelKey: "clientTypes.title",
-        icon: IconIdBadge2,
+        icon: IdCardIcon,
         wide: true,
       },
-      { id: "users", labelKey: "users.title", icon: IconUsers, wide: true },
-      { id: "roles", labelKey: "settings.roles", icon: IconShieldLock, wide: true },
+      { id: "users", labelKey: "users.title", icon: UsersIcon, wide: true },
+      { id: "roles", labelKey: "settings.roles", icon: ShieldCheckIcon, wide: true },
     ],
   },
   {
@@ -131,34 +131,34 @@ const GROUPS: {
       {
         id: "apiKeys",
         labelKey: "apiKeys.title",
-        icon: IconApi,
+        icon: WebhookIcon,
         right: "api_keys_button",
         wide: true,
       },
       {
         id: "endpoints",
         labelKey: "endpoints.title",
-        icon: IconRoute,
+        icon: RouteIcon,
         right: "redirects_button",
         wide: true,
       },
-      { id: "functions", labelKey: "functions.title", icon: IconFunction, wide: true },
+      { id: "functions", labelKey: "functions.title", icon: SquareFunctionIcon, wide: true },
       {
         id: "microfrontends",
         labelKey: "microfrontends.title",
-        icon: IconLayoutGrid,
+        icon: LayoutGridIcon,
         wide: true,
       },
-      { id: "connections", labelKey: "connections.title", icon: IconDatabase, wide: true },
+      { id: "connections", labelKey: "connections.title", icon: DatabaseIcon, wide: true },
       /* Своего права у консоли нет: в GLOBAL_RIGHTS такой кнопки не
          заводили. Значит её видит тот же, кто видит настройки проекта
          целиком, — групповое `settings_button`. */
-      { id: "sql", labelKey: "sql.title", icon: IconTerminal2, wide: true },
-      { id: "resources", labelKey: "resources.title", icon: IconPlug, wide: true },
+      { id: "sql", labelKey: "sql.title", icon: SquareTerminalIcon, wide: true },
+      { id: "resources", labelKey: "resources.title", icon: PlugIcon, wide: true },
       {
         id: "activity",
         labelKey: "activity.title",
-        icon: IconHistory,
+        icon: HistoryIcon,
         right: "version_button",
         wide: true,
       },
@@ -183,9 +183,16 @@ const CONTENT: Record<string, () => React.JSX.Element> = {
   activity: ActivityLog,
 };
 
-export function SettingsDialog({ onClose }: { onClose: () => void }) {
+export function SettingsDialog({
+  onClose,
+  initialSection = "profile",
+}: {
+  onClose: () => void;
+  /** С какого раздела открыть: «Пригласить участников» ведёт сразу в «Пользователей». */
+  initialSection?: string;
+}) {
   const { t } = useTranslation();
-  const [section, setSection] = useState("profile");
+  const [section, setSection] = useState(initialSection);
 
   /*
    * Права спрашиваются по одному и всегда: хук нельзя звать в цикле
@@ -266,7 +273,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               title={t("action.close")}
               className="grid size-7 shrink-0 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
             >
-              <Icon as={IconX} size={16} />
+              <Icon as={XIcon} size={16} />
             </button>
           </header>
 

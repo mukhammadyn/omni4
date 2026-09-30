@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { perLanguage } from "@/shared/lib/i18n";
 import { api } from "@/shared/api/client";
 import { useSession } from "@/shared/api/use-session";
 import { keys } from "@/shared/lib/query-keys";
@@ -154,10 +155,15 @@ export function useDeleteMenu() {
   );
 }
 
-/** Подписи по языкам → ключи attributes. Пустые уезжают тоже: так стирают. */
+/**
+ * Подписи по языкам → ключи attributes. Пустые уезжают тоже: так стирают.
+ * Пустой код — проект без языков данных: подпись идёт только в `label`.
+ */
 function labelAttributes(labels: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(labels).map(([code, value]) => [`label_${code}`, value.trim()]),
+    Object.entries(labels).flatMap(([code, value]) =>
+      Object.entries(perLanguage("label_", code, value.trim())),
+    ),
   );
 }
 

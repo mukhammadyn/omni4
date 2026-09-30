@@ -14,6 +14,7 @@ import { toCascadingsBody } from "../model/cascade";
 import type { Labels, Relation } from "../model/types";
 import { invalidateSchema } from "./fields";
 import { pickLabels } from "./normalize";
+import { perLanguage } from "@/shared/lib/i18n";
 
 /** Одна таблица в списке. Кроме слага, подписи и значка отсюда ничего не нужно. */
 type TableDto = {
@@ -211,7 +212,7 @@ export function useCreateRelation(tableSlug: string | undefined) {
         auto_filters: toAutoFiltersBody(draft.autoFilters),
         ...toSelfDefaultBody(draft.selfDefault),
         label,
-        attributes: { [`label_${language}`]: label },
+        attributes: perLanguage("label_", language, label),
       });
     },
 
@@ -291,7 +292,7 @@ export function useUpdateRelation(tableSlug: string | undefined) {
            безусловно, и `...raw` вернул бы прежнее поверх снятого. */
         ...toSelfDefaultBody(draft.selfDefault),
         label,
-        attributes: { ...attributes, label, [`label_${language}`]: label },
+        attributes: { ...attributes, label, ...perLanguage("label_", language, label) },
       });
     },
 

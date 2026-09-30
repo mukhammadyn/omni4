@@ -14,7 +14,7 @@ export function AuthCard({
   footer: ReactNode;
 }) {
   return (
-    <div className="flex w-full max-w-sm flex-col gap-6">
+    <div className="flex w-full max-w-80 flex-col gap-6">
       <div className="flex flex-col items-center gap-3 text-center">
         <Logo />
         <div className="flex flex-col gap-1">

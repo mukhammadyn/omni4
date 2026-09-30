@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  IconArrowsSort,
-  IconDotsVertical,
-  IconLoader2,
-  IconFilter,
-  IconRefresh,
-  IconSearch,
-  IconX,
-} from "@tabler/icons-react";
+  ArrowUpDownIcon,
+  EllipsisVerticalIcon,
+  ListFilterIcon,
+  LoaderCircleIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   localized,
@@ -82,7 +82,7 @@ export function TableToolbar({
     <div className="flex items-center gap-0.5">
       {onRefresh && (
         <ToolButton
-          icon={IconRefresh}
+          icon={RefreshCwIcon}
           label={t("table.refresh")}
           spin={refreshing === true}
           onClick={onRefresh}
@@ -99,7 +99,7 @@ export function TableToolbar({
       )}
 
       <ToolButton
-        icon={IconFilter}
+        icon={ListFilterIcon}
         label={t("table.filter")}
         open={filtersOpen}
         on={filterCount > 0}
@@ -111,7 +111,7 @@ export function TableToolbar({
           align="end"
           trigger={({ open, toggle }) => (
             <ToolButton
-              icon={IconArrowsSort}
+              icon={ArrowUpDownIcon}
               label={t("table.sort")}
               open={open}
               on={sorts.length > 0}
@@ -197,7 +197,7 @@ function SearchBox({
           запрос обязан быть виден, иначе таблица показывает неполный
           список без объяснения. */}
       <ToolButton
-        icon={IconSearch}
+        icon={SearchIcon}
         label={t("table.search")}
         open={open}
         on={Boolean(value)}
@@ -240,7 +240,7 @@ function SearchBox({
             aria-label={t("table.clearSearch")}
             className="mr-1.5 shrink-0 text-fg-subtle transition-colors hover:text-fg"
           >
-            <Icon as={IconX} size={14} />
+            <Icon as={XIcon} size={14} />
           </button>
         )}
       </label>
@@ -277,7 +277,7 @@ function SearchFieldsMenu({ tableSlug, language }: { tableSlug: string; language
       align="end"
       trigger={({ open, toggle }) => (
         <ToolButton
-          icon={IconDotsVertical}
+          icon={EllipsisVerticalIcon}
           label={t("table.searchFields")}
           open={open}
           on={enabled.size > 0}
@@ -292,7 +292,7 @@ function SearchFieldsMenu({ tableSlug, language }: { tableSlug: string; language
               {/* Список не приехал — говорим об этом, а не «искать не по чему». */}
               {error ?? t(searchable.length ? "table.searchFieldsHint" : "table.searchFieldsNone")}
             </span>
-            {busy && <Icon as={IconLoader2} size={12} className="shrink-0 animate-spin" />}
+            {busy && <Icon as={LoaderCircleIcon} size={12} className="shrink-0 animate-spin" />}
           </p>
 
           {searchable.map((field) => (

@@ -1,4 +1,4 @@
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
@@ -59,7 +59,7 @@ export function ResourceVariables({
             title={t("action.delete")}
             className="grid size-8 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
           >
-            <Icon as={IconTrash} size={14} />
+            <Icon as={Trash2Icon} size={14} />
           </button>
         </div>
       ))}
@@ -69,7 +69,7 @@ export function ResourceVariables({
         onClick={() => onChange([...variables, { id: "", key: "", value: "" }])}
         className="inline-flex h-8 items-center gap-1.5 self-start rounded-md px-2 text-xs text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
       >
-        <Icon as={IconPlus} size={14} />
+        <Icon as={PlusIcon} size={14} />
         {t("resources.addVariable")}
       </button>
     </div>

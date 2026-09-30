@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from "react";
-import { IconChevronDown, IconDots, IconTrash } from "@tabler/icons-react";
+import { ChevronDownIcon, EllipsisIcon, Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, optionOf, type Field, type Relation } from "@/features/table";
 import type { Translate, TranslationKey } from "@/shared/lib/i18n";
@@ -62,7 +62,7 @@ export function FilterChip({
           <Icon as={fieldIcon(field.type)} size={14} />
           <span className="truncate font-medium">{label}</span>
           {set && <span className="truncate">: {summary(filter, field, language, t)}</span>}
-          <Icon as={IconChevronDown} size={14} className="opacity-60" />
+          <Icon as={ChevronDownIcon} size={14} className="opacity-60" />
         </button>
       )}
     >
@@ -93,14 +93,14 @@ export function FilterChip({
                   aria-label={t("table.filterActions")}
                   className="grid size-6 shrink-0 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
                 >
-                  <Icon as={IconDots} size={14} />
+                  <Icon as={EllipsisIcon} size={14} />
                 </button>
               )}
             >
               {() => (
                 <PopoverItem
                   danger
-                  icon={<Icon as={IconTrash} size={14} />}
+                  icon={<Icon as={Trash2Icon} size={14} />}
                   onClick={() => {
                     onRemove();
                     close();
@@ -153,7 +153,7 @@ function OperatorPicker({
           className="flex h-6 items-center gap-0.5 rounded-md px-1 text-xs font-medium text-fg transition-colors hover:bg-surface-hover"
         >
           {name(value)}
-          <Icon as={IconChevronDown} size={12} className="opacity-60" />
+          <Icon as={ChevronDownIcon} size={12} className="opacity-60" />
         </button>
       )}
     >

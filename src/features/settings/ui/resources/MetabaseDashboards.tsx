@@ -1,4 +1,4 @@
-import { IconCopy, IconLoader2 } from "@tabler/icons-react";
+import { CopyIcon, LoaderCircleIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/shared/ui/icon";
 import { toast } from "@/shared/lib/toast";
@@ -69,7 +69,7 @@ export function MetabaseDashboards({ username, password }: { username: string; p
               className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg disabled:opacity-40"
             >
               <Icon
-                as={publicUrl.isPending ? IconLoader2 : IconCopy}
+                as={publicUrl.isPending ? LoaderCircleIcon : CopyIcon}
                 size={14}
                 className={publicUrl.isPending ? "animate-spin" : ""}
               />

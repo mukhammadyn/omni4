@@ -1,34 +1,35 @@
 import { useState, type ReactNode } from "react";
 import {
-  IconAdjustments,
-  IconCalendarTime,
-  IconChevronLeft,
-  IconChevronRight,
-  IconDotsVertical,
-  IconEye,
-  IconExternalLink,
-  IconEyeOff,
-  IconFileExport,
-  IconFileImport,
-  IconFilter,
-  IconFilterCog,
-  IconInfinity,
-  IconGripVertical,
-  IconLayoutList,
-  IconLayoutColumns,
-  IconLayoutNavbar,
-  IconLayoutRows,
-  IconLoader2,
-  IconPin,
-  IconPinnedOff,
-  IconSearch,
-  IconStack2,
-  IconPrinter,
-  IconTable,
-  IconTrash,
-  IconX,
-  type Icon as TablerIcon,
-} from "@tabler/icons-react";
+  CalendarClockIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EllipsisVerticalIcon,
+  ExternalLinkIcon,
+  EyeIcon,
+  EyeOffIcon,
+  FileInputIcon,
+  FileOutputIcon,
+  FunnelPlusIcon,
+  GripVerticalIcon,
+  InfinityIcon,
+  KanbanIcon,
+  LayersIcon,
+  LayoutListIcon,
+  ListFilterIcon,
+  LoaderCircleIcon,
+  PanelTopIcon,
+  PinIcon,
+  PinOffIcon,
+  PrinterIcon,
+  Rows3Icon,
+  SearchIcon,
+  PlusIcon,
+  SlidersHorizontalIcon,
+  Table2Icon,
+  Trash2Icon,
+  XIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Permission } from "@/features/auth";
 import { DocTemplates, useDocTemplates } from "@/features/docs";
@@ -145,6 +146,8 @@ export type ViewOptionsHandlers = {
   onEditField?: (field: Field, anchor: DOMRect) => void;
   /** Удалить поле из ТАБЛИЦЫ, а не из view. Спрашивает подтверждение вызывающий. */
   onDeleteField?: (field: Field) => void;
+  /** «Новое свойство» внизу списка свойств — тот же редактор, что у «+» в шапке таблицы. */
+  onAddField?: (anchor: DOMRect) => void;
   onImport?: () => void;
   onExport?: () => void;
   /** Нет обработчика — удалять нечем. */
@@ -162,6 +165,7 @@ export function ViewOptions({
   busy,
   handlers,
   labels = VIEW_LABELS,
+  beforeMenu,
 }: {
   view: View;
   /** ВСЕ поля таблицы: скрытых во view здесь ещё нет, а показать их надо. */
@@ -182,6 +186,12 @@ export function ViewOptions({
    * и «Убрать вкладку».
    */
   labels?: ViewOptionsLabels;
+  /**
+   * Что стоит между «Свойствами» и «⋮» — кнопка «Создать» у таблицы:
+   * порядок прототипа «Свойства → Создать → ⋮», и настройки view —
+   * самые правые.
+   */
+  beforeMenu?: ReactNode;
 }) {
   const { t } = useTranslation();
 
@@ -194,36 +204,64 @@ export function ViewOptions({
    * не должна видеть кнопку, которая открывает пустоту.
    */
   const anything = can.settings || can.columns || can.fixColumn || can.excelMenu;
-  if (!anything) return null;
+  // Кнопка между ними от прав на настройки не зависит.
+  if (!anything) return <>{beforeMenu}</>;
+
+  const panel = (close: () => void, startPage: PanelPage = null) => (
+    <Panel
+      view={view}
+      fields={fields}
+      language={language}
+      languages={languages}
+      defaultFilters={defaultFilters}
+      can={can}
+      exporting={exporting}
+      busy={busy}
+      handlers={handlers}
+      labels={labels}
+      close={close}
+      startPage={startPage}
+    />
+  );
 
   return (
-    <Popover
-      align="end"
-      trigger={({ open, toggle }) => (
-        <ToolButton
-          icon={IconDotsVertical}
-          label={t(labels.title)}
-          open={open}
-          onClick={toggle}
-        />
+    <>
+      {/* «Свойства» — отдельной кнопкой, как ползунки в тулбаре прототипа
+          (`propsPop`, docs/REDESIGN.md): видимость и порядок колонок
+          меняют чаще всего остального, и искать их в `⋮` — лишний шаг.
+          Открывает ту же страницу панели, что и пункт в `⋮`. */}
+      {can.columns && (
+        <Popover
+          align="end"
+          trigger={({ open, toggle }) => (
+            <ToolButton
+              icon={SlidersHorizontalIcon}
+              label={t("view.columns")}
+              open={open}
+              onClick={toggle}
+            />
+          )}
+        >
+          {(close) => panel(close, "columns")}
+        </Popover>
       )}
-    >
-      {(close) => (
-        <Panel
-          view={view}
-          fields={fields}
-          language={language}
-          languages={languages}
-          defaultFilters={defaultFilters}
-          can={can}
-          exporting={exporting}
-          busy={busy}
-          handlers={handlers}
-          labels={labels}
-          close={close}
-        />
-      )}
-    </Popover>
+
+      {beforeMenu}
+
+      <Popover
+        align="end"
+        trigger={({ open, toggle }) => (
+          <ToolButton
+            icon={EllipsisVerticalIcon}
+            label={t(labels.title)}
+            open={open}
+            onClick={toggle}
+          />
+        )}
+      >
+        {(close) => panel(close)}
+      </Popover>
+    </>
   );
 }
 
@@ -255,6 +293,7 @@ function Panel({
   handlers,
   labels,
   close,
+  startPage = null,
 }: {
   view: View;
   fields: Field[];
@@ -267,9 +306,11 @@ function Panel({
   handlers: ViewOptionsHandlers;
   labels: ViewOptionsLabels;
   close: () => void;
+  /** Открыта сразу на странице — кнопка «Свойства». Назад тогда некуда. */
+  startPage?: PanelPage;
 }) {
   const { t } = useTranslation();
-  const [page, setPage] = useState<PanelPage>(null);
+  const [page, setPage] = useState<PanelPage>(startPage);
   /*
    * Поиск по полям — один на все страницы со списками. Своего состояния
    * на страницу не заводим: страницы взаимоисключающие, а сбрасывать его
@@ -356,13 +397,10 @@ function Panel({
       language,
     );
     const shownSlugs = new Set(shown.map((field) => field.slug));
-    const hidden = matching(
-      collapseLanguages(hideable, codes, language).filter(
-        (field) => !shownSlugs.has(field.slug),
-      ),
-      query,
-      language,
+    const hiddenAll = collapseLanguages(hideable, codes, language).filter(
+      (field) => !shownSlugs.has(field.slug),
     );
+    const hidden = matching(hiddenAll, query, language);
     const groups = languageGroups(fields, codes);
     /** Все языковые варианты поля. Обычное поле — оно само. */
     const groupOf = (field: Field): Field[] => {
@@ -392,20 +430,31 @@ function Panel({
         : undefined;
 
     return (
-      <Subpage title={t("view.columns")} busy={busy} onBack={back} hint={t("view.columnsHint")}>
-        <div className="flex gap-1 px-1 pb-1">
-          <BulkButton
-            label={t("view.showAll")}
-            onClick={() => handlers.onColumns(hideable.map(columnKey))}
-          />
-          {/* Совсем без колонок view оставлять нельзя — экран станет пустым
-              без единой подсказки, что делать. Первая остаётся. */}
-          <BulkButton
-            label={t("view.hideAll")}
-            onClick={() => handlers.onColumns(visible.slice(0, 1).map(columnKey))}
-          />
-        </div>
-
+      /* Вид — `propsPop` прототипа: «Свойства» и одна ссылка «Показать
+         все» / «Скрыть все» в шапке, поиск, строки с глазом справа,
+         скрытые — тусклые в том же ряду, внизу «Новое свойство». */
+      <Subpage
+        title={t("view.columns")}
+        busy={busy}
+        {...(startPage === "columns" ? {} : { onBack: back, hint: t("view.columnsHint") })}
+        action={
+          <button
+            type="button"
+            onClick={() =>
+              handlers.onColumns(
+                hiddenAll.length > 0
+                  ? hideable.map(columnKey)
+                  : /* Совсем без колонок view оставлять нельзя — экран станет
+                       пустым без единой подсказки, что делать. Первая остаётся. */
+                    visible.slice(0, 1).map(columnKey),
+              )
+            }
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
+          >
+            {t(hiddenAll.length > 0 ? "view.showAll" : "view.hideAll")}
+          </button>
+        }
+      >
         <FieldSearch value={query} onChange={setQuery} />
 
         <List>
@@ -423,15 +472,27 @@ function Panel({
           />
 
           {hidden.map((field) => (
-            <div key={field.id} className="group/field flex items-center">
-              <PopoverItem
-                icon={<Icon as={IconEyeOff} size={16} className="shrink-0 text-fg-subtle" />}
+            <div
+              key={field.id}
+              className="group/field flex h-7.5 w-full items-center gap-2 rounded-md px-2.5 text-sm transition-colors hover:bg-surface-hover"
+            >
+              {/* Место рукоятки: скрытое не переставляется, но подписи
+                  стоят в одну линию с показанными. */}
+              {!query && <span aria-hidden className="size-5 shrink-0" />}
+              <Icon as={fieldIcon(field.type)} size={16} className="shrink-0 text-fg-subtle" />
+              <span className="flex-1 truncate text-fg-subtle">
+                {localized(field.labels, language, field.label)}
+              </span>
+
+              <button
+                type="button"
                 onClick={() => handlers.onColumns(toggleColumn(view, groupOf(field), true))}
+                aria-label={t("view.showColumn")}
+                title={t("view.showColumn")}
+                className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
               >
-                <span className="text-fg-subtle">
-                  {localized(field.labels, language, field.label)}
-                </span>
-              </PopoverItem>
+                <Icon as={EyeOffIcon} size={14} />
+              </button>
 
               {/* Скрытая колонка — то же поле: настроить и удалить его
                   можно, не показывая сперва в таблице. */}
@@ -439,6 +500,21 @@ function Panel({
             </div>
           ))}
         </List>
+
+        {can.addField && handlers.onAddField && (
+          <>
+            <PopoverSeparator />
+            <PopoverItem
+              icon={<Icon as={PlusIcon} />}
+              onClick={(event) => {
+                handlers.onAddField?.(event.currentTarget.getBoundingClientRect());
+                close();
+              }}
+            >
+              {t("view.newProperty")}
+            </PopoverItem>
+          </>
+        )}
       </Subpage>
     );
   }
@@ -535,7 +611,7 @@ function Panel({
                 active={pinned}
                 icon={
                   <Icon
-                    as={pinned ? IconPin : IconPinnedOff}
+                    as={pinned ? PinIcon : PinOffIcon}
                     size={16}
                     className={`shrink-0 ${pinned ? "" : "text-fg-subtle"}`}
                   />
@@ -577,7 +653,7 @@ function Panel({
         <List>
           <PopoverItem
             active={!view.groupByIds.length}
-            icon={<Icon as={IconX} size={16} className="shrink-0 text-fg-subtle" />}
+            icon={<Icon as={XIcon} size={16} className="shrink-0 text-fg-subtle" />}
             onClick={() => handlers.onGroupBy?.([])}
           >
             {t("view.groupNone")}
@@ -656,7 +732,7 @@ function Panel({
           {!isBoard && (
             <PopoverItem
               active={!view.tabGroupId}
-              icon={<Icon as={IconX} size={16} className="shrink-0 text-fg-subtle" />}
+              icon={<Icon as={XIcon} size={16} className="shrink-0 text-fg-subtle" />}
               onClick={() => handlers.onTabGroup?.("")}
             >
               {t("view.tabGroupNone")}
@@ -717,7 +793,7 @@ function Panel({
         <List>
           <PopoverItem
             active={!view.subGroupId}
-            icon={<Icon as={IconX} size={16} className="shrink-0 text-fg-subtle" />}
+            icon={<Icon as={XIcon} size={16} className="shrink-0 text-fg-subtle" />}
             onClick={() => handlers.onSubGroup?.("")}
           >
             {t("view.subGroupNone")}
@@ -934,7 +1010,7 @@ function Panel({
 
           {handlers.onType && (
             <Row
-              icon={IconLayoutList}
+              icon={LayoutListIcon}
               label={t("view.viewType")}
               value={typeLabel}
               onClick={() => open("type")}
@@ -942,7 +1018,7 @@ function Panel({
           )}
           {handlers.onNavigate && !isTree && !isChart && (
             <Row
-              icon={IconExternalLink}
+              icon={ExternalLinkIcon}
               label={t("view.navigation")}
               value={navigationCount ? String(navigationCount) : ""}
               onClick={() => open("navigation")}
@@ -955,7 +1031,7 @@ function Panel({
 
       {can.columns && (
         <Row
-          icon={IconEye}
+          icon={EyeIcon}
           label={t("view.columns")}
           value={String(shown.length)}
           onClick={() => open("columns")}
@@ -964,13 +1040,13 @@ function Panel({
       {can.settings && !isTree && (
         <>
           <Row
-            icon={IconFilterCog}
+            icon={FunnelPlusIcon}
             label={t("view.defaultFilters")}
             value={defaultCount ? String(defaultCount) : ""}
             onClick={() => open("defaultFilters")}
           />
           <Row
-            icon={IconFilter}
+            icon={ListFilterIcon}
             label={t("view.filters")}
             value={quick.length ? String(quick.length) : ""}
             onClick={() => open("quickFilters")}
@@ -981,7 +1057,7 @@ function Panel({
           он вообще ничего не рисует. */}
       {can.settings && isCalendar && handlers.onDateFrom && (
         <Row
-          icon={IconCalendarTime}
+          icon={CalendarClockIcon}
           label={t("view.calendarFields")}
           value={dateFrom ? localized(dateFrom.labels, language, dateFrom.label) : ""}
           onClick={() => open("calendar")}
@@ -989,7 +1065,7 @@ function Panel({
       )}
       {can.fixColumn && !isBoard && !isCalendar && !isChart && (
         <Row
-          icon={IconPin}
+          icon={PinIcon}
           label={t("view.fixColumns")}
           value={fixed.length ? String(fixed.length) : ""}
           onClick={() => open("fixed")}
@@ -997,7 +1073,7 @@ function Panel({
       )}
       {can.settings && handlers.onGroupBy && canGroup && (
         <Row
-          icon={IconStack2}
+          icon={LayersIcon}
           label={t("view.groupBy")}
           value={
             grouped[0]
@@ -1012,7 +1088,7 @@ function Panel({
           от настройки view: так их и выдаёт бэкенд. */}
       {can.settings && can.tabGroup && handlers.onTabGroup && !isTree && !isChart && (
         <Row
-          icon={isBoard ? IconLayoutColumns : IconLayoutNavbar}
+          icon={isBoard ? KanbanIcon : PanelTopIcon}
           label={t(isBoard ? "view.boardGroup" : "view.tabGroup")}
           value={tabGrouped ? localized(tabGrouped.labels, language, tabGrouped.label) : ""}
           onClick={() => open("tabGroup")}
@@ -1025,7 +1101,7 @@ function Panel({
           доски: это одна настройка в двух уровнях. */}
       {can.settings && can.tabGroup && handlers.onSubGroup && isBoard && (
         <Row
-          icon={IconLayoutRows}
+          icon={Rows3Icon}
           label={t("view.subGroup")}
           value={subGrouped ? localized(subGrouped.labels, language, subGrouped.label) : ""}
           onClick={() => open("subGroup")}
@@ -1036,7 +1112,7 @@ function Panel({
           и ради них открывать экран незачем. */}
       {can.settings && handlers.onInfiniteScroll && isGrid && (
         <label className="flex h-7.5 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm text-fg transition-colors hover:bg-surface-hover">
-          <Icon as={IconInfinity} size={16} className="shrink-0 text-fg-muted" />
+          <Icon as={InfinityIcon} size={16} className="shrink-0 text-fg-muted" />
           <span className="flex-1 truncate">{t("view.infiniteScroll")}</span>
           <Checkbox
             checked={view.infiniteScroll}
@@ -1050,7 +1126,7 @@ function Panel({
       {can.excelMenu && handlers.onImport && handlers.onExport && (
         <>
           <PopoverItem
-            icon={<Icon as={IconFileImport} size={16} className="shrink-0 text-fg-muted" />}
+            icon={<Icon as={FileInputIcon} size={16} className="shrink-0 text-fg-muted" />}
             onClick={() => {
               handlers.onImport?.();
               close();
@@ -1062,7 +1138,7 @@ function Panel({
           <PopoverItem
             icon={
               <Icon
-                as={exporting ? IconLoader2 : IconFileExport}
+                as={exporting ? LoaderCircleIcon : FileOutputIcon}
                 size={16}
                 className={`shrink-0 text-fg-muted ${exporting ? "animate-spin" : ""}`}
               />
@@ -1082,14 +1158,14 @@ function Panel({
           в настройки самой таблицы. */}
       {can.settings ? (
         <Row
-          icon={IconTable}
+          icon={Table2Icon}
           label={t("view.source")}
           value={view.tableSlug}
           onClick={() => open("table")}
         />
       ) : (
         <div className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-sm text-fg">
-          <Icon as={IconTable} size={16} className="shrink-0 text-fg-muted" />
+          <Icon as={Table2Icon} size={16} className="shrink-0 text-fg-muted" />
           <span className="flex-1 truncate">{t("view.source")}</span>
           <span className="max-w-[9rem] truncate text-fg-subtle">{view.tableSlug}</span>
         </div>
@@ -1100,7 +1176,7 @@ function Panel({
           — во всех её view одни и те же. */}
       {can.settings && (
         <Row
-          icon={IconPrinter}
+          icon={PrinterIcon}
           label={t("docs.title")}
           value={String(docTemplates.length)}
           onClick={() => open("docs")}
@@ -1118,7 +1194,7 @@ function Panel({
 
           <PopoverItem
             danger
-            icon={<Icon as={IconTrash} size={16} className="shrink-0" />}
+            icon={<Icon as={Trash2Icon} size={16} className="shrink-0" />}
             onClick={() => {
               handlers.onDelete?.();
               close();
@@ -1216,7 +1292,7 @@ function ColumnOrder({
               event.preventDefault();
               drop(key);
             }}
-            className={`group/field flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors ${
+            className={`group/field flex h-7.5 w-full items-center gap-2 rounded-md px-2.5 text-sm transition-colors ${
               dragged === key
                 ? "opacity-40"
                 : over === key && dragged
@@ -1237,10 +1313,10 @@ function ColumnOrder({
                 }}
                 className="grid size-5 shrink-0 cursor-grab place-items-center rounded text-fg-subtle transition-colors hover:text-fg"
               >
-                <Icon as={IconGripVertical} size={14} />
+                <Icon as={GripVerticalIcon} size={14} />
               </button>
             )}
-            <Icon as={fieldIcon(field.type)} size={16} className="shrink-0 text-fg-muted" />
+            <Icon as={fieldIcon(field.type)} size={16} className="shrink-0 text-fg-subtle" />
             <span className="flex-1 truncate">
               {localized(field.labels, language, field.label)}
             </span>
@@ -1252,7 +1328,7 @@ function ColumnOrder({
               title={t("view.hideColumn")}
               className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
             >
-              <Icon as={IconEye} size={14} />
+              <Icon as={EyeIcon} size={14} />
             </button>
 
             <FieldActions field={field} onEdit={onEditField} onDelete={onDeleteField} />
@@ -1303,7 +1379,7 @@ function FieldActions({
           title={t("column.settings")}
           className={`${button} hover:bg-surface-active hover:text-fg`}
         >
-          <Icon as={IconAdjustments} size={14} />
+          <Icon as={SlidersHorizontalIcon} size={14} />
         </button>
       )}
 
@@ -1315,7 +1391,7 @@ function FieldActions({
           title={t("column.delete")}
           className={`${button} hover:bg-danger-subtle hover:text-danger`}
         >
-          <Icon as={IconTrash} size={14} />
+          <Icon as={Trash2Icon} size={14} />
         </button>
       )}
     </>
@@ -1369,7 +1445,7 @@ function Row({
   value,
   onClick,
 }: {
-  icon: TablerIcon;
+  icon: LucideIcon;
   label: string;
   value: string;
   onClick: () => void;
@@ -1381,7 +1457,7 @@ function Row({
       trailing={
         <span className="flex min-w-0 shrink-0 items-center gap-1 text-fg-subtle">
           <span className="max-w-[7rem] truncate">{value}</span>
-          <Icon as={IconChevronRight} size={14} />
+          <Icon as={ChevronRightIcon} size={14} />
         </span>
       }
     >
@@ -1396,6 +1472,7 @@ function Subpage({
   hint,
   wide,
   onBack,
+  action,
   children,
 }: {
   title: string;
@@ -1403,12 +1480,15 @@ function Subpage({
   hint?: string;
   /** Редактору фильтров 320 пикселей мало: чипы складываются в столбик. */
   wide?: boolean;
-  onBack: () => void;
+  /** Нет — страница открыта сама по себе (кнопка «Свойства»), назад некуда. */
+  onBack?: () => void;
+  /** Действие в шапке справа — «Показать все» у свойств. */
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className={wide ? "w-[26rem]" : "w-80"}>
-      <Header title={title} busy={busy} onBack={onBack} />
+      <Header title={title} busy={busy} {...(onBack ? { onBack } : {})} action={action} />
       {hint && <p className="px-2 pb-1 text-2xs text-fg-subtle">{hint}</p>}
       {children}
     </div>
@@ -1420,24 +1500,27 @@ function Header({
   busy,
   onBack,
   onClose,
+  action,
 }: {
   title: string;
   busy: boolean;
   onBack?: () => void;
   onClose?: () => void;
+  action?: ReactNode;
 }) {
   const { t } = useTranslation();
 
   return (
     <div className="flex h-8 items-center gap-1 px-1">
-      {onBack && <IconTool icon={IconChevronLeft} label={t("action.back")} onClick={onBack} />}
+      {onBack && <IconTool icon={ChevronLeftIcon} label={t("action.back")} onClick={onBack} />}
 
-      <span className="flex-1 truncate px-1 text-xs font-medium text-fg-muted">{title}</span>
+      <span className="flex-1 truncate px-1 text-xs font-semibold text-fg-muted">{title}</span>
 
       {/* Признак работы: правка уезжает на сервер и возвращается оттуда же,
           иначе щелчок выглядит несработавшим. */}
-      {busy && <Icon as={IconLoader2} size={12} className="shrink-0 animate-spin text-fg-subtle" />}
-      {onClose && <IconTool icon={IconX} label={t("action.close")} onClick={onClose} />}
+      {busy && <Icon as={LoaderCircleIcon} size={12} className="shrink-0 animate-spin text-fg-subtle" />}
+      {action}
+      {onClose && <IconTool icon={XIcon} label={t("action.close")} onClick={onClose} />}
     </div>
   );
 }
@@ -1447,7 +1530,7 @@ function IconTool({
   label,
   onClick,
 }: {
-  icon: TablerIcon;
+  icon: LucideIcon;
   label: string;
   onClick: () => void;
 }) {
@@ -1493,7 +1576,7 @@ function FieldSearch({ value, onChange }: { value: string; onChange: (value: str
   return (
     <div className="relative px-1 pb-1">
       <Icon
-        as={IconSearch}
+        as={SearchIcon}
         size={14}
         className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-subtle"
       />
@@ -1716,7 +1799,7 @@ function UrlSetting({
             title={t("action.delete")}
             className="grid size-7 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
           >
-            <Icon as={IconTrash} size={14} />
+            <Icon as={Trash2Icon} size={14} />
           </button>
         </div>
       ))}
@@ -1744,7 +1827,7 @@ function UrlSetting({
             title={t("action.delete")}
             className="grid size-7 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
           >
-            <Icon as={IconTrash} size={14} />
+            <Icon as={Trash2Icon} size={14} />
           </button>
         </div>
       )}

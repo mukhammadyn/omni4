@@ -8,6 +8,7 @@ import { keys } from "@/shared/lib/query-keys";
 import { errorMessage, reportError, toast } from "@/shared/lib/toast";
 import type { View } from "../model/types";
 import { toUrlTemplate, type UrlTemplate } from "../model/url-template";
+import { perLanguage } from "@/shared/lib/i18n";
 
 /** Сырой view. Наружу не выходит. */
 type ViewDto = {
@@ -118,7 +119,7 @@ export function useCreateView({
         // Имя пишется дважды: в колонку и в attributes на языке данных.
         // Старая админка читает только attributes, мы — сначала их же.
         name: name.trim(),
-        attributes: { [`name_${language}`]: name.trim() },
+        attributes: perLanguage("name_", language, name.trim()),
         /*
          * Вкладка карточки — это view со связью, и ровно так её заводит
          * старая админка: `is_relation_view` плюс слаг ЧУЖОЙ таблицы
@@ -341,7 +342,7 @@ export function toUpdateBody({
 
   const attributes: Record<string, unknown> = {
     ...((raw["attributes"] as Record<string, unknown> | undefined) ?? {}),
-    ...(trimmed === undefined ? {} : { [`${NAME_PREFIX}${language ?? ""}`]: trimmed }),
+    ...(trimmed === undefined ? {} : perLanguage(NAME_PREFIX, language ?? "", trimmed)),
     /*
      * is_checked дописывается к каждому полю: по нему старая админка
      * считает счётчик чипов (ViewForm) и решает, рисовать ли поле

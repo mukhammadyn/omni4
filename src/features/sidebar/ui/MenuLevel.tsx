@@ -13,16 +13,33 @@ import { MenuRowActions } from "./MenuRowActions";
  * не целиком — место под «⋮» остаётся незакрашенным.
  *
  * has-[.row-active] ловит класс, который роутер вешает на активную ссылку.
+ *
+ * `.sb-item` прототипа (docs/REDESIGN.md, 4.2): 28px, приглушённый
+ * полужирный текст; выбранный — подложкой `surface-active` и основным
+ * цветом, без белой плашки с тенью.
  */
 const row =
-  "group/row relative flex h-8 w-full items-center rounded-md pr-1 transition-colors hover:bg-surface-hover has-[.row-active]:bg-surface has-[.row-active]:shadow-raised";
+  "group/row relative flex h-7 w-full items-center rounded-md pr-1 transition-colors hover:bg-surface-hover has-[.row-active]:bg-surface-active";
+
+/**
+ * Папка — заголовок группы, как `.sb-section-label` прототипа: 22px,
+ * 11.5px полужирным бледным, без значка, стрелка справа. Пункты под ней
+ * идут без отступа: группа — подпись над ними, а не ветка дерева.
+ *
+ * Размеры — из ДЕЙСТВУЮЩИХ правил прототипа: у него два набора для
+ * сайдбара, и второй, плотный (22 / 28 / 6), перекрывает первый.
+ */
+const groupRow =
+  "group/row relative flex h-5.5 w-full items-center rounded-md pr-1 transition-colors hover:bg-surface-hover";
+const groupInner =
+  "flex h-5.5 min-w-0 flex-1 items-center gap-1 rounded-md text-left text-[11.5px] font-semibold text-fg-subtle";
 
 /** Сама ссылка или кнопка раскрытия — занимает всю строку, кроме «⋮». */
 const inner_row =
-  "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md text-left text-sm text-fg-muted";
+  "flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md text-left text-sm font-medium text-fg-muted";
 
 /** Активный пункт: класс ловится обёрткой через has-[]. */
-const activeRow = "row-active text-fg font-medium";
+const activeRow = "row-active text-fg";
 
 /**
  * Один уровень меню. Бэкенд отдаёт меню по одному уровню за запрос
@@ -35,9 +52,12 @@ const activeRow = "row-active text-fg font-medium";
  */
 export function MenuLevel({ items, path }: { items: MenuNode[]; path: string[] }) {
   return (
-    <ul className="flex flex-col gap-0.5">
-      {items.map((node) => (
-        <li key={node.id}>
+    /* Пункты — встык, как `.sb-item` прототипа (margin 0). */
+    <ul className="flex flex-col">
+      {items.map((node, index) => (
+        /* Над группой — воздух, как `.sb-section` прототипа (6px), кроме
+           первой: над ней и так заголовок «Меню». */
+        <li key={node.id} className={node.kind === "group" && index > 0 ? "mt-1.5" : ""}>
           <MenuRow node={node} siblings={items} path={path} />
         </li>
       ))}
@@ -112,28 +132,30 @@ function MenuRow({
         },
       };
 
-  // Отступ вложенности инлайном: Tailwind не собирает классы из строк.
-  const style = { paddingLeft: `${8 + depth * 14}px` };
+  /* Отступ вложенности инлайном: Tailwind не собирает классы из строк.
+     Первый уровень папок сдвига не даёт — он заголовок группы; сдвиг
+     начинается с папки внутри папки. */
+  const style = { paddingLeft: `${8 + Math.max(0, depth - 1) * 14}px` };
 
-  /**
-   * У раскрываемых пунктов шеврон занимает место иконки при наведении:
-   * иконка гаснет, стрелка проявляется в том же слоте. Так строка
-   * не дёргается и не тратит второй слот справа.
-   */
-  const inner = (
+  const inner = expandable ? (
     <>
-      <span className="relative grid size-4 shrink-0 place-items-center">
-        <span className={expandable ? "transition-opacity group-hover/row:opacity-0" : ""}>
+      {/* Значок у группы — только если его задали (эмодзи из формы
+          пункта). Без него папка — чистый заголовок, как у прототипа. */}
+      {node.icon && (
+        <span className="grid size-5 shrink-0 place-items-center">
           <MenuIcon name={node.icon} type={node.type} />
         </span>
-
-        {expandable && (
-          <span className="absolute opacity-0 transition-opacity group-hover/row:opacity-100">
-            <Chevron open={open} />
-          </span>
-        )}
+      )}
+      <span className="flex-1 truncate">{node.label}</span>
+      <Chevron open={open} />
+    </>
+  ) : (
+    <>
+      {/* Слот значка 20px и бледный значок — `.sb-item .emoji` и
+          `.sb-item svg` прототипа. */}
+      <span className="grid size-5 shrink-0 place-items-center text-fg-subtle">
+        <MenuIcon name={node.icon} type={node.type} />
       </span>
-
       <span className="flex-1 truncate">{node.label}</span>
     </>
   );
@@ -146,7 +168,7 @@ function MenuRow({
       type="button"
       onClick={() => toggleMenu(node.id)}
       aria-expanded={open}
-      className={inner_row}
+      className={groupInner}
       style={style}
     >
       {inner}
@@ -178,7 +200,7 @@ function MenuRow({
   return (
     <>
       <div
-        className={`${row} ${dragging ? "opacity-40" : ""} ${
+        className={`${expandable ? groupRow : row} ${dragging ? "opacity-40" : ""} ${
           hit === "inside" ? "bg-accent-subtle ring-1 ring-accent ring-inset" : ""
         }`}
         {...dragHandlers}
@@ -208,12 +230,12 @@ function MenuRow({
 
 function LevelSkeleton({ depth }: { depth: number }) {
   return (
-    <div className="flex flex-col gap-0.5" aria-hidden>
+    <div className="flex flex-col" aria-hidden>
       {[60, 45].map((width, index) => (
         <div
           key={index}
-          className="flex h-8 items-center"
-          style={{ paddingLeft: `${8 + depth * 14}px` }}
+          className="flex h-7 items-center"
+          style={{ paddingLeft: `${8 + Math.max(0, depth - 1) * 14}px` }}
         >
           <div className="h-3 rounded-sm bg-surface-active" style={{ width: `${width}%` }} />
         </div>

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import {
-  IconCheck,
-  IconChevronLeft,
-  IconChevronRight,
-  IconLoader2,
-  IconTrash,
-} from "@tabler/icons-react";
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  LoaderCircleIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
@@ -80,7 +80,7 @@ export function GridFooter({
             только тогда: пустая панель действий сбивает с толку. */}
         {selectedCount > 0 && onDeleteSelected && (
           <Button variant="danger" size="sm" disabled={deleting} onClick={onDeleteSelected}>
-            <Icon as={IconTrash} size={14} />
+            <Icon as={Trash2Icon} size={14} />
             {t("table.deleteSelected", { count: selectedCount })}
           </Button>
         )}
@@ -88,14 +88,14 @@ export function GridFooter({
 
       {page === undefined || !onPage ? (
         <p className="flex shrink-0 items-center gap-1.5 text-xs text-fg-muted tabular-nums">
-          {loadingMore && <Icon as={IconLoader2} size={12} className="animate-spin" />}
+          {loadingMore && <Icon as={LoaderCircleIcon} size={12} className="animate-spin" />}
           {t("table.shownOf", { shown, total })}
         </p>
       ) : (
         <nav className="flex items-center gap-0.5" aria-label={t("table.pages")}>
           <Step
             label={t("table.prevPage")}
-            icon={IconChevronLeft}
+            icon={ChevronLeftIcon}
             disabled={page <= 1}
             onClick={() => onPage(page - 1)}
           />
@@ -125,7 +125,7 @@ export function GridFooter({
 
           <Step
             label={t("table.nextPage")}
-            icon={IconChevronRight}
+            icon={ChevronRightIcon}
             disabled={page >= pages}
             onClick={() => onPage(page + 1)}
           />
@@ -142,7 +142,7 @@ function Step({
   onClick,
 }: {
   label: string;
-  icon: typeof IconChevronLeft;
+  icon: typeof ChevronLeftIcon;
   disabled: boolean;
   onClick: () => void;
 }) {
@@ -223,7 +223,7 @@ function LimitMenu({
           className="flex h-7.5 items-center justify-between rounded-md px-2.5 text-sm text-fg transition-colors hover:bg-surface-hover"
         >
           <span className="tabular-nums">{size}</span>
-          {size === limit && <Icon as={IconCheck} size={14} className="text-accent-text" />}
+          {size === limit && <Icon as={CheckIcon} size={14} className="text-accent-text" />}
         </button>
       ))}
 

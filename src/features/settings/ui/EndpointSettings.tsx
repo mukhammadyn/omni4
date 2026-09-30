@@ -1,11 +1,11 @@
 import { useState } from "react";
 import {
-  IconArrowDown,
-  IconArrowUp,
-  IconPencil,
-  IconPlus,
-  IconTrash,
-} from "@tabler/icons-react";
+  ArrowDownIcon,
+  ArrowUpIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
@@ -80,7 +80,7 @@ export function EndpointSettings() {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <SectionHeader title={t("endpoints.title")} hint={t("endpoints.hint")}>
         <Button size="sm" onClick={() => setEditing("new")}>
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("endpoints.create")}
         </Button>
       </SectionHeader>
@@ -135,24 +135,24 @@ export function EndpointSettings() {
                 <Td className="text-right">
                   <span className="inline-flex gap-1 opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100">
                     <RowButton
-                      icon={IconArrowUp}
+                      icon={ArrowUpIcon}
                       label={t("endpoints.moveUp")}
                       disabled={index === 0 || reorder.isPending}
                       onClick={() => move(index, -1)}
                     />
                     <RowButton
-                      icon={IconArrowDown}
+                      icon={ArrowDownIcon}
                       label={t("endpoints.moveDown")}
                       disabled={index === endpoints.length - 1 || reorder.isPending}
                       onClick={() => move(index, 1)}
                     />
                     <RowButton
-                      icon={IconPencil}
+                      icon={PencilIcon}
                       label={t("action.edit")}
                       onClick={() => setEditing(endpoint)}
                     />
                     <RowButton
-                      icon={IconTrash}
+                      icon={Trash2Icon}
                       label={t("action.delete")}
                       danger
                       onClick={() => setDeleting(endpoint)}
@@ -194,7 +194,7 @@ function RowButton({
   disabled = false,
   onClick,
 }: {
-  icon: typeof IconPencil;
+  icon: typeof PencilIcon;
   label: string;
   danger?: boolean;
   disabled?: boolean;

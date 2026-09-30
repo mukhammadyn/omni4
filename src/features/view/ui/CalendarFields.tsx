@@ -1,4 +1,4 @@
-import { IconX } from "@tabler/icons-react";
+import { XIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, type Field } from "@/features/table";
 import { fieldIcon } from "@/features/item";
@@ -90,7 +90,7 @@ export function CalendarFields({
           событие тогда точка в дне, а не полоса на сутки. */}
       <PopoverItem
         active={!to}
-        icon={<Icon as={IconX} size={16} className="shrink-0 text-fg-subtle" />}
+        icon={<Icon as={XIcon} size={16} className="shrink-0 text-fg-subtle" />}
         onClick={() => onDateTo("")}
       >
         {t("view.calendarToNone")}

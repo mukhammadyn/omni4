@@ -1,5 +1,11 @@
 import { useRef, useState } from "react";
-import { IconCopy, IconFileTypeDocx, IconLoader2, IconPencil, IconTrash } from "@tabler/icons-react";
+import {
+  CopyIcon,
+  FileTypeIcon,
+  LoaderCircleIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useUploadFiles } from "@/features/item";
 import type { Field } from "@/features/table";
@@ -87,7 +93,7 @@ export function DocTemplates({
             key={template.id}
             className="flex h-7.5 items-center gap-2.5 rounded-md px-2.5 hover:bg-surface-hover"
           >
-            <Icon as={IconFileTypeDocx} size={14} className="shrink-0 text-fg-subtle" />
+            <Icon as={FileTypeIcon} size={14} className="shrink-0 text-fg-subtle" />
 
             {renaming === template.id ? (
               <NameInput
@@ -119,7 +125,7 @@ export function DocTemplates({
               title={t("action.rename")}
               className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
             >
-              <Icon as={IconPencil} size={14} />
+              <Icon as={PencilIcon} size={14} />
             </button>
             <button
               type="button"
@@ -127,7 +133,7 @@ export function DocTemplates({
               aria-label={t("action.delete")}
               className="grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
             >
-              <Icon as={IconTrash} size={14} />
+              <Icon as={Trash2Icon} size={14} />
             </button>
           </div>
         ))}
@@ -158,7 +164,7 @@ export function DocTemplates({
         onClick={() => input.current?.click()}
         className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-accent text-sm text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-40"
       >
-        {busy && <Icon as={IconLoader2} size={14} className="animate-spin" />}
+        {busy && <Icon as={LoaderCircleIcon} size={14} className="animate-spin" />}
         {t("docs.upload")}
       </button>
 
@@ -237,7 +243,7 @@ function Variable({ label, slug }: { label: string; slug: string }) {
     >
       <span className="min-w-0 flex-1 truncate text-2xs text-fg-muted">{label}</span>
       <span className="shrink-0 font-mono text-2xs text-fg-subtle">{`{${slug}}`}</span>
-      <Icon as={IconCopy} size={12} className="shrink-0 text-fg-subtle" />
+      <Icon as={CopyIcon} size={12} className="shrink-0 text-fg-subtle" />
     </button>
   );
 }

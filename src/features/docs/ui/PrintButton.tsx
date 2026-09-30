@@ -1,5 +1,10 @@
 import { useMemo, useRef, useState } from "react";
-import { IconCode, IconFileTypeDocx, IconLoader2, IconPrinter } from "@tabler/icons-react";
+import {
+  CodeIcon,
+  FileTypeIcon,
+  LoaderCircleIcon,
+  PrinterIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Field } from "@/features/table";
 import { Anchored } from "@/shared/ui/anchored";
@@ -73,7 +78,7 @@ export function PrintButton({
         className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-40"
       >
         <Icon
-          as={busy ? IconLoader2 : IconPrinter}
+          as={busy ? LoaderCircleIcon : PrinterIcon}
           size={16}
           className={busy ? "animate-spin" : ""}
         />
@@ -92,7 +97,7 @@ export function PrintButton({
                 }}
                 className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
               >
-                <Icon as={IconFileTypeDocx} size={14} className="shrink-0 text-fg-subtle" />
+                <Icon as={FileTypeIcon} size={14} className="shrink-0 text-fg-subtle" />
                 <span className="truncate">{template.title || t("docs.untitled")}</span>
               </button>
             ))}
@@ -107,7 +112,7 @@ export function PrintButton({
                 }}
                 className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
               >
-                <Icon as={IconCode} size={14} className="shrink-0 text-fg-subtle" />
+                <Icon as={CodeIcon} size={14} className="shrink-0 text-fg-subtle" />
                 <span className="truncate">{template.title || t("docs.untitled")}</span>
               </button>
             ))}

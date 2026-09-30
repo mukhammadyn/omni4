@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconTrash } from "@tabler/icons-react";
+import { Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Field, Relation } from "@/features/table";
 import { Button } from "@/shared/ui/button";
@@ -170,7 +170,7 @@ export function TreeGrid({
       {onDeleteSelected && selected.size > 0 && (
         <div className="flex h-11 shrink-0 items-center border-t border-border px-3">
           <Button variant="danger" size="sm" disabled={deleting} onClick={onDeleteSelected}>
-            <Icon as={IconTrash} size={14} />
+            <Icon as={Trash2Icon} size={14} />
             {t("table.deleteSelected", { count: selected.size })}
           </Button>
         </div>

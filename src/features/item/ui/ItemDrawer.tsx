@@ -8,26 +8,25 @@ import {
   type ReactNode,
 } from "react";
 import {
-  IconAppWindow,
-  IconCheck,
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsRight,
-  IconEye,
-  IconEyeOff,
-  IconFileDescription,
-  IconFileTypePdf,
-  IconGripVertical,
-  IconHeading,
-  IconLayoutList,
-  IconLayoutSidebarRight,
-  IconMaximize,
-  IconPencil,
-  IconPlus,
-  IconTable,
-  IconX,
-  type Icon as TablerIcon,
-} from "@tabler/icons-react";
+  AppWindowIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronsRightIcon,
+  EyeIcon,
+  EyeOffIcon,
+  FileTextIcon,
+  GripVerticalIcon,
+  HeadingIcon,
+  LayoutListIcon,
+  MaximizeIcon,
+  PanelRightIcon,
+  PencilIcon,
+  PlusIcon,
+  Table2Icon,
+  XIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   collapseLanguages,
@@ -207,7 +206,7 @@ export function ItemDrawer({
    * Набор знает features/view — карточке о типах view знать незачем,
    * она только рисует список. Пусто или один — шага выбора нет вовсе.
    */
-  tabTypes?: { type: string; label: string; icon: TablerIcon }[] | undefined;
+  tabTypes?: { type: string; label: string; icon: LucideIcon }[] | undefined;
   /**
    * Открыть PDF записи. Адрес задаёт админ в настройках view
    * (attributes.pdf_url); не задан — кнопки нет.
@@ -297,7 +296,7 @@ export function ItemDrawer({
   const canLayout = Boolean(onRenameSection ?? onAddSection ?? onToggleHidden);
   /** Имена секций правятся: режим включён и право на это есть. */
   const editable = editing && Boolean(onRenameSection);
-  const { drawerMode, setDrawerMode, drawerWidth, setDrawerWidth, sidebarCollapsed } = useUi();
+  const { drawerMode, setDrawerMode, drawerWidth, setDrawerWidth } = useUi();
   const panel = useRef<HTMLElement>(null);
   const side = drawerMode === "side";
 
@@ -429,13 +428,13 @@ export function ItemDrawer({
    */
   const tabItems = useMemo(
     () => [
-      { id: "", label: t("drawer.record"), icon: IconLayoutList },
+      { id: "", label: t("drawer.record"), icon: LayoutListIcon },
       ...(tabs ?? []).map((item) => ({
         id: item.id,
         label: item.label,
         /* Вкладка на одну строку — не таблица: у обратной связи
            в нашей колонке лежит ровно один чужой guid. */
-        icon: item.direction === "outgoing" ? IconFileDescription : IconTable,
+        icon: item.direction === "outgoing" ? FileTextIcon : Table2Icon,
       })),
     ],
     [tabs, t],
@@ -521,18 +520,11 @@ export function ItemDrawer({
       <aside
         ref={panel}
         style={side ? { width: drawerWidth } : undefined}
-        /*
-         * Свёрнутый сайдбар убирает отступ и скругление у контента
-         * (`_authed.tsx`: отделять карточку слева не от чего) — панель
-         * следует за ним и тоже прижимается к краю. Иначе она осталась
-         * бы единственной плавающей поверхностью на экране, где всё
-         * остальное лежит встык.
-         */
         /* Переход по `translate`, а не по `transform`: утилиты сдвига
            в tailwind 4 пишут отдельное свойство translate, и переход
            по transform не двигал бы ничего. */
         className={`fixed z-50 flex flex-col bg-surface transition-[translate,opacity] duration-200 ease-out ${
-          side && sidebarCollapsed ? SIDE_FLUSH : MODE_CLASS[drawerMode]
+          MODE_CLASS[drawerMode]
         } ${closing ? EXIT_CLASS[drawerMode] : ENTER_CLASS[drawerMode]}`}
       >
         {side && (
@@ -560,9 +552,9 @@ export function ItemDrawer({
 
         {/* Отступы и граница — как у шапки страницы: это тот же ряд,
             только в панели. */}
-        <header className="flex h-header shrink-0 items-center gap-1 border-b border-border px-4">
+        <header className="flex h-header shrink-0 items-center gap-1 px-4">
           <IconButton
-            icon={side ? IconChevronsRight : IconX}
+            icon={side ? ChevronsRightIcon : XIcon}
             label={t("action.close")}
             onClick={dismiss}
           />
@@ -589,7 +581,7 @@ export function ItemDrawer({
                   >
                     <span className="flex items-center gap-2">
                       {t(MODE_LABEL[mode])}
-                      {drawerMode === mode && <Icon as={IconCheck} size={14} />}
+                      {drawerMode === mode && <Icon as={CheckIcon} size={14} />}
                     </span>
                   </PopoverItem>
                 ))}
@@ -612,7 +604,7 @@ export function ItemDrawer({
               {crumbs.map((crumb, index) => (
                 <Fragment key={index}>
                   {index > 0 && (
-                    <Icon as={IconChevronRight} size={12} className="shrink-0 text-fg-subtle" />
+                    <Icon as={ChevronRightIcon} size={12} className="shrink-0 text-fg-subtle" />
                   )}
 
                   {crumb.onClick ? (
@@ -652,7 +644,7 @@ export function ItemDrawer({
                 нужна прямо здесь — с открытой карточкой, а не после
                 возврата в таблицу. */}
             {onPdf && (
-              <IconButton icon={IconFileTypePdf} label={t("drawer.openPdf")} onClick={onPdf} />
+              <IconButton icon={FileTextIcon} label={t("drawer.openPdf")} onClick={onPdf} />
             )}
 
             {actions}
@@ -705,7 +697,7 @@ export function ItemDrawer({
             {canLayout && (
               <div className="ml-auto shrink-0">
                 <IconButton
-                  icon={IconPencil}
+                  icon={PencilIcon}
                   label={t("drawer.layoutEdit")}
                   active={editing}
                   onClick={() => setEditing((current) => !current)}
@@ -727,7 +719,7 @@ export function ItemDrawer({
         ) : tab ? (
           tabContent
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-10">
+          <div className="min-h-0 flex-1 overflow-y-auto px-12 pb-10">
             <Heading
               field={title}
               candidates={rest}
@@ -786,7 +778,7 @@ export function ItemDrawer({
                         title={t("drawer.sectionRemove")}
                         className="grid size-5 shrink-0 place-items-center rounded text-fg-subtle transition hover:bg-surface-hover hover:text-danger"
                       >
-                        <Icon as={IconX} size={12} />
+                        <Icon as={XIcon} size={12} />
                       </button>
                     )}
                   </div>
@@ -916,7 +908,7 @@ export function ItemDrawer({
                     {editing && onToggleHidden && (
                       <span className="mt-0.5 shrink-0">
                         <IconButton
-                          icon={hidden?.has(field.slug) ? IconEyeOff : IconEye}
+                          icon={hidden?.has(field.slug) ? EyeOffIcon : EyeIcon}
                           label={t(
                             hidden?.has(field.slug) ? "drawer.fieldShow" : "drawer.fieldHide",
                           )}
@@ -939,7 +931,7 @@ export function ItemDrawer({
                 onClick={() => onAddSection("")}
                 className="mt-3 flex items-center gap-1.5 px-1 text-2xs text-fg-subtle transition-colors hover:text-fg"
               >
-                <Icon as={IconPlus} size={12} />
+                <Icon as={PlusIcon} size={12} />
                 {t("drawer.sectionAdd")}
               </button>
             )}
@@ -1105,9 +1097,9 @@ const MODE_LABEL = {
  * неотличим от невыбранного флажка.
  */
 const MODE_ICON = {
-  side: IconLayoutSidebarRight,
-  center: IconAppWindow,
-  full: IconMaximize,
+  side: PanelRightIcon,
+  center: AppWindowIcon,
+  full: MaximizeIcon,
 } as const;
 
 /**
@@ -1115,22 +1107,16 @@ const MODE_ICON = {
  * карточка над таблицей. Во весь экран — без скруглений и границ:
  * это уже не панель поверх экрана, а сам экран.
  *
- * У панели сбоку тот же отступ и тот же радиус, что у карточки контента
- * (`_authed.tsx`: `m-2 rounded-xl`): приклеенная к краю окна, она была
- * единственной поверхностью приложения со своими правилами — шапка
- * страницы начиналась на 8px ниже шапки панели, а скруглённый угол
- * контента уезжал под неё. Радиус 12px — тот, который DESIGN.md
- * и назначает drawer'у.
+ * Панель сбоку — встык к правому краю окна, как `.peek` прототипа
+ * (docs/REDESIGN.md, 4.4): раскладка плоская, и отступа со скруглением,
+ * которые повторяли карточку контента, больше не у чего повторять.
  */
 const MODE_CLASS = {
-  side: "inset-y-2 right-2 rounded-xl border border-border shadow-modal",
+  side: "inset-y-0 right-0 border-l border-border shadow-peek",
   center:
     "inset-y-8 left-1/2 w-[min(1100px,calc(100%-4rem))] -translate-x-1/2 rounded-xl border border-border shadow-modal",
   full: "inset-0",
 } as const;
-
-/** Панель сбоку без сайдбара: встык к краю окна, как и сам контент. */
-const SIDE_FLUSH = "inset-y-0 right-0 border-l border-border shadow-modal";
 
 /**
  * Откуда карточка приезжает и куда уезжает.
@@ -1227,7 +1213,7 @@ function Heading({
           title={t("drawer.heading")}
           className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
         >
-          <Icon as={IconHeading} size={16} />
+          <Icon as={HeadingIcon} size={16} />
         </button>
       )}
     >
@@ -1270,12 +1256,12 @@ function Heading({
           onClick={(event) => onOpen(field, event.currentTarget)}
           /* Отступы те же, что у редактора (карточка p-1.5 + поле
              px-0.5): текст не сдвигается в момент открытия правки. */
-          className="flex min-w-0 flex-1 rounded-md px-2 py-1.5 text-left text-2xl leading-8 font-semibold transition-colors hover:bg-surface-hover"
+          className="flex min-w-0 flex-1 rounded-md px-2 py-1.5 text-left text-2xl leading-9 font-bold transition-colors hover:bg-surface-hover"
         >
           {children}
         </button>
       ) : (
-        <span className="flex-1 px-2 py-1.5 text-2xl leading-8 font-semibold text-fg-subtle">
+        <span className="flex-1 px-2 py-1.5 text-2xl leading-9 font-bold text-fg-subtle">
           {placeholder}
         </span>
       )}
@@ -1384,7 +1370,7 @@ function FieldLabel({
           className={`transition-opacity ${grip ? "opacity-0" : "group-hover/label:opacity-0"}`}
         />
         <Icon
-          as={IconGripVertical}
+          as={GripVerticalIcon}
           size={14}
           className={`absolute transition-opacity ${
             grip ? "opacity-100" : "opacity-0 group-hover/label:opacity-100"
@@ -1408,7 +1394,7 @@ function IconButton({
   active,
   onClick,
 }: {
-  icon: typeof IconChevronsRight;
+  icon: typeof ChevronsRightIcon;
   label: string;
   /** Кнопка-переключатель: задан — нажатое состояние видно и читается вслух. */
   active?: boolean | undefined;
@@ -1458,7 +1444,7 @@ function AddTabButton({
   shown: ReadonlySet<string | undefined>;
   language: string;
   /** Типы вкладки: подпись и значок. Пусто или один — шаг пропускается. */
-  types: { type: string; label: string; icon: TablerIcon }[];
+  types: { type: string; label: string; icon: LucideIcon }[];
   onAdd: (relationId: string, label: string, type: string) => void;
 }) {
   const { t } = useTranslation();
@@ -1483,7 +1469,7 @@ function AddTabButton({
           title={t("drawer.addTab")}
           className="grid size-6 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
         >
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
         </button>
       )}
     >
@@ -1504,7 +1490,7 @@ function AddTabButton({
                 onClick={() => setPicked(null)}
                 className="flex h-8 w-full items-center gap-1 rounded-md px-1 text-left text-xs text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
               >
-                <Icon as={IconChevronLeft} size={14} className="shrink-0" />
+                <Icon as={ChevronLeftIcon} size={14} className="shrink-0" />
                 <span className="truncate">{picked.label}</span>
               </button>
 
@@ -1539,7 +1525,7 @@ function AddTabButton({
                   active={shown.has(relation.id)}
                   trailing={
                     types.length > 1 ? (
-                      <Icon as={IconChevronRight} size={14} className="text-fg-subtle" />
+                      <Icon as={ChevronRightIcon} size={14} className="text-fg-subtle" />
                     ) : undefined
                   }
                   onClick={() =>

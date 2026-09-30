@@ -6,6 +6,7 @@ import { reportError, toast } from "@/shared/lib/toast";
 import type { Labels } from "../model/types";
 import { invalidateSchema } from "./fields";
 import { pickLabels } from "./normalize";
+import { perLanguage } from "@/shared/lib/i18n";
 
 /**
  * Настройки самой ТАБЛИЦЫ — не view: имя, кэш, мягкое удаление, вход.
@@ -211,7 +212,7 @@ export function toUpdateBody({
 
   const named: Record<string, unknown> = {};
   for (const [code, value] of Object.entries(nextLabels)) {
-    named[`label_${code}`] = value.trim();
+    Object.assign(named, perLanguage("label_", code, value.trim()));
   }
 
   return {

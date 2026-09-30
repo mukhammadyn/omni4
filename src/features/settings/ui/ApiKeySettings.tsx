@@ -1,12 +1,12 @@
 import { useDeferredValue, useState } from "react";
 import {
-  IconCopy,
-  IconEye,
-  IconEyeOff,
-  IconPencil,
-  IconPlus,
-  IconTrash,
-} from "@tabler/icons-react";
+  CopyIcon,
+  EyeIcon,
+  EyeOffIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
@@ -78,7 +78,7 @@ export function ApiKeySettings() {
         </div>
 
         <Button size="sm" onClick={() => setEditing("new")}>
-          <Icon as={IconPlus} size={14} />
+          <Icon as={PlusIcon} size={14} />
           {t("apiKeys.create")}
         </Button>
       </SectionHeader>
@@ -133,7 +133,7 @@ export function ApiKeySettings() {
                       title={t("action.edit")}
                       className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
                     >
-                      <Icon as={IconPencil} size={14} />
+                      <Icon as={PencilIcon} size={14} />
                     </button>
 
                     <button
@@ -143,7 +143,7 @@ export function ApiKeySettings() {
                       title={t("action.delete")}
                       className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
                     >
-                      <Icon as={IconTrash} size={14} />
+                      <Icon as={Trash2Icon} size={14} />
                     </button>
                   </span>
                 </Td>
@@ -215,7 +215,7 @@ function Secret({ value, masked = false }: { value: string; masked?: boolean }) 
           title={shown ? t("auth.hidePassword") : t("auth.showPassword")}
           className="grid size-6 place-items-center rounded text-fg-subtle transition-colors hover:text-fg"
         >
-          <Icon as={shown ? IconEyeOff : IconEye} size={13} />
+          <Icon as={shown ? EyeOffIcon : EyeIcon} size={13} />
         </button>
       )}
 
@@ -229,7 +229,7 @@ function Secret({ value, masked = false }: { value: string; masked?: boolean }) 
         title={t("cell.copy")}
         className="grid size-6 place-items-center rounded text-fg-subtle transition-colors hover:text-fg"
       >
-        <Icon as={IconCopy} size={13} />
+        <Icon as={CopyIcon} size={13} />
       </button>
     </span>
   );

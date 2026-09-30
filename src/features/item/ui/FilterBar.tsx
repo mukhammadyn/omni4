@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { IconArrowNarrowDown, IconArrowNarrowUp, IconPlus, IconSearch } from "@tabler/icons-react";
+import {
+  MoveDownIcon,
+  MoveUpIcon,
+  PlusIcon,
+  SearchIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, type Field, type Relation } from "@/features/table";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -120,7 +125,7 @@ export function FilterBar({
               title={t("table.addFilter")}
               className="grid size-7 shrink-0 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
             >
-              <Icon as={IconPlus} size={16} />
+              <Icon as={PlusIcon} size={16} />
             </button>
           )}
         >
@@ -178,7 +183,7 @@ function FieldPicker({
   return (
     <div className="flex w-64 flex-col gap-1">
       <label className="flex h-7 items-center gap-1.5 rounded-md border border-border-strong bg-input px-2 text-sm">
-        <Icon as={IconSearch} size={14} className="text-fg-subtle" />
+        <Icon as={SearchIcon} size={14} className="text-fg-subtle" />
         <input
           autoFocus
           value={query}
@@ -248,7 +253,7 @@ function SortChips({
                 className="flex h-7 max-w-56 items-center gap-1 rounded-full border border-accent bg-accent-subtle px-2 text-xs text-accent-text"
               >
                 <Icon
-                  as={sort.direction === "asc" ? IconArrowNarrowUp : IconArrowNarrowDown}
+                  as={sort.direction === "asc" ? MoveUpIcon : MoveDownIcon}
                   size={14}
                 />
                 <span className="truncate">

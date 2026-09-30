@@ -9,13 +9,13 @@ import {
   type ReactNode,
 } from "react";
 import {
-  IconAdjustments,
-  IconCheck,
-  IconExternalLink,
-  IconPlus,
-  IconTrash,
-  IconUpload,
-} from "@tabler/icons-react";
+  CheckIcon,
+  ExternalLinkIcon,
+  PlusIcon,
+  SlidersHorizontalIcon,
+  Trash2Icon,
+  UploadIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconPicker } from "@/features/icons";
 import {
@@ -99,6 +99,14 @@ const CalendarFallback = () => <div className="h-64 w-64" />;
 /* Цвет рамки задаётся на месте: две color-утилиты в одной строке классов
    борются не по порядку в строке, а по порядку в стилях. */
 const card = "rounded-md border bg-surface shadow-popover";
+
+/*
+ * Строка ввода в редакторах связи, статуса и мультивыбора — отдельным
+ * залитым полем с отступами (`.pop-input` прототипа), а не полосой
+ * с линией снизу. Редактор открывается ровно на месте ячейки, и линия
+ * под полосой высотой в строку вставала в продолжение линии таблицы:
+ * казалось, что таблица просвечивает сквозь окно.
+ */
 
 export function ActiveCell({
   field,
@@ -629,7 +637,7 @@ function TextEditor({
             }
           }}
           className={`max-h-64 w-full resize-none bg-transparent px-0.5 text-fg outline-none ${
-            heading ? "text-2xl leading-8 font-semibold" : "text-sm"
+            heading ? "text-2xl leading-9 font-bold" : "text-sm"
           }`}
         />
 
@@ -965,7 +973,7 @@ function RelationEditor({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-1 border-b border-border p-1.5">
+        <div className="m-1.5 flex min-h-7.5 flex-wrap items-center gap-1 rounded-md border border-border bg-input px-2 py-1">
           {selected.map((item) => (
             <span key={item.guid} className="inline-flex min-w-0 items-center gap-0.5">
               <Chip onRemove={() => write(null)} removeLabel={t("cell.remove")}>
@@ -983,7 +991,7 @@ function RelationEditor({
                 title={t("cell.open")}
                 className="grid size-4 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:text-fg"
               >
-                <Icon as={IconExternalLink} size={11} />
+                <Icon as={ExternalLinkIcon} size={11} />
               </button>
             </span>
           ))}
@@ -1019,7 +1027,7 @@ function RelationEditor({
                   >
                     <span className="truncate">{label || guid}</span>
                     {selectedGuids.has(guid) && (
-                      <Icon as={IconCheck} size={14} className="ml-auto text-accent-text" />
+                      <Icon as={CheckIcon} size={14} className="ml-auto text-accent-text" />
                     )}
                   </button>
                 );
@@ -1038,7 +1046,7 @@ function RelationEditor({
                   disabled={create.isPending}
                   className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-50"
                 >
-                  <Icon as={IconPlus} size={14} />
+                  <Icon as={PlusIcon} size={14} />
                   <span className="truncate">{t("cell.createNamed", { name: query.trim() })}</span>
               </button>
             )}
@@ -1116,7 +1124,7 @@ function StatusEditor({
       <div className={`${card} border-accent w-64 overflow-hidden`}>
         {/* Текущее значение остаётся на месте ячейки — под ним и
             открылось меню. Крестик снимает его. */}
-        <div className="flex min-h-9 flex-wrap items-center gap-1 border-b border-border px-2 py-1.5">
+        <div className="m-1.5 flex min-h-7.5 flex-wrap items-center gap-1 rounded-md border border-border bg-input px-2 py-1">
           {current && (
             <Chip
               dot
@@ -1200,7 +1208,7 @@ function SettingsRow({ onClick }: { onClick?: (() => void) | undefined }) {
       onClick={onClick}
       className="flex h-8 w-full items-center gap-2 border-t border-border px-2.5 text-left text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
     >
-      <Icon as={IconAdjustments} size={14} />
+      <Icon as={SlidersHorizontalIcon} size={14} />
       <span className="truncate">{t("column.settings")}</span>
     </button>
   );
@@ -1251,7 +1259,7 @@ function MultiselectEditor({
   return (
     <Anchored anchor={anchor} onClose={onClose}>
       <div className={`${card} border-accent w-72 overflow-hidden`}>
-        <div className="flex flex-wrap items-center gap-1 border-b border-border p-1.5">
+        <div className="m-1.5 flex min-h-7.5 flex-wrap items-center gap-1 rounded-md border border-border bg-input px-2 py-1">
           {selected.map((item) => (
             <Chip
               key={item}
@@ -1329,7 +1337,7 @@ function OptionRow({
         {optionLabel(option, option.value, language)}
       </Chip>
 
-      {checked && <Icon as={IconCheck} size={14} className="ml-auto text-accent-text" />}
+      {checked && <Icon as={CheckIcon} size={14} className="ml-auto text-accent-text" />}
     </button>
   );
 }
@@ -1438,7 +1446,7 @@ function FileEditor({
                     images ? "absolute top-0.5 right-0.5 bg-surface/80" : ""
                   }`}
                 >
-                  <Icon as={IconTrash} size={14} />
+                  <Icon as={Trash2Icon} size={14} />
                 </button>
               </div>
             ))}
@@ -1464,7 +1472,7 @@ function FileEditor({
           disabled={upload.isPending}
           className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border-strong text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-50"
         >
-          <Icon as={IconUpload} size={14} />
+          <Icon as={UploadIcon} size={14} />
           {upload.isPending ? t("cell.uploading") : t("cell.upload")}
         </button>
       </div>
@@ -1535,7 +1543,7 @@ function ColorEditor({
             aria-label={t("cell.clear")}
             className="grid size-8 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconTrash} size={14} />
+            <Icon as={Trash2Icon} size={14} />
           </button>
         )}
       </div>
@@ -1704,7 +1712,7 @@ function MapEditor({
             rel="noreferrer noopener"
             className="mt-1.5 flex h-7 items-center justify-center gap-1.5 rounded-md border border-border text-xs text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <Icon as={IconExternalLink} size={14} />
+            <Icon as={ExternalLinkIcon} size={14} />
             {t("cell.openMap")}
           </a>
         )}

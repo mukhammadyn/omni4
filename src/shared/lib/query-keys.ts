@@ -193,7 +193,10 @@ export const keys = {
   },
   icons: {
     all: ["icons"] as const,
-    search: (query: string) => [...keys.icons.all, query] as const,
+    /** Весь набор эмодзи Apple — один на сеанс. */
+    emoji: () => [...keys.icons.all, "emoji"] as const,
+    /** Весь набор Lucide — один на сеанс. */
+    lucide: () => [...keys.icons.all, "lucide"] as const,
   },
   /**
    * Действия таблицы (automation): что можно запустить над отмеченными

@@ -36,6 +36,7 @@ export function placement({
   height,
   view,
   align,
+  minBelow,
 }: {
   anchor: { top: number; bottom: number; left: number; right: number };
   /** Ширина меню — уже с учётом минимальной. */
@@ -44,11 +45,18 @@ export function placement({
   height: number;
   view: { width: number; height: number };
   align: "start" | "end";
+  /**
+   * Держаться снизу, пока там есть хотя бы столько места, — даже если
+   * целиком не помещается: содержимое, умеющее ужиматься (выбор иконки),
+   * лучше под кнопкой и чуть ниже ростом, чем развёрнутым вверх поверх
+   * того, к чему оно относится.
+   */
+  minBelow?: number | undefined;
 }): { left: number; top?: number; bottom?: number; maxHeight: number } {
   const below = view.height - anchor.bottom - GAP - EDGE;
   const above = anchor.top - GAP - EDGE;
   // Вверх — только если снизу не помещается И сверху места больше.
-  const up = height > below && above > below;
+  const up = (minBelow === undefined ? height > below : below < minBelow) && above > below;
 
   const wanted = align === "end" ? anchor.right - width : anchor.left;
 
@@ -83,6 +91,7 @@ export function Popover({
   children,
   align = "start",
   className = "",
+  minBelow,
 }: {
   trigger: (props: { open: boolean; toggle: () => void }) => ReactNode;
   children: (close: () => void) => ReactNode;
@@ -96,6 +105,8 @@ export function Popover({
    * она и растягивается сама, и слушается flex-1.
    */
   className?: string;
+  /** См. placement: держаться снизу, пока там есть столько места. */
+  minBelow?: number;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -135,6 +146,7 @@ export function Popover({
         height: box.scrollHeight,
         view: { width: window.innerWidth, height: window.innerHeight },
         align,
+        minBelow,
       });
 
       box.style.left = `${spot.left}px`;
@@ -156,7 +168,7 @@ export function Popover({
       window.removeEventListener("scroll", place, true);
       window.removeEventListener("resize", place);
     };
-  }, [open, align]);
+  }, [open, align, minBelow]);
 
   useEffect(() => {
     if (!open) return;
