@@ -78,6 +78,14 @@ const PAIRS: [fg: string, stack: string[], min: number][] = [
   ...HUES.map((hue): [string, string[], number] => [`chip-${hue}-fg`, [`chip-${hue}-bg`], 4.5]),
 ];
 
+test("высота строки грида совпадает с --spacing-row", () => {
+  // Импорт DataGrid тянет за собой полприложения — число берётся из текста.
+  const grid = readFileSync(new URL("../features/item/ui/DataGrid.tsx", import.meta.url), "utf8");
+  const js = /const ROW_HEIGHT = (\d+);/.exec(grid)?.[1];
+  const token = /--spacing-row:\s*(\d+)px/.exec(css)?.[1];
+  expect(js).toBe(token);
+});
+
 test.each([
   ["светлая", light],
   ["тёмная", dark],
