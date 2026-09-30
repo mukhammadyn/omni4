@@ -3,8 +3,8 @@
     "deny": [
       "Edit(~/Documents/workspace/IT/udevs/ucode/ucode_backend/**)",
       "Write(~/Documents/workspace/IT/udevs/ucode/ucode_backend/**)",
-      "Edit(~/Documents/workspace/IT/udevs/ucode/ucode-frontend/**)",
-      "Write(~/Documents/workspace/IT/udevs/ucode/ucode-frontend/**)",
+      "Edit(~/Documents/workspace/IT/udevs/ucode/ucode-frontend/ucode_admin_frontend/**)",
+      "Write(~/Documents/workspace/IT/udevs/ucode/ucode-frontend/ucode_admin_frontend/**)",
       "Edit(~/Documents/workspace/IT/udevs/ucode-frontend/**)",
       "Write(~/Documents/workspace/IT/udevs/ucode-frontend/**)",
       "Edit(~/Documents/workspace/IT/udevs/ucode/omni4_core/crm/**)",

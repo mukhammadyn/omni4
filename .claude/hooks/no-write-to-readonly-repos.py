@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Не пускает Bash туда, куда нельзя писать.
 
-Бэкенд ucode, new-ucode, старая админка и прототип crm — спецификация
-поведения и дизайна, а не рабочий код (CLAUDE.md). `Edit` и `Write` по ним запрещены в settings.json, но
+Бэкенд ucode, старая админка и прототип crm — спецификация поведения
+и дизайна, а не рабочий код (CLAUDE.md). new-ucode сюда не входит:
+редизайн идёт в обоих репозиториях, и правится он из omni4. `Edit` и `Write` по ним запрещены в settings.json, но
 запрет ловит только инструменты правки: `sed -i`, `git commit` или
 `> файл` из Bash проходили мимо. Эта дыра и закрывается здесь.
 
@@ -27,9 +28,12 @@ import sys
 
 # Репозитории, которые только читаются. Слэш в конце обязателен:
 # иначе под запрет попадает и `ucode_backend-notes.md`.
-# `ucode-frontend/` покрывает и new-ucode, и старую админку. Прототип
-# лежит соседом, из omni4 до него чаще всего `../crm/`.
-PROTECTED = ("ucode_backend/", "ucode-frontend/", "omni4_core/crm/", "../crm/")
+# Старая админка — по своему имени, а не по `ucode-frontend/`: рядом
+# с ней лежит new-ucode, и его писать можно. Имя ловит и её копию вне
+# `ucode/`; слэш ему не нужен — оно уникально, а `git -C <путь> commit`
+# пишет путь без него. Прототип лежит соседом, из omni4 до него чаще
+# `../crm/`.
+PROTECTED = ("ucode_backend/", "ucode_admin_frontend", "omni4_core/crm/", "../crm/")
 
 # Глаголы, которые меняют файлы или состояние git. Читающие подкоманды
 # git (status, log, diff, show, blame) сюда намеренно не попали.
@@ -40,14 +44,14 @@ WRITES = re.compile(
     | (?:^|[;&|(\s])git\b[^;&|]*?\s
       (?:commit|checkout|switch|restore|reset|clean|stash|apply|push|merge|rebase|cherry-pick|revert|add|rm|mv|tag)
       (?:\s|$)
-    | >>?\s*\S*(?:ucode[-_](?:backend|frontend)|crm/)
+    | >>?\s*\S*(?:ucode_backend|ucode_admin_frontend|crm/)
     """,
     re.VERBOSE,
 )
 
 REASON = (
     "Это репозиторий только для чтения (CLAUDE.md: «Соседние репозитории — только чтение»). "
-    "Правка бэкенда, new-ucode, старой админки или прототипа — отдельная задача "
+    "Правка бэкенда, старой админки или прототипа — отдельная задача "
     "в отдельном репозитории "
     "с отдельным ревью. Читать (grep, sed -n, cat, git log, git diff) можно."
 )

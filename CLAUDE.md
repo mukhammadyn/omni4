@@ -13,7 +13,8 @@ ERP на платформе ucode: модули CRM, HRMS, Склад, Фина�
 1. [CONTEXT.md](CONTEXT.md) — словарь домена. Обязательно.
 2. [docs/STATUS.md](docs/STATUS.md) — текущее состояние, открытые
    вопросы, что дальше.
-3. [docs/DESIGN.md](docs/DESIGN.md) — дизайн-система и её источник.
+3. [docs/DESIGN.md](docs/DESIGN.md) — дизайн-система и её источник;
+   [docs/REDESIGN.md](docs/REDESIGN.md) — план перехода на прототип.
 4. [docs/adr/](docs/adr/) — решения, у которых есть цена.
 
 **Наследие new-ucode** — история решений, по которым написан
@@ -25,16 +26,16 @@ ERP на платформе ucode: модули CRM, HRMS, Склад, Фина�
 [FIELD-AUDIT.md](docs/FIELD-AUDIT.md) — сверка типов полей.
 [docs/backend-notes.md](docs/backend-notes.md) — живой, пополняется.
 
-## Соседние репозитории — только чтение
+## Соседние репозитории
 
-| Что | Путь | Зачем |
-|---|---|---|
-| Бэкенд ucode | `~/Documents/workspace/IT/udevs/ucode/ucode_backend/` | истина о ручках |
-| new-ucode | `~/Documents/workspace/IT/udevs/ucode/ucode-frontend/new-ucode/frontend` | откуда форк |
-| Старая админка | `~/Documents/workspace/IT/udevs/ucode/ucode-frontend/ucode_admin_frontend` | спецификация поведения платформы |
-| Прототип omni4 | `~/Documents/workspace/IT/udevs/ucode/omni4_core/crm/` | дизайн и состав ERP-модулей |
+| Что | Путь | Зачем | Писать |
+|---|---|---|---|
+| Бэкенд ucode | `~/Documents/workspace/IT/udevs/ucode/ucode_backend/` | истина о ручках | нет |
+| new-ucode | `~/Documents/workspace/IT/udevs/ucode/ucode-frontend/new-ucode/frontend` | откуда форк; редизайн идёт и в нём | **да** |
+| Старая админка | `~/Documents/workspace/IT/udevs/ucode/ucode-frontend/ucode_admin_frontend` | спецификация поведения платформы | нет |
+| Прототип omni4 | `~/Documents/workspace/IT/udevs/ucode/omni4_core/crm/` | дизайн и состав ERP-модулей | нет |
 
-Писать в них нельзя: ни правок, ни новых файлов, ни `sed -i`, ни `git`
+В те, что «нет», писать нельзя: ни правок, ни новых файлов, ни `sed -i`, ни `git`
 с изменением состояния (`commit`, `checkout`, `stash`, `restore`).
 Правка там — отдельная задача в отдельном репозитории с отдельным
 ревью; из этого репозитория она уезжает незамеченной.
@@ -64,7 +65,13 @@ ERP на платформе ucode: модули CRM, HRMS, Склад, Фина�
 
 Живёт дальше своей жизнью, и синхронизации нет: исправление там само
 сюда не приедет. Нужное переносится осознанно, со ссылкой на коммит
-new-ucode в сообщении. Обратное — тоже отдельная задача там.
+new-ucode в сообщении.
+
+**Писать в него из omni4 можно** — ради редизайна, который идёт в обоих
+репозиториях ([docs/REDESIGN.md](docs/REDESIGN.md)): шаг делается здесь
+и тем же диффом переносится туда. Там свой `CLAUDE.md` и свои правила —
+они действуют на его файлы. Коммит в new-ucode — отдельный, в его
+репозитории, и только по просьбе.
 
 ### Старая админка
 
