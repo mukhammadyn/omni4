@@ -301,7 +301,7 @@ function SetInput({
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder={t("table.filterChoose")}
-        className="h-7 w-full rounded-md border border-border-strong bg-surface px-2 text-sm text-fg"
+        className="h-7 w-full rounded-md border border-border-strong bg-input px-2 text-sm text-fg"
       />
 
       <div className="max-h-64 overflow-y-auto">
@@ -405,7 +405,7 @@ function RelationInput({
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder={t("cell.searchRelation")}
-        className="h-7 w-full rounded-md border border-border-strong bg-surface px-2 text-sm text-fg"
+        className="h-7 w-full rounded-md border border-border-strong bg-input px-2 text-sm text-fg"
       />
 
       <div className="max-h-64 overflow-y-auto">
@@ -459,7 +459,7 @@ function TextInput({
         onChange={(event) => setText(event.target.value)}
         onBlur={() => onChange(text ? [text] : [])}
         placeholder={t("table.filterValue")}
-        className="h-7 w-full rounded-md border border-border-strong bg-surface px-2 text-sm text-fg"
+        className="h-7 w-full rounded-md border border-border-strong bg-input px-2 text-sm text-fg"
       />
     </form>
   );
@@ -525,7 +525,7 @@ function RangeInput({
   onChange: (values: string[]) => void;
 }) {
   const { t } = useTranslation();
-  const input = "h-7 w-full rounded-md border border-border-strong bg-surface px-2 text-sm text-fg";
+  const input = "h-7 w-full rounded-md border border-border-strong bg-input px-2 text-sm text-fg";
   const type = filterKind(field) === "number" ? "number" : "date";
 
   // В значении может лежать дотянутая до конца суток граница

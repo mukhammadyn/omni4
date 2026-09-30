@@ -72,7 +72,7 @@ export function ConnectionSettings() {
               key={connection.id}
               type="button"
               onClick={() => setConnectionId(connection.id)}
-              className={`flex h-8 items-center gap-2 rounded-md px-2 text-left text-sm transition-colors ${
+              className={`flex h-7.5 items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors ${
                 connection.id === active
                   ? "bg-surface-active text-fg"
                   : "text-fg-muted hover:bg-surface-hover hover:text-fg"

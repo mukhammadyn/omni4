@@ -1,21 +1,26 @@
 import type { ComponentProps } from "react";
 
 /**
- * Цвета и размеры — только токенами из app/styles.css.
+ * Цвета и размеры — только токенами из app/styles.css. Вид — `.btn`
+ * прототипа (docs/REDESIGN.md, шаг 3).
  *
- * primary заливается не самим брендом, а тёмной ступенью его шкалы:
- * белый текст на #45aeff даёт 2.40:1 при нужных 4.5:1, на #0075cf — 4.72:1.
+ * primary заливается не самим брендом, а его цветом наведения: белый
+ * текст на #2383e2 даёт 3.88:1 при нужных 4.5:1, на #0077d4 — 4.58:1.
  * Бренд при этом остаётся брендом — в фокусе, активном состоянии и акцентах.
+ *
+ * ghost приглушён, как `.btn.ghost`: это «Отмена» рядом с основной, и
+ * спорить с ней за взгляд она не должна. danger обведён сам — раньше
+ * рамку дописывали руками, и у половины кнопок удаления её не было.
  */
 const variants = {
   primary: "bg-accent-solid text-accent-fg hover:bg-accent-solid-hover",
   secondary: "bg-surface text-fg border border-border-strong hover:bg-surface-hover",
-  ghost: "bg-transparent text-fg hover:bg-surface-hover",
-  danger: "bg-transparent text-danger hover:bg-danger-subtle",
+  ghost: "bg-transparent text-fg-muted hover:bg-surface-hover hover:text-fg",
+  danger: "bg-transparent text-danger border border-danger/40 hover:bg-danger-subtle",
 } as const;
 
 const sizes = {
-  sm: "h-7 px-2 text-xs gap-1",
+  sm: "h-7 px-2.5 text-xs gap-1",
   md: "h-(--spacing-control) px-3 text-sm gap-1.5",
 } as const;
 

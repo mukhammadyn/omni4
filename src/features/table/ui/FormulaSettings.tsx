@@ -133,7 +133,7 @@ function ExpressionEditor({
         placeholder={template ? "INV-order_number/client_name" : "(price * count) * 1.12"}
         aria-label={label}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full resize-none rounded-md border border-border-strong bg-surface px-2 py-1.5 font-mono text-xs text-fg outline-none focus:border-accent"
+        className="w-full resize-none rounded-md border border-border-strong bg-input px-2 py-1.5 font-mono text-xs text-fg outline-none focus:border-accent"
       />
 
       {/* Обещание, которое стоит проговорить: у формулы значение живое,

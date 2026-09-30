@@ -223,7 +223,7 @@ export function Popover({
             ref={menu}
             role="menu"
             data-popover
-            className="fixed z-56 flex flex-col overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-popover"
+            className="fixed z-56 flex flex-col overflow-y-auto rounded-lg border border-border bg-surface px-1 py-1.5 shadow-popover"
           >
             {children(() => setOpen(false))}
           </div>,
@@ -257,15 +257,19 @@ export function PopoverItem({
       ? "bg-accent-subtle text-accent-text"
       : "text-fg hover:bg-surface-hover";
 
+  /* Размеры и приглушённая иконка — `.mi` прототипа. Иконка обычного
+     пункта тише подписи; у опасного и включённого она того же цвета,
+     что текст, — цвет там и есть смысл. `contents`: обёртка только
+     передаёт цвет и не становится лишней ячейкой flex. */
   return (
     <button
       type="button"
       role="menuitem"
       aria-pressed={active}
       onClick={onClick}
-      className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors ${tone}`}
+      className={`flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors ${tone}`}
     >
-      {icon}
+      {icon && <span className={`contents ${danger || active ? "" : "text-fg-muted"}`}>{icon}</span>}
       <span className="flex-1 truncate">{children}</span>
       {trailing}
     </button>
@@ -273,5 +277,5 @@ export function PopoverItem({
 }
 
 export function PopoverSeparator() {
-  return <div className="my-1 h-px bg-border" />;
+  return <div className="my-1.5 h-px bg-border" />;
 }

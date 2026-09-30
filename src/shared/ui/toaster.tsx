@@ -7,16 +7,20 @@ import { Icon } from "./icon";
  * Стопка уведомлений поверх экрана. Один экземпляр на приложение —
  * в корневом маршруте.
  *
- * Внизу справа: сверху живёт шапка таблицы, слева — сайдбар, а правый
- * нижний угол свободен на всех экранах и не перекрывает строку, которую
- * человек только что правил.
+ * Тёмная плашка внизу по центру — `.toast` прототипа. Тёмная в обеих
+ * темах: класс `dark` переключает токены внутри плашки на значения
+ * тёмной темы. Отсюда и цвет иконок — ошибка и успех берут ступени,
+ * проверенные на тёмном фоне, а не светлые, которые на плашке не видны.
+ * Своих цветов у уведомления нет, как и хардкода.
+ *
+ * Ошибку от успеха отличает иконка, а не заливка всей карточки.
  *
  * role="status" и aria-live: без них уведомление увидят только глазами,
  * а сообщение об ошибке — единственный след неудачного сохранения.
  */
-const STYLES = {
-  error: "border-danger bg-danger-subtle text-danger",
-  success: "border-success bg-success-subtle text-success",
+const TONES = {
+  error: "text-danger",
+  success: "text-success",
 };
 
 const ICONS = {
@@ -35,14 +39,14 @@ export function Toaster() {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed right-4 bottom-4 z-100 flex w-80 flex-col gap-2"
+      className="pointer-events-none fixed bottom-6 left-1/2 z-100 flex w-max max-w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 flex-col items-center gap-2"
     >
       {items.map((item) => (
         <div
           key={item.id}
-          className={`pointer-events-auto flex items-start gap-2 rounded-lg border p-3 shadow-popover ${STYLES[item.kind]}`}
+          className="dark pointer-events-auto flex items-start gap-2 rounded-lg border border-border bg-bg px-3.5 py-2 text-fg shadow-popover"
         >
-          <Icon as={ICONS[item.kind]} size={16} className="mt-0.5" />
+          <Icon as={ICONS[item.kind]} size={16} className={`mt-0.5 shrink-0 ${TONES[item.kind]}`} />
 
           {/* Текст ошибки приходит с сервера и бывает длинным: переносим,
               а не обрезаем — обрезанная причина бесполезна. */}

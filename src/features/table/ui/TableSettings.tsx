@@ -186,7 +186,7 @@ export function TableSettings({
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm text-danger transition-colors hover:bg-danger-subtle"
+          className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-sm text-danger transition-colors hover:bg-danger-subtle"
         >
           <Icon as={IconTrash} size={16} className="shrink-0" />
           {t("tableSettings.delete")}

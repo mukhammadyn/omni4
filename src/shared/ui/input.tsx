@@ -1,7 +1,10 @@
 import type { ComponentProps, ReactNode } from "react";
 
+/* Поле залито серым, как `.input` прототипа, а не белое с рамкой.
+   Та же заливка у всего, что выглядит полем: Dropdown, DatePicker,
+   SelectMenu. */
 const control =
-  "h-(--spacing-input) w-full rounded-md border border-border-strong bg-surface px-2.5 text-sm text-fg outline-none transition-colors placeholder:text-fg-subtle hover:border-fg-subtle focus:border-accent disabled:opacity-50";
+  "h-(--spacing-input) w-full rounded-md border border-border-strong bg-input px-2.5 text-sm text-fg outline-none transition-colors placeholder:text-fg-subtle hover:border-fg-subtle focus:border-accent disabled:opacity-50";
 
 export function Input({ className = "", ...props }: ComponentProps<"input">) {
   return <input {...props} className={`${control} ${className}`} />;

@@ -1015,7 +1015,7 @@ function RelationEditor({
                     key={guid}
                     type="button"
                     onClick={() => pick(item)}
-                    className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors hover:bg-surface-hover"
+                    className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-surface-hover"
                   >
                     <span className="truncate">{label || guid}</span>
                     {selectedGuids.has(guid) && (
@@ -1036,7 +1036,7 @@ function RelationEditor({
                   type="button"
                   onClick={createAndLink}
                   disabled={create.isPending}
-                  className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-50"
+                  className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:opacity-50"
                 >
                   <Icon as={IconPlus} size={14} />
                   <span className="truncate">{t("cell.createNamed", { name: query.trim() })}</span>
@@ -1323,7 +1323,7 @@ function OptionRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-8 w-full items-center gap-2 rounded-md px-1.5 text-left transition-colors hover:bg-surface-hover"
+      className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-1.5 text-left transition-colors hover:bg-surface-hover"
     >
       <Chip dot={dot} color={optionColor(option)}>
         {optionLabel(option, option.value, language)}
@@ -1522,7 +1522,7 @@ function ColorEditor({
           placeholder="#2383e2"
           onChange={(event) => set(event.target.value)}
           onKeyDown={(event) => event.key === "Enter" && commit()}
-          className="h-8 min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 font-mono text-sm text-fg outline-none focus:border-accent"
+          className="h-8 min-w-0 flex-1 rounded-md border border-border-strong bg-input px-2 font-mono text-sm text-fg outline-none focus:border-accent"
         />
 
         {draft && (
@@ -1656,7 +1656,7 @@ function MapEditor({
 
   const draft = parseCoords(formatCoords(lat, lon));
   const field =
-    "h-8 w-full rounded-md border border-border-strong bg-surface px-2 text-sm tabular-nums text-fg outline-none focus:border-accent";
+    "h-8 w-full rounded-md border border-border-strong bg-input px-2 text-sm tabular-nums text-fg outline-none focus:border-accent";
 
   return (
     <Anchored anchor={anchor} onClose={commit} onCancel={onClose}>

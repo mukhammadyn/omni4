@@ -617,7 +617,7 @@ export function FieldEditor({
                       placeholder={t("fieldForm.validationMessage")}
                       aria-label={t("fieldForm.validationMessage")}
                       onChange={(event) => patch({ validationMessage: event.target.value })}
-                      className="mt-1 h-7 w-full rounded-md border border-border-strong bg-surface px-2 text-xs text-fg outline-none focus:border-accent"
+                      className="mt-1 h-7 w-full rounded-md border border-border-strong bg-input px-2 text-xs text-fg outline-none focus:border-accent"
                     />
                   )}
                 </div>
@@ -696,7 +696,7 @@ export function FieldEditor({
                       value={draft.defaultValue}
                       placeholder={t("fieldForm.defaultValuePlaceholder")}
                       onChange={(event) => patch({ defaultValue: event.target.value })}
-                      className="h-7 w-full rounded-md border border-border-strong bg-surface px-2 text-sm text-fg outline-none focus:border-accent"
+                      className="h-7 w-full rounded-md border border-border-strong bg-input px-2 text-sm text-fg outline-none focus:border-accent"
                     />
                   </div>
                 )}
@@ -740,7 +740,7 @@ export function FieldEditor({
                         onClose();
                         onDelete(field);
                       }}
-                      className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
+                      className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
                     >
                       <Icon as={IconTrash} size={16} />
                       <span className="truncate">{t("column.delete")}</span>
@@ -800,14 +800,14 @@ function OptionScreen({
             event.preventDefault();
             onBack();
           }}
-          className="h-8 min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 text-sm text-fg outline-none focus:border-accent"
+          className="h-8 min-w-0 flex-1 rounded-md border border-border-strong bg-input px-2 text-sm text-fg outline-none focus:border-accent"
         />
       </div>
 
       <button
         type="button"
         onClick={onDelete}
-        className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
+        className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
       >
         <Icon as={IconTrash} size={16} />
         <span className="truncate">{t("action.delete")}</span>
@@ -822,7 +822,7 @@ function OptionScreen({
             key={color}
             type="button"
             onClick={() => onChange({ color })}
-            className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors hover:bg-surface-hover"
+            className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-surface-hover"
           >
             {/* Образец — сам чип: тот же оттенок, что встанет в ячейку,
                 а не отдельный квадратик со своим набором токенов. */}
@@ -967,7 +967,7 @@ function RelationForm({
           placeholder={t("fieldForm.namePlaceholder")}
           aria-label={t("fieldForm.label")}
           onChange={(event) => patch({ label: event.target.value })}
-          className="mb-2 h-8 w-full rounded-md border border-border-strong bg-surface px-2 text-sm text-fg outline-none focus:border-accent"
+          className="mb-2 h-8 w-full rounded-md border border-border-strong bg-input px-2 text-sm text-fg outline-none focus:border-accent"
         />
 
         <SelectMenu
@@ -1215,7 +1215,7 @@ function Row({ label, value, onClick }: { label: string; value: string; onClick:
     <button
       type="button"
       onClick={onClick}
-      className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors hover:bg-surface-hover"
+      className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-surface-hover"
     >
       <span className="flex-1 truncate">{label}</span>
       <span className="truncate text-fg-muted">{value}</span>
@@ -1243,7 +1243,7 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 transition-colors hover:bg-surface-hover">
+    <label className="flex h-7.5 cursor-pointer items-center gap-2.5 rounded-md px-2.5 transition-colors hover:bg-surface-hover">
       <span className="flex-1 truncate text-sm text-fg">{label}</span>
       <Checkbox checked={checked} onChange={(event) => onChange(event.target.checked)} />
     </label>
@@ -1429,7 +1429,7 @@ function OptionList({
           key={index}
           type="button"
           onClick={() => onOpen(index)}
-          className="flex h-8 w-full items-center gap-2 rounded-md px-1.5 text-left transition-colors hover:bg-surface-hover"
+          className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-1.5 text-left transition-colors hover:bg-surface-hover"
         >
           {/* Безымянный вариант — это тот, который только что завели
               и не дописали: подпись-подсказка честнее пустого чипа. */}

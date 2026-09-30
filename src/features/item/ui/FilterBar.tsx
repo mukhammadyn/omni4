@@ -177,7 +177,7 @@ function FieldPicker({
 
   return (
     <div className="flex w-64 flex-col gap-1">
-      <label className="flex h-7 items-center gap-1.5 rounded-md border border-border-strong px-2 text-sm">
+      <label className="flex h-7 items-center gap-1.5 rounded-md border border-border-strong bg-input px-2 text-sm">
         <Icon as={IconSearch} size={14} className="text-fg-subtle" />
         <input
           autoFocus
@@ -195,7 +195,7 @@ function FieldPicker({
           return (
             <label
               key={column.id}
-              className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-sm transition-colors hover:bg-surface-hover"
+              className="flex h-7.5 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors hover:bg-surface-hover"
             >
               <Checkbox
                 checked={added}

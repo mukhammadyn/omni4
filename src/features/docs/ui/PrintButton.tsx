@@ -90,7 +90,7 @@ export function PrintButton({
                   print.mutate({ template, row, lookups });
                   setAnchor(null);
                 }}
-                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
+                className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
               >
                 <Icon as={IconFileTypeDocx} size={14} className="shrink-0 text-fg-subtle" />
                 <span className="truncate">{template.title || t("docs.untitled")}</span>
@@ -105,7 +105,7 @@ export function PrintButton({
                   printHtml.mutate({ template, row, lookups });
                   setAnchor(null);
                 }}
-                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
+                className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
               >
                 <Icon as={IconCode} size={14} className="shrink-0 text-fg-subtle" />
                 <span className="truncate">{template.title || t("docs.untitled")}</span>

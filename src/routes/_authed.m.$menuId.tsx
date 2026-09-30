@@ -1324,7 +1324,7 @@ function MenuPage() {
                   size="sm"
                   disabled={remove.isPending}
                   onClick={() => setConfirming(true)}
-                  className="ml-2 border border-danger"
+                  className="ml-2"
                 >
                   <Icon as={IconTrash} size={14} />
                   {t("table.deleteSelected", { count: selected.size })}

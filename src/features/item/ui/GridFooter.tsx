@@ -176,7 +176,7 @@ function LimitPicker({ limit, onLimit }: { limit: number; onLimit: (limit: numbe
           type="button"
           onClick={toggle}
           aria-expanded={open}
-          className="flex h-7 items-center gap-1.5 rounded-md border border-border-strong px-2 text-sm text-fg transition-colors hover:bg-surface-hover"
+          className="flex h-7 items-center gap-1.5 rounded-md border border-border-strong bg-input px-2 text-sm text-fg transition-colors hover:bg-surface-hover"
         >
           <span className="tabular-nums">{limit}</span>
           <span className="text-xs text-fg-muted">{t("table.perPage")}</span>
@@ -220,7 +220,7 @@ function LimitMenu({
             onLimit(size);
             close();
           }}
-          className="flex h-8 items-center justify-between rounded-md px-2 text-sm text-fg transition-colors hover:bg-surface-hover"
+          className="flex h-7.5 items-center justify-between rounded-md px-2.5 text-sm text-fg transition-colors hover:bg-surface-hover"
         >
           <span className="tabular-nums">{size}</span>
           {size === limit && <Icon as={IconCheck} size={14} className="text-accent-text" />}
@@ -243,7 +243,7 @@ function LimitMenu({
           value={custom}
           onChange={(event) => setCustom(event.target.value)}
           aria-label={t("table.customLimit")}
-          className="h-7 w-full min-w-0 rounded-md border border-border-strong bg-surface px-2 text-sm tabular-nums text-fg"
+          className="h-7 w-full min-w-0 rounded-md border border-border-strong bg-input px-2 text-sm tabular-nums text-fg"
         />
         <Button type="submit" size="sm">
           {t("action.apply")}

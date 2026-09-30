@@ -34,7 +34,7 @@ export function HtmlTemplateRows({ tableSlug }: { tableSlug: string }) {
       {templates.map((template) => (
         <div
           key={template.id}
-          className="flex h-8 items-center gap-2 rounded-md px-2 hover:bg-surface-hover"
+          className="flex h-7.5 items-center gap-2.5 rounded-md px-2.5 hover:bg-surface-hover"
         >
           <Icon as={IconCode} size={14} className="shrink-0 text-fg-subtle" />
 
@@ -155,7 +155,7 @@ function HtmlEditor({
           onChange={(event) => setDraft({ ...draft, title: event.target.value })}
           aria-label={t("docs.htmlName")}
           placeholder={t("docs.htmlName")}
-          className="h-8 rounded-md border border-border-strong bg-surface px-2 text-sm text-fg outline-none focus:border-accent"
+          className="h-8 rounded-md border border-border-strong bg-input px-2 text-sm text-fg outline-none focus:border-accent"
         />
 
         <textarea

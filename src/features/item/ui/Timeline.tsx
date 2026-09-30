@@ -797,6 +797,7 @@ export function Timeline({
 
         <div className="ml-auto">
           <Tabs
+            variant="segment"
             tabs={TIMELINE_SCALES.map((item) => ({
               id: item,
               label: t(`timeline.scale.${item}` as const),

@@ -667,7 +667,7 @@ export function ItemDrawer({
          */}
         {row && ((tabs && tabs.length > 0) || onAddTab || canLayout) && (
           <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-            {/* Прокрутку и плашку активной вкладки держит сама полоса
+            {/* Прокрутку и черту активной вкладки держит сама полоса
                 (shared/ui/tabs). «+» стоит рядом с ней, а не внутри:
                 всплывашка, открытая из прокручиваемого контейнера,
                 обрезается его краями.

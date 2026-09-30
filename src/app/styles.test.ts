@@ -65,8 +65,10 @@ const PAIRS: [fg: string, stack: string[], min: number][] = [
   ["fg-muted", ["bg"], 4.5],
   ["fg-muted", ["surface", "surface-hover"], 4.5],
   ["fg-muted", ["bg", "surface-hover"], 4.5],
+  ["fg", ["surface", "input"], 4.5],
   // Решено оставить как в прототипе (2.49). Порог — чтобы не опустился ниже.
   ["fg-subtle", ["surface"], 2.4],
+  ["fg-subtle", ["surface", "input"], 2.3],
   ["accent-fg", ["accent-solid"], 4.5],
   ["accent-fg", ["accent-solid-hover"], 4.5],
   ["accent-text", ["surface"], 4.5],

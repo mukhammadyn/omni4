@@ -418,7 +418,7 @@ function RowMenu({
         <button
           type="button"
           onClick={() => setPage("rights")}
-          className="flex h-8 w-full items-center gap-1.5 rounded-md px-2 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+          className="flex h-7.5 w-full items-center gap-1.5 rounded-md px-2.5 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
         >
           <Icon as={IconChevronLeft} size={14} />
           {t("action.back")}
@@ -474,7 +474,7 @@ function RowMenu({
       {OTHER_SCREEN_RIGHTS.map((right) => (
         <label
           key={right}
-          className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-sm transition-colors hover:bg-surface-hover"
+          className="flex h-7.5 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors hover:bg-surface-hover"
         >
           <Checkbox
             checked={table.other[right]}
@@ -817,7 +817,7 @@ function CustomRights({ roleId, clientTypeId }: { roleId: string; clientTypeId: 
           <button
             type="button"
             onClick={() => setAdding({ parentId: "", parentTitle: "" })}
-            className="mt-1 flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+            className="mt-1 flex h-7.5 items-center gap-1.5 rounded-md px-2.5 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
             <Icon as={IconPlus} size={14} />
             {t("customRights.create")}

@@ -74,7 +74,7 @@ export function SortPanel({
             <button
               type="button"
               onClick={toggle}
-              className="flex h-8 items-center gap-2 rounded-md px-2 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
+              className="flex h-7.5 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
             >
               <Icon as={IconPlus} size={14} />
               {t("table.addSort")}
@@ -98,7 +98,7 @@ export function SortPanel({
         <button
           type="button"
           onClick={() => onChange([])}
-          className="flex h-8 items-center gap-2 rounded-md px-2 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
+          className="flex h-7.5 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
         >
           <Icon as={IconTrash} size={14} />
           {t("table.clearSort")}
@@ -127,7 +127,7 @@ function FieldPicker({
         <button
           type="button"
           onClick={toggle}
-          className="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border-strong px-2 text-sm text-fg transition-colors hover:bg-surface-hover"
+          className="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border-strong bg-input px-2 text-sm text-fg transition-colors hover:bg-surface-hover"
         >
           <Icon as={fieldIcon(icon)} size={14} className="text-fg-muted" />
           <span className="truncate">{value}</span>
@@ -189,7 +189,7 @@ function DirectionPicker({
         <button
           type="button"
           onClick={toggle}
-          className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-border-strong px-2 text-sm text-fg transition-colors hover:bg-surface-hover"
+          className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-border-strong bg-input px-2 text-sm text-fg transition-colors hover:bg-surface-hover"
         >
           {t(value === "asc" ? "table.sortAsc" : "table.sortDesc")}
           <Icon as={IconChevronDown} size={12} className="opacity-60" />

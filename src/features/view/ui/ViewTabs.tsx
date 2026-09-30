@@ -48,7 +48,7 @@ export function ViewTabs({
     // subheader с поиском и действиями, и без потолка десяток вкладок
     // вытеснил бы их за край. У вкладок в других местах (карточка,
     // настройки) свободного соседства с другими элементами нет.
-    <div className="max-w-[416px] min-w-0">
+    <div className="flex max-w-[416px] min-w-0 self-stretch">
       <Tabs
         tabs={tabs}
         activeId={activeId}

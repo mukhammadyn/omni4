@@ -109,7 +109,7 @@ export function Dropdown({
           aria-expanded={open}
           aria-haspopup="menu"
           {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
-          className={`flex w-full items-center gap-2 rounded-md border bg-surface text-left transition-colors disabled:opacity-50 ${
+          className={`flex w-full items-center gap-2 rounded-md border bg-input text-left transition-colors disabled:opacity-50 ${
             size === "sm"
               ? "h-7 px-1.5 text-xs"
               : size === "control"

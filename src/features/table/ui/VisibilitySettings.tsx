@@ -120,7 +120,7 @@ export function VisibilitySettings({
                 onChange={(event) =>
                   onChange({ hideValues: [event.target.value], hideMulti: false })
                 }
-                className="h-7 w-full rounded-md border border-border-strong bg-surface px-2 text-xs text-fg outline-none focus:border-accent"
+                className="h-7 w-full rounded-md border border-border-strong bg-input px-2 text-xs text-fg outline-none focus:border-accent"
               />
             )}
           </Labeled>

@@ -114,7 +114,7 @@ export function ColumnMenu({
               }
             }}
             aria-label={t("fieldForm.label")}
-            className="h-8 min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 text-sm text-fg outline-none focus:border-accent"
+            className="h-8 min-w-0 flex-1 rounded-md border border-border-strong bg-input px-2 text-sm text-fg outline-none focus:border-accent"
           />
         </div>
         ) : (
@@ -185,7 +185,7 @@ function MenuItem({
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm transition-colors ${
+      className={`flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors ${
         danger ? "text-danger hover:bg-danger-subtle" : "text-fg hover:bg-surface-hover"
       }`}
     >

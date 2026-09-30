@@ -198,7 +198,7 @@ function ProjectRow({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
+        className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg transition-colors hover:bg-surface-hover"
       >
         <Icon
           as={IconChevronRight}
@@ -225,7 +225,7 @@ function ProjectRow({
                 type="button"
                 disabled={busy}
                 onClick={() => onPick(project.id, environment.id)}
-                className={`flex h-8 w-full items-center gap-2 rounded-md py-0 pr-2 pl-8 text-left text-sm transition-colors hover:bg-surface-hover disabled:opacity-50 ${
+                className={`flex h-7.5 w-full items-center gap-2.5 rounded-md py-0 pr-2 pl-8 text-left text-sm transition-colors hover:bg-surface-hover disabled:opacity-50 ${
                   active ? "text-fg" : "text-fg-muted"
                 }`}
               >

@@ -1035,7 +1035,7 @@ function Panel({
       {/* Переключатель, а не страница: у настройки два состояния,
           и ради них открывать экран незачем. */}
       {can.settings && handlers.onInfiniteScroll && isGrid && (
-        <label className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-sm text-fg transition-colors hover:bg-surface-hover">
+        <label className="flex h-7.5 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-sm text-fg transition-colors hover:bg-surface-hover">
           <Icon as={IconInfinity} size={16} className="shrink-0 text-fg-muted" />
           <span className="flex-1 truncate">{t("view.infiniteScroll")}</span>
           <Checkbox
@@ -1088,7 +1088,7 @@ function Panel({
           onClick={() => open("table")}
         />
       ) : (
-        <div className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm text-fg">
+        <div className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-sm text-fg">
           <Icon as={IconTable} size={16} className="shrink-0 text-fg-muted" />
           <span className="flex-1 truncate">{t("view.source")}</span>
           <span className="max-w-[9rem] truncate text-fg-subtle">{view.tableSlug}</span>
@@ -1216,7 +1216,7 @@ function ColumnOrder({
               event.preventDefault();
               drop(key);
             }}
-            className={`group/field flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm transition-colors ${
+            className={`group/field flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors ${
               dragged === key
                 ? "opacity-40"
                 : over === key && dragged

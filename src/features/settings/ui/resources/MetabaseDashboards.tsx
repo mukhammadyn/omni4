@@ -34,7 +34,7 @@ export function MetabaseDashboards({ username, password }: { username: string; p
         {dashboards.map((dashboard) => (
           <div
             key={dashboard.id}
-            className="flex h-8 items-center gap-2 rounded-md px-2 hover:bg-surface-hover"
+            className="flex h-7.5 items-center gap-2.5 rounded-md px-2.5 hover:bg-surface-hover"
           >
             <span className="min-w-0 flex-1 truncate text-sm text-fg">
               {dashboard.name || `#${dashboard.id}`}

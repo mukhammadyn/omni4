@@ -266,7 +266,7 @@ function SavedQueries({
       <button
         type="button"
         onClick={onNew}
-        className="flex h-8 shrink-0 items-center gap-2 rounded-md px-2 text-left text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+        className="flex h-7.5 shrink-0 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
       >
         <Icon as={IconPlus} size={14} className="shrink-0" />
         {t("sql.new")}

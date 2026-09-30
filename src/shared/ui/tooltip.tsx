@@ -118,7 +118,7 @@ export function Tooltip({
           <div
             ref={box}
             role="tooltip"
-            className="text-2xs pointer-events-none fixed z-60 max-w-64 rounded-md bg-fg px-2 py-1 text-bg shadow-popover"
+            className="text-2xs pointer-events-none fixed z-60 max-w-64 rounded-md bg-fg px-2 py-1 font-medium text-bg shadow-popover"
             style={{
               left: placed?.left ?? at.left,
               top: placed?.top ?? at.top,

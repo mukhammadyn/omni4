@@ -137,7 +137,7 @@ export function Usage() {
         </div>
       )}
 
-      <div className="shrink-0 border-b border-border px-4 py-2">
+      <div className="flex h-11 shrink-0 border-b border-border px-4">
         <Tabs
           tabs={[
             { id: "all", label: t("usage.allTraffic") },

@@ -85,7 +85,7 @@ export function DocTemplates({
         {templates.map((template) => (
           <div
             key={template.id}
-            className="flex h-8 items-center gap-2 rounded-md px-2 hover:bg-surface-hover"
+            className="flex h-7.5 items-center gap-2.5 rounded-md px-2.5 hover:bg-surface-hover"
           >
             <Icon as={IconFileTypeDocx} size={14} className="shrink-0 text-fg-subtle" />
 

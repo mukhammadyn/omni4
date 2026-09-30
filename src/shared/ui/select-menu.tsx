@@ -90,13 +90,13 @@ export function SelectMenu({
 
   return (
     <div>
-      <p className="px-1 pb-1 text-2xs text-fg-subtle">{label}</p>
+      <p className="px-1 pb-1 text-2xs font-semibold text-fg-subtle">{label}</p>
 
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="mx-1 flex h-8 w-[calc(100%-0.5rem)] items-center gap-2 rounded-md border border-border-strong px-2 text-left text-sm transition-colors hover:border-fg-subtle"
+        className="mx-1 flex h-8 w-[calc(100%-0.5rem)] items-center gap-2 rounded-md border border-border-strong bg-input px-2 text-left text-sm transition-colors hover:border-fg-subtle"
       >
         {/* Значок выбранного — на кнопке тоже: иначе выбор со значком
             превращается в строку текста, как только список закрыли. */}

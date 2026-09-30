@@ -48,7 +48,7 @@ export function ActivityLog() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="shrink-0 border-b border-border px-4 py-2">
+      <div className="flex h-11 shrink-0 border-b border-border px-4">
         <Tabs
           tabs={[
             { id: "changes", label: t("activity.tabChanges") },

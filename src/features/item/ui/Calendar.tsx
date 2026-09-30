@@ -327,6 +327,7 @@ export function CalendarView({
 
         <div className="ml-auto">
           <Tabs
+            variant="segment"
             tabs={CALENDAR_PERIODS.map((item) => ({
               id: item,
               label: t(`calendar.period.${item}` as const),

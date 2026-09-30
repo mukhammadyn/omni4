@@ -2,9 +2,9 @@ import type { Icon as TablerIcon } from "@tabler/icons-react";
 import { Icon } from "@/shared/ui/icon";
 
 /**
- * Вкладки — сегментированный контрол: дорожка, а в ней плашка активной.
+ * Вкладки: подчёркнутые для навигации, сегменты для режима (ниже).
  *
- * Один вид на все вкладки приложения. Ими показывается не только набор
+ * Один компонент на все вкладки приложения. Ими показывается не только набор
  * view: раскладка таблицы по значению поля (`group_fields`) и связи
  * в карточке записи — это те же вкладки, с тем же поведением. В старой
  * админке на каждый случай был свой компонент со своими кнопками
@@ -28,26 +28,52 @@ export type TabItem = {
   title?: string;
 };
 
-const tab =
-  "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm transition-colors";
+/*
+ * Два вида — как в прототипе.
+ *
+ * underline — навигация: view, связи в карточке, разделы настроек
+ * (`.view-tab`). Вкладка тянется на всю высоту своей полосы, и черта
+ * активной ложится на нижнюю границу полосы, а не висит над ней.
+ *
+ * segment — переключатель режима внутри экрана: день/неделя/месяц
+ * у календаря и таймлайна (`.seg`). Навигацией он не является, и
+ * подчёркнутым рядом с поиском и кнопками читался бы как вторая полоса
+ * вкладок.
+ */
+const STYLES = {
+  underline: {
+    track:
+      "flex min-w-0 max-w-full gap-1 self-stretch overflow-x-auto [scrollbar-width:none]",
+    tab: "relative inline-flex min-h-9 shrink-0 items-center gap-1.5 px-2 text-sm font-medium transition-colors",
+    active:
+      "text-fg after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-fg",
+    idle: "text-fg-muted hover:text-fg",
+  },
+  segment: {
+    track: "flex w-fit min-w-0 max-w-full items-center overflow-x-auto rounded-md bg-surface-hover p-0.5",
+    tab: "inline-flex h-6 shrink-0 items-center gap-1.5 rounded-[5px] px-2.5 text-xs transition-colors",
+    active: "bg-surface text-fg shadow-raised",
+    idle: "text-fg-muted hover:text-fg",
+  },
+} as const;
 
 export function Tabs({
   tabs,
   activeId,
   onSelect,
+  variant = "underline",
 }: {
   tabs: TabItem[];
   activeId: string;
   onSelect: (id: string) => void;
+  variant?: keyof typeof STYLES;
 }) {
   if (!tabs.length) return null;
 
+  const style = STYLES[variant];
+
   return (
-    // Дорожка по содержимому, а не во всю строку: три вкладки на всю
-    // ширину модалки читаются как пустая панель, у которой что-то
-    // не загрузилось. `max-w-full` оставляет прокрутку там, где вкладок
-    // больше, чем помещается.
-    <div className="flex w-fit min-w-0 max-w-full items-center gap-0.5 overflow-x-auto rounded-lg bg-surface-active p-0.5">
+    <div className={style.track}>
       {tabs.map((item) => {
         const active = item.id === activeId;
 
@@ -58,9 +84,7 @@ export function Tabs({
             aria-current={active ? "page" : undefined}
             onClick={() => onSelect(item.id)}
             {...(item.title ? { title: item.title } : {})}
-            className={`${tab} whitespace-nowrap ${
-              active ? "bg-surface text-fg shadow-raised" : "text-fg-muted hover:text-fg"
-            }`}
+            className={`${style.tab} whitespace-nowrap ${active ? style.active : style.idle}`}
           >
             {item.icon && <Icon as={item.icon} size={14} />}
             {item.label}

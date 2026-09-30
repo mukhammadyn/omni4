@@ -60,7 +60,7 @@ export function DatePicker({
           aria-expanded={open}
           aria-haspopup="dialog"
           {...(ariaLabel ? { "aria-label": ariaLabel } : {})}
-          className={`flex h-(--spacing-input) w-full items-center gap-2 rounded-md border bg-surface px-2.5 text-left text-sm transition-colors ${
+          className={`flex h-(--spacing-input) w-full items-center gap-2 rounded-md border bg-input px-2.5 text-left text-sm transition-colors ${
             open ? "border-accent" : "border-border-strong hover:border-fg-subtle"
           } ${className}`}
         >
