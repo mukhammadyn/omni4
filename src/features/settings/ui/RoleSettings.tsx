@@ -4,7 +4,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   Columns2Icon,
-  EllipsisVerticalIcon,
+  EllipsisIcon,
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
@@ -391,7 +391,7 @@ function OtherRights({
           title={t("roles.otherRights")}
           className="grid size-6 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
         >
-          <Icon as={EllipsisVerticalIcon} size={14} />
+          <Icon as={EllipsisIcon} size={14} />
         </button>
       )}
     >

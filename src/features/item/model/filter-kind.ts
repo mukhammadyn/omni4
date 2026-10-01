@@ -49,6 +49,8 @@ const BY_TYPE: Record<string, FilterKind> = {
    * к VARCHAR, диапазон — сравнениями по числу.
    */
   NUMBER: "number",
+  // В базе индикатор — NUMBER (см. PROGRESS_TYPE): фильтр тот же.
+  PROGRESS: "number",
   FLOAT: "number",
   FLOAT_NOLIMIT: "number",
 

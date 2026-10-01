@@ -10,8 +10,10 @@ import {
 import {
   AppWindowIcon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
   ChevronsRightIcon,
   EyeIcon,
   EyeOffIcon,
@@ -19,7 +21,7 @@ import {
   GripVerticalIcon,
   HeadingIcon,
   LayoutListIcon,
-  MaximizeIcon,
+  Maximize2Icon,
   PanelRightIcon,
   PencilIcon,
   PlusIcon,
@@ -126,6 +128,8 @@ export function ItemDrawer({
   onRemoveSection,
   onToggleHidden,
   onHeading,
+  siblings,
+  instant = false,
   onClose,
 }: {
   tableSlug: string;
@@ -274,6 +278,22 @@ export function ItemDrawer({
    * Не задан — заголовок не меняется (нет прав на настройки).
    */
   onHeading?: ((slug: string, variants: Record<string, string> | null) => void) | undefined;
+  /**
+   * Соседние записи — «Предыдущая» и «Следующая» в шапке, как `pkPrev`
+   * и `pkNext` прототипа: те строки и в том порядке, что видны в view.
+   * Кто сосед, знает вызывающий — у него список.
+   *
+   * Не задан — кнопок нет: карточка открыта не из списка (по ссылке,
+   * из связи). Задан без стороны — эта кнопка неактивна: дальше строк нет.
+   */
+  siblings?:
+    | { prev?: (() => void) | undefined; next?: (() => void) | undefined }
+    | undefined;
+  /**
+   * Открыта переходом к соседней записи: панель уже на экране, и въезжать
+   * ей незачем — меняется только содержимое, как в прототипе.
+   */
+  instant?: boolean;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -371,13 +391,15 @@ export function ItemDrawer({
    * уносило бы обе, а человек хотел вернуться к списку. Отсюда стопка:
    * слушателей два, но действует тот, кто в ней последний.
    */
+  const self = useRef({});
+
   useEffect(() => {
-    const self = {};
-    DRAWER_STACK.push(self);
+    const me = self.current;
+    DRAWER_STACK.push(me);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || active) return;
-      if (DRAWER_STACK[DRAWER_STACK.length - 1] !== self) return;
+      if (DRAWER_STACK[DRAWER_STACK.length - 1] !== me) return;
 
       dismiss();
     };
@@ -386,10 +408,59 @@ export function ItemDrawer({
 
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      const at = DRAWER_STACK.indexOf(self);
+      const at = DRAWER_STACK.indexOf(me);
       if (at !== -1) DRAWER_STACK.splice(at, 1);
     };
   }, [active, dismiss]);
+
+  /*
+   * Щелчок мимо карточки закрывает её — как прозрачная подложка
+   * `.peek-overlay` прототипа. Подложки при этом нет: она перекрыла бы
+   * вложенную карточку связи, у которой своя стопка (см. выше).
+   *
+   * «Внутри» узнаётся по дереву React, а не по DOM: меню, редакторы
+   * ячеек и выбор значения уходят порталом в <body>, но события из
+   * портала всплывают по дереву компонентов — до `onPointerDownCapture`
+   * у панели. Слушатель на document срабатывает позже и видит метку.
+   *
+   * Не «мимо»: окна (`data-modal` — подтверждение удаления открывает
+   * страница, не карточка) и уведомления. Закрывается только верхняя
+   * карточка: щелчок по нижней, пока открыта вложенная, снимает вложенную.
+   *
+   * Закрывший щелчок дальше не идёт, как у подложки прототипа: иначе
+   * он открыл бы строку таблицы под собой, а закрытие через 200 мс
+   * сняло бы и её.
+   */
+  const inside = useRef(false);
+
+  useEffect(() => {
+    const swallow = (event: MouseEvent) => {
+      event.stopPropagation();
+      event.preventDefault();
+    };
+    // click приходит сразу за pointerup; не пришёл (протянули мимо) —
+    // глушить больше нечего, и следующий щелчок должен дойти.
+    const release = () =>
+      setTimeout(() => document.removeEventListener("click", swallow, true), 0);
+
+    const onPointerDown = (event: PointerEvent) => {
+      const hit = inside.current;
+      inside.current = false;
+
+      if (hit || event.button !== 0) return;
+      if (DRAWER_STACK[DRAWER_STACK.length - 1] !== self.current) return;
+      if (event.target instanceof Element && event.target.closest("[data-modal],[role=status]")) {
+        return;
+      }
+
+      dismiss();
+      document.addEventListener("click", swallow, { capture: true, once: true });
+      document.addEventListener("pointerup", release, { capture: true, once: true });
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [dismiss]);
 
   const guid = typeof row?.guid === "string" ? row.guid : undefined;
 
@@ -506,7 +577,8 @@ export function ItemDrawer({
   return (
     <>
       {/* Затемнение — только у центрального положения: сбоку таблица
-          остаётся рабочей, во весь экран её и не видно. */}
+          остаётся видна (щелчок по ней закрывает карточку — см. выше),
+          во весь экран её и не видно. */}
       {drawerMode === "center" && (
         <div
           className={`fixed inset-0 z-40 transition-opacity duration-200 ease-out starting:opacity-0 ${
@@ -519,13 +591,16 @@ export function ItemDrawer({
 
       <aside
         ref={panel}
+        onPointerDownCapture={() => {
+          inside.current = true;
+        }}
         style={side ? { width: drawerWidth } : undefined}
         /* Переход по `translate`, а не по `transform`: утилиты сдвига
            в tailwind 4 пишут отдельное свойство translate, и переход
            по transform не двигал бы ничего. */
         className={`fixed z-50 flex flex-col bg-surface transition-[translate,opacity] duration-200 ease-out ${
           MODE_CLASS[drawerMode]
-        } ${closing ? EXIT_CLASS[drawerMode] : ENTER_CLASS[drawerMode]}`}
+        } ${closing ? EXIT_CLASS[drawerMode] : instant ? "" : ENTER_CLASS[drawerMode]}`}
       >
         {side && (
           <ResizeHandle
@@ -588,6 +663,23 @@ export function ItemDrawer({
               </div>
             )}
           </Popover>
+
+          {siblings && (
+            <>
+              <IconButton
+                icon={ChevronUpIcon}
+                label={t("drawer.previous")}
+                disabled={!siblings.prev}
+                onClick={() => siblings.prev?.()}
+              />
+              <IconButton
+                icon={ChevronDownIcon}
+                label={t("drawer.next")}
+                disabled={!siblings.next}
+                onClick={() => siblings.next?.()}
+              />
+            </>
+          )}
 
           {/*
            * Путь до карточки. Открытая поверх вкладки связанная строка
@@ -1099,7 +1191,7 @@ const MODE_LABEL = {
 const MODE_ICON = {
   side: PanelRightIcon,
   center: AppWindowIcon,
-  full: MaximizeIcon,
+  full: Maximize2Icon,
 } as const;
 
 /**
@@ -1392,18 +1484,21 @@ function IconButton({
   icon,
   label,
   active,
+  disabled = false,
   onClick,
 }: {
   icon: typeof ChevronsRightIcon;
   label: string;
   /** Кнопка-переключатель: задан — нажатое состояние видно и читается вслух. */
   active?: boolean | undefined;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       title={label}
       {...(active === undefined ? {} : { "aria-pressed": active })}
@@ -1411,7 +1506,7 @@ function IconButton({
         active
           ? "bg-surface-active text-fg"
           : "text-fg-muted hover:bg-surface-hover hover:text-fg"
-      }`}
+      } disabled:pointer-events-none disabled:opacity-35`}
     >
       <Icon as={icon} size={16} />
     </button>

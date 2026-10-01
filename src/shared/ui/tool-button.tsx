@@ -17,6 +17,7 @@ import { type LucideIcon } from "lucide-react";
 export function ToolButton({
   icon,
   label,
+  text = "",
   open = false,
   on = false,
   spin = false,
@@ -24,6 +25,12 @@ export function ToolButton({
 }: {
   icon: LucideIcon;
   label: string;
+  /**
+   * Подпись рядом со значком — что выбрано (поле группировки, `.va-label`
+   * прототипа). На узком экране прячется, как там же: значок и цвет
+   * говорят «задано», имя — уже подробность.
+   */
+  text?: string;
   open?: boolean;
   on?: boolean;
   /** Действие уже выполняется: значок крутится, повторный щелчок не нужен. */
@@ -44,11 +51,12 @@ export function ToolButton({
       aria-label={label}
       aria-pressed={open}
       title={label}
-      className={`grid h-7 min-w-7 shrink-0 place-items-center rounded-[5px] px-1.5 transition-colors ${color} ${
+      className={`inline-flex h-7 min-w-7 shrink-0 items-center justify-center gap-1.5 rounded-[5px] px-1.5 transition-colors ${color} ${
         open ? "bg-surface-hover" : "hover:bg-surface-hover"
       }`}
     >
       <Icon as={icon} size={16} className={spin ? "animate-spin" : ""} />
+      {text && <span className="max-w-40 truncate text-sm max-[1500px]:hidden">{text}</span>}
     </button>
   );
 }

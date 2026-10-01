@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import {
-  BuildingIcon,
+  BuildingComplexIcon,
   DatabaseIcon,
-  HistoryIcon,
   IdCardIcon,
+  KeyRoundIcon,
   LayoutGridIcon,
   PlugIcon,
   RouteIcon,
+  ScrollTextIcon,
   ServerIcon,
   ShieldCheckIcon,
   SquareFunctionIcon,
   SquareTerminalIcon,
   UserIcon,
   UsersIcon,
-  WebhookIcon,
   XIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -104,7 +104,7 @@ const GROUPS: {
       {
         id: "project",
         labelKey: "settings.project",
-        icon: BuildingIcon,
+        icon: BuildingComplexIcon,
         right: "project_settings_button",
       },
       {
@@ -131,7 +131,7 @@ const GROUPS: {
       {
         id: "apiKeys",
         labelKey: "apiKeys.title",
-        icon: WebhookIcon,
+        icon: KeyRoundIcon,
         right: "api_keys_button",
         wide: true,
       },
@@ -158,7 +158,7 @@ const GROUPS: {
       {
         id: "activity",
         labelKey: "activity.title",
-        icon: HistoryIcon,
+        icon: ScrollTextIcon,
         right: "version_button",
         wide: true,
       },

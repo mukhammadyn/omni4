@@ -1,4 +1,7 @@
 import {
+  DISPLAY_KEY,
+  PROGRESS_DISPLAY,
+  PROGRESS_TYPE,
   STATUS_GROUPS,
   type Field,
   type FieldOption,
@@ -20,7 +23,7 @@ export function toField(dto: FieldDto): Field {
     slug: dto.slug ?? "",
     label: pickLabel(dto),
     labels: pickLabels(dto.attributes),
-    type: dto.type ?? "",
+    type: shownType(dto),
     // Два имени одного значения: /v2/fields отдаёт relation_field,
     // view_fields внутри связи — relation_id.
     relationId: dto.relation_field || dto.relation_id || null,
@@ -33,6 +36,18 @@ export function toField(dto: FieldDto): Field {
     attributes: dto.attributes ?? {},
     raw: { ...dto },
   };
+}
+
+/**
+ * Число с пометкой «индикатор» — тип PROGRESS (см. PROGRESS_TYPE).
+ * Пометка у другого типа ничего не значит: её мог оставить индикатор,
+ * которому потом сменили тип.
+ */
+function shownType(dto: FieldDto): string {
+  if (dto.type === "NUMBER" && dto.attributes?.[DISPLAY_KEY] === PROGRESS_DISPLAY) {
+    return PROGRESS_TYPE;
+  }
+  return dto.type ?? "";
 }
 
 /**

@@ -54,7 +54,7 @@ import {
 import { autoFilterValues, isLinkable, relationLabel, relationSelection } from "../model/relation";
 import type { Item } from "../model/types";
 import { cellError } from "../model/validate";
-import { Cell, optionColor, optionLabel } from "./Cell";
+import { Cell, isStage, optionColor, optionLabel } from "./Cell";
 import { CodeCell } from "./CodeCell";
 import { ForeignRecord } from "./ForeignRecord";
 import { MapPicker } from "./MapPicker";
@@ -1127,7 +1127,7 @@ function StatusEditor({
         <div className="m-1.5 flex min-h-7.5 flex-wrap items-center gap-1 rounded-md border border-border bg-input px-2 py-1">
           {current && (
             <Chip
-              dot
+              dot={isStage(field)}
               color={optionColor(optionOf(field, current))}
               onRemove={() => {
                 onEdit("");
@@ -1163,7 +1163,7 @@ function StatusEditor({
                   key={option.value}
                   option={option}
                   language={language}
-                  dot
+                  dot={isStage(field)}
                   onClick={() => pick(option.value)}
                 />
               ))}
@@ -1175,7 +1175,7 @@ function StatusEditor({
               key={option.value}
               option={option}
               language={language}
-              dot
+              dot={isStage(field)}
               onClick={() => pick(option.value)}
             />
           ))}

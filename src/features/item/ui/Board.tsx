@@ -11,7 +11,7 @@ import { cellKind } from "../model/cell-kind";
 import { isBlank } from "../model/cell-value";
 import { valueLabelOf } from "../model/relation";
 import type { Item } from "../model/types";
-import { Cell } from "./Cell";
+import { Cell, isStage } from "./Cell";
 import { ActiveCell } from "./CellEditor";
 import { fieldIcon } from "./field-icon";
 
@@ -267,8 +267,8 @@ export function Board({
                    * карточка, то есть радиус на глазах пропадал бы.
                    */}
                   <div className={`shrink-0 bg-bg ${laneField ? "" : "sticky top-0 z-10"}`}>
-                    <header className={`flex h-11 items-center gap-2 rounded-t-xl px-2 ${tint}`}>
-                      <Chip color={color} dot>
+                    <header className={`flex h-11 items-center gap-2 rounded-t-[8px] px-2 ${tint}`}>
+                      <Chip color={color} dot={isStage(field)}>
                         {column.label}
                       </Chip>
 
@@ -289,7 +289,7 @@ export function Board({
                           onClick={() => onAddCard(cellValues(lane.id, column.id))}
                           aria-label={t("table.addRow")}
                           title={t("table.addRow")}
-                          className="ml-auto grid size-6 shrink-0 place-items-center rounded-md text-fg-subtle opacity-0 transition hover:bg-surface hover:text-fg focus-visible:opacity-100 group-hover/column:opacity-100"
+                          className="ml-auto grid size-6 shrink-0 place-items-center rounded-[4px] text-fg-subtle opacity-0 transition hover:bg-surface hover:text-fg focus-visible:opacity-100 group-hover/column:opacity-100"
                         >
                           <Icon as={PlusIcon} size={16} />
                         </button>
@@ -298,7 +298,7 @@ export function Board({
                   </div>
 
                   <div
-                    className={`flex min-h-24 flex-1 flex-col gap-2 rounded-b-xl px-2 pb-2 ${tint}`}
+                    className={`flex min-h-24 flex-1 flex-col gap-2 rounded-b-[8px] px-2 pb-2 ${tint}`}
                     onDragOver={(event) => {
                       if (!dragging) return;
                       // Без preventDefault браузер считает область запрещённой
@@ -384,7 +384,7 @@ export function Board({
                           /* select-none: без него перетаскивание начинается
                              с выделения текста карточки, и вместо неё
                              в руке оказывается кусок текста. */
-                          className={`group/card relative rounded-xl border bg-surface p-2.5 shadow-xs transition-colors select-none ${
+                          className={`group/card relative rounded-md border bg-surface p-2.5 shadow-xs transition-colors select-none ${
                             editing === row.guid
                               ? "border-accent"
                               : "cursor-pointer border-border hover:border-border-strong"
@@ -469,7 +469,7 @@ function Placeholder({ height }: { height: number }) {
     <div
       aria-hidden
       style={{ height }}
-      className="mb-2 rounded-xl border-2 border-dashed border-accent bg-accent-subtle"
+      className="mb-2 rounded-md border-2 border-dashed border-accent bg-accent-subtle"
     />
   );
 }
@@ -589,7 +589,7 @@ function Card({
             alt=""
             loading="lazy"
             draggable={false}
-            className="h-28 w-full rounded-lg object-cover"
+            className="h-28 w-full rounded-sm object-cover"
           />
         </button>
       )}

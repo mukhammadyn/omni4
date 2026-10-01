@@ -30,6 +30,7 @@ export const AGGREGATIONS = ["count", "sum", "avg", "min", "max"] as const;
  */
 export const NUMERIC_FIELDS = new Set([
   "NUMBER",
+  "PROGRESS",
   "FLOAT",
   "FLOAT_NOLIMIT",
   "INCREMENT_ID",

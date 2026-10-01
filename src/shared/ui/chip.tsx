@@ -187,11 +187,16 @@ export function Chip({
      * многоточием каждый.
      */
     <span
-      className={`inline-flex h-5 max-w-full min-w-0 items-center gap-1 rounded-sm px-1.5 text-xs ${CHIP_STYLES[color]}`}
+      /* Статус — круглая плашка с точкой (`.tag.round` прототипа),
+         варианты — прямоугольные (`.tag`): форма отличает «этап» от
+         «метки» раньше, чем прочитан текст. */
+      className={`inline-flex h-5 max-w-full min-w-0 items-center text-xs ${
+        dot ? "gap-[5px] rounded-full pr-2 pl-[7px]" : "gap-1 rounded-sm px-1.5"
+      } ${CHIP_STYLES[color]}`}
     >
       {/* Цвет точки — сам текст чипа: третий токен на каждый оттенок
           пришлось бы держать в двух темах ради четырёх пикселей. */}
-      {dot && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current opacity-70" />}
+      {dot && <span aria-hidden className="size-[7px] shrink-0 rounded-full bg-current opacity-75" />}
       <span className="truncate">{children}</span>
 
       {onRemove && (

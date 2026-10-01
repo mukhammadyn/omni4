@@ -7,14 +7,12 @@ import {
   type ReactNode,
 } from "react";
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  EllipsisVerticalIcon,
-  HashIcon,
-  Maximize2Icon,
-  MoveDownIcon,
-  MoveUpIcon,
+  PanelRightOpenIcon,
   PlusIcon,
   Trash2Icon,
   XIcon,
@@ -26,7 +24,7 @@ import { toast } from "@/shared/lib/toast";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Icon } from "@/shared/ui/icon";
 import { Tooltip } from "@/shared/ui/tooltip";
-import { editorKind } from "../model/cell-kind";
+import { cellKind, editorKind } from "../model/cell-kind";
 import { blankItem } from "../model/cell-value";
 import { columnWindow, type ColumnWindow } from "../model/column-window";
 import { groupEntries, visibleEntries } from "../model/group";
@@ -58,6 +56,16 @@ import { fieldIcon } from "./field-icon";
 const FIRST_WIDTH = 240;
 const WIDTH = 180;
 const PIN_WIDTH = 40;
+/** Колонка флажков — `td.sel` прототипа: 32px, флажок с отступом 6px. */
+const SELECT_WIDTH = 32;
+/**
+ * Поле прокрутки слева и справа — `.page.full` прототипа (px-6).
+ *
+ * Липкие колонки отсчитываются от него с минусом: Chrome держит sticky
+ * внутри padding контейнера прокрутки, и `left: 0` прилипал бы в 24px
+ * от края — а в этой щели проезжали бы прокрученные ячейки.
+ */
+const GUTTER = 24;
 /** Уже — и в колонке не остаётся места ни под подпись, ни под значок. */
 const MIN_WIDTH = 80;
 
@@ -108,8 +116,12 @@ const pinCell = `${cellBase} p-0`;
  * Граница нарисована тенью, а не border: у sticky-ячейки собственная
  * граница уезжает вместе с прокруткой на пиксель и мерцает.
  */
-const pinLeft = "sticky left-0 z-10 bg-surface shadow-[1px_0_0_0_var(--color-border)]";
-const pinRight = "sticky right-0 z-10 bg-surface shadow-[-1px_0_0_0_var(--color-border)]";
+/*
+ * Колонка флажков линии справа не держит — как `td.sel` прототипа:
+ * флажок прижат к имени записи, а не отгорожен от него.
+ */
+const selectCol = "sticky -left-6 z-10 bg-surface";
+const pinRight = "sticky -right-6 z-10 bg-surface shadow-[-1px_0_0_0_var(--color-border)]";
 
 /** Общий пустой набор: без него у DataGrid на каждый рендер новый Set. */
 const EMPTY_PINS: ReadonlySet<string> = new Set<string>();
@@ -131,6 +143,9 @@ const NO_ERRORS: ReadonlyMap<string, CellError> = new Map();
 
 /** Постоянная ссылка: у дерева сортировки нет, а новый массив — новый рендер. */
 const NO_SORTS: Sort[] = [];
+
+/** Виды, чьи значения стоят по правому краю — как `td.num` прототипа. */
+const NUMERIC = new Set(["number", "formula"]);
 
 /** Открытое меню колонки. Тоже одно: оно всплывает поверх таблицы. */
 type Menu = { slug: string; anchor: DOMRect };
@@ -160,7 +175,8 @@ function pinLayout(
   const ordered = [...front, ...rest];
 
   const lefts = new Map<string, number>();
-  let left = PIN_WIDTH;
+  // Минус поле: см. GUTTER.
+  let left = SELECT_WIDTH - GUTTER;
 
   ordered.slice(0, front.length).forEach((column, index) => {
     lefts.set(column.id, left);
@@ -190,7 +206,7 @@ export function DataGrid({
   columnActions,
   onOpenRow,
   onDeleteRow,
-  startIndex = 0,
+  count,
   onEdit,
   onCreate,
   onAddRow,
@@ -276,10 +292,11 @@ export function DataGrid({
    */
   onDeleteRow?: ((guid: string) => void) | undefined;
   /**
-   * Номер первой строки. У таблицы со страницами это смещение страницы:
-   * на второй странице по 20 нумерация идёт с 21, как и в подвале.
+   * Сколько строк всего — «Кол-во» в подвале таблицы (`tfoot` прототипа).
+   * Всего, а не загружено: страница показывает двадцать из тысячи.
+   * Не задан — подвала нет.
    */
-  startIndex?: number;
+  count?: number | undefined;
   /**
    * Своё действие вместо строки-черновика: админ мог задать view адрес
    * собственной формы создания (attributes.url_object). Не задан —
@@ -444,9 +461,9 @@ export function DataGrid({
    * Ширины берутся оттуда же, откуда их берёт <colgroup>, поэтому окно
    * считается по тем же пикселям, что видит человек.
    *
-   * Отсчёт у виртуализатора идёт от левого края таблицы, а колонка
-   * с флажками сдвигает содержимое на PIN_WIDTH — этот сдвиг покрывает
-   * запас: колонка уже 80 пикселей не бывает.
+   * Отсчёт у виртуализатора идёт от левого края прокрутки, а поле 24px
+   * и колонка с флажками сдвигают содержимое на 56 — этот сдвиг
+   * покрывает запас: колонка уже 80 пикселей не бывает.
    */
   const virtualColumns = ordered.length >= VIRTUAL_FROM;
   const columnVirtualizer = useVirtualizer({
@@ -575,7 +592,13 @@ export function DataGrid({
   });
 
   return (
-    <div ref={scroller} className="min-h-0 flex-1 overflow-auto">
+    /*
+     * Поля 24px по бокам — `.page.full` прототипа: таблица отступает от
+     * сайдбара так же, как строка вкладок над ней. Полем, а не отступом
+     * таблицы: прокручивается вся ширина, и закреплённые колонки
+     * прилипают к краю окна, доехав до него.
+     */
+    <div ref={scroller} className="min-h-0 flex-1 overflow-auto px-6">
       {/*
         w-full растягивает таблицу на всю ширину, min-w-max не даёт ей
         сжаться уже содержимого. Слабину забирает ПОСЛЕДНЯЯ колонка —
@@ -586,7 +609,7 @@ export function DataGrid({
       */}
       <table className="w-full min-w-max table-fixed border-separate border-spacing-0">
         <colgroup>
-          <col style={{ width: PIN_WIDTH }} />
+          <col style={{ width: SELECT_WIDTH }} />
           {ordered.map((column, index) => (
             /*
              * Последней колонке ширина не задаётся: она растягивается
@@ -622,21 +645,14 @@ export function DataGrid({
 
         {/* Шапка липкая: колонки нужны и на тысячной строке. */}
         <thead className="sticky top-0 z-20 bg-surface">
-          <tr>
-            {/* «#» превращается в «выделить всё» по наведению — как
-                номер строки превращается в флажок. Пока что-то отмечено,
-                флажок виден всегда: он показывает состояние. */}
-            <th className={`${pinCell} ${pinLeft} group/all z-30`}>
+          <tr className="group/headrow">
+            {/* «Выделить всё» — по наведению на шапку, как в прототипе.
+                Пока что-то отмечено, флажок виден всегда: он показывает
+                состояние. */}
+            <th className={`${pinCell} ${selectCol} z-30`}>
               <span
-                className={`h-full place-items-center text-fg-subtle ${
-                  checked.length ? "hidden" : "grid group-hover/all:hidden"
-                }`}
-              >
-                <Icon as={HashIcon} size={14} />
-              </span>
-              <span
-                className={`h-full place-items-center ${
-                  checked.length ? "grid" : "hidden group-hover/all:grid"
+                className={`flex h-full items-center pl-1.5 transition-opacity focus-within:opacity-100 ${
+                  checked.length ? "" : "opacity-0 group-hover/headrow:opacity-100"
                 }`}
               >
                 <Checkbox
@@ -691,7 +707,9 @@ export function DataGrid({
           </tr>
         </thead>
 
-        <tbody>
+        {/* Пустое значение в строке таблицы — пустая ячейка, как
+            в прототипе; прочерк остаётся карточке и редакторам. */}
+        <tbody className="[&_[data-empty]]:invisible">
           {/* Распорки вместо невидимых строк: одна ячейка нужной высоты
               дешевле тысячи <tr> и не ломает ни ширины, ни прокрутку. */}
           {before > 0 && <Spacer height={before} span={span} />}
@@ -785,7 +803,8 @@ export function DataGrid({
               ? "bg-surface tint-accent-subtle"
               : inSubtree
                 ? "bg-surface tint-surface-hover"
-                : "bg-surface";
+                : // Наведение — тоже: иначе липкая ячейка выпадает из подсветки строки.
+                  "bg-surface group-hover/row:tint-surface-hover";
 
             return (
               <tr
@@ -806,20 +825,12 @@ export function DataGrid({
                       : "hover:bg-surface-hover"
                 }`}
               >
-                {/* Номер строки, по наведению — флажок. У отмеченной
-                    флажок виден всегда: номер прятал бы само выделение. */}
-                <td className={`${pinCell} ${pinLeft} ${pinBg}`}>
+                {/* Флажок — по наведению; у отмеченной и пока отмечена
+                    хоть одна — всегда: он показывает выделение. */}
+                <td className={`${pinCell} ${selectCol} ${pinBg}`}>
                   <span
-                    aria-hidden
-                    className={`h-full place-items-center text-xs text-fg-subtle tabular-nums ${
-                      isSelected ? "hidden" : "grid group-hover/row:hidden"
-                    }`}
-                  >
-                    {startIndex + index + 1}
-                  </span>
-                  <span
-                    className={`h-full place-items-center ${
-                      isSelected ? "grid" : "hidden group-hover/row:grid"
+                    className={`flex h-full items-center pl-1.5 transition-opacity focus-within:opacity-100 ${
+                      checked.length ? "" : "opacity-0 group-hover/row:opacity-100"
                     }`}
                   >
                     <Checkbox
@@ -846,8 +857,8 @@ export function DataGrid({
                          текст поверх текста. */
                       style={left === undefined ? undefined : { left }}
                       className={`${cell} cursor-default border-r ${
-                        isActive && left === undefined ? "bg-accent-subtle" : ""
-                      } ${
+                        columnIndex === 0 ? "font-medium" : ""
+                      } ${isActive && left === undefined ? "bg-accent-subtle" : ""} ${
                         left === undefined
                           ? ""
                           : `sticky z-10 ${isActive ? "bg-surface tint-accent-subtle" : pinBg} ${
@@ -857,7 +868,11 @@ export function DataGrid({
                             }`
                       }`}
                     >
-                      <span className="flex h-full min-w-0 items-center">
+                      <span
+                        className={`relative flex h-full min-w-0 items-center ${
+                          NUMERIC.has(cellKind(column.type)) ? "justify-end" : ""
+                        }`}
+                      >
                         {/* Дерево живёт в первой колонке: отступ по глубине
                             и шеврон у узла с детьми. Узел без детей получает
                             распорку той же ширины — значения одной глубины
@@ -874,10 +889,9 @@ export function DataGrid({
                           language={language}
                         />
 
-                        {/* «Открыть» — в первой колонке по наведению, как
-                            в референсе. Собственные кнопки ячейки (ссылка,
-                            копирование) остаются левее: здесь обычный
-                            flex-ряд, а не наложение. */}
+                        {/* «Открыть» — в первой колонке по наведению, поверх
+                            конца значения, как `.open-btn` прототипа:
+                            плашка с тенью, подпись капсом. */}
                         {onOpenRow && columnIndex === 0 && (
                           <button
                             type="button"
@@ -886,9 +900,9 @@ export function DataGrid({
                               event.stopPropagation();
                               onOpenRow(id);
                             }}
-                            className="ml-auto hidden h-6 shrink-0 items-center gap-1 rounded-md border border-border bg-surface px-1.5 text-xs text-fg-muted transition-colors group-hover/row:flex hover:bg-surface-hover hover:text-fg"
+                            className="absolute top-1/2 right-0 hidden h-5.5 -translate-y-1/2 items-center gap-1 rounded-[4px] bg-surface px-1.5 text-[11.5px] font-semibold tracking-[.3px] text-fg-muted uppercase shadow-raised transition-colors group-hover/row:inline-flex hover:text-fg"
                           >
-                            <Icon as={Maximize2Icon} size={12} />
+                            <Icon as={PanelRightOpenIcon} size={12} />
                             {t("cell.open")}
                           </button>
                         )}
@@ -943,8 +957,8 @@ export function DataGrid({
           */}
           {draft && (
             <tr className="bg-surface">
-              <td className={`${pinCell} ${pinLeft}`}>
-                <span className="grid h-full place-items-center">
+              <td className={`${pinCell} ${selectCol}`}>
+                <span className="flex h-full items-center">
                   <button
                     type="button"
                     onClick={cancelDraft}
@@ -1035,15 +1049,41 @@ export function DataGrid({
                   onClick={onAddRow ?? startDraft}
                   /* Кнопка липнет к левому краю: у таблицы шире экрана
                      она иначе уезжает из виду вместе с первой колонкой. */
-                  className="sticky left-0 flex h-row items-center gap-1.5 px-3 text-sm text-fg-subtle transition-colors group-hover/add:text-fg"
+                  className="sticky left-0 flex h-row items-center gap-1.5 px-2 text-sm text-fg-subtle transition-colors group-hover/add:text-fg"
                 >
-                  <Icon as={PlusIcon} size={14} />
+                  <Icon as={PlusIcon} size={16} />
                   {t("table.addRow")}
                 </button>
               </td>
             </tr>
           )}
         </tbody>
+
+        {/*
+          Подвал — `tfoot` прототипа: липнет к низу, «Кол-во» под первой
+          колонкой. Одна ячейка во всю ширину, а не по ячейке на колонку:
+          итогов по колонкам нет — бэкенд не считает сумм, а сумма
+          по загруженной странице выдавала бы часть за целое.
+
+          Вбок подпись уезжает вместе с первой колонкой, как в прототипе.
+          Липкой её не сделать: sticky внутри липкого tfoot Chrome
+          не держит, и она уезжала бы всё равно — только криво.
+        */}
+        {count !== undefined && (
+          <tfoot className="sticky bottom-0 z-20 bg-surface">
+            <tr>
+              <td colSpan={span} className="h-row border-t border-border p-0">
+                <span
+                  style={{ paddingLeft: SELECT_WIDTH + 8 }}
+                  className="flex h-row items-center text-2xs text-fg-subtle"
+                >
+                  {t("table.count")}
+                  <b className="ml-1 text-xs font-medium text-fg-muted tabular-nums">{count}</b>
+                </span>
+              </td>
+            </tr>
+          </tfoot>
+        )}
       </table>
 
       {menu && menuField && columnActions && (
@@ -1205,10 +1245,10 @@ export function GridSkeleton({ columns = 5, rows = 14 }: { columns?: number; row
   const widths = [70, 45, 60, 85, 55, 75];
 
   return (
-    <div className="min-h-0 flex-1 overflow-hidden" aria-hidden>
+    <div className="min-h-0 flex-1 overflow-hidden px-6" aria-hidden>
       <table className="w-full min-w-max table-fixed border-separate border-spacing-0">
         <colgroup>
-          <col style={{ width: PIN_WIDTH }} />
+          <col style={{ width: SELECT_WIDTH }} />
           {Array.from({ length: columns }, (_, index) => (
             <col key={index} style={{ width: index === 0 ? FIRST_WIDTH : WIDTH }} />
           ))}
@@ -1218,7 +1258,7 @@ export function GridSkeleton({ columns = 5, rows = 14 }: { columns?: number; row
 
         <thead className="sticky top-0 z-20 bg-surface">
           <tr>
-            <th className={`${pinCell} ${pinLeft} z-30`} />
+            <th className={`${pinCell} ${selectCol} z-30`} />
             {Array.from({ length: columns }, (_, index) => (
               <th key={index} className={cell}>
                 <SkeletonBar width={widths[index % widths.length]! - 15} />
@@ -1232,7 +1272,7 @@ export function GridSkeleton({ columns = 5, rows = 14 }: { columns?: number; row
         <tbody>
           {Array.from({ length: rows }, (_, row) => (
             <tr key={row}>
-              <td className={`${pinCell} ${pinLeft} bg-surface`} />
+              <td className={`${pinCell} ${selectCol}`} />
               {Array.from({ length: columns }, (_, index) => (
                 <td key={index} className={cell}>
                   <SkeletonBar width={widths[(row + index) % widths.length]!} />
@@ -1281,28 +1321,43 @@ function HeaderCell({
   onResize?: ((event: ReactPointerEvent<HTMLDivElement>) => void) | undefined;
   /** Вернуть исходную ширину: двойной щелчок по ручке. */
   onResetWidth?: (() => void) | undefined;
-  /** Сортировать по колонке. Нет — заголовок не кнопка: щёлкать нечему. */
+  /** Сортировать по колонке — клик, когда меню колонки нет. */
   onSort?: ((field: string) => void) | undefined;
+  /** Меню колонки. Есть — клик по заголовку открывает его. */
   onMenu?: ((element: HTMLElement) => void) | undefined;
 }) {
   const { t } = useTranslation();
   const active = sorts.find((sort) => sort.field === column.slug);
+
+  /*
+   * Заголовок целиком — кнопка меню, как `th` прототипа: сортировка,
+   * фильтр и настройка поля в одном месте, без отдельной «…» по
+   * наведению. Меню нет (таблица только читается) — клик сортирует;
+   * нет и сортировки (дерево) — заголовок просто подпись.
+   */
+  const action = onMenu
+    ? (element: HTMLElement) => onMenu(element)
+    : onSort
+      ? () => onSort(column.slug)
+      : undefined;
+
   const title = (
     <>
-      <Icon as={fieldIcon(column.type)} size={14} />
+      <Icon as={fieldIcon(column.type)} size={14} className="text-fg-subtle" />
       {/* Подсказка — слаг: подпись и так написана в заголовке, а слаг
           это то имя, которым поле зовут в API, фильтрах и формулах. */}
       <Tooltip label={column.slug}>
         <span className="truncate">{localized(column.labels, language, column.label)}</span>
       </Tooltip>
 
-      {/* Стрелка только у сортированной колонки: значок «можно
-          сортировать» на каждом заголовке — это шум в плотной шапке. */}
+      {/* Стрелка только у сортированной колонки, у правого края, как
+          `.sort-ind`: значок «можно сортировать» на каждом заголовке —
+          шум в плотной шапке. */}
       {active && (
         <Icon
-          as={active.direction === "asc" ? MoveUpIcon : MoveDownIcon}
+          as={active.direction === "asc" ? ArrowUpIcon : ArrowDownIcon}
           size={14}
-          className="text-accent-text"
+          className="ml-auto text-accent-text"
         />
       )}
     </>
@@ -1314,6 +1369,8 @@ function HeaderCell({
       /* z-30, а не 20: шапка целиком липкая сверху, и закреплённая
          ячейка обязана оказаться выше проезжающих под ней соседей. */
       className={`${cell} group/head relative border-r text-left font-normal ${
+        action ? "transition-colors hover:bg-surface-hover" : ""
+      } ${
         left === undefined
           ? ""
           : `sticky z-30 bg-surface ${lastPinned ? "shadow-[1px_0_0_0_var(--color-border)]" : ""}`
@@ -1326,11 +1383,12 @@ function HeaderCell({
         распорка в заголовке до него доходит.
       */}
       <span className={`flex h-full items-center ${last ? "min-w-[164px]" : "min-w-0"}`}>
-        {onSort ? (
+        {action ? (
           <button
             type="button"
-            onClick={() => onSort(column.slug)}
-            className="flex h-full min-w-0 flex-1 items-center gap-1.5 text-fg-muted transition-colors hover:text-fg"
+            onClick={(event) => action(event.currentTarget)}
+            {...(onMenu ? { "aria-haspopup": "menu" as const } : {})}
+            className="flex h-full min-w-0 flex-1 items-center gap-1.5 text-fg-muted"
           >
             {title}
           </button>
@@ -1338,19 +1396,6 @@ function HeaderCell({
           <span className="flex h-full min-w-0 flex-1 items-center gap-1.5 text-fg-muted">
             {title}
           </span>
-        )}
-
-        {/* Кнопка меню появляется по наведению: в шапке из десяти колонок
-            десять одинаковых значков — это рябь, а не подсказка. */}
-        {onMenu && (
-          <button
-            type="button"
-            onClick={(event) => onMenu(event.currentTarget)}
-            aria-label={t("column.menu")}
-            className="ml-1 hidden size-6 shrink-0 place-items-center rounded-md text-fg-muted transition-colors group-hover/head:grid hover:bg-surface-active hover:text-fg"
-          >
-            <Icon as={EllipsisVerticalIcon} size={14} />
-          </button>
         )}
       </span>
 

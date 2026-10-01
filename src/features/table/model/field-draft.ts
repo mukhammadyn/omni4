@@ -1,6 +1,13 @@
 import { hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { slugify } from "@/shared/lib/slug";
-import { STATUS_GROUPS, localized, type Field, type FieldOption, type StatusGroup } from "./types";
+import {
+  PROGRESS_TYPE,
+  STATUS_GROUPS,
+  localized,
+  type Field,
+  type FieldOption,
+  type StatusGroup,
+} from "./types";
 
 /**
  * Новое поле, как его заполняет человек. Форма ввода, а не тело запроса:
@@ -558,6 +565,7 @@ const DEFAULT_VALUE_TYPES = new Set([
   "COLOR",
   "ICON",
   "NUMBER",
+  PROGRESS_TYPE,
   "FLOAT",
   "FLOAT_NOLIMIT",
   "CHECKBOX",
@@ -725,6 +733,7 @@ export const FIELD_TYPE_GROUPS: FieldTypeGroup[] = [
     key: "number",
     types: [
       { type: "NUMBER", label: "Number" },
+      { type: PROGRESS_TYPE, label: "Progress" },
       { type: "FLOAT", label: "Float" },
       // Тот же float, но без ограничения знаков после запятой:
       // у количеств и курсов их бывает больше двух.

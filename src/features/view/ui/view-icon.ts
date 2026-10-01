@@ -1,11 +1,12 @@
 import {
-  CalendarRangeIcon,
-  ChartGanttIcon,
+  CalendarDaysIcon,
+  ChartNoAxesGanttIcon,
   ChartPieIcon,
-  KanbanIcon,
   LayoutGridIcon,
   LayoutListIcon,
+  ListIcon,
   NetworkIcon,
+  SquareKanbanIcon,
   Table2Icon,
   TablePropertiesIcon,
   type LucideIcon,
@@ -18,31 +19,32 @@ import {
  * выигрывает силуэт, а не подробность: значок из трёх линий читается,
  * значок из десяти превращается в пятно.
  *
- * Набор выбран заказчиком; здесь записано, что каждый значит, чтобы
+ * Таблица, список, доска, календарь, таймлайн, галерея и оргструктура — как
+ * в `VIEW_META` прототипа (`table-2`, `list`, `kanban-square`, `calendar-days`,
+ * `gantt-chart`, `layout-grid`, `network`). Имена у прототипа из Lucide
+ * 0.468; в нашей версии это `SquareKanban` и `ChartNoAxesGantt`, а не
+ * `Kanban` и `ChartGantt` — у тех другой рисунок.
+ *
+ * Остальным в прототипе пары нет; что каждый значит, записано, чтобы
  * следующая правка не свелась к «поменяю, вроде похоже»:
- *   CALENDAR  — неделя строкой. Не пустая рамка с засечкой: у голого
- *               `CalendarIcon` внутри мелкая «1», которая в 14px
- *               становится кляксой.
  *   PIVOT     — таблица с шапкой строк, тот же значок, что у пункта меню
  *               типа PIVOT в сайдбаре (`sidebar/ui/MenuIcon`). Один
  *               смысл — один значок в обоих местах.
- *   TIMELINE  — диаграмма Ганта: силуэт ленты, где у каждой строки
- *               свой отрезок во времени. У Lucide он есть (`ChartGantt`);
- *               у Tabler, на котором значок выбирали раньше, его не было.
- *   TREE      — карта узлов со связями.
  *   CHART     — сектор круга. Экран показывает восемь форм сразу,
  *               и значок отвечает «здесь диаграммы», а не называет
  *               одну из них.
  */
 const ICONS: Record<string, LucideIcon> = {
   TABLE: Table2Icon,
-  BOARD: KanbanIcon,
-  CALENDAR: CalendarRangeIcon,
+  LIST: ListIcon,
+  GALLERY: LayoutGridIcon,
+  BOARD: SquareKanbanIcon,
+  CALENDAR: CalendarDaysIcon,
   CHART: ChartPieIcon,
   GRID: LayoutGridIcon,
   PIVOT: TablePropertiesIcon,
   SECTION: LayoutListIcon,
-  TIMELINE: ChartGanttIcon,
+  TIMELINE: ChartNoAxesGanttIcon,
   TREE: NetworkIcon,
 };
 

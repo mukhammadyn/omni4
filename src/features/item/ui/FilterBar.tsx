@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
-  MoveDownIcon,
-  MoveUpIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   PlusIcon,
   SearchIcon,
 } from "lucide-react";
@@ -88,7 +88,7 @@ export function FilterBar({
   };
 
   return (
-    <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-1.5 transition-opacity duration-200 ease-out starting:opacity-0">
+    <div className="mx-6 flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-border py-1.5 transition-opacity duration-200 ease-out starting:opacity-0">
       {sorts.length > 0 && (
         <>
           <SortChips columns={columns} language={language} sorts={sorts} onChange={onSorts} />
@@ -253,7 +253,7 @@ function SortChips({
                 className="flex h-7 max-w-56 items-center gap-1 rounded-full border border-accent bg-accent-subtle px-2 text-xs text-accent-text"
               >
                 <Icon
-                  as={sort.direction === "asc" ? MoveUpIcon : MoveDownIcon}
+                  as={sort.direction === "asc" ? ArrowUpIcon : ArrowDownIcon}
                   size={14}
                 />
                 <span className="truncate">

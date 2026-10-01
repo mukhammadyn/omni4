@@ -4,7 +4,13 @@ import { CHIP_HEX } from "@/shared/ui/chip";
 import i18n from "@/shared/lib/i18n";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError, toast } from "@/shared/lib/toast";
-import type { Field } from "../model/types";
+import {
+  DISPLAY_KEY,
+  PROGRESS_DISPLAY,
+  PROGRESS_TYPE,
+  storedType,
+  type Field,
+} from "../model/types";
 import {
   DEFAULT_LENGTH,
   EMPTY_DRAFT,
@@ -220,7 +226,8 @@ export function toUpdateBodies(
   language: string,
 ): Record<string, unknown>[] {
   const body = toUpdateBody(field, draft, language);
-  if (body.slug === field.slug || body.type === field.type) return [body];
+  // Сравниваются типы БЭКЕНДА: число и индикатор для него одно и то же.
+  if (body.slug === field.slug || body.type === storedType(field.type)) return [body];
 
   return [{ ...field.raw, id: field.id, slug: body.slug }, body];
 }
@@ -249,7 +256,7 @@ export function toUpdateBody(
     id: field.id,
     slug: draft.slug.trim() || field.slug,
     label,
-    type: draft.type,
+    type: storedType(draft.type),
     required: draft.required,
     unique: draft.unique,
     ...toColumnSettings(draft),
@@ -346,6 +353,16 @@ function toSettingsAttributes(draft: FieldDraft): Record<string, unknown> {
      */
     validation: draft.validation.trim(),
     validation_message: draft.validationMessage.trim(),
+    /*
+     * Вид числа (см. PROGRESS_TYPE). У числа ключ уходит и пустым:
+     * индикатор, ставший обычным числом, иначе остался бы индикатором —
+     * тело собирается поверх прежних attributes.
+     */
+    ...(draft.type === PROGRESS_TYPE
+      ? { [DISPLAY_KEY]: PROGRESS_DISPLAY }
+      : draft.type === "NUMBER"
+        ? { [DISPLAY_KEY]: "" }
+        : {}),
     ...toVisibilityAttributes(draft),
     ...toFormulaAttributes(draft),
     /*
@@ -511,7 +528,7 @@ export function toCreateBody(
     id,
     slug: draft.slug.trim() || slugify(label),
     label,
-    type: draft.type,
+    type: storedType(draft.type),
     /*
      * Именно ТАБЛИЦА, а не поле. Имя ключа врёт дважды: это не id
      * и не поля — бэкенд ищет `WHERE slug = $1`, если значение не uuid.

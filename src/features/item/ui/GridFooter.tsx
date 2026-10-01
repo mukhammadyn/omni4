@@ -33,8 +33,9 @@ export const PAGE_SIZES = [20, 50, 100, 200] as const;
 export const MIN_LIMIT = 1;
 export const MAX_LIMIT = 1000;
 
+/** Кнопка страницы — `.pager button` прототипа: 26px, 13px, радиус 5. */
 const pageButton =
-  "inline-flex size-7 items-center justify-center rounded-md text-sm transition-colors";
+  "inline-flex size-6.5 items-center justify-center rounded-[5px] text-xs tabular-nums transition-colors";
 
 export function GridFooter({
   page,
@@ -70,10 +71,25 @@ export function GridFooter({
 }) {
   const { t } = useTranslation();
   const pages = pageCount(total, limit);
+  const paged = page !== undefined && onPage !== undefined;
 
   return (
-    <div className="flex h-11 shrink-0 items-center justify-between gap-4 border-t border-border px-3">
+    /* Без линии сверху: её даёт подвал таблицы («Кол-во») прямо над ним.
+       Поля 24px — те же, что у таблицы. */
+    <div className="flex h-11 shrink-0 items-center justify-between gap-4 px-6">
       <div className="flex min-w-0 items-center gap-3">
+        {/* «1–20 из 44» — `.pager` прототипа. У прокрутки свой счётчик
+            справа, на месте страниц. */}
+        {paged && (
+          <span className="shrink-0 text-xs text-fg-subtle tabular-nums">
+            {t("table.range", {
+              from: total ? (page - 1) * limit + 1 : 0,
+              to: Math.min(page * limit, total),
+              total,
+            })}
+          </span>
+        )}
+
         <LimitPicker limit={limit} onLimit={onLimit} />
 
         {/* Действия появляются вместе с выделением и занимают место
@@ -86,7 +102,7 @@ export function GridFooter({
         )}
       </div>
 
-      {page === undefined || !onPage ? (
+      {!paged ? (
         <p className="flex shrink-0 items-center gap-1.5 text-xs text-fg-muted tabular-nums">
           {loadingMore && <Icon as={LoaderCircleIcon} size={12} className="animate-spin" />}
           {t("table.shownOf", { shown, total })}
@@ -114,7 +130,7 @@ export function GridFooter({
                 onClick={() => onPage(item)}
                 className={`${pageButton} ${
                   item === page
-                    ? "bg-accent-solid text-accent-fg"
+                    ? "bg-surface-active font-semibold text-fg"
                     : "text-fg-muted hover:bg-surface-hover hover:text-fg"
                 }`}
               >
@@ -152,7 +168,7 @@ function Step({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className={`${pageButton} text-fg-muted hover:bg-surface-hover hover:text-fg disabled:pointer-events-none disabled:opacity-40`}
+      className={`${pageButton} text-fg-muted hover:bg-surface-hover hover:text-fg disabled:pointer-events-none disabled:opacity-35`}
     >
       <Icon as={icon} size={16} />
     </button>
@@ -176,10 +192,12 @@ function LimitPicker({ limit, onLimit }: { limit: number; onLimit: (limit: numbe
           type="button"
           onClick={toggle}
           aria-expanded={open}
-          className="flex h-7 items-center gap-1.5 rounded-md border border-border-strong bg-input px-2 text-sm text-fg transition-colors hover:bg-surface-hover"
+          /* Тихая кнопка, а не поле: в прототипе размер порции живёт
+             в меню «Ещё», и в подвале он не должен спорить со страницами. */
+          className="flex h-6.5 items-center gap-1 rounded-[5px] px-1.5 text-xs text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
         >
           <span className="tabular-nums">{limit}</span>
-          <span className="text-xs text-fg-muted">{t("table.perPage")}</span>
+          <span>{t("table.perPage")}</span>
         </button>
       )}
     >

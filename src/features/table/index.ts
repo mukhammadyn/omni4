@@ -39,6 +39,7 @@ export { TableSettings } from "./ui/TableSettings";
 export { TableActions } from "./ui/TableActions";
 export {
   EMPTY_SCHEMA,
+  PROGRESS_TYPE,
   SEARCH_TYPES,
   STATUS_GROUPS,
   localized,

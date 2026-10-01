@@ -51,6 +51,8 @@ export type { Item } from "./model/types";
 export { rowErrors } from "./model/validate";
 export type { CellError } from "./model/validate";
 export { DataGrid, GridSkeleton } from "./ui/DataGrid";
+export { ListSkeleton, RecordList } from "./ui/RecordList";
+export { Gallery, GallerySkeleton } from "./ui/Gallery";
 export { TreeGrid } from "./ui/TreeGrid";
 export type { ColumnActions } from "./ui/ColumnMenu";
 export { fieldIcon } from "./ui/field-icon";

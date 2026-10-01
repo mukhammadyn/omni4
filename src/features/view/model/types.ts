@@ -21,6 +21,8 @@ import type { UrlTemplate } from "./url-template";
  */
 export const VIEW_TYPES = [
   "TABLE",
+  "LIST",
+  "GALLERY",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -43,6 +45,17 @@ const NOT_A_TAB = new Set<string>(["SECTION"]);
 /** Экраны, которые действительно есть. Остальные вкладки видны, но пусты. */
 export const IMPLEMENTED_VIEW_TYPES = new Set<string>([
   "TABLE",
+  /*
+   * Список — `r_list` прототипа. Бэкенд, как и у CHART, про тип не знает
+   * и знать ему нечего (см. VIEW_TYPES): строки те же, что у таблицы.
+   */
+  "LIST",
+  /*
+   * Галерея — `r_gallery` прототипа. Не GRID: GRID у ucode — прежний
+   * табличный тип на ag-grid (CONTEXT, ViewType), и такие вкладки
+   * в проектах уже есть — галереей им становиться нельзя.
+   */
+  "GALLERY",
   "TREE",
   "BOARD",
   "CALENDAR",
@@ -79,9 +92,14 @@ export const IMPLEMENTED_VIEW_TYPES = new Set<string>([
  * которые и так загружены с нужным отбором (features/item/model/tree,
  * groupByParent). Старая админка фильтры в эту ручку шлёт и получает
  * то самое «всё» — см. docs/backend-notes.md.
+ *
+ * СПИСКА и ГАЛЕРЕИ во вкладке пока нет: новую строку вкладка заводит
+ * черновиком прямо в таблице, а у них черновика нет — «Новая запись»
+ * создала бы пустую строку. Нужна своя карточка создания поверх вкладки.
  */
+const NOT_IN_TABS = new Set<string>(["CHART", "LIST", "GALLERY"]);
 export const TAB_VIEW_TYPES = VIEW_TYPES.filter(
-  (type) => IMPLEMENTED_VIEW_TYPES.has(type) && type !== "CHART",
+  (type) => IMPLEMENTED_VIEW_TYPES.has(type) && !NOT_IN_TABS.has(type),
 );
 
 export type View = {

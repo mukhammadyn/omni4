@@ -5,12 +5,14 @@ export type { TabGroup, TabGroupTab } from "./api/tab-group";
 export { relationTabs, tabbableRelations } from "./model/relation-tabs";
 export type { RelationTab } from "./model/relation-tabs";
 export {
+  columnGroup,
   columnKey,
   pickView,
   pinnedIds,
   resolveColumnIds,
   resolveColumns,
   tabViews,
+  toggleColumn,
 } from "./model/columns";
 export { CalendarSetup } from "./ui/CalendarFields";
 export { RelationView } from "./ui/RelationView";

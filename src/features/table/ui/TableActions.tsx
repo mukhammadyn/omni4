@@ -3,7 +3,7 @@ import {
   ChevronLeftIcon,
   LoaderCircleIcon,
   PlusIcon,
-  SettingsIcon,
+  Settings2Icon,
   Trash2Icon,
   XIcon,
   ZapIcon,
@@ -267,7 +267,7 @@ function Panel({
               title={t("actions.settings")}
               className="grid size-7 shrink-0 place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
             >
-              <Icon as={SettingsIcon} size={14} />
+              <Icon as={Settings2Icon} size={14} />
             </button>
           )}
         </div>

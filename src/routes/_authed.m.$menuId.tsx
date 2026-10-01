@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDownIcon, FileIcon, FileInputIcon, Trash2Icon } from "lucide-react";
+import { ChevronDownIcon, FileIcon, UploadIcon, Trash2Icon } from "lucide-react";
 import { z } from "zod";
 import {
   BOARD_ORDER,
@@ -12,6 +12,10 @@ import {
   blankItem,
   GridSkeleton,
   ItemDrawer,
+  Gallery,
+  GallerySkeleton,
+  ListSkeleton,
+  RecordList,
   TreeGrid,
   GridFooter,
   MAX_LIMIT,
@@ -108,6 +112,7 @@ import {
   ViewOptions,
   ViewTabs,
   viewIcon,
+  columnGroup,
   columnKey,
   pickView,
   pinnedIds,
@@ -115,6 +120,7 @@ import {
   relationTabs as relationTabsFromViews,
   tabbableRelations,
   tabViews,
+  toggleColumn,
   useCreateView,
   useDeleteView,
   useExportExcel,
@@ -533,6 +539,14 @@ function MenuPage() {
    * дат; ручка та же; отличается только раскладка.
    */
   const timelineView = supportedView && view?.type === "TIMELINE";
+  /**
+   * Список (`r_list` прототипа) — таблица другим рисунком: строки,
+   * отбор, сортировка, страницы и подвал у них общие, отличается только
+   * компонент на месте DataGrid.
+   */
+  const listView = supportedView && view?.type === "LIST";
+  /** Галерея (`r_gallery` прототипа) — то же самое карточками. */
+  const galleryView = supportedView && view?.type === "GALLERY";
   /** Экраны, отбирающие строки по видимому диапазону дат. */
   const dateView = calendarView || timelineView;
   /** Режим: из адреса, иначе из настроек view, иначе месяц. */
@@ -887,7 +901,14 @@ function MenuPage() {
    * под «Новой записью». Нетронутый черновик уходит молча; в заполненный
    * человек что-то ввёл, и молча выбрасывать это нельзя.
    */
+  /**
+   * Карточку открыли переходом к соседней записи (см. siblings ниже):
+   * панель уже на экране, и въезжать заново ей незачем.
+   */
+  const [stepped, setStepped] = useState(false);
+
   const openRow = (guid: string) => {
+    setStepped(false);
     /* И среди записей без дат: у таймлайна они лежат отдельным списком,
        а свой адрес перехода (`attributes.navigate`) им положен такой же,
        как всем остальным. */
@@ -981,6 +1002,17 @@ function MenuPage() {
    * не найдена» — то есть ссылка на запись работала только у автора.
    */
   const loadedRow = rows.rows.find((item) => item.guid === search.item);
+  /** Место открытой карточки в списке view: от него считаются соседи. */
+  const openIndex = search.item ? rows.rows.findIndex((item) => item.guid === search.item) : -1;
+  const sibling = (index: number) => {
+    const guid = rows.rows[index]?.guid;
+    if (typeof guid !== "string" || !guid) return undefined;
+
+    return () => {
+      openRow(guid);
+      setStepped(true);
+    };
+  };
   const fetched = useItem(view?.tableSlug, search.item, Boolean(search.item) && !loadedRow);
   const drawerRow = loadedRow ?? fetched.item;
 
@@ -1253,7 +1285,7 @@ function MenuPage() {
           справа. Не «пусто, а потом всё сразу» — иначе полоса дёргается
           дважды: сначала под вкладками, потом под «Новой записью». */}
       {supported && chromeLoading && (
-        <div className="flex h-11.5 shrink-0 items-center gap-2 border-b border-border px-3">
+        <div className="mx-6 flex h-11.5 shrink-0 items-center gap-2 border-b border-border">
           <Bar className="h-3.5 w-20" />
           <Bar className="h-3.5 w-16" />
           <div className="ml-auto flex items-center gap-1.5">
@@ -1268,8 +1300,9 @@ function MenuPage() {
 
       {supported && !chromeLoading && (tabs.length > 0 || (can.viewCreate && tableSlug)) && (
         /* Строка вкладок — `.viewbar` прототипа: 46px, линия снизу;
-           справа тулбар (`.view-actions`) с зазором 2px между кнопками. */
-        <div className="flex h-11.5 shrink-0 items-center gap-1 border-b border-border px-3 transition-opacity duration-200 ease-out starting:opacity-0">
+           справа тулбар (`.view-actions`) с зазором 2px между кнопками.
+           Поля 24px — `.page.full`: линия начинается там же, где таблица. */
+        <div className="mx-6 flex h-11.5 shrink-0 items-center gap-1 border-b border-border transition-opacity duration-200 ease-out starting:opacity-0">
           <ViewTabs
             views={tabs}
             activeId={view?.id ?? ""}
@@ -1433,7 +1466,7 @@ function MenuPage() {
                                 <>
                                   <PopoverSeparator />
                                   <PopoverItem
-                                    icon={<Icon as={FileInputIcon} />}
+                                    icon={<Icon as={UploadIcon} />}
                                     onClick={() => {
                                       close();
                                       setImporting(true);
@@ -1691,7 +1724,7 @@ function MenuPage() {
               У доски та же настройка рисует колонки, а не вкладки:
               полоса поверх доски дублировала бы её же шапки. */}
           {tabGroup.tabs.length > 0 && !boardView && (
-            <div className="flex h-11 shrink-0 items-center border-b border-border px-3">
+            <div className="mx-6 flex h-11 shrink-0 items-center border-b border-border">
               <Tabs
                 tabs={tabGroup.tabs}
                 activeId={tabGroup.activeId}
@@ -1748,7 +1781,13 @@ function MenuPage() {
                 : {})}
             />
           ) : rowsLoading || tabGroup.pending ? (
-            <GridSkeleton columns={columns.length} />
+            listView ? (
+              <ListSkeleton />
+            ) : galleryView ? (
+              <GallerySkeleton />
+            ) : (
+              <GridSkeleton columns={columns.length} />
+            )
           ) : rowsError ? (
             /* Отказ показывается словами сервера. Пустая таблица вместо
                него врала бы: «записей нет» и «спросить не дали» — разные
@@ -1966,6 +2005,32 @@ function MenuPage() {
                   }
                 : {})}
             />
+          ) : galleryView ? (
+            <Gallery
+              tableSlug={view.tableSlug}
+              columns={columns}
+              rows={rows.rows}
+              relations={schema.relations}
+              locale={i18n.language}
+              language={language}
+              onOpenRow={openRow}
+              {...(can.write ? { onAdd: createRecord } : {})}
+              {...(infinite && hasMore ? { onEndReached: loadMore } : {})}
+            />
+          ) : listView ? (
+            <RecordList
+              tableSlug={view.tableSlug}
+              columns={columns}
+              rows={rows.rows}
+              relations={schema.relations}
+              locale={i18n.language}
+              language={language}
+              onOpenRow={openRow}
+              /* «Новая запись» — карточкой, как «Создать» в шапке: строки
+                 для черновика на месте у списка нет. */
+              {...(can.write ? { onAdd: createRecord } : {})}
+              {...(infinite && hasMore ? { onEndReached: loadMore } : {})}
+            />
           ) : (
             <DataGrid
               tableSlug={view.tableSlug}
@@ -1985,8 +2050,7 @@ function MenuPage() {
                 : {})}
               rows={rows.rows}
               groups={groupColumns}
-              /* Номера строк продолжают счёт страниц: на второй по 20 — с 21. */
-              startIndex={infinite ? 0 : (search.page - 1) * limit}
+              count={rows.count}
               {...(can.delete ? { onDeleteRow: setDeletingRow } : {})}
               relations={schema.relations}
               locale={i18n.language}
@@ -2052,6 +2116,17 @@ function MenuPage() {
                  админка (views/modules/Table/…/Th.jsx:71). */
               columnActions={{
                 ...columnActions,
+                /* «Скрыть» — правка списка колонок view, то же, что глаз
+                   на странице «Свойства»; с тем же правом. */
+                ...(can.columns
+                  ? {
+                      hide: (field: Field) =>
+                        updateView.mutate({
+                          view,
+                          columns: toggleColumn(view, columnGroup(field, schema.fields, codes), false),
+                        }),
+                    }
+                  : {}),
                 ...(can.fieldFilter
                   ? {
                       filter: (field: Field) => {
@@ -2102,6 +2177,17 @@ function MenuPage() {
       {search.item && view && (
         <ItemDrawer
           key={search.item}
+          /*
+           * «Предыдущая» и «Следующая» — `Peek.step` прототипа: соседи
+           * в том порядке, что виден в view, по загруженным строкам.
+           * На краю страницы кнопка гаснет: следующая страница ещё
+           * на сервере, а листать её из карточки — уже другой экран.
+           * Переход — через openRow: свой адрес и черновик он учитывает.
+           */
+          {...(openIndex === -1
+            ? {}
+            : { siblings: { prev: sibling(openIndex - 1), next: sibling(openIndex + 1) } })}
+          instant={stepped}
           tableSlug={view.tableSlug}
           columns={orderedFields}
           hidden={drawerLayout.hidden}

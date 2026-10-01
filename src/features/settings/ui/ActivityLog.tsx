@@ -1,5 +1,5 @@
 import { Fragment, useDeferredValue, useState } from "react";
-import { ChevronDownIcon, ChevronUpIcon, FileSpreadsheetIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, DownloadIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { DatePicker } from "@/shared/ui/date-picker";
@@ -105,7 +105,7 @@ function ChangesLog() {
           disabled={exportExcel.isPending}
           onClick={() => exportExcel.mutate(deferred)}
         >
-          <Icon as={FileSpreadsheetIcon} size={14} />
+          <Icon as={DownloadIcon} size={14} />
           {exportExcel.isPending ? t("common.loading") : t("activity.export")}
         </Button>
       </SectionHeader>

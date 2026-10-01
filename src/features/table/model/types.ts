@@ -104,6 +104,29 @@ export function tabLabel(
   return (tabbed && labels[language]?.trim()) || localized(labels, language, fallback);
 }
 
+/**
+ * Индикатор — `progress` прототипа: число 0–100, нарисованное полоской.
+ *
+ * У бэкенда такого типа нет, а незнакомый тип он молча заводит строкой
+ * (`helper.GetDataType` → VARCHAR): сортировка пошла бы по буквам
+ * («9» > «50»), а фильтры «больше/меньше» не работали бы вовсе. Поэтому
+ * в базе это обычный NUMBER (колонка FLOAT), а вид — наш ключ
+ * в свободном мешке attributes, как `validation` и `defaultValue`.
+ *
+ * Наружу из api поле выходит уже типом PROGRESS (api/normalize), обратно
+ * уходит NUMBER (api/fields, storedType). Других мест, где одно
+ * превращается в другое, быть не должно. Старая админка и бэкенд видят
+ * обычное число.
+ */
+export const PROGRESS_TYPE = "PROGRESS";
+export const DISPLAY_KEY = "number_display";
+export const PROGRESS_DISPLAY = "progress";
+
+/** Тип, который хранит бэкенд: индикатор там — число. */
+export function storedType(type: string): string {
+  return type === PROGRESS_TYPE ? "NUMBER" : type;
+}
+
 /** Группы вариантов STATUS. Бэкенд хранит их тремя отдельными списками. */
 export const STATUS_GROUPS = ["todo", "progress", "complete"] as const;
 export type StatusGroup = (typeof STATUS_GROUPS)[number];

@@ -36,6 +36,8 @@ const DATE_KINDS: Record<string, DateKind> = {
  */
 const NUMBER_TYPES = new Set([
   "NUMBER",
+  // Индикатор: в базе тот же NUMBER, у нас — свой тип (features/table).
+  "PROGRESS",
   "FLOAT",
   "FLOAT_NOLIMIT",
   "INCREMENT_NUMBER",

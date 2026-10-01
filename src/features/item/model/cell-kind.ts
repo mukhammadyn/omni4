@@ -101,6 +101,9 @@ const BY_TYPE: Record<string, CellKind> = {
   PROGRAMMING_LANGUAGE: "longtext",
 
   NUMBER: "number",
+  // Индикатор — то же число, другой только рисунок (см. ui/Cell):
+  // правка, фильтр и сортировка у него числовые.
+  PROGRESS: "number",
   FLOAT: "number",
   FLOAT_NOLIMIT: "number",
   INCREMENT_NUMBER: "number",

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { FileSpreadsheetIcon, LoaderCircleIcon } from "lucide-react";
+import { CloudUploadIcon, LoaderCircleIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, useCreateTextFields, type Field } from "@/features/table";
 import { slugify } from "@/shared/lib/slug";
@@ -140,7 +140,7 @@ export function ExcelImportDialog({
               disabled={read.isPending}
               className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border-strong p-8 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg disabled:pointer-events-none disabled:opacity-50"
             >
-              <Icon as={read.isPending ? LoaderCircleIcon : FileSpreadsheetIcon} size={24} className={read.isPending ? "animate-spin" : ""} />
+              <Icon as={read.isPending ? LoaderCircleIcon : CloudUploadIcon} size={24} className={read.isPending ? "animate-spin" : ""} />
               {t(read.isPending ? "common.loading" : "view.importPick")}
             </button>
           </>

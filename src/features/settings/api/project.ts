@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fileUrl } from "@/features/item";
 import { useProjectDetail } from "@/features/workspace";
 import { api } from "@/shared/api/client";
 import { useSession } from "@/shared/api/use-session";
@@ -233,7 +234,9 @@ export function toProjectSettings(dto: ProjectDto): ProjectSettings {
     id: dto.project_id ?? "",
     companyId: dto.company_id ?? "",
     title: dto.title?.trim() ?? "",
-    logo: dto.logo ?? "",
+    // Старая админка сохраняет путь в хранилище без адреса CDN
+    // («<id>/Media/x.png»), наша загрузка — готовый адрес. Читаем оба.
+    logo: fileUrl(dto.logo ?? ""),
     languageIds: (dto.language ?? []).map((item) => item.id ?? "").filter(Boolean),
     timezoneId: dto.timezone?.id ?? "",
     currencyId: dto.currency?.id ?? "",

@@ -50,7 +50,7 @@ import {
 } from "../model/relation-draft";
 import { cascadeSteps } from "../model/cascade";
 import { languageGroups } from "../model/multilanguage";
-import { localized, type Field, type Relation } from "../model/types";
+import { localized, storedType, type Field, type Relation } from "../model/types";
 import { useTableFields, useTables } from "../api/tables";
 import { AutofillSettings } from "./AutofillSettings";
 import { ButtonSettings } from "./ButtonSettings";
@@ -274,7 +274,9 @@ export function FieldEditor({
    * на стороне базы (field.go). Значения во всех строках пропадают,
    * и сказать об этом надо ДО закрытия панели, а не после.
    */
-  const retyping = Boolean(field && draft.type !== initial.type);
+  // Индикатор и число — одна колонка (PROGRESS_TYPE): смена между ними
+  // данные не трогает, и пугать незачем.
+  const retyping = Boolean(field && storedType(draft.type) !== storedType(initial.type));
   const shape = optionsShape(draft.type);
 
   const setGroup = (group: StatusGroup, options: DraftOption[]) =>
@@ -523,8 +525,11 @@ export function FieldEditor({
                         <AddOption onClick={() => addOption(group)} />
                       </header>
 
+                      {/* Стадии бывают только у STATUS: плашки этапа — круглые,
+                          как в таблице. */}
                       <OptionList
                         options={draft.groups[group]}
+                        dot
                         onOpen={(index) => setOpenOption({ group, index })}
                       />
                     </section>
@@ -1415,9 +1420,12 @@ function AddOption({ onClick }: { onClick: () => void }) {
  */
 function OptionList({
   options,
+  dot,
   onOpen,
 }: {
   options: DraftOption[];
+  /** Плашки этапа (STATUS) — круглые с точкой, как в ячейке. */
+  dot?: boolean;
   onOpen: (index: number) => void;
 }) {
   const { t } = useTranslation();
@@ -1433,7 +1441,7 @@ function OptionList({
         >
           {/* Безымянный вариант — это тот, который только что завели
               и не дописали: подпись-подсказка честнее пустого чипа. */}
-          <Chip color={option.color}>
+          <Chip color={option.color} dot={dot}>
             {option.label.trim() || t("fieldForm.optionPlaceholder")}
           </Chip>
 

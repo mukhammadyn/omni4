@@ -1,4 +1,4 @@
-import type { Field } from "@/features/table";
+import { baseSlug, languageGroups, type Field } from "@/features/table";
 import { isTabView, type View } from "./types";
 
 /**
@@ -116,4 +116,38 @@ export function pinnedIds(fixedColumnIds: string[], fields: Field[]): Set<string
       .filter((field) => fixed.has(field.id) || (field.relationId && fixed.has(field.relationId)))
       .map((field) => field.id),
   );
+}
+
+/**
+ * Новый список колонок после переключения одной.
+ *
+ * Переключается СПИСОК полей, а не одно: у мультиязычного поля это все
+ * языковые варианты сразу. Показать один вариант из трёх — значит
+ * оставить колонку без языковой группы, и в таблице она подпишется
+ * «Название (cyr)» вместо «Название».
+ *
+ * При скрытии убираются ОБА ключа поля-связи — и id поля, и id связи.
+ * Бэкенд при создании view кладёт в columns оба (view.go, INSERT), и
+ * колонка, снятая по одному ключу, продолжает находиться по второму:
+ * в старой админке галочка снималась, а колонка оставалась.
+ *
+ * Новая колонка встаёт в конец: у view нет «правильного места» для неё,
+ * а вставка в середину переставила бы соседние без спроса.
+ */
+export function toggleColumn(view: View, group: Field[], visible: boolean): string[] {
+  const keys = new Set(
+    group.flatMap((field) => [field.id, ...(field.relationId ? [field.relationId] : [])]),
+  );
+  const rest = view.columnIds.filter((id) => !keys.has(id));
+
+  return visible ? [...rest, ...group.map(columnKey)] : rest;
+}
+
+/**
+ * Все языковые варианты поля — то, что скрывается и показывается
+ * одной колонкой (см. toggleColumn). Обычное поле — оно само.
+ */
+export function columnGroup(field: Field, fields: Field[], codes: string[]): Field[] {
+  const base = baseSlug(field, codes);
+  return (base === null ? undefined : languageGroups(fields, codes).get(base)) ?? [field];
 }

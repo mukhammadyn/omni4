@@ -1,4 +1,5 @@
 import {
+  ArrowUpRightIcon,
   CopyIcon,
   ExternalLinkIcon,
   MapPinIcon,
@@ -6,7 +7,14 @@ import {
   PlusIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { localized, optionOf, type Field, type FieldOption, type Relation } from "@/features/table";
+import {
+  PROGRESS_TYPE,
+  localized,
+  optionOf,
+  type Field,
+  type FieldOption,
+  type Relation,
+} from "@/features/table";
 import { fileName } from "@/shared/lib/file-kind";
 import { toast } from "@/shared/lib/toast";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -36,9 +44,15 @@ import { PolygonCell } from "./PolygonCell";
  */
 
 /**
- * Пусто — прочерк, а не пустая ячейка: иначе строка выглядит поехавшей.
+ * Пусто — прочерк, а не пустая ячейка: иначе поле карточки выглядит
+ * поехавшим. В строке таблицы прочерк прячет сама таблица (`data-empty`,
+ * см. DataGrid): там пустая ячейка — как в прототипе.
  */
-const Empty = () => <span className="text-fg-subtle">—</span>;
+const Empty = () => (
+  <span data-empty className="text-fg-subtle">
+    —
+  </span>
+);
 
 export function Cell({
   field,
@@ -106,8 +120,21 @@ export function Cell({
         />
       );
 
+    /*
+     * Вид `status` — это и STATUS, и одиночный выбор PICK_LIST, но
+     * плашки у них разные, как в прототипе: этап — круглая с точкой
+     * (`.tag.round`), вариант выбора — прямоугольная (`.tag`).
+     */
     case "status":
-      return <TagsCell field={field} value={value} language={language} dot wrap={wrap} />;
+      return (
+        <TagsCell
+          field={field}
+          value={value}
+          language={language}
+          dot={isStage(field)}
+          wrap={wrap}
+        />
+      );
 
     case "multiselect":
       return <TagsCell field={field} value={value} language={language} wrap={wrap} />;
@@ -135,11 +162,9 @@ export function Cell({
      * по-прежнему без пробелов.
      */
     case "number":
-      return isBlank(value) ? (
-        <Empty />
-      ) : (
-        <span className={`tabular-nums ${line}`}>{formatNumber(value, locale)}</span>
-      );
+      if (isBlank(value)) return <Empty />;
+      if (field.type === PROGRESS_TYPE) return <ProgressCell value={value} locale={locale} />;
+      return <span className={`tabular-nums ${line}`}>{formatNumber(value, locale)}</span>;
 
     case "boolean":
       /*
@@ -407,6 +432,14 @@ function TagsCell({
 }
 
 /**
+ * Значение — этап (STATUS): его плашка круглая и с точкой. У остальных
+ * выборов — прямоугольная, как `.tag` прототипа.
+ */
+export function isStage(field: Field): boolean {
+  return field.type === "STATUS";
+}
+
+/**
  * Цвет варианта. Есть цвет — красим, нет — нейтральный чип.
  *
  * `attributes.has_color` при этом не спрашивается, и это осознанно.
@@ -514,7 +547,18 @@ function RelationCell({
     .map((item) => item.label)
     .filter(Boolean);
 
-  if (parts.length) return <span className={line}>{parts.join(", ")}</span>;
+  /*
+   * Ссылка на запись — `.rel` прототипа: стрелка «перейти» и линия
+   * снизу. Отличает связь от обычного текста с первого взгляда.
+   */
+  if (parts.length) {
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1 border-b border-border-strong leading-tight">
+        <Icon as={ArrowUpRightIcon} size={13} className="text-fg-subtle" />
+        <span className={line}>{parts.join(", ")}</span>
+      </span>
+    );
+  }
 
   /*
    * Пусто — и связь настроена: предлагаем связать. Прочерк здесь врёт,
@@ -523,7 +567,12 @@ function RelationCell({
    */
   if (slugs?.length && editorKind(field)) {
     return (
-      <span className="flex items-center gap-1 text-fg-subtle opacity-0 transition-opacity group-hover/row:opacity-100">
+      /* `data-placeholder` — подсказка, а не значение: список (RecordList)
+         прячет её вместе с местом, которое она занимает. */
+      <span
+        data-placeholder
+        className="flex items-center gap-1 text-fg-subtle opacity-0 transition-opacity group-hover/row:opacity-100"
+      >
         <Icon as={PlusIcon} size={14} />
         <span className="truncate">{t("cell.createRelation")}</span>
       </span>
@@ -531,6 +580,33 @@ function RelationCell({
   }
 
   return <Empty />;
+}
+
+/**
+ * Индикатор — `.progress` прототипа: полоса 4px и процент справа.
+ * Цвет — смысл, а не украшение: 100 и больше — готово, меньше 50 —
+ * отстаёт, между ними — обычный акцент. Полоса обрезается по краям
+ * шкалы, подпись — нет: 130% остаётся 130%.
+ */
+function ProgressCell({ value, locale }: { value: unknown; locale: string }) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return <span className="truncate">{String(value)}</span>;
+
+  const tone = number >= 100 ? "bg-success" : number < 50 ? "bg-warning" : "bg-accent";
+
+  return (
+    <span className="flex min-w-[120px] flex-1 items-center gap-2">
+      <span className="h-1 flex-1 overflow-hidden rounded-[3px] bg-surface-active">
+        <span
+          className={`block h-full rounded-[3px] ${tone}`}
+          style={{ width: `${Math.min(100, Math.max(0, number))}%` }}
+        />
+      </span>
+      <span className="w-9 shrink-0 text-right text-2xs text-fg-muted tabular-nums">
+        {formatNumber(number, locale)}%
+      </span>
+    </span>
+  );
 }
 
 function DateCell({ value, kind, locale }: { value: unknown; kind: DateKind; locale: string }) {

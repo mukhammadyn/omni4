@@ -473,3 +473,44 @@ test("слаг нового поля не повторяет занятые", ()
   expect(freeSlug("№", used)).toBe("field");
   expect(used.has("field")).toBe(true);
 });
+
+/*
+ * Индикатор: у бэкенда такого типа нет (незнакомый он заводит VARCHAR),
+ * поэтому уходит числом с пометкой в attributes — и обратно читается
+ * индикатором. См. PROGRESS_TYPE.
+ */
+test("индикатор уходит числом с пометкой и читается обратно индикатором", () => {
+  const body = toCreateBody({ ...EMPTY_DRAFT, label: "Маржа", slug: "marja", type: "PROGRESS" }, AT);
+
+  expect(body.type).toBe("NUMBER");
+  expect(body.attributes).toMatchObject({ number_display: "progress" });
+  expect(toField(body).type).toBe("PROGRESS");
+});
+
+test("число без пометки остаётся числом, а пометка у другого типа не значит ничего", () => {
+  expect(toField({ slug: "a", type: "NUMBER", attributes: {} }).type).toBe("NUMBER");
+  expect(toField({ slug: "a", type: "FLOAT", attributes: { number_display: "progress" } }).type).toBe(
+    "FLOAT",
+  );
+});
+
+test("индикатор → число снимает пометку: тело собирается поверх прежних attributes", () => {
+  const field = toField({ id: "1", slug: "marja", type: "NUMBER", attributes: { number_display: "progress" } });
+  const body = toUpdateBody(field, { ...toDraft(field, "en"), type: "NUMBER" }, "en");
+
+  expect(body.type).toBe("NUMBER");
+  expect(body.attributes).toMatchObject({ number_display: "" });
+  expect(toField(body).type).toBe("NUMBER");
+});
+
+test("число ↔ индикатор с новым слагом — один запрос: для бэкенда тип не менялся", () => {
+  const field = toField({ id: "1", slug: "marja", type: "NUMBER", attributes: {} });
+  const bodies = toUpdateBodies(
+    field,
+    { ...toDraft(field, "en"), slug: "margin", type: "PROGRESS" },
+    "en",
+  );
+
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0]).toMatchObject({ slug: "margin", type: "NUMBER" });
+});

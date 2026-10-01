@@ -1,7 +1,8 @@
 import { useState } from "react";
 import {
-  ArrowDownWideNarrowIcon,
-  ArrowUpNarrowWideIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
+  EyeOffIcon,
   ListFilterIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
@@ -40,6 +41,8 @@ export type ColumnActions = {
   settings: (field: Field, anchor: DOMRect) => void;
   /** Добавить фильтр по колонке. Нет — списку фильтр не применить. */
   filter?: ((field: Field) => void) | undefined;
+  /** Убрать колонку из view — «Скрыть» прототипа. Нет — пункта нет. */
+  hide?: ((field: Field) => void) | undefined;
   remove: (field: Field) => void;
 };
 
@@ -138,12 +141,12 @@ export function ColumnMenu({
         {onSort && (
           <>
             <MenuItem
-              icon={ArrowUpNarrowWideIcon}
+              icon={ArrowUpIcon}
               onClick={() => run(() => onSort(field.slug, "asc"))}
               label={t("table.sortAsc")}
             />
             <MenuItem
-              icon={ArrowDownWideNarrowIcon}
+              icon={ArrowDownIcon}
               onClick={() => run(() => onSort(field.slug, "desc"))}
               label={t("table.sortDesc")}
             />
@@ -159,6 +162,13 @@ export function ColumnMenu({
 
         <div className="my-1 h-px bg-border" />
 
+        {actions.hide && (
+          <MenuItem
+            icon={EyeOffIcon}
+            onClick={() => run(() => actions.hide?.(field))}
+            label={t("column.hide")}
+          />
+        )}
         <MenuItem
           icon={Trash2Icon}
           danger

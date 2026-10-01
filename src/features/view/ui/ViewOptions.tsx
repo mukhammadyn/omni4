@@ -3,16 +3,14 @@ import {
   CalendarClockIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  EllipsisVerticalIcon,
+  DownloadIcon,
+  EllipsisIcon,
   ExternalLinkIcon,
   EyeIcon,
   EyeOffIcon,
-  FileInputIcon,
-  FileOutputIcon,
   FunnelPlusIcon,
   GripVerticalIcon,
   InfinityIcon,
-  KanbanIcon,
   LayersIcon,
   LayoutListIcon,
   ListFilterIcon,
@@ -20,13 +18,15 @@ import {
   PanelTopIcon,
   PinIcon,
   PinOffIcon,
+  PlusIcon,
   PrinterIcon,
   Rows3Icon,
   SearchIcon,
-  PlusIcon,
   SlidersHorizontalIcon,
+  SquareKanbanIcon,
   Table2Icon,
   Trash2Icon,
+  UploadIcon,
   XIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -42,9 +42,7 @@ import {
 } from "@/features/item";
 import {
   TableSettings,
-  baseSlug,
   collapseLanguages,
-  languageGroups,
   localized,
   type Field,
 } from "@/features/table";
@@ -59,7 +57,7 @@ import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { ToolButton } from "@/shared/ui/tool-button";
 import { moveBefore } from "@/shared/lib/order";
 import { TAB_GROUP_TYPES, subGroupField, tabGroupField } from "../api/tab-group";
-import { columnKey } from "../model/columns";
+import { columnGroup, columnKey, toggleColumn } from "../model/columns";
 import { hasUrl, type UrlTemplate } from "../model/url-template";
 import { IMPLEMENTED_VIEW_TYPES, TAB_VIEW_TYPES, VIEW_TYPES, type View } from "../model/types";
 import { CalendarFields, dateFields } from "./CalendarFields";
@@ -224,8 +222,45 @@ export function ViewOptions({
     />
   );
 
+  /*
+   * Где строки собираются в группы: таблица и таймлайн. У доски за это
+   * отвечают её колонки, у календаря — клетки дней, у списка и галереи
+   * нет колонок, а дерево и графики строят порядок сами.
+   */
+  const canGroup =
+    !["TREE", "BOARD", "CALENDAR", "CHART", "LIST", "GALLERY"].includes(view.type);
+  /** Первое поле группировки — подписью на кнопке, остальные счётом. */
+  const grouped = view.groupByIds
+    .map((id) => fields.find((field) => field.id === id || field.relationId === id))
+    .filter((field): field is Field => Boolean(field));
+  const groupedLabel = grouped[0]
+    ? localized(grouped[0].labels, language, grouped[0].label) +
+      (grouped.length > 1 ? ` +${grouped.length - 1}` : "")
+    : "";
+
   return (
     <>
+      {/* Группировка — своей кнопкой с именем поля, как `vtG` в тулбаре
+          прототипа (vacancies.html): что строки сгруппированы, видно
+          без того, чтобы открывать `⋮`. */}
+      {can.settings && handlers.onGroupBy && canGroup && (
+        <Popover
+          align="end"
+          trigger={({ open, toggle }) => (
+            <ToolButton
+              icon={LayersIcon}
+              label={t("view.groupBy")}
+              text={groupedLabel}
+              open={open}
+              on={grouped.length > 0}
+              onClick={toggle}
+            />
+          )}
+        >
+          {(close) => panel(close, "group")}
+        </Popover>
+      )}
+
       {/* «Свойства» — отдельной кнопкой, как ползунки в тулбаре прототипа
           (`propsPop`, docs/REDESIGN.md): видимость и порядок колонок
           меняют чаще всего остального, и искать их в `⋮` — лишний шаг.
@@ -252,7 +287,7 @@ export function ViewOptions({
         align="end"
         trigger={({ open, toggle }) => (
           <ToolButton
-            icon={EllipsisVerticalIcon}
+            icon={EllipsisIcon}
             label={t(labels.title)}
             open={open}
             onClick={toggle}
@@ -401,12 +436,7 @@ function Panel({
       (field) => !shownSlugs.has(field.slug),
     );
     const hidden = matching(hiddenAll, query, language);
-    const groups = languageGroups(fields, codes);
-    /** Все языковые варианты поля. Обычное поле — оно само. */
-    const groupOf = (field: Field): Field[] => {
-      const base = baseSlug(field, codes);
-      return (base === null ? undefined : groups.get(base)) ?? [field];
-    };
+    const groupOf = (field: Field): Field[] => columnGroup(field, fields, codes);
 
     /*
      * Правка и удаление ПОЛЯ — не настройка view: они меняют схему
@@ -647,7 +677,12 @@ function Panel({
     const groupable = matching(collapseLanguages(shown, codes, language), query, language);
 
     return (
-      <Subpage title={t("view.groupBy")} busy={busy} onBack={back} hint={t("view.groupByHint")}>
+      <Subpage
+        title={t("view.groupBy")}
+        busy={busy}
+        hint={t("view.groupByHint")}
+        {...(startPage === "group" ? {} : { onBack: back })}
+      >
         <FieldSearch value={query} onChange={setQuery} />
 
         <List>
@@ -956,20 +991,14 @@ function Panel({
    */
   const isGrid = !isTree && !isBoard && !isCalendar && !isChart;
   /*
-   * Где строки собираются в группы: таблица и таймлайн. У доски за это
-   * отвечают её колонки, у календаря — клетки дней, а дерево строит
-   * порядок само.
+   * Список и галерея — таблица без колонок (`r_list`, `r_gallery`
+   * прототипа): свойства стоят в строке или в карточке подряд, и ни
+   * закреплять, ни делить их на группы нечем. Страницы, отбор и
+   * раскладка вкладками — как у таблицы.
    */
-  const canGroup = isGrid || view.type === "TIMELINE";
+  const isList = view.type === "LIST" || view.type === "GALLERY";
   /** Поле начала события — подписью в строке настроек. Здесь это слаг. */
   const dateFrom = fields.find((field) => field.slug === view.dateFromSlug);
-  /**
-   * Поля группировки — подписью в строке настроек: первое словом,
-   * остальные счётом. Ключи те же, что у колонок.
-   */
-  const grouped = view.groupByIds
-    .map((id) => fields.find((field) => field.id === id || field.relationId === id))
-    .filter((field): field is Field => Boolean(field));
   /** Поле раскладки вкладками — подписью в строке настроек. */
   const tabGrouped = tabGroupField(view, fields);
   /** Поле дорожек доски — там же. */
@@ -1031,7 +1060,7 @@ function Panel({
 
       {can.columns && (
         <Row
-          icon={EyeIcon}
+          icon={SlidersHorizontalIcon}
           label={t("view.columns")}
           value={String(shown.length)}
           onClick={() => open("columns")}
@@ -1063,7 +1092,7 @@ function Panel({
           onClick={() => open("calendar")}
         />
       )}
-      {can.fixColumn && !isBoard && !isCalendar && !isChart && (
+      {can.fixColumn && !isBoard && !isCalendar && !isChart && !isList && (
         <Row
           icon={PinIcon}
           label={t("view.fixColumns")}
@@ -1071,24 +1100,11 @@ function Panel({
           onClick={() => open("fixed")}
         />
       )}
-      {can.settings && handlers.onGroupBy && canGroup && (
-        <Row
-          icon={LayersIcon}
-          label={t("view.groupBy")}
-          value={
-            grouped[0]
-              ? localized(grouped[0].labels, language, grouped[0].label) +
-                (grouped.length > 1 ? ` +${grouped.length - 1}` : "")
-              : ""
-          }
-          onClick={() => open("group")}
-        />
-      )}
       {/* Раскладка вкладками — своё право роли (`tab_group`), отдельное
           от настройки view: так их и выдаёт бэкенд. */}
       {can.settings && can.tabGroup && handlers.onTabGroup && !isTree && !isChart && (
         <Row
-          icon={isBoard ? KanbanIcon : PanelTopIcon}
+          icon={isBoard ? SquareKanbanIcon : PanelTopIcon}
           label={t(isBoard ? "view.boardGroup" : "view.tabGroup")}
           value={tabGrouped ? localized(tabGrouped.labels, language, tabGrouped.label) : ""}
           onClick={() => open("tabGroup")}
@@ -1126,7 +1142,7 @@ function Panel({
       {can.excelMenu && handlers.onImport && handlers.onExport && (
         <>
           <PopoverItem
-            icon={<Icon as={FileInputIcon} size={16} className="shrink-0 text-fg-muted" />}
+            icon={<Icon as={UploadIcon} size={16} className="shrink-0 text-fg-muted" />}
             onClick={() => {
               handlers.onImport?.();
               close();
@@ -1138,7 +1154,7 @@ function Panel({
           <PopoverItem
             icon={
               <Icon
-                as={exporting ? LoaderCircleIcon : FileOutputIcon}
+                as={exporting ? LoaderCircleIcon : DownloadIcon}
                 size={16}
                 className={`shrink-0 text-fg-muted ${exporting ? "animate-spin" : ""}`}
               />
@@ -1675,31 +1691,6 @@ function fixedFields(view: View, shown: Field[]): Field[] {
   const wanted = new Set(view.fixedColumnIds);
 
   return shown.filter((field) => wanted.has(field.relationId ?? field.id) || wanted.has(field.id));
-}
-
-/**
- * Новый список колонок после переключения одной.
- *
- * Переключается СПИСОК полей, а не одно: у мультиязычного поля это все
- * языковые варианты сразу. Показать один вариант из трёх — значит
- * оставить колонку без языковой группы, и в таблице она подпишется
- * «Название (cyr)» вместо «Название».
- *
- * При скрытии убираются ОБА ключа поля-связи — и id поля, и id связи.
- * Бэкенд при создании view кладёт в columns оба (view.go, INSERT), и
- * колонка, снятая по одному ключу, продолжает находиться по второму:
- * в старой админке галочка снималась, а колонка оставалась.
- *
- * Новая колонка встаёт в конец: у view нет «правильного места» для неё,
- * а вставка в середину переставила бы соседние без спроса.
- */
-function toggleColumn(view: View, group: Field[], visible: boolean): string[] {
-  const keys = new Set(
-    group.flatMap((field) => [field.id, ...(field.relationId ? [field.relationId] : [])]),
-  );
-  const rest = view.columnIds.filter((id) => !keys.has(id));
-
-  return visible ? [...rest, ...group.map(columnKey)] : rest;
 }
 
 /** Плейсхолдер один на все три адреса: запись подстановки у них общая. */

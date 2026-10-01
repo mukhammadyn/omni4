@@ -271,21 +271,35 @@ export function CalendarView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-        <div className="flex items-center">
+      {/*
+        Шапка периода — `.ap-bar` / `vt-cal` прототипа: «‹ Месяц ›» одним
+        блоком, рядом «Сегодня». Без линии снизу: сетка под ней в своей
+        рамке. Поля 24px — как у строки вкладок (`.page.full`).
+      */}
+      <div className="mx-6 flex h-12 shrink-0 items-center gap-2.5">
+        <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => onCursor(shiftPeriod(period, cursor, -1))}
             aria-label={t("action.previous")}
-            className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+            className="grid size-7 place-items-center rounded-[5px] text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
             <Icon as={ChevronLeftIcon} size={16} />
           </button>
+
+          {/* Подпись периода — капитель: Intl отдаёт месяц строчной буквой
+              в русском и узбекском, а это заголовок экрана. Ширина
+              постоянная (`.ap-nav b`): стрелки не прыгают от месяца
+              к месяцу. */}
+          <span className="min-w-[150px] px-1.5 text-center text-[14.5px] font-semibold first-letter:uppercase">
+            {periodTitle(period, (period === "MONTH" && visible) || cursor, locale)}
+          </span>
+
           <button
             type="button"
             onClick={() => onCursor(shiftPeriod(period, cursor, 1))}
             aria-label={t("action.next")}
-            className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+            className="grid size-7 place-items-center rounded-[5px] text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
             <Icon as={ChevronRightIcon} size={16} />
           </button>
@@ -301,16 +315,10 @@ export function CalendarView({
             onCursor(today);
             setFocus((current) => ({ day: today, align: "center", id: current.id + 1 }));
           }}
-          className="h-7 rounded-md border border-border px-2 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+          className="h-7 rounded-md border border-border-strong px-2.5 text-sm text-fg transition-colors hover:bg-surface-hover"
         >
           {t("calendar.today")}
         </button>
-
-        {/* Подпись периода — капитель: Intl отдаёт месяц строчной буквой
-            в русском и узбекском, а это заголовок экрана. */}
-        <span className="text-sm font-medium first-letter:uppercase">
-          {periodTitle(period, (period === "MONTH" && visible) || cursor, locale)}
-        </span>
 
         {/* Строк в диапазоне больше, чем приехало: сетка показывает
             не всё, и молчать об этом нельзя — на календаре не видно
@@ -689,11 +697,20 @@ function MonthGrid({
     <div
       ref={box}
       onScroll={onScroll}
-      className="relative min-h-0 flex-1 overflow-y-auto bg-bg select-none"
+      /* Рамка — `.at-cal` прототипа: радиус 10, линия по краю, поля 24px.
+         Прокручивается лента недель внутри неё. */
+      className="relative mx-6 mb-6 min-h-0 flex-1 overflow-y-auto rounded-[10px] border border-border bg-surface select-none"
     >
-      <div className="sticky top-0 z-20 grid grid-cols-7 border-b border-border bg-bg">
+      <div className="sticky top-0 z-20 grid grid-cols-7 border-b border-border bg-surface">
         {(weeks[0] ?? []).map((day) => (
-          <span key={day.getDay()} className="px-2 py-1 text-2xs text-fg-muted capitalize">
+          <span
+            key={day.getDay()}
+            /* `.at-wd`: 12px, 500, бледный; выходные — красным
+               вполсилы. */
+            className={`px-2.5 py-[7px] text-2xs font-medium capitalize ${
+              day.getDay() === 0 || day.getDay() === 6 ? "text-danger/75" : "text-fg-subtle"
+            }`}
+          >
             {weekdayName(day, locale)}
           </span>
         ))}
@@ -710,16 +727,14 @@ function MonthGrid({
               if (element) rows.current.set(key, element);
               else rows.current.delete(key);
             }}
-            className="relative min-h-24"
+            className="relative min-h-26"
           >
             {/* Клетки: фон, число, «+» и приём броска. */}
             <div className="absolute inset-0 grid grid-cols-7">
               {week.map((day) => {
                 const dayId = dayKey(day);
-                /* Суббота и воскресенье — другим фоном: месяц читается
-                   неделями, и без этой полоски глаз ищет границу недели
-                   по числам. */
-                const weekend = day.getDay() === 0 || day.getDay() === 6;
+                /* Выходные отмечены в шапке, а не фоном клетки — как
+                   `.at-wd .we` прототипа. */
                 const disabled = disabledDays.has(dayId);
 
                 return (
@@ -734,14 +749,14 @@ function MonthGrid({
                       if (!drag || disabled) return;
                       setDrag({ ...drag, day });
                     }}
-                    className={`group/day relative border-r border-b border-border ${
+                    /* `.at-day`: линии справа и снизу, у седьмой справа
+                       нет — её даёт рамка; подсветка на наведении. */
+                    className={`group/day relative border-b border-border transition-colors not-last:border-r ${
                       selected(day)
                         ? "bg-accent-subtle"
                         : disabled
                           ? "bg-surface-active"
-                          : weekend
-                            ? "bg-bg"
-                            : "bg-surface"
+                          : "hover:bg-surface-hover"
                     }`}
                   >
                     {/* «+» появляется на наведении: он нужен раз в день,
@@ -754,20 +769,21 @@ function MonthGrid({
                         onClick={() => onCreate(day, day)}
                         aria-label={t("table.addRow")}
                         title={t("table.addRow")}
-                        className="absolute top-1 left-1 grid size-6 place-items-center rounded-md border border-border bg-surface text-fg-subtle opacity-0 transition hover:tint-surface-hover hover:text-fg focus-visible:opacity-100 group-hover/day:opacity-100"
+                        className="absolute top-1.5 right-1.5 grid size-5.5 place-items-center rounded-[5px] border border-border bg-surface text-fg-subtle opacity-0 transition hover:tint-surface-hover hover:text-fg focus-visible:opacity-100 group-hover/day:opacity-100"
                       >
                         <Icon as={PlusIcon} size={14} />
                       </button>
                     )}
 
-                    {/* Число справа: слева его закрывал бы «+». */}
+                    {/* Число слева, `.at-n`: 13px, 500, в круге 22px; сегодня —
+                        красный круг. «+» на наведении — справа. Первое
+                        число месяца подписано месяцем и в круг не влезает:
+                        у него свои поля. */}
                     <span
-                      className={`absolute top-1 right-1.5 rounded px-1 text-xs tabular-nums ${
-                        dayId === today
-                          ? "bg-accent-solid text-accent-fg"
-                          : day.getDate() === 1
-                            ? "text-fg"
-                            : "text-fg-muted"
+                      className={`absolute top-1.5 left-2 grid h-5.5 min-w-5.5 place-items-center rounded-full text-xs font-medium tabular-nums ${
+                        day.getDate() === 1 ? "px-1.5" : ""
+                      } ${
+                        dayId === today ? "bg-danger text-accent-fg" : "text-fg"
                       }`}
                     >
                       {day.getDate() === 1 ? monthDay(day, locale) : day.getDate()}
@@ -891,7 +907,8 @@ function TimeGrid({
   const resized = useRef(0);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-auto bg-surface">
+    /* Та же рамка, что у месяца (`.at-cal`): радиус 10, поля 24px. */
+    <div className="mx-6 mb-6 flex min-h-0 flex-1 flex-col overflow-auto rounded-[10px] border border-border bg-surface">
       {/* Шапка липнет к верху: после первого экрана прокрутки иначе
           непонятно, в каком дне полоса. */}
       <div className="sticky top-0 z-20 flex shrink-0 border-b border-border bg-surface">
@@ -900,11 +917,20 @@ function TimeGrid({
           const key = dayKey(day);
 
           return (
-            <div key={key} className="flex-1 border-l border-border px-2 py-1">
-              <span className="text-2xs text-fg-muted capitalize">{weekdayName(day, locale)}</span>
+            /* min-w-0: иначе длинное событие на весь день растягивает
+               колонку шапки, и она расходится с колонкой часов под ней. */
+            <div key={key} className="min-w-0 flex-1 border-l border-border px-2.5 py-1.5">
               <span
-                className={`ml-1 rounded px-1 text-sm tabular-nums ${
-                  key === today ? "bg-accent-solid text-accent-fg" : "text-fg"
+                className={`text-2xs font-medium capitalize ${
+                  day.getDay() === 0 || day.getDay() === 6 ? "text-danger/75" : "text-fg-subtle"
+                }`}
+              >
+                {weekdayName(day, locale)}
+              </span>
+              {/* Число — как в клетке месяца: круг 22px, сегодня красный. */}
+              <span
+                className={`ml-1 inline-grid size-5.5 place-items-center rounded-full text-xs font-medium tabular-nums ${
+                  key === today ? "bg-danger text-accent-fg" : "text-fg"
                 }`}
               >
                 {day.getDate()}
@@ -958,15 +984,8 @@ function TimeGrid({
           return (
             <section
               key={key}
-              /* Выходные — другим фоном, как и в месяце: неделя читается
-                 колонками, и край рабочей недели должен быть виден. */
-              className={`relative flex-1 border-l border-border ${
-                disabled
-                  ? "bg-surface-active"
-                  : day.getDay() === 0 || day.getDay() === 6
-                    ? "bg-bg"
-                    : ""
-              }`}
+              /* Выходные отмечены в шапке, как и в месяце. */
+              className={`relative min-w-0 flex-1 border-l border-border ${disabled ? "bg-surface-active" : ""}`}
               style={{ height: slots.length * SLOT_HEIGHT }}
               onDragOver={(event: DragEvent<HTMLElement>) => {
                 if (!dragging || disabled) return;
@@ -1211,18 +1230,18 @@ export function EventChip({
         card
           ? /* Карточка: поля в столбик, подложка мягкая — на ней лежат
                чипы значений, и полный цвет спорил бы с ними. */
-            `min-h-8 flex-col items-start gap-0.5 border border-border p-1 ${CHIP_SURFACE[color]} ${
-              clippedStart ? "" : "rounded-l-md"
-            } ${clippedEnd ? "" : "rounded-r-md"}`
+            `min-h-6 flex-col items-start gap-0.5 px-2 py-0.5 text-[11.5px] ${CHIP_SURFACE[color]} ${
+              clippedStart ? "" : "rounded-l-[4px]"
+            } ${clippedEnd ? "" : "rounded-r-[4px]"}`
           : shape === "bar"
             ? /* Полоса: высота задана строкой оси, поэтому текст стоит
                  по центру, а не липнет к верхнему краю. */
               `min-h-6 items-center gap-1.5 px-2 ${CHIP_STYLES[color]} ${
                 clippedStart ? "" : "rounded-l-sm"
               } ${clippedEnd ? "" : "rounded-r-sm"}`
-            : `min-h-5 items-start gap-1 px-1.5 py-px ${CHIP_STYLES[color]} ${
-                clippedStart ? "" : "rounded-l-sm"
-              } ${clippedEnd ? "" : "rounded-r-sm"}`
+            : `min-h-5 items-start gap-1 px-2 py-0.5 text-[11.5px] ${CHIP_STYLES[color]} ${
+                clippedStart ? "" : "rounded-l-[4px]"
+              } ${clippedEnd ? "" : "rounded-r-[4px]"}`
       } ${onGrab || draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
         active ? "shadow-raised ring-2 ring-accent" : ""
       }`}
@@ -1271,7 +1290,7 @@ export function EventChip({
           {rest.map((field) => (
             <div
               key={field.id}
-              className={`flex min-w-0 items-center opacity-80 ${card ? "text-2xs" : ""}`}
+              className="flex min-w-0 items-center opacity-80"
             >
               {/* Чьё это значение — видно по слагу: подписи полей
                   на плашке нет, а место у неё одно. */}

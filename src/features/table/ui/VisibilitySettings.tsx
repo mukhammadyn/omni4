@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { HIDE_COMPARISONS, type FieldDraft } from "../model/field-draft";
-import { localized, type Field } from "../model/types";
+import { PROGRESS_TYPE, localized, type Field } from "../model/types";
 import { Labeled } from "./FormulaSettings";
 
 /**
@@ -45,7 +45,8 @@ export function VisibilitySettings({
    * занят видом агрегата. Двух смыслов у одного ключа не бывает,
    * поэтому агрегату выбор не предлагается — остаётся равенство.
    */
-  const numeric = watched?.type === "NUMBER" && draft.type !== "FORMULA";
+  const numeric =
+    (watched?.type === "NUMBER" || watched?.type === PROGRESS_TYPE) && draft.type !== "FORMULA";
 
   const pick = (slug: string) =>
     // Значение выбиралось у прежнего поля: у нового такого варианта нет,
