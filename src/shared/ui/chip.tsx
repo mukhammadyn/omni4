@@ -49,6 +49,19 @@ export const CHIP_STYLES: Record<ChipColor, string> = {
  * оттенок, что и в светлой. Классы перечислены целиком — Tailwind
  * не видит собранные строкой имена.
  */
+/** Точка цвета — у полосы таймлайна (`.tl-bar .dot` прототипа). */
+export const CHIP_DOT: Record<ChipColor, string> = {
+  gray: "bg-chip-gray-fg",
+  blue: "bg-chip-blue-fg",
+  green: "bg-chip-green-fg",
+  yellow: "bg-chip-yellow-fg",
+  orange: "bg-chip-orange-fg",
+  red: "bg-chip-red-fg",
+  purple: "bg-chip-purple-fg",
+  pink: "bg-chip-pink-fg",
+  brown: "bg-chip-brown-fg",
+};
+
 export const CHIP_SURFACE: Record<ChipColor, string> = {
   gray: "bg-chip-gray-bg/40",
   blue: "bg-chip-blue-bg/40",

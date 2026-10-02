@@ -48,6 +48,23 @@ const ICONS: Record<string, LucideIcon> = {
   TREE: NetworkIcon,
 };
 
+/**
+ * Значки типов view — вкладкой в выборе иконки. Имя Lucide, потому что
+ * сохраняется оно (`lucide:<имя>`), как и любая иконка из пикера.
+ */
+export const VIEW_ICON_CHOICES: { name: string; icon: LucideIcon }[] = [
+  { name: "table-2", icon: Table2Icon },
+  { name: "list", icon: ListIcon },
+  { name: "layout-grid", icon: LayoutGridIcon },
+  { name: "square-kanban", icon: SquareKanbanIcon },
+  { name: "calendar-days", icon: CalendarDaysIcon },
+  { name: "chart-pie", icon: ChartPieIcon },
+  { name: "table-properties", icon: TablePropertiesIcon },
+  { name: "layout-list", icon: LayoutListIcon },
+  { name: "chart-no-axes-gantt", icon: ChartNoAxesGanttIcon },
+  { name: "network", icon: NetworkIcon },
+];
+
 export function viewIcon(type: string): LucideIcon {
   return ICONS[type] ?? Table2Icon;
 }

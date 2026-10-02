@@ -114,6 +114,8 @@ export type View = {
   name: string;
   /** То же имя по языкам ДАННЫХ (attributes.name_<short_name>). */
   names: Record<string, string>;
+  /** Иконка вкладки (`attributes.icon`), как у пункта меню. Пусто — значок типа. */
+  icon: string;
   /** Порядок вкладок задаёт админ. */
   order: number;
   /**

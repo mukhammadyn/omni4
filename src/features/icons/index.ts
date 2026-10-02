@@ -1,1 +1,1 @@
-export { IconPicker } from "./ui/IconPicker";
+export { IconPicker, type IconPreset } from "./ui/IconPicker";

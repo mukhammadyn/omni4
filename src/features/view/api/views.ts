@@ -261,6 +261,8 @@ export type ViewEdit = {
   language?: string;
   /** Новый тип: таблица, доска, календарь. */
   type?: string;
+  /** Иконка вкладки. Пустая строка — убрать. */
+  icon?: string;
   /** Новый список колонок целиком, в порядке показа. */
   columns?: string[];
   /**
@@ -322,6 +324,7 @@ export function toUpdateBody({
   name,
   language,
   type,
+  icon,
   columns,
   quickFilters,
   fixedColumns,
@@ -358,6 +361,7 @@ export function toUpdateBody({
       ? {}
       : { fixedColumns: Object.fromEntries(fixedColumns.map((id) => [id, true])) }),
     ...(defaultFilters === undefined ? {} : { default_filters: defaultFilters }),
+    ...(icon === undefined ? {} : { icon }),
     /*
      * Адреса пишутся объектом `{url, params}` — так их читает и пишет
      * старая админка. Пустой адрес отправляется тоже: иначе стёртый
@@ -481,6 +485,7 @@ export function toView(dto: ViewDto): View {
     tableSlug: dto.table_slug ?? "",
     name: dto.name?.trim() ?? "",
     names: toNames(dto.attributes),
+    icon: typeof dto.attributes?.["icon"] === "string" ? dto.attributes["icon"] : "",
     // Поле есть не у всех типов: у TABLE его в ответе нет вовсе.
     order: dto.order ?? 0,
     defaultLimit: toLimit(dto.default_limit),

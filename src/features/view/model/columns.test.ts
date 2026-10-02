@@ -28,6 +28,7 @@ const view = (columnIds: string[]): View => ({
   tableSlug: "t",
   name: "",
   names: {},
+  icon: "",
   order: 0,
   defaultLimit: null,
   isRelationView: false,

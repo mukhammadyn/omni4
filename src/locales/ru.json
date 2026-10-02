@@ -1107,6 +1107,7 @@
   "view.calendarFrom": "Начало",
   "view.calendarTo": "Конец",
   "view.calendarToNone": "Без конца — точка в дне, растянуть нельзя",
+  "view.iconPreset": "Views",
   "view.columns": "Свойства",
   "view.columnsHint": "Перетащите за рукоятку, чтобы поменять порядок колонок. Правка и удаление поля действуют во всех view сразу.",
   "view.create": "Новый view",

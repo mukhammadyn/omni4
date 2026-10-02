@@ -1107,6 +1107,7 @@
   "view.calendarFrom": "Boshlanishi",
   "view.calendarTo": "Tugashi",
   "view.calendarToNone": "Tugashisiz — kundagi nuqta, cho‘zib bo‘lmaydi",
+  "view.iconPreset": "Views",
   "view.columns": "Xossalar",
   "view.columnsHint": "Ustunlar tartibini o‘zgartirish uchun dastakdan torting. Maydonni tahrirlash va o‘chirish barcha view’larga bir vaqtda ta’sir qiladi.",
   "view.create": "Yangi view",

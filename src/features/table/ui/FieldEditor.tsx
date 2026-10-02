@@ -87,6 +87,7 @@ export function FieldEditor({
   onEditRelation,
   onDelete,
   onClose,
+  onBack,
 }: {
   /** Правим существующее поле. Нет — заводим новое. */
   field?: Field | undefined;
@@ -119,6 +120,8 @@ export function FieldEditor({
   onEditRelation?: ((relation: Relation, draft: RelationDraft) => void) | undefined;
   onDelete: (field: Field) => void;
   onClose: () => void;
+  /** Открыт из «Настроек view»: сохранить и вернуться туда. */
+  onBack?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const editing = Boolean(field);
@@ -372,6 +375,14 @@ export function FieldEditor({
         ) : (
           <>
             <div className="flex items-center gap-1.5 p-1">
+              {onBack && (
+                <BackButton
+                  onClick={() => {
+                    close();
+                    onBack();
+                  }}
+                />
+              )}
               <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border text-fg-muted">
                 <Icon as={icon(draft.type)} size={14} />
               </span>
@@ -745,10 +756,11 @@ export function FieldEditor({
                         onClose();
                         onDelete(field);
                       }}
-                      className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-danger transition-colors hover:bg-danger-subtle"
+                      aria-label={t("column.delete")}
+                      title={t("column.delete")}
+                      className="ml-auto grid size-7.5 place-items-center rounded-md text-danger transition-colors hover:bg-danger-subtle"
                     >
                       <Icon as={Trash2Icon} size={16} />
-                      <span className="truncate">{t("column.delete")}</span>
                     </button>
                   </>
                 )}

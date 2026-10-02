@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { type LucideIcon } from "lucide-react";
 import { Icon } from "@/shared/ui/icon";
 
@@ -24,6 +25,8 @@ export type TabItem = {
   id: string;
   label: string;
   icon?: LucideIcon;
+  /** Готовая иконка вместо `icon` — например, выбранная админом. */
+  iconNode?: ReactNode;
   /** Подсказка под курсором. Нужна там, где подпись сокращена до кода. */
   title?: string;
 };
@@ -97,7 +100,7 @@ export function Tabs({
                   : ""
               }`}
             >
-              {item.icon && <Icon as={item.icon} size={14} />}
+              {item.iconNode ?? (item.icon && <Icon as={item.icon} size={14} />)}
               {item.label}
             </span>
           </button>

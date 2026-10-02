@@ -79,25 +79,22 @@ function AppShell() {
 }
 
 /**
- * Вкладка браузера — под проект: его имя в заголовке, его логотип
- * вместо значка. У человека открыто пять вкладок ucode с разными
- * проектами, и различить их иначе нечем — адрес у всех одинаковый.
+ * Вкладка браузера — под проект: его имя в заголовке. У человека
+ * открыто пять вкладок с разными проектами, и различить их иначе
+ * нечем — адрес у всех одинаковый. Значок — всегда o⁴ (см. ниже).
  *
- * Так же это делает старая админка (MainLayout: `document.title` и
- * `<Favicon url={projectInfo.logo}/>`). Пакета ради значка здесь нет:
- * react-favicon — это те же четыре строки с DOM, только чужие.
- *
- * Запроса тоже нет: карточку проекта уже грузит features/workspace,
- * и заголовок с логотипом берутся из того же ответа, что языки данных
- * и шапка сайдбара.
- *
- * Оба значения возвращаются на место при выходе из приложения: экран
- * входа — общий для всех проектов, и чужой логотип на нём врёт.
+ * Запроса нет: карточку проекта уже грузит features/workspace.
+ * Заголовок возвращается на место при выходе из приложения: экран
+ * входа — общий для всех проектов.
  */
 function useProjectBranding() {
   const { project } = useProject();
   const title = project?.title ?? "";
-  const logo = project?.logo ?? "";
+  /*
+   * Значок вкладки — не логотип проекта, как в админке ucode, а свой
+   * o⁴ (public/favicon.svg): omni4 — продукт, и вкладка должна
+   * узнаваться как он в любом проекте.
+   */
 
   useEffect(() => {
     if (!title) return;
@@ -107,31 +104,6 @@ function useProjectBranding() {
       document.title = DEFAULT_TITLE;
     };
   }, [title]);
-
-  useEffect(() => {
-    if (!logo) return;
-
-    /*
-     * <link rel="icon"> в index.html нет — значок берётся по умолчанию
-     * из /favicon.ico. Заводим свой, когда есть что в него положить,
-     * и возвращаем прежний адрес при уходе: пустой href — это и есть
-     * «как было», браузер снова спросит /favicon.ico.
-     */
-    let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
-
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "icon";
-      document.head.append(link);
-    }
-
-    const before = link.getAttribute("href") ?? "";
-    link.href = logo;
-
-    return () => {
-      link.setAttribute("href", before);
-    };
-  }, [logo]);
 }
 
 /** Заголовок вкладки вне проекта — тот же, что в index.html. */

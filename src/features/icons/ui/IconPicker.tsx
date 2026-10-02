@@ -43,14 +43,22 @@ import { pushRecent, readRecent, readTone, saveTone } from "../model/prefs";
  * что у интерфейса (api/lucide). Оба списка большие и прокручиваются
  * виртуально: в DOM только видимые строки.
  */
+/** Свой набор иконок отдельной вкладкой — например, значки view. */
+export type IconPreset = { label: string; icons: { name: string; icon: LucideIcon }[] };
+
 export function IconPicker({
   value,
   type,
   onChange,
+  preset,
+  placeholder,
 }: {
   value: string;
   type: string;
   onChange: (icon: string) => void;
+  preset?: IconPreset | undefined;
+  /** Что показать, пока иконка не выбрана. Нет — первая буква типа. */
+  placeholder?: ReactNode;
 }) {
   const { t } = useTranslation();
 
@@ -70,13 +78,14 @@ export function IconPicker({
               open ? "border-accent text-fg" : "border-border-strong"
             }`}
           >
-            <DynamicIcon name={value} fallback={<Placeholder type={type} />} />
+            <DynamicIcon name={value} fallback={placeholder ?? <Placeholder type={type} />} />
           </button>
         )}
       >
         {(close) => (
           <IconPickerPanel
             value={value}
+            preset={preset}
             onPick={(icon) => {
               onChange(icon);
               close();
@@ -106,13 +115,17 @@ export function IconPickerPanel({
   value,
   onPick,
   onRemove,
+  preset,
 }: {
   value: string;
   onPick: (icon: string) => void;
   onRemove: () => void;
+  preset?: IconPreset | undefined;
 }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<"emoji" | "icons">(isLucide(value) ? "icons" : "emoji");
+  const [tab, setTab] = useState<"emoji" | "icons" | "preset">(
+    preset ? "preset" : isLucide(value) ? "icons" : "emoji",
+  );
 
   return (
     /* Ширина — 12 клеток по 32px, поля по 12px и полоса прокрутки 8px
@@ -125,9 +138,10 @@ export function IconPickerPanel({
           tabs={[
             { id: "emoji", label: t("iconPicker.tabEmoji") },
             { id: "icons", label: t("iconPicker.tabIcons") },
+            ...(preset ? [{ id: "preset", label: preset.label }] : []),
           ]}
           activeId={tab}
-          onSelect={(id) => setTab(id as "emoji" | "icons")}
+          onSelect={(id) => setTab(id as "emoji" | "icons" | "preset")}
         />
         {value && (
           <button
@@ -140,7 +154,24 @@ export function IconPickerPanel({
         )}
       </div>
 
-      {tab === "emoji" ? <EmojiTab onPick={onPick} /> : <IconsTab onPick={onPick} />}
+      {tab === "emoji" && <EmojiTab onPick={onPick} />}
+      {tab === "icons" && <IconsTab onPick={onPick} />}
+      {tab === "preset" && preset && (
+        <div className="grid grid-cols-12 px-3 py-2">
+          {preset.icons.map((item) => (
+            <button
+              key={item.name}
+              type="button"
+              onClick={() => onPick(iconValue(item.name, ""))}
+              aria-label={item.name}
+              title={item.name.replaceAll("-", " ")}
+              className="grid size-8 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+            >
+              <Icon as={item.icon} size={20} />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

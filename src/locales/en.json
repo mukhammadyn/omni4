@@ -1107,6 +1107,7 @@
   "view.calendarFrom": "Start",
   "view.calendarTo": "End",
   "view.calendarToNone": "No end — a point in the day, cannot be resized",
+  "view.iconPreset": "Views",
   "view.columns": "Properties",
   "view.columnsHint": "Drag by the handle to reorder columns. Editing and deleting a field affects every view at once.",
   "view.create": "New view",

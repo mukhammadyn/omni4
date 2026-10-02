@@ -252,7 +252,7 @@ export function Board({
               return (
                 <section
                   key={column.id || NO_GROUP_KEY}
-                  className="group/column flex w-72 shrink-0 flex-col"
+                  className="group/column flex w-[260px] shrink-0 flex-col"
                 >
                   {/*
                    * Шапка липнет к верху доски. Подложка двойная: цвет

@@ -18,7 +18,7 @@ import {
   PlusIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { optionOf, type Field, type Relation } from "@/features/table";
+import { localized, optionOf, type Field, type Relation } from "@/features/table";
 import { toast } from "@/shared/lib/toast";
 import { hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
@@ -77,16 +77,13 @@ const LEFT_WIDTH = 240;
 const RAIL_WIDTH = 28;
 
 /** Высота строки записи. */
-const ROW_HEIGHT = 40;
+const ROW_HEIGHT = 38;
 
 /** Ближе этого к краю ленты — просим следующие месяцы. */
 const EDGE_GAP = 300;
 
 /** Ниже этой ширины колонки число в неё не помещается. */
 const NUMBER_WIDTH = 22;
-
-/** Ниже этой — не помещается и день недели. */
-const WEEKDAY_WIDTH = 44;
 
 /**
  * Сколько миллисекунд после переноса щелчок считается его хвостом,
@@ -533,7 +530,7 @@ export function Timeline({
         }}
         onPointerEnter={() => setHoveredBar({ from: event.from, to: event.to })}
         onPointerLeave={() => setHoveredBar(null)}
-        className="absolute inset-y-1.5 px-px"
+        className="absolute inset-y-1.5 px-0.5"
       >
         <EventChip
           event={event}
@@ -743,45 +740,19 @@ export function Timeline({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => onCursor(shiftPeriod("MONTH", cursor, -1))}
-            aria-label={t("action.previous")}
-            className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
-          >
-            <Icon as={ChevronLeftIcon} size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onCursor(shiftPeriod("MONTH", cursor, 1))}
-            aria-label={t("action.next")}
-            className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
-          >
-            <Icon as={ChevronRightIcon} size={16} />
-          </button>
-        </div>
-
-        <button
-          type="button"
-          /* Сегодня — это и день, и место на экране: ось прокручивается
-             так, чтобы текущий день оказался по центру. */
-          onClick={() => {
-            const day = new Date();
-            onCursor(day);
-            setFocus((current) => ({ day, align: "center", id: current.id + 1 }));
-          }}
-          className="h-7 rounded-md border border-border px-2 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
-        >
-          {t("calendar.today")}
-        </button>
-
-        {/* Капитель: Intl отдаёт месяц строчной буквой в русском
-            и узбекском, а это заголовок экрана. */}
-        <span className="text-sm font-medium first-letter:uppercase">
-          {monthTitle(visible ?? cursor, locale)}
-        </span>
+      {/*
+        Шапка — `.cal-head` таймлайна прототипа: слева видимый период,
+        справа — какими полями построены полосы, масштаб, «Сегодня»
+        и стрелки. Без линии снизу.
+      */}
+      <div className="mx-6 flex h-12 shrink-0 items-center gap-2">
+        {/* Период — то, что сейчас на экране, а не месяц курсора: ось
+            уезжает прокруткой, и заголовок должен ехать вместе с ней. */}
+        <h3 className="flex-1 truncate text-base font-semibold first-letter:uppercase">
+          {days[seen.first] && days[seen.last]
+            ? rangeTitle(days[seen.first]!, days[seen.last]!, locale)
+            : monthTitle(visible ?? cursor, locale)}
+        </h3>
 
         {/* Строк в диапазоне больше, чем приехало: молчать об этом
             нельзя — ни счётчика, ни номеров страниц на оси нет. */}
@@ -789,13 +760,21 @@ export function Timeline({
           <button
             type="button"
             onClick={onLoadMore}
-            className="h-7 rounded-md px-2 text-xs text-accent-text transition-colors hover:bg-surface-hover"
+            className="h-7 shrink-0 rounded-md px-2 text-xs text-accent-text transition-colors hover:bg-surface-hover"
           >
             {t("calendar.loadMore")}
           </button>
         )}
 
-        <div className="ml-auto">
+        {/* Чем построены полосы: «Начало → Конец». */}
+        <span className="truncate text-[13px] text-fg-subtle">
+          {localized(fromField.labels, language, fromField.label)}
+          {toField && ` → ${localized(toField.labels, language, toField.label)}`}
+        </span>
+
+        {/* Масштаба в прототипе нет; у нас он есть — рядом с навигацией,
+            потому что тоже про то, как смотреть на ось. */}
+        <div className="shrink-0">
           <Tabs
             variant="segment"
             tabs={TIMELINE_SCALES.map((item) => ({
@@ -806,6 +785,37 @@ export function Timeline({
             onSelect={(id) => onScale(id as TimelineScale)}
           />
         </div>
+
+        <button
+          type="button"
+          /* «Сегодня» — и день, и место на экране: лента прокручивается
+             так, чтобы текущий день оказался по центру. */
+          onClick={() => {
+            const day = new Date();
+            onCursor(day);
+            setFocus((current) => ({ day, align: "center", id: current.id + 1 }));
+          }}
+          className="h-7 shrink-0 rounded-md px-2.5 text-sm font-medium text-fg transition-colors hover:bg-surface-hover"
+        >
+          {t("calendar.today")}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onCursor(shiftPeriod("MONTH", cursor, -1))}
+          aria-label={t("action.previous")}
+          className="grid size-7 shrink-0 place-items-center rounded-[5px] text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+        >
+          <Icon as={ChevronLeftIcon} size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onCursor(shiftPeriod("MONTH", cursor, 1))}
+          aria-label={t("action.next")}
+          className="grid size-7 shrink-0 place-items-center rounded-[5px] text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+        >
+          <Icon as={ChevronRightIcon} size={16} />
+        </button>
       </div>
 
       <div
@@ -818,7 +828,7 @@ export function Timeline({
         }}
         className="relative min-h-0 flex-1 overflow-auto bg-surface select-none"
       >
-        <div style={{ width: leftWidth + axisWidth }}>
+        <div className="flex min-h-full flex-col" style={{ width: leftWidth + axisWidth }}>
           {/* Шапка оси. Липнет к верху, а список записей внутри неё —
               к левому краю: у прокрутки два направления, и уехать
               не должно ни то, ни другое. */}
@@ -896,26 +906,26 @@ export function Timeline({
                     <Tooltip key={key} label={fullDate(day, locale)}>
                     <div
                       style={{ width }}
-                      className={`flex shrink-0 items-center justify-center gap-1 text-2xs ${
+                      /* `.tl-head` прототипа: числа тусклые, понедельник
+                         темнее — по нему читается неделя, сегодня красным. */
+                      className={`flex shrink-0 items-center justify-center gap-1 text-[11.5px] ${
                         lit
                           ? "bg-surface-active font-medium text-fg"
-                          : weekend
-                            ? "text-fg-subtle"
-                            : "text-fg-muted"
+                          : key === today
+                            ? "font-semibold text-danger"
+                            : day.getDay() === 1 && !weekend
+                              ? "text-fg-muted"
+                              : "text-fg-subtle"
                       }`}
                     >
-                      {width >= WEEKDAY_WIDTH && (
-                        <span className="capitalize">{weekdayName(day, locale)}</span>
-                      )}
+
                       {numbered && (
                         <span
                           className={
-                            key === today
-                              ? "grid size-4.5 place-items-center rounded-full bg-accent-solid text-accent-fg tabular-nums"
-                              : "tabular-nums"
+                            "tabular-nums"
                           }
                         >
-                          {day.getDate()}
+                          {day.getDate() === 1 ? shortMonth(day, locale) : day.getDate()}
                         </span>
                       )}
                     </div>
@@ -926,7 +936,7 @@ export function Timeline({
             </div>
           </div>
 
-          <div className="relative">
+          <div className="relative flex flex-1 flex-col">
             {/* Колонки — одним слоем на все строки: выходные, сегодня
                 и разделители. Рисовать их в каждой строке значило бы
                 держать на экране день × запись пустых элементов. */}
@@ -943,10 +953,9 @@ export function Timeline({
                 <div
                   /* Без z-index: полосы событий проходят поверх линии,
                      а не перечёркиваются ею. */
-                  className="absolute inset-y-0 w-0.5 -translate-x-1/2 rounded-full bg-accent"
+                  className="absolute inset-y-0 z-[2] w-0.5 -translate-x-1/2 bg-danger"
                   style={{ left: (todayIndex + 0.5) * width }}
                 >
-                  <span className="absolute -top-1 left-1/2 size-2 -translate-x-1/2 rounded-full bg-accent" />
                 </div>
               )}
 
@@ -961,7 +970,7 @@ export function Timeline({
                   <div
                     key={key}
                     style={{ width }}
-                    className={`h-full shrink-0 ${weekend ? "bg-bg" : ""}`}
+                    className={`h-full shrink-0 ${weekend ? "bg-surface-hover/50" : ""}`}
                   />
                 );
               })}
@@ -1027,6 +1036,16 @@ export function Timeline({
                 {t("timeline.noRows")}
               </p>
             )}
+
+            {/* Добивка до низа экрана: колонки, «сегодня» и левая панель
+                продолжаются, когда записей мало, — иначе сетка обрывается
+                посреди экрана и пустота под ней читается как поломка. */}
+            <div className="flex flex-1">
+              <div
+                className="sticky left-0 z-20 shrink-0 border-r border-border bg-surface"
+                style={{ width: leftWidth }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1058,7 +1077,7 @@ function Lane({
       /* Ни рамок, ни линеек: сетку рисует только подложка колонок —
          полоса на чистом фоне читается как полоса, а не как ещё одна
          клетка таблицы. */
-      className={`relative flex shrink-0 items-center transition-colors group-hover/row:bg-surface-hover/60 ${
+      className={`relative flex shrink-0 items-center border-b border-border ${
         onPick ? "cursor-crosshair" : ""
       }`}
       style={{ width }}
@@ -1259,11 +1278,27 @@ function fullDate(day: Date, locale: string): string {
   }).format(day);
 }
 
-function weekdayName(day: Date, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(day);
+/** «окт» вместо единицы — как `.tl-head` прототипа. */
+function shortMonth(day: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { month: "short" }).format(day).replace(".", "");
 }
 
 /** «Январь 2026» — через Intl: склонение месяца у него уже правильное. */
+/** «Сентябрь – Октябрь 2026», как `.cal-head h3` прототипа. Один месяц — без тире. */
+function rangeTitle(from: Date, to: Date, locale: string): string {
+  // С заглавной каждый: Intl отдаёт месяц строчной в русском и узбекском.
+  const month = (day: Date) => {
+    const name = new Intl.DateTimeFormat(locale, { month: "long" }).format(day);
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  };
+  const sameYear = from.getFullYear() === to.getFullYear();
+
+  if (sameYear && from.getMonth() === to.getMonth()) return monthTitle(from, locale);
+  return sameYear
+    ? `${month(from)} – ${month(to)} ${to.getFullYear()}`
+    : `${month(from)} ${from.getFullYear()} – ${month(to)} ${to.getFullYear()}`;
+}
+
 function monthTitle(day: Date, locale: string): string {
   return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(
     startOfDay(day),

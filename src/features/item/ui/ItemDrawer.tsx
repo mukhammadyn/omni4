@@ -312,6 +312,20 @@ export function ItemDrawer({
    * куда уходили из таблицы и возвращались обратно.
    */
   const [editing, setEditing] = useState(false);
+  /**
+   * Свёрнутые секции — по имени и месту. Помнятся у этого человека
+   * в этом браузере (localStorage, по таблице): это способ смотреть,
+   * а не настройка раскладки, и другим её навязывать незачем. В правке все открыты —
+   * переносить поле в свёрнутую секцию некуда.
+   */
+  const [folded, setFolded] = useState<Set<string>>(() => readFolded(tableSlug));
+  const toggleSection = (key: string) =>
+    setFolded((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      saveFolded(tableSlug, next);
+      return next;
+    });
   /** Раскладку правит тот, кому это позволено: без обработчиков режима нет. */
   const canLayout = Boolean(onRenameSection ?? onAddSection ?? onToggleHidden);
   /** Имена секций правятся: режим включён и право на это есть. */
@@ -765,8 +779,12 @@ export function ItemDrawer({
 
             {/* Новая вкладка — это связь, которую ещё не показали:
                 бэкенд заводит вкладки сам, но только тем связям,
-                что существовали на момент создания раскладки. */}
-            {onAddTab && (
+                что существовали на момент создания раскладки.
+
+                Показывается в режиме правки: добавить вкладку — это правка
+                раскладки, как и остальное под карандашом. Без права
+                на раскладку карандаша нет, и «+» тогда стоит как раньше. */}
+            {onAddTab && (editing || !canLayout) && (
               <AddTabButton
                 relations={addableRelations ?? []}
                 shown={new Set((tabs ?? []).map((item) => item.relationId).filter(Boolean))}
@@ -857,9 +875,23 @@ export function ItemDrawer({
                         className="h-6 border-transparent bg-transparent px-1 text-2xs font-medium tracking-wide uppercase"
                       />
                     ) : (
-                      <h3 className="text-2xs font-medium tracking-wide text-fg-subtle uppercase">
-                        {group.label}
-                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(`${group.index}:${group.label}`)}
+                        aria-expanded={!folded.has(`${group.index}:${group.label}`)}
+                        className="-ml-2 flex items-center gap-1 rounded px-1 py-0.5 text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
+                      >
+                        <Icon
+                          as={ChevronRightIcon}
+                          size={12}
+                          className={`shrink-0 transition-transform duration-150 motion-reduce:transition-none ${
+                            folded.has(`${group.index}:${group.label}`) ? "" : "rotate-90"
+                          }`}
+                        />
+                        <h3 className="text-2xs font-medium tracking-wide uppercase">
+                          {group.label}
+                        </h3>
+                      </button>
                     )}
 
                     {editing && onRemoveSection && group.index > 0 && (
@@ -876,7 +908,8 @@ export function ItemDrawer({
                   </div>
                 )}
 
-                {group.fields.map((field) => (
+                {(editing || !folded.has(`${group.index}:${group.label}`)) &&
+                  group.fields.map((field) => (
                   <div
                     key={field.id}
                     /*
@@ -1348,12 +1381,12 @@ function Heading({
           onClick={(event) => onOpen(field, event.currentTarget)}
           /* Отступы те же, что у редактора (карточка p-1.5 + поле
              px-0.5): текст не сдвигается в момент открытия правки. */
-          className="flex min-w-0 flex-1 rounded-md px-2 py-1.5 text-left text-2xl leading-9 font-bold transition-colors hover:bg-surface-hover"
+          className="flex min-w-0 flex-1 rounded-md px-1 py-1.5 text-left text-2xl leading-9 font-bold transition-colors hover:bg-surface-hover"
         >
           {children}
         </button>
       ) : (
-        <span className="flex-1 px-2 py-1.5 text-2xl leading-9 font-bold text-fg-subtle">
+        <span className="flex-1 px-1 py-1.5 text-2xl leading-9 font-bold text-fg-subtle">
           {placeholder}
         </span>
       )}
@@ -1642,4 +1675,28 @@ function AddTabButton({
       }}
     </Popover>
   );
+}
+
+/* ── Свёрнутые секции: удобство одного человека ─────────────── */
+
+const foldedKey = (tableSlug: string) => `omni4.drawerFolded.${tableSlug}`;
+
+/** Молча: в приватном окне или без хранилища всё просто открыто. */
+function readFolded(tableSlug: string): Set<string> {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(foldedKey(tableSlug)) ?? "[]");
+    return new Set(
+      Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function saveFolded(tableSlug: string, folded: Set<string>) {
+  try {
+    localStorage.setItem(foldedKey(tableSlug), JSON.stringify([...folded]));
+  } catch {
+    // Хранилище недоступно — свёрнутое помнится до закрытия карточки.
+  }
 }

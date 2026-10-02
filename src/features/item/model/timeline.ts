@@ -30,7 +30,7 @@ export function toScale(value: string | undefined): TimelineScale {
  * сжатая до обзора квартала. Иначе у полосы, начатой 3-го, пропал бы
  * край — тянуть её стало бы не за что.
  */
-export const COLUMN_WIDTH: Record<TimelineScale, number> = { DAY: 48, WEEK: 24, MONTH: 12 };
+export const COLUMN_WIDTH: Record<TimelineScale, number> = { DAY: 32, WEEK: 24, MONTH: 12 };
 
 /** Дни оси, включая последний. */
 export function timelineDays(from: Date, to: Date): Date[] {

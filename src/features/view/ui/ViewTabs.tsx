@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TranslationKey } from "@/shared/lib/i18n";
+import { DynamicIcon } from "@/shared/ui/dynamic-icon";
+import { Icon } from "@/shared/ui/icon";
 import { Tabs } from "@/shared/ui/tabs";
 import { viewName, type View } from "../model/types";
 import { viewIcon } from "./view-icon";
@@ -39,6 +41,17 @@ export function ViewTabs({
           viewName(view, language) ||
           t(`view.type.${view.type}` as TranslationKey, { defaultValue: view.type }),
         icon: viewIcon(view.type),
+        ...(view.icon
+          ? {
+              iconNode: (
+                <DynamicIcon
+                  name={view.icon}
+                  size={14}
+                  fallback={<Icon as={viewIcon(view.type)} size={14} />}
+                />
+              ),
+            }
+          : {}),
       })),
     [views, language, t],
   );

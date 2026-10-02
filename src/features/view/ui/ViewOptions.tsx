@@ -1,30 +1,25 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   CalendarClockIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   DownloadIcon,
   EllipsisIcon,
-  ExternalLinkIcon,
   EyeIcon,
   EyeOffIcon,
-  FunnelPlusIcon,
   GripVerticalIcon,
   InfinityIcon,
   LayersIcon,
-  LayoutListIcon,
-  ListFilterIcon,
   LoaderCircleIcon,
   PanelTopIcon,
   PinIcon,
+  PencilIcon,
   PinOffIcon,
   PlusIcon,
-  PrinterIcon,
   Rows3Icon,
   SearchIcon,
   SlidersHorizontalIcon,
   SquareKanbanIcon,
-  Table2Icon,
   Trash2Icon,
   UploadIcon,
   XIcon,
@@ -32,10 +27,10 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Permission } from "@/features/auth";
-import { DocTemplates, useDocTemplates } from "@/features/docs";
+import { DocTemplates } from "@/features/docs";
+import { IconPicker } from "@/features/icons";
 import {
   FilterBar,
-  activeFilterCount,
   fieldIcon,
   filterKind,
   type Filters,
@@ -58,10 +53,10 @@ import { ToolButton } from "@/shared/ui/tool-button";
 import { moveBefore } from "@/shared/lib/order";
 import { TAB_GROUP_TYPES, subGroupField, tabGroupField } from "../api/tab-group";
 import { columnGroup, columnKey, toggleColumn } from "../model/columns";
-import { hasUrl, type UrlTemplate } from "../model/url-template";
+import { type UrlTemplate } from "../model/url-template";
 import { IMPLEMENTED_VIEW_TYPES, TAB_VIEW_TYPES, VIEW_TYPES, type View } from "../model/types";
 import { CalendarFields, dateFields } from "./CalendarFields";
-import { viewIcon } from "./view-icon";
+import { VIEW_ICON_CHOICES, viewIcon } from "./view-icon";
 
 /**
  * Настройки открытого view.
@@ -108,6 +103,8 @@ const VIEW_LABELS: ViewOptionsLabels = { title: "view.options", delete: "view.de
 export type ViewOptionsHandlers = {
   /** Имя на конкретном языке ДАННЫХ. Язык задаёт вызывающая страница. */
   onRename: (name: string, language: string) => void;
+  /** Иконка вкладки. Пустая строка — вернуть значок типа. */
+  onIcon?: (icon: string) => void;
   onColumns: (columnIds: string[]) => void;
   onQuickFilters: (fields: Field[]) => void;
   /** Закреплённые колонки целиком: список ключей, как в columns. */
@@ -140,8 +137,11 @@ export type ViewOptionsHandlers = {
    */
   onDateFrom?: (slug: string) => void;
   onDateTo?: (slug: string) => void;
-  /** Настроить поле: открывает ту же панель, что и меню колонки. */
-  onEditField?: (field: Field, anchor: DOMRect) => void;
+  /**
+   * Настроить поле: открывает ту же панель, что и меню колонки.
+   * `back` снова открывает «Свойства» в «⋮» — вернуться из редактора.
+   */
+  onEditField?: (field: Field, anchor: DOMRect, back: () => void) => void;
   /** Удалить поле из ТАБЛИЦЫ, а не из view. Спрашивает подтверждение вызывающий. */
   onDeleteField?: (field: Field) => void;
   /** «Новое свойство» внизу списка свойств — тот же редактор, что у «+» в шапке таблицы. */
@@ -192,6 +192,9 @@ export function ViewOptions({
   beforeMenu?: ReactNode;
 }) {
   const { t } = useTranslation();
+  /** С какой страницы откроется «⋮»: после редактора поля — со «Свойств». */
+  const [menuPage, setMenuPage] = useState<PanelPage>(null);
+  const reopenMenu = useRef<(() => void) | null>(null);
 
   /*
    * Три точки, а не шестерёнка: рядом стоят поиск, отбор и сортировка —
@@ -205,7 +208,7 @@ export function ViewOptions({
   // Кнопка между ними от прав на настройки не зависит.
   if (!anything) return <>{beforeMenu}</>;
 
-  const panel = (close: () => void, startPage: PanelPage = null) => (
+  const panel = (close: () => void, startPage: PanelPage = null, initialPage = startPage) => (
     <Panel
       view={view}
       fields={fields}
@@ -219,6 +222,11 @@ export function ViewOptions({
       labels={labels}
       close={close}
       startPage={startPage}
+      initialPage={initialPage}
+      reopen={() => {
+        setMenuPage("columns");
+        reopenMenu.current?.();
+      }}
     />
   );
 
@@ -285,16 +293,22 @@ export function ViewOptions({
 
       <Popover
         align="end"
-        trigger={({ open, toggle }) => (
-          <ToolButton
-            icon={EllipsisIcon}
-            label={t(labels.title)}
-            open={open}
-            onClick={toggle}
-          />
-        )}
+        trigger={({ open, toggle }) => {
+          reopenMenu.current = toggle;
+          return (
+            <ToolButton
+              icon={EllipsisIcon}
+              label={t(labels.title)}
+              open={open}
+              onClick={() => {
+                setMenuPage(null);
+                toggle();
+              }}
+            />
+          );
+        }}
       >
-        {(close) => panel(close)}
+        {(close) => panel(close, null, menuPage)}
       </Popover>
     </>
   );
@@ -329,6 +343,8 @@ function Panel({
   labels,
   close,
   startPage = null,
+  initialPage = startPage,
+  reopen,
 }: {
   view: View;
   fields: Field[];
@@ -343,19 +359,19 @@ function Panel({
   close: () => void;
   /** Открыта сразу на странице — кнопка «Свойства». Назад тогда некуда. */
   startPage?: PanelPage;
+  /** С какой страницы открыться, не меняя смысла startPage. */
+  initialPage?: PanelPage;
+  /** Открыть панель снова — возврат из редактора поля. */
+  reopen: () => void;
 }) {
   const { t } = useTranslation();
-  const [page, setPage] = useState<PanelPage>(startPage);
+  const [page, setPage] = useState<PanelPage>(initialPage);
   /*
    * Поиск по полям — один на все страницы со списками. Своего состояния
    * на страницу не заводим: страницы взаимоисключающие, а сбрасывать его
    * при переходе всё равно надо.
    */
   const [query, setQuery] = useState("");
-
-  /* Сколько печатных форм у таблицы — числом в строке, как у полей.
-     Тот же запрос, что и у кнопки печати в карточке: ключ общий. */
-  const { templates: docTemplates } = useDocTemplates(view.tableSlug);
 
   const shown = shownFields(view, fields);
   const quick = quickFilterFields(view, fields);
@@ -444,15 +460,16 @@ function Panel({
      * и своя подсказка, а панель при переходе в редактор закрывается:
      * он всплывает на том же якоре.
      */
+    const standalone = startPage === "columns";
     const editField =
-      can.settings && handlers.onEditField
+      !standalone && can.settings && handlers.onEditField
         ? (field: Field, at: DOMRect) => {
-            handlers.onEditField?.(field, at);
+            handlers.onEditField?.(field, at, reopen);
             close();
           }
         : undefined;
     const deleteField =
-      can.settings && handlers.onDeleteField
+      !standalone && can.settings && handlers.onDeleteField
         ? (field: Field) => {
             handlers.onDeleteField?.(field);
             close();
@@ -496,7 +513,11 @@ function Panel({
             language={language}
             draggable={!query}
             onReorder={handlers.onColumns}
-            onHide={(field) => handlers.onColumns(toggleColumn(view, groupOf(field), false))}
+            onHide={
+              standalone
+                ? (field) => handlers.onColumns(toggleColumn(view, groupOf(field), false))
+                : undefined
+            }
             onEditField={editField}
             onDeleteField={deleteField}
           />
@@ -514,6 +535,7 @@ function Panel({
                 {localized(field.labels, language, field.label)}
               </span>
 
+              {standalone && (
               <button
                 type="button"
                 onClick={() => handlers.onColumns(toggleColumn(view, groupOf(field), true))}
@@ -523,6 +545,7 @@ function Panel({
               >
                 <Icon as={EyeOffIcon} size={14} />
               </button>
+              )}
 
               {/* Скрытая колонка — то же поле: настроить и удалить его
                   можно, не показывая сперва в таблице. */}
@@ -965,7 +988,6 @@ function Panel({
     );
   }
 
-  const defaultCount = activeFilterCount(defaultFilters);
   /*
    * Настройки, которых у типа view нет, не показываются. У дерева нет
    * ни страниц, ни фильтров, ни группировки, ни перехода по клику:
@@ -1003,9 +1025,6 @@ function Panel({
   const tabGrouped = tabGroupField(view, fields);
   /** Поле дорожек доски — там же. */
   const subGrouped = subGroupField(view, fields);
-  /* Сколько адресов задано: строка настроек молчит, пока их нет. */
-  const navigationCount = [hasUrl(view.navigate), hasUrl(view.objectUrl), Boolean(view.pdfUrl)]
-    .filter(Boolean).length;
 
   return (
     <div className="w-80">
@@ -1014,9 +1033,19 @@ function Panel({
       {can.settings && (
         <>
           <div className="flex items-center gap-1.5 p-1">
-            <span className="grid size-8 shrink-0 place-items-center rounded-md border border-border text-fg-muted">
-              <Icon as={viewIcon(view.type)} size={16} />
-            </span>
+            {handlers.onIcon ? (
+              <IconPicker
+                value={view.icon}
+                type={view.type}
+                placeholder={<Icon as={viewIcon(view.type)} size={16} />}
+                preset={{ label: t("view.iconPreset"), icons: VIEW_ICON_CHOICES }}
+                onChange={handlers.onIcon}
+              />
+            ) : (
+              <span className="grid size-8 shrink-0 place-items-center rounded-md border border-border text-fg-muted">
+                <Icon as={viewIcon(view.type)} size={16} />
+              </span>
+            )}
             {/*
               Имя на каждом языке ДАННЫХ — одним полем с переключателем
               внутри, как в старой админке (TextFieldWithMultiLanguage).
@@ -1037,23 +1066,6 @@ function Panel({
             />
           </div>
 
-          {handlers.onType && (
-            <Row
-              icon={LayoutListIcon}
-              label={t("view.viewType")}
-              value={typeLabel}
-              onClick={() => open("type")}
-            />
-          )}
-          {handlers.onNavigate && !isTree && !isChart && (
-            <Row
-              icon={ExternalLinkIcon}
-              label={t("view.navigation")}
-              value={navigationCount ? String(navigationCount) : ""}
-              onClick={() => open("navigation")}
-            />
-          )}
-
           <PopoverSeparator />
         </>
       )}
@@ -1065,22 +1077,6 @@ function Panel({
           value={String(shown.length)}
           onClick={() => open("columns")}
         />
-      )}
-      {can.settings && !isTree && (
-        <>
-          <Row
-            icon={FunnelPlusIcon}
-            label={t("view.defaultFilters")}
-            value={defaultCount ? String(defaultCount) : ""}
-            onClick={() => open("defaultFilters")}
-          />
-          <Row
-            icon={ListFilterIcon}
-            label={t("view.filters")}
-            value={quick.length ? String(quick.length) : ""}
-            onClick={() => open("quickFilters")}
-          />
-        </>
       )}
       {/* Даты события — первая настройка календаря: без поля начала
           он вообще ничего не рисует. */}
@@ -1166,58 +1162,22 @@ function Panel({
         </>
       )}
 
-      <PopoverSeparator />
-      <p className="px-2 py-1 text-2xs text-fg-subtle">{t("view.dataSection")}</p>
-
-      {/* Таблица не ВЫБИРАЕТСЯ — слаг задаётся при создании пункта меню
-          и меняет смысл всего экрана, — но настраивается: строка ведёт
-          в настройки самой таблицы. */}
-      {can.settings ? (
-        <Row
-          icon={Table2Icon}
-          label={t("view.source")}
-          value={view.tableSlug}
-          onClick={() => open("table")}
-        />
-      ) : (
-        <div className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-sm text-fg">
-          <Icon as={Table2Icon} size={16} className="shrink-0 text-fg-muted" />
-          <span className="flex-1 truncate">{t("view.source")}</span>
-          <span className="max-w-[9rem] truncate text-fg-subtle">{view.tableSlug}</span>
-        </div>
-      )}
-
-      {/* Печатные формы: шаблон .docx, из которого собирается PDF записи.
-          Рядом с настройками таблицы, потому что шаблоны у таблицы общие
-          — во всех её view одни и те же. */}
-      {can.settings && (
-        <Row
-          icon={PrinterIcon}
-          label={t("docs.title")}
-          value={String(docTemplates.length)}
-          onClick={() => open("docs")}
-        />
-      )}
-
-      {/* Строки «Поля таблицы» здесь нет: поля настраиваются там же, где
-          показываются колонки, — на странице «Свойства» (как в старой
-          админке). Отдельный список означал бы одно и то же поле
-          в двух местах панели. */}
-
       {handlers.onDelete && can.settings && (
         <>
           <PopoverSeparator />
 
-          <PopoverItem
-            danger
-            icon={<Icon as={Trash2Icon} size={16} className="shrink-0" />}
+          <button
+            type="button"
             onClick={() => {
               handlers.onDelete?.();
               close();
             }}
+            aria-label={t(labels.delete)}
+            title={t(labels.delete)}
+            className="ml-auto grid size-7.5 place-items-center rounded-md text-danger transition-colors hover:bg-danger-subtle"
           >
-            {t(labels.delete)}
-          </PopoverItem>
+            <Icon as={Trash2Icon} size={16} />
+          </button>
         </>
       )}
     </div>
@@ -1254,7 +1214,8 @@ function ColumnOrder({
   /** Список отфильтрован поиском — перетаскивать нечего: см. страницу колонок. */
   draggable: boolean;
   onReorder: (columnIds: string[]) => void;
-  onHide: (field: Field) => void;
+  /** Нет — глаза нет: из «Настроек view» видимость не меняется. */
+  onHide?: ((field: Field) => void) | undefined;
   /** Настройки САМОГО поля. Нет прав — нет и кнопок. */
   onEditField?: ((field: Field, anchor: DOMRect) => void) | undefined;
   onDeleteField?: ((field: Field) => void) | undefined;
@@ -1337,6 +1298,7 @@ function ColumnOrder({
               {localized(field.labels, language, field.label)}
             </span>
 
+            {onHide && (
             <button
               type="button"
               onClick={() => onHide(field)}
@@ -1346,6 +1308,7 @@ function ColumnOrder({
             >
               <Icon as={EyeIcon} size={14} />
             </button>
+            )}
 
             <FieldActions field={field} onEdit={onEditField} onDelete={onDeleteField} />
           </div>
@@ -1361,10 +1324,6 @@ function ColumnOrder({
  * Так же в старой админке: у строки «Visible columns» справа меню поля
  * с «Edit field» и «Delete field». Кнопки, а не меню из двух пунктов:
  * меню ради двух действий — лишний щелчок на каждое.
- *
- * Появляются по наведению и по фокусу с клавиатуры: в списке из сорока
- * полей восемьдесят постоянно видимых кнопок читаются хуже, чем сами
- * поля, а удаление ещё и опасно держать под случайным щелчком.
  *
  * Удаление здесь — правка схемы: поле пропадёт во всех view сразу,
  * вместе со значениями. Подтверждение спрашивает вызывающий — тем же
@@ -1383,7 +1342,7 @@ function FieldActions({
   if (!onEdit && !onDelete) return null;
 
   const button =
-    "grid size-6 shrink-0 place-items-center rounded text-fg-subtle opacity-0 transition-colors group-hover/field:opacity-100 focus-visible:opacity-100";
+    "grid size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors";
 
   return (
     <>
@@ -1395,7 +1354,7 @@ function FieldActions({
           title={t("column.settings")}
           className={`${button} hover:bg-surface-active hover:text-fg`}
         >
-          <Icon as={SlidersHorizontalIcon} size={14} />
+          <Icon as={PencilIcon} size={14} />
         </button>
       )}
 

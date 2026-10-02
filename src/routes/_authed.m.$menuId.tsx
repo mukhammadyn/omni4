@@ -367,7 +367,7 @@ function MenuPage() {
     [schema.fields, drawerLayout.rights],
   );
 
-  /** Колонки view — и таблицы, и карточки: порядок у них разный, набор один. */
+  /** Колонки view. Карточка берёт не их, а все поля таблицы — см. orderedFields. */
   const viewFields = useMemo(() => resolveColumns(view, tableFields), [view, tableFields]);
 
   /*
@@ -442,9 +442,20 @@ function MenuPage() {
    * не появлялась вовсе (флаг `enable_multilanguage` для этого не годится:
    * object_builder не пишет его при вставке, см. ADR-0004).
    */
+  /*
+   * Набор — ВСЕ поля таблицы, а не колонки view: «Свойства» прячут
+   * колонку таблицы, а в карточке у поля своё скрытие
+   * (`field_hide_layout`, drawerLayout.hidden). Иначе скрытая в таблице
+   * колонка пропадала и из карточки, и вернуть её туда было нечем.
+   * guid — служебный ключ строки, полем карточки он не бывает.
+   */
   const orderedFields = useMemo(
-    () => orderColumns(viewFields, drawerLayout.order),
-    [viewFields, drawerLayout.order],
+    () =>
+      orderColumns(
+        tableFields.filter((field) => field.slug !== "guid"),
+        drawerLayout.order,
+      ),
+    [tableFields, drawerLayout.order],
   );
 
   /*
@@ -1130,9 +1141,12 @@ function MenuPage() {
    * Якорь — то место, откуда её открыли: заголовок колонки, кнопка «+»
    * или раскрытая ячейка.
    */
-  const [fieldPanel, setFieldPanel] = useState<{ field: Field | null; anchor: DOMRect } | null>(
-    null,
-  );
+  const [fieldPanel, setFieldPanel] = useState<{
+    field: Field | null;
+    anchor: DOMRect;
+    /** Открыт из «Настроек view» — туда и назад. */
+    back?: () => void;
+  } | null>(null);
   const [deletingField, setDeletingField] = useState<Field | null>(null);
   const [importing, setImporting] = useState(false);
   const exportExcel = useExportExcel(view?.tableSlug);
@@ -1380,6 +1394,7 @@ function MenuPage() {
                   строками. Рядом с настройками, а не среди поиска
                   и фильтра: это не способ посмотреть на список,
                   а способ что-то с ним сделать. */}
+              {/* Временно скрыто по просьбе — вернуть, раскомментировав.
               {supportedView && (
                 <TableActions
                   tableSlug={view.tableSlug}
@@ -1388,7 +1403,7 @@ function MenuPage() {
                   selected={[...selected]}
                   canEdit={can.settings}
                 />
-              )}
+              )} */}
 
               {/* Удаление отмеченных — тут же, у поиска и действий, а не
                   внизу под таблицей: строку выделяют здесь же, в шапке,
@@ -1499,6 +1514,7 @@ function MenuPage() {
                   onRename: (name, nameLanguage) =>
                     updateView.mutate({ view, name, language: nameLanguage }),
                   onType: (type) => updateView.mutate({ view, type }),
+                  onIcon: (icon) => updateView.mutate({ view, icon }),
                   onColumns: (columns) => updateView.mutate({ view, columns }),
                   onQuickFilters: (quickFilters) => updateView.mutate({ view, quickFilters }),
                   onFixedColumns: (fixedColumns) => updateView.mutate({ view, fixedColumns }),
@@ -1526,7 +1542,7 @@ function MenuPage() {
                     updateView.mutate({ view, tabGroup });
                     setSearch({ group: undefined, page: 1 });
                   },
-                  onEditField: (field, anchor) => setFieldPanel({ field, anchor }),
+                  onEditField: (field, anchor, back) => setFieldPanel({ field, anchor, back }),
                   ...(can.addField
                     ? { onAddField: (anchor: DOMRect) => setFieldPanel({ field: null, anchor }) }
                     : {}),
@@ -2467,6 +2483,7 @@ function MenuPage() {
           anchor={fieldPanel.anchor}
           icon={fieldIcon}
           onClose={() => setFieldPanel(null)}
+          onBack={fieldPanel.back}
           onSubmit={saveField}
           onSubmitRelation={(draft) => createRelation.mutate({ draft, language })}
           onEditRelation={(relation, draft) => {

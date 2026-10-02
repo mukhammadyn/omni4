@@ -10,9 +10,9 @@ import {
 } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { optionOf, type Field, type Relation } from "@/features/table";
+import { localized, optionOf, type Field, type Relation } from "@/features/table";
 import { toast } from "@/shared/lib/toast";
-import { CHIP_STYLES, CHIP_SURFACE, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
+import { CHIP_DOT, CHIP_STYLES, CHIP_SURFACE, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
 import { Tabs } from "@/shared/ui/tabs";
 import { Tooltip } from "@/shared/ui/tooltip";
@@ -272,37 +272,47 @@ export function CalendarView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/*
-        Шапка периода — `.ap-bar` / `vt-cal` прототипа: «‹ Месяц ›» одним
-        блоком, рядом «Сегодня». Без линии снизу: сетка под ней в своей
-        рамке. Поля 24px — как у строки вкладок (`.page.full`).
+        Шапка периода — тот же порядок, что у таймлайна (`.cal-head`
+        прототипа): слева период, справа поля дат, режим, «Сегодня»
+        и стрелки. Без линии снизу: сетка под ней в своей рамке. Поля
+        24px — как у строки вкладок (`.page.full`).
       */}
-      <div className="mx-6 flex h-12 shrink-0 items-center gap-2.5">
-        <div className="flex items-center gap-0.5">
+      <div className="mx-6 flex h-12 shrink-0 items-center gap-2">
+        {/* Капитель: Intl отдаёт месяц строчной буквой в русском
+            и узбекском, а это заголовок экрана. */}
+        <h3 className="flex-1 truncate text-base font-semibold first-letter:uppercase">
+          {periodTitle(period, (period === "MONTH" && visible) || cursor, locale)}
+        </h3>
+
+        {/* Строк в диапазоне больше, чем приехало: сетка показывает
+            не всё, и молчать об этом нельзя — на календаре не видно
+            ни счётчика, ни номеров страниц. */}
+        {hasMore && onLoadMore && (
           <button
             type="button"
-            onClick={() => onCursor(shiftPeriod(period, cursor, -1))}
-            aria-label={t("action.previous")}
-            className="grid size-7 place-items-center rounded-[5px] text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+            onClick={onLoadMore}
+            className="h-7 shrink-0 rounded-md px-2 text-xs text-accent-text transition-colors hover:bg-surface-hover"
           >
-            <Icon as={ChevronLeftIcon} size={16} />
+            {t("calendar.loadMore")}
           </button>
+        )}
 
-          {/* Подпись периода — капитель: Intl отдаёт месяц строчной буквой
-              в русском и узбекском, а это заголовок экрана. Ширина
-              постоянная (`.ap-nav b`): стрелки не прыгают от месяца
-              к месяцу. */}
-          <span className="min-w-[150px] px-1.5 text-center text-[14.5px] font-semibold first-letter:uppercase">
-            {periodTitle(period, (period === "MONTH" && visible) || cursor, locale)}
-          </span>
+        {/* Чем расставлены события: «Начало → Конец». */}
+        <span className="truncate text-[13px] text-fg-subtle">
+          {localized(fromField.labels, language, fromField.label)}
+          {toField && ` → ${localized(toField.labels, language, toField.label)}`}
+        </span>
 
-          <button
-            type="button"
-            onClick={() => onCursor(shiftPeriod(period, cursor, 1))}
-            aria-label={t("action.next")}
-            className="grid size-7 place-items-center rounded-[5px] text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
-          >
-            <Icon as={ChevronRightIcon} size={16} />
-          </button>
+        <div className="shrink-0">
+          <Tabs
+            variant="segment"
+            tabs={CALENDAR_PERIODS.map((item) => ({
+              id: item,
+              label: t(`calendar.period.${item}` as const),
+            }))}
+            activeId={period}
+            onSelect={(id) => onPeriod(id as CalendarPeriod)}
+          />
         </div>
 
         <button
@@ -315,35 +325,27 @@ export function CalendarView({
             onCursor(today);
             setFocus((current) => ({ day: today, align: "center", id: current.id + 1 }));
           }}
-          className="h-7 rounded-md border border-border-strong px-2.5 text-sm text-fg transition-colors hover:bg-surface-hover"
+          className="h-7 shrink-0 rounded-md px-2.5 text-sm font-medium text-fg transition-colors hover:bg-surface-hover"
         >
           {t("calendar.today")}
         </button>
 
-        {/* Строк в диапазоне больше, чем приехало: сетка показывает
-            не всё, и молчать об этом нельзя — на календаре не видно
-            ни счётчика, ни номеров страниц. */}
-        {hasMore && onLoadMore && (
-          <button
-            type="button"
-            onClick={onLoadMore}
-            className="h-7 rounded-md px-2 text-xs text-accent-text transition-colors hover:bg-surface-hover"
-          >
-            {t("calendar.loadMore")}
-          </button>
-        )}
-
-        <div className="ml-auto">
-          <Tabs
-            variant="segment"
-            tabs={CALENDAR_PERIODS.map((item) => ({
-              id: item,
-              label: t(`calendar.period.${item}` as const),
-            }))}
-            activeId={period}
-            onSelect={(id) => onPeriod(id as CalendarPeriod)}
-          />
-        </div>
+        <button
+          type="button"
+          onClick={() => onCursor(shiftPeriod(period, cursor, -1))}
+          aria-label={t("action.previous")}
+          className="grid size-7 shrink-0 place-items-center rounded-[5px] text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+        >
+          <Icon as={ChevronLeftIcon} size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onCursor(shiftPeriod(period, cursor, 1))}
+          aria-label={t("action.next")}
+          className="grid size-7 shrink-0 place-items-center rounded-[5px] text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
+        >
+          <Icon as={ChevronRightIcon} size={16} />
+        </button>
       </div>
 
       {period === "MONTH" ? (
@@ -357,6 +359,7 @@ export function CalendarView({
           locale={locale}
           renderEvent={renderBar}
           onVisibleMonth={setVisible}
+          active={visible ?? cursor}
           /* В месяце времени на экране нет, поэтому перенос меняет
              только день: час события остаётся тем, что был. */
           {...(onMove
@@ -471,6 +474,7 @@ function MonthGrid({
   resizable,
   onMoveTo,
   onVisibleMonth,
+  active,
   onCreate,
   onResize,
   onLoadPast,
@@ -502,6 +506,8 @@ function MonthGrid({
   onMoveTo?: ((event: CalendarEvent, start: Date) => void) | undefined;
   /** Месяц, который сейчас перед глазами: им подписан заголовок. */
   onVisibleMonth: (month: Date) => void;
+  /** Месяц в заголовке. Дни чужих месяцев приглушены — свой читается сразу. */
+  active: Date;
   /** Новая запись на выделенных днях. Не задан — нет права на запись. */
   onCreate?: ((first: Date, last: Date) => void) | undefined;
   /** Новый край события. Не задан — растягивать нечем. */
@@ -666,6 +672,9 @@ function MonthGrid({
     }
 
     anchored.current = { key: firstKey, height: area.scrollHeight };
+    // Прыжок двигает прокрутку руками, и scroll может не прийти вовсе
+    // (уже стояли там же) — месяц в заголовке остался бы прежним.
+    reportVisible();
   }, [focus, firstKey, weeks]);
 
   const onScroll = () => {
@@ -675,13 +684,22 @@ function MonthGrid({
     if (area.scrollTop < EDGE_GAP) onLoadPast?.();
     if (area.scrollHeight - area.scrollTop - area.clientHeight < EDGE_GAP) onLoadFuture?.();
 
-    /* Видимый месяц — по первой неделе, которая ещё не уехала под
-       шапку. Середина недели, а не её начало: неделя на стыке месяцев
-       принадлежит тому, которого в ней больше. */
-    const top = area.getBoundingClientRect().top + HEADER_HEIGHT;
+    reportVisible();
+  };
+
+  function reportVisible() {
+    const area = box.current;
+    if (!area) return;
+
+    /* Видимый месяц — по неделе посреди экрана: сверху и снизу торчат
+       соседние месяцы, а смотрят на тот, что в середине. Середина
+       недели, а не её начало: неделя на стыке принадлежит тому месяцу,
+       которого в ней больше. */
+    const rect = area.getBoundingClientRect();
+    const line = rect.top + HEADER_HEIGHT + (rect.height - HEADER_HEIGHT) / 2;
     for (const week of weeks) {
       const row = week[0] && rows.current.get(dayKey(week[0]));
-      if (row && row.getBoundingClientRect().bottom > top) {
+      if (row && row.getBoundingClientRect().bottom > line) {
         const middle = week[3];
         const key = middle && `${middle.getFullYear()}-${middle.getMonth()}`;
         if (middle && key && reported.current !== key) {
@@ -691,7 +709,7 @@ function MonthGrid({
         return;
       }
     }
-  };
+  }
 
   return (
     <div
@@ -699,7 +717,9 @@ function MonthGrid({
       onScroll={onScroll}
       /* Рамка — `.at-cal` прототипа: радиус 10, линия по краю, поля 24px.
          Прокручивается лента недель внутри неё. */
-      className="relative mx-6 mb-6 min-h-0 flex-1 overflow-y-auto rounded-[10px] border border-border bg-surface select-none"
+      /* Прилипание к началу месяца — `proximity`: доводит плавно, только
+         если остановились рядом; свободную прокрутку не отнимает. */
+      className="relative mx-6 mb-6 min-h-0 flex-1 snap-y snap-proximity overflow-y-auto rounded-[10px] border border-border bg-surface select-none"
     >
       <div className="sticky top-0 z-20 grid grid-cols-7 border-b border-border bg-surface">
         {(weeks[0] ?? []).map((day) => (
@@ -727,7 +747,10 @@ function MonthGrid({
               if (element) rows.current.set(key, element);
               else rows.current.delete(key);
             }}
-            className="relative min-h-26"
+            /* Неделя, где начинается месяц, — точка прилипания. Отступ
+               на липкую шапку дней, иначе она накрыла бы эту неделю. */
+            className={`relative min-h-26 ${week.some((day) => day.getDate() === 1) ? "snap-start" : ""}`}
+            style={{ scrollMarginTop: HEADER_HEIGHT }}
           >
             {/* Клетки: фон, число, «+» и приём броска. */}
             <div className="absolute inset-0 grid grid-cols-7">
@@ -736,6 +759,9 @@ function MonthGrid({
                 /* Выходные отмечены в шапке, а не фоном клетки — как
                    `.at-wd .we` прототипа. */
                 const disabled = disabledDays.has(dayId);
+                const outside =
+                  day.getMonth() !== active.getMonth() ||
+                  day.getFullYear() !== active.getFullYear();
 
                 return (
                   <div
@@ -759,6 +785,16 @@ function MonthGrid({
                           : "hover:bg-surface-hover"
                     }`}
                   >
+                    {/* Приглушение чужого месяца — отдельным слоем, чтобы
+                        смена месяца плавно перетекала (300 мс), а наведение
+                        на клетку оставалось мгновенным. */}
+                    <span
+                      aria-hidden
+                      className={`pointer-events-none absolute inset-0 bg-surface-hover/60 transition-opacity duration-300 motion-reduce:transition-none ${
+                        outside && !disabled && !selected(day) ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+
                     {/* «+» появляется на наведении: он нужен раз в день,
                         а рябил бы в каждой клетке постоянно. С клавиатуры
                         доступен по-прежнему — фокус его показывает. */}
@@ -780,10 +816,14 @@ function MonthGrid({
                         число месяца подписано месяцем и в круг не влезает:
                         у него свои поля. */}
                     <span
-                      className={`absolute top-1.5 left-2 grid h-5.5 min-w-5.5 place-items-center rounded-full text-xs font-medium tabular-nums ${
+                      className={`absolute top-1.5 left-2 grid h-5.5 min-w-5.5 place-items-center rounded-full text-xs font-medium tabular-nums transition-colors duration-300 motion-reduce:transition-none ${
                         day.getDate() === 1 ? "px-1.5" : ""
                       } ${
-                        dayId === today ? "bg-danger text-accent-fg" : "text-fg"
+                        dayId === today
+                          ? "bg-danger text-accent-fg"
+                          : outside
+                            ? "text-fg-subtle"
+                            : "text-fg"
                       }`}
                     >
                       {day.getDate() === 1 ? monthDay(day, locale) : day.getDate()}
@@ -1234,11 +1274,11 @@ export function EventChip({
               clippedStart ? "" : "rounded-l-[4px]"
             } ${clippedEnd ? "" : "rounded-r-[4px]"}`
           : shape === "bar"
-            ? /* Полоса: высота задана строкой оси, поэтому текст стоит
-                 по центру, а не липнет к верхнему краю. */
-              `min-h-6 items-center gap-1.5 px-2 ${CHIP_STYLES[color]} ${
-                clippedStart ? "" : "rounded-l-sm"
-              } ${clippedEnd ? "" : "rounded-r-sm"}`
+            ? /* Полоса — `.tl-bar` прототипа: карточка с тенью, цвет
+                 только точкой. Высота задана строкой оси, текст по центру. */
+              `h-full items-center gap-1.5 bg-card px-2 text-[13px] font-medium text-fg shadow-card hover:tint-surface-hover ${
+                clippedStart ? "" : "rounded-l-[5px]"
+              } ${clippedEnd ? "" : "rounded-r-[5px]"}`
             : `min-h-5 items-start gap-1 px-2 py-0.5 text-[11.5px] ${CHIP_STYLES[color]} ${
                 clippedStart ? "" : "rounded-l-[4px]"
               } ${clippedEnd ? "" : "rounded-r-[4px]"}`
@@ -1254,6 +1294,10 @@ export function EventChip({
       )}
       {onResize && !clippedEnd && (
         <Handle edge="end" onResize={onResize} onHold={() => setHolding(true)} />
+      )}
+
+      {shape === "bar" && (
+        <span aria-hidden className={`size-2 shrink-0 rounded-full ${CHIP_DOT[color]}`} />
       )}
 
       {showTime && !event.allDay && !card && (
@@ -1287,7 +1331,9 @@ export function EventChip({
               в строку — по мере ширины. */}
           {/* Значения мельче заголовка: на карточку смотрят ради
               названия, остальное читают вторым взглядом. */}
-          {rest.map((field) => (
+          {/* На полосе таймлайна — только заголовок, как в прототипе:
+              остальное открывается карточкой записи. */}
+          {shape !== "bar" && rest.map((field) => (
             <div
               key={field.id}
               className="flex min-w-0 items-center opacity-80"
