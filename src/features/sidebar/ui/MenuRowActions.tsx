@@ -2,6 +2,7 @@ import { useState } from "react";
 import { EllipsisIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useIsSuperRole } from "@/features/auth";
+import { useDataLanguages } from "@/features/workspace";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { useUi } from "@/shared/lib/ui-store";
@@ -36,6 +37,7 @@ export function MenuRowActions({ node }: { node: MenuNode }) {
   const [dialog, setDialog] = useState<Dialog>(null);
   // Суперадмину права на пункт не проверяются — см. actionsFor.
   const isAdmin = useIsSuperRole();
+  const { languages } = useDataLanguages();
 
   const create = useCreateMenu();
   const update = useUpdateMenu();
@@ -135,7 +137,7 @@ export function MenuRowActions({ node }: { node: MenuNode }) {
           title={t("menuForm.editTitle", { type: typeWord })}
           initial={{
             ...EMPTY_MENU_FORM,
-            labels: node.labels,
+            labels: editLabels(node, languages[0]?.code ?? ""),
             icon: node.icon,
             href: node.href ?? "",
             folder: node.folder,
@@ -193,3 +195,16 @@ export function MenuRowActions({ node }: { node: MenuNode }) {
   );
 }
 
+
+/**
+ * Подписи для формы правки. Пункт, заведённый не из формы (через API,
+ * MCP, старую админку), держит имя только в колонке `label`, без
+ * `attributes.label_<язык>` — и поле открывалось пустым. Тогда имя
+ * кладётся на основной язык данных, тем же ключом, каким форма его
+ * и сохранит (пустой код — проект без языков, см. labelAttributes).
+ */
+function editLabels(node: MenuNode, base: string): Record<string, string> {
+  if (Object.keys(node.labels).length > 0) return node.labels;
+  const label = node.raw.label?.trim();
+  return label ? { [base]: label } : {};
+}
