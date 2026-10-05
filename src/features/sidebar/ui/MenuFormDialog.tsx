@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconPicker } from "@/features/icons";
-import { useMicrofrontends } from "@/features/microfrontend";
 import { localized, useTables } from "@/features/table";
 import { SelectMenu } from "@/shared/ui/select-menu";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -10,7 +9,6 @@ import { useDataLanguages } from "@/features/workspace";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
 import type { TranslationKey } from "@/shared/lib/i18n";
-import { Dropdown } from "@/shared/ui/dropdown";
 import { Field, Input } from "@/shared/ui/input";
 import { slugify } from "@/shared/lib/slug";
 import { LanguageInput } from "@/shared/ui/language-input";
@@ -44,16 +42,17 @@ export type MenuFormValue = {
   params: { key: string; value: string }[];
 };
 
-/** Типы пунктов, которые заводят из сайдбара. */
-export type CreatableType = "FOLDER" | "TABLE" | "LINK" | "MINIO_FOLDER" | "MICROFRONTEND";
+/**
+ * Типы пунктов, которые заводят из сайдбара. Ссылку и микрофронтенд
+ * больше не заводят (docs/STATUS.md); существующие правятся как раньше.
+ */
+export type CreatableType = "FOLDER" | "TABLE" | "MINIO_FOLDER";
 
 /** Заголовок окна создания зависит только от типа. */
 export const CREATE_TITLES: Record<CreatableType, TranslationKey> = {
   FOLDER: "menuForm.createFolder",
   TABLE: "menuForm.createTable",
-  LINK: "menuForm.createLink",
   MINIO_FOLDER: "menuForm.createFiles",
-  MICROFRONTEND: "menuForm.createMicrofrontend",
 };
 
 /** Пустое значение формы. Одно на все места, где заводят пункт. */
@@ -93,7 +92,6 @@ export function MenuFormDialog({
   initial,
   type,
   needsSlug = false,
-  needsRemote = false,
   needsTable = false,
   busy,
   onSubmit,
@@ -104,8 +102,6 @@ export function MenuFormDialog({
   type: string;
   /** Только при создании таблицы: слаг задаёт имя таблицы в базе. */
   needsSlug?: boolean;
-  /** Только при создании микрофронтенда: выбрать, какое приложение. */
-  needsRemote?: boolean;
   /** Пункт заводят на СУЩЕСТВУЮЩУЮ таблицу: выбрать, на какую. */
   needsTable?: boolean;
   busy: boolean;
@@ -135,17 +131,9 @@ export function MenuFormDialog({
    * что у слага: латиница, цифры и подчёркивание.
    */
   const isFiles = type === "MINIO_FOLDER";
-  /*
-   * Микрофронтенд выбирают ТОЛЬКО при создании: PUT /v3/menus
-   * колонку `microfrontend_id` не пишет вовсе (menu.go:944 — её нет
-   * в SET), и список в форме правки был бы переключателем, который
-   * ничего не переключает. См. docs/backend-notes.md, «Меню».
-   */
-  const picksRemote = type === "MICROFRONTEND" && needsRemote;
   const folderValid = !isFiles || SLUG.test(value.folder.trim());
   const hrefValid = !isLink || isHttpUrl(value.href);
   const slugValid = !needsSlug || SLUG.test(value.slug.trim());
-  const remoteValid = !picksRemote || Boolean(value.microfrontendId);
   const tableValid = !needsTable || Boolean(value.tableId);
   // Хотя бы одно имя: пункт без единой подписи в сайдбаре — пустая строка.
   const named = Object.values(value.labels).some((label) => label.trim());
@@ -158,7 +146,7 @@ export function MenuFormDialog({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (named && hrefValid && slugValid && folderValid && remoteValid && tableValid) {
+    if (named && hrefValid && slugValid && folderValid && tableValid) {
       onSubmit({
         ...value,
         href: value.href.trim(),
@@ -305,7 +293,6 @@ export function MenuFormDialog({
         {type === "MICROFRONTEND" && (
           <RemoteFields
             value={value}
-            picksRemote={picksRemote}
             onChange={(next) => setValue((v) => ({ ...v, ...next }))}
           />
         )}
@@ -317,7 +304,7 @@ export function MenuFormDialog({
           </Button>
           <Button
             type="submit"
-            disabled={busy || !named || !hrefValid || !slugValid || !remoteValid || !tableValid}
+            disabled={busy || !named || !hrefValid || !slugValid || !tableValid}
           >
             {t("action.save")}
           </Button>
@@ -389,8 +376,10 @@ function TableField({
 }
 
 /**
- * Настройки пункта-микрофронтенда: какое приложение и с какими
- * параметрами.
+ * Настройки пункта-микрофронтенда — его параметры. Приложение здесь
+ * не выбирают: оно задаётся только при создании (PUT /v3/menus
+ * `microfrontend_id` не пишет — menu.go:944), а новые микрофронтенды
+ * из сайдбара больше не заводят.
  *
  * Параметры — список пар, как в старой админке
  * (`MicrofrontendLinkModal.jsx:190`). Порядок сохраняем: он ничего
@@ -398,15 +387,12 @@ function TableField({
  */
 function RemoteFields({
   value,
-  picksRemote,
   onChange,
 }: {
   value: MenuFormValue;
-  picksRemote: boolean;
   onChange: (next: Partial<MenuFormValue>) => void;
 }) {
   const { t } = useTranslation();
-  const { items, isLoading } = useMicrofrontends(picksRemote);
 
   const patchParam = (index: number, next: Partial<{ key: string; value: string }>) =>
     onChange({
@@ -415,20 +401,6 @@ function RemoteFields({
 
   return (
     <>
-      {picksRemote && (
-        <Field
-          label={t("menuForm.microfrontend")}
-          hint={isLoading ? t("common.loading") : t("menuForm.microfrontendHint")}
-        >
-          <Dropdown
-            value={value.microfrontendId}
-            placeholder={t("menuForm.microfrontendPick")}
-            items={items.map((item) => ({ value: item.id, label: item.name }))}
-            onChange={(microfrontendId) => onChange({ microfrontendId })}
-          />
-        </Field>
-      )}
-
       <Field label={t("menuForm.params")} hint={t("menuForm.paramsHint")}>
         <div className="flex flex-col gap-1.5">
           {value.params.map((param, index) => (

@@ -96,6 +96,7 @@ import {
   ALL_VIEW_RIGHTS,
   useTableDetails,
   useTableSchema,
+  useSchemaLocked,
   useUpdateField,
   useUpdateRelation,
   type Field,
@@ -298,7 +299,16 @@ function MenuPage() {
    * но уже после того, как переименовала вкладку у себя на экране.
    */
   const permissionOf = useTablePermissions();
-  const can = permissionOf(view?.tableSlug);
+  /*
+   * Защищённая таблица (CONTEXT, «Protected»): структуру не меняет
+   * никто, суперадмин тоже. Без схемных правок остаются: «+ поле»
+   * (через addField), меню колонки, настройки поля, раскладка карточки
+   * и новые поля из Excel.
+   */
+  const schemaLocked = useSchemaLocked(view?.tableSlug, menu?.isProtected);
+  const can = schemaLocked
+    ? { ...permissionOf(view?.tableSlug), addField: false }
+    : permissionOf(view?.tableSlug);
 
   /*
    * Строка поиска, приведённая к правам. Роли без права на поиск он
@@ -1148,6 +1158,15 @@ function MenuPage() {
     back?: () => void;
   } | null>(null);
   const [deletingField, setDeletingField] = useState<Field | null>(null);
+  /*
+   * Признак защиты приезжает отдельным запросом, и панель поля, открытую
+   * до его ответа, кнопки уже не закроют — их не станет. Закрываем сами.
+   */
+  useEffect(() => {
+    if (!schemaLocked) return;
+    setFieldPanel(null);
+    setDeletingField(null);
+  }, [schemaLocked]);
   const [importing, setImporting] = useState(false);
   const exportExcel = useExportExcel(view?.tableSlug);
 
@@ -1183,14 +1202,16 @@ function MenuPage() {
    * Фильтра здесь нет: он относится к запросу, и у дерева его ручка
    * не читает. Таблица дописывает его себе сама.
    */
-  const columnActions: ColumnActions = {
-    // Переименование — единственная правка схемы, которую делают
-    // на бегу: остальное открывает диалог.
-    rename: (field, label) =>
-      updateField.mutate({ field, draft: { ...toDraft(field, language), label }, language }),
-    settings: (field, anchor) => setFieldPanel({ field, anchor }),
-    remove: setDeletingField,
-  };
+  const columnActions: ColumnActions = schemaLocked
+    ? {}
+    : {
+        // Переименование — единственная правка схемы, которую делают
+        // на бегу: остальное открывает диалог.
+        rename: (field, label) =>
+          updateField.mutate({ field, draft: { ...toDraft(field, language), label }, language }),
+        settings: (field, anchor) => setFieldPanel({ field, anchor }),
+        remove: setDeletingField,
+      };
 
   /** Незаполненные обязательные и непрошедшие проверку поля черновика. */
   const draftErrors = useMemo(
@@ -1542,13 +1563,18 @@ function MenuPage() {
                     updateView.mutate({ view, tabGroup });
                     setSearch({ group: undefined, page: 1 });
                   },
-                  onEditField: (field, anchor, back) => setFieldPanel({ field, anchor, back }),
                   ...(can.addField
                     ? { onAddField: (anchor: DOMRect) => setFieldPanel({ field: null, anchor }) }
                     : {}),
                   // Тот же диалог подтверждения, что и у меню колонки:
                   // удаление поля сносит его во всех view вместе с данными.
-                  onDeleteField: setDeletingField,
+                  ...(schemaLocked
+                    ? {}
+                    : {
+                        onEditField: (field: Field, anchor: DOMRect, back: () => void) =>
+                          setFieldPanel({ field, anchor, back }),
+                        onDeleteField: setDeletingField,
+                      }),
                   onImport: () => setImporting(true),
                   // Выгружается то, что видно: колонки view и действующий
                   // отбор — вместе с областью видимости view, иначе файл
@@ -1727,8 +1753,10 @@ function MenuPage() {
               : {})}
             /* Меню колонки — то же, что у таблицы, минус сортировка
                и фильтр: их ручка дерева не читает, и в меню их нет.
-               Правки схемы к способу показа отношения не имеют. */
-            columnActions={columnActions}
+               Правки схемы к способу показа отношения не имеют.
+               У защищённой таблицы в меню дерева остаётся одна подпись —
+               такого меню не открываем вовсе. */
+            {...(schemaLocked ? {} : { columnActions })}
           />
         )
       ) : (
@@ -1846,6 +1874,10 @@ function MenuPage() {
                 ? {
                     onEdit: (guid: string, slug: string, value: unknown) =>
                       update.mutate({ guid, values: { [slug]: value } }),
+                  }
+                : {})}
+              {...(can.update && !schemaLocked
+                ? {
                     onSettings: (field: Field, anchor: DOMRect) =>
                       setFieldPanel({ field, anchor }),
                   }
@@ -2126,7 +2158,9 @@ function MenuPage() {
                 ? { onAddRow: () => openCreateUrl(view) }
                 : {})}
               onOpenRow={openRow}
-              onAddField={(anchor) => setFieldPanel({ field: null, anchor })}
+              {...(can.addField
+                ? { onAddField: (anchor: DOMRect) => setFieldPanel({ field: null, anchor }) }
+                : {})}
               /* Отбор из меню колонки — своё право роли (`field_filter`),
                  отдельное от подшапки с чипами: так же делит их старая
                  админка (views/modules/Table/…/Th.jsx:71). */
@@ -2356,17 +2390,23 @@ function MenuPage() {
                   update.mutate({ guid, values: { [slug]: value } }),
               }
             : {})}
-          onSettings={(field, anchor) => setFieldPanel({ field, anchor })}
-          onReorder={drawerLayout.reorder}
-          /* Секции правит тот же, кто двигает поля: это одна и та же
-             раскладка и одно и то же право. */
-          onAddSection={drawerLayout.addSection}
-          onRenameSection={drawerLayout.renameSection}
-          onRemoveSection={drawerLayout.removeSection}
-          onToggleHidden={drawerLayout.toggleHidden}
-          // Заголовок карточки — настройка раскладки: её правит тот же,
-          // кто правит настройки view.
-          {...(can.settings ? { onHeading: drawerLayout.setHeading } : {})}
+          /* Раскладка карточки общая для всех view таблицы — это
+             структура, и у системной таблицы она заперта целиком. */
+          {...(schemaLocked
+            ? {}
+            : {
+                onSettings: (field: Field, anchor: DOMRect) => setFieldPanel({ field, anchor }),
+                onReorder: drawerLayout.reorder,
+                /* Секции правит тот же, кто двигает поля: это одна и та же
+                   раскладка и одно и то же право. */
+                onAddSection: drawerLayout.addSection,
+                onRenameSection: drawerLayout.renameSection,
+                onRemoveSection: drawerLayout.removeSection,
+                onToggleHidden: drawerLayout.toggleHidden,
+                // Заголовок карточки — настройка раскладки: её правит тот же,
+                // кто правит настройки view.
+                ...(can.settings ? { onHeading: drawerLayout.setHeading } : {}),
+              })}
           onClose={() => setSearch({ item: undefined, tab: undefined })}
         />
       )}
@@ -2466,6 +2506,7 @@ function MenuPage() {
           // положить и в скрытую колонку — данные от этого не исчезнут.
           fields={tableFields}
           language={language}
+          canAddFields={can.addField}
           onClose={() => setImporting(false)}
         />
       )}

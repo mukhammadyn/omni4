@@ -32,12 +32,15 @@ export function ExcelImportDialog({
   tableSlug,
   fields,
   language,
+  canAddFields,
   onClose,
 }: {
   tableSlug: string;
   /** Поля таблицы: заполнить можно любое, а не только показанное во view. */
   fields: Field[];
   language: string;
+  /** Заводить поля под столбцы без пары. Нет — столбцы просто пропускаются. */
+  canAddFields: boolean;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -77,14 +80,15 @@ export function ExcelImportDialog({
         }
 
         setMapping(guessed);
-        setCreate(fillable.length ? new Set() : new Set(result.columns));
+        setCreate(fillable.length || !canAddFields ? new Set() : new Set(result.columns));
       },
     });
   };
 
   const mapped = new Set(Object.values(mapping).filter(Boolean));
   const free = (file?.columns ?? []).filter((column) => !mapped.has(column));
-  const creating = free.filter((column) => create.has(column));
+  // Отметки, поставленные до того, как право пропало, не создают полей.
+  const creating = canAddFields ? free.filter((column) => create.has(column)) : [];
   const busy = createFields.isPending || write.isPending;
 
   const submit = async () => {
@@ -166,7 +170,7 @@ export function ExcelImportDialog({
                 </label>
               ))}
 
-              {free.length > 0 && (
+              {canAddFields && free.length > 0 && (
                 <section className={fillable.length ? "mt-3 border-t border-border pt-3" : ""}>
                   <label className="flex h-8 items-center gap-2 text-xs font-medium text-fg-subtle">
                     <Checkbox

@@ -33,17 +33,18 @@ import { fieldIcon } from "./field-icon";
  * (/v2/items/{slug}/tree), и она не читает ни того, ни другого —
  * пункты, которые ничего не делают, там не показываются. Всё остальное
  * — переименование, настройки, удаление — правит СХЕМУ, и дереву
- * нужно ровно так же, как таблице.
+ * нужно ровно так же, как таблице. У защищённой таблицы (CONTEXT,
+ * «Protected») правок схемы нет вовсе — нет и этих трёх пунктов.
  */
 export type ColumnActions = {
-  rename: (field: Field, label: string) => void;
+  rename?: ((field: Field, label: string) => void) | undefined;
   /** Панель настроек всплывает там же, где меню: ей нужен тот же якорь. */
-  settings: (field: Field, anchor: DOMRect) => void;
+  settings?: ((field: Field, anchor: DOMRect) => void) | undefined;
   /** Добавить фильтр по колонке. Нет — списку фильтр не применить. */
   filter?: ((field: Field) => void) | undefined;
   /** Убрать колонку из view — «Скрыть» прототипа. Нет — пункта нет. */
   hide?: ((field: Field) => void) | undefined;
-  remove: (field: Field) => void;
+  remove?: ((field: Field) => void) | undefined;
 };
 
 export function ColumnMenu({
@@ -70,12 +71,12 @@ export function ColumnMenu({
    * У колонки-связи подпись лежит не в `label`, а в attributes, и
    * уезжает своей ручкой — переименования на месте у неё нет.
    *
-   * «Настройки» и «Удалить» есть у всех. У связи оба пункта ведут
+   * «Настройки» и «Удалить» не зависят от типа. У связи оба пункта ведут
    * в её собственные ручки: настройки открывают форму связи, а удаление
    * сносит связь целиком — вместе с колонкой-ссылкой. Различие
    * вызывающий и разбирает, здесь оно не видно.
    */
-  const renamable = !field.relationId;
+  const renamable = !field.relationId && Boolean(actions.rename);
   const filterable = Boolean(actions.filter) && filterKind(field) !== null;
 
   const run = (action: () => void) => {
@@ -86,7 +87,7 @@ export function ColumnMenu({
   /** Переименование применяется при закрытии — как правка ячейки. */
   const commitName = () => {
     const next = name.trim();
-    if (renamable && next && next !== label) actions.rename(field, next);
+    if (renamable && next && next !== label) actions.rename?.(field, next);
   };
 
   return (
@@ -127,11 +128,13 @@ export function ColumnMenu({
           </p>
         )}
 
-        <MenuItem
-          icon={SlidersHorizontalIcon}
-          onClick={() => run(() => actions.settings(field, anchor))}
-          label={t("column.settings")}
-        />
+        {actions.settings && (
+          <MenuItem
+            icon={SlidersHorizontalIcon}
+            onClick={() => run(() => actions.settings?.(field, anchor))}
+            label={t("column.settings")}
+          />
+        )}
 
         {/* Разделитель — вместе со своей группой: у дерева ни сортировки,
             ни фильтра нет, и пустая полоска между двумя пунктами
@@ -160,7 +163,7 @@ export function ColumnMenu({
           />
         )}
 
-        <div className="my-1 h-px bg-border" />
+        {(actions.hide || actions.remove) && <div className="my-1 h-px bg-border" />}
 
         {actions.hide && (
           <MenuItem
@@ -169,12 +172,14 @@ export function ColumnMenu({
             label={t("column.hide")}
           />
         )}
-        <MenuItem
-          icon={Trash2Icon}
-          danger
-          onClick={() => run(() => actions.remove(field))}
-          label={t("column.delete")}
-        />
+        {actions.remove && (
+          <MenuItem
+            icon={Trash2Icon}
+            danger
+            onClick={() => run(() => actions.remove?.(field))}
+            label={t("column.delete")}
+          />
+        )}
       </div>
     </Anchored>
   );

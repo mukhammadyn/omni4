@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { useIsSuperRole } from "@/features/auth";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
-import { TemplateCreateDialog } from "@/features/templates";
 import { useUi } from "@/shared/lib/ui-store";
 import { useCreateMenu, useDeleteMenu, useUpdateMenu } from "../api/mutations";
 import { actionsFor, typeWordKey, type MenuActionId } from "../model/actions";
@@ -26,7 +25,6 @@ type Dialog =
   /** existing — пункт заводят на уже существующую таблицу, а не на новую. */
   | { kind: "create"; type: CreatableType; existing?: boolean }
   | { kind: "delete" }
-  | { kind: "template" }
   | null;
 
 /**
@@ -36,12 +34,7 @@ type Dialog =
 export function MenuRowActions({ node }: { node: MenuNode }) {
   const { t } = useTranslation();
   const [dialog, setDialog] = useState<Dialog>(null);
-  /*
-   * Роль спрашиваем здесь, а не принимаем сверху: «сделать шаблоном»
-   * видит только суперадмин, и пока это был проброшенный флаг, строка
-   * меню передавала в него голое false — действие не показывалось
-   * никому и никогда.
-   */
+  // Суперадмину права на пункт не проверяются — см. actionsFor.
   const isAdmin = useIsSuperRole();
 
   const create = useCreateMenu();
@@ -61,11 +54,8 @@ export function MenuRowActions({ node }: { node: MenuNode }) {
     if (id === "create-folder") setDialog({ kind: "create", type: "FOLDER" });
     if (id === "create-table") setDialog({ kind: "create", type: "TABLE" });
     if (id === "link-table") setDialog({ kind: "create", type: "TABLE", existing: true });
-    if (id === "create-link") setDialog({ kind: "create", type: "LINK" });
     if (id === "create-files") setDialog({ kind: "create", type: "MINIO_FOLDER" });
-    if (id === "create-microfrontend") setDialog({ kind: "create", type: "MICROFRONTEND" });
     if (id === "delete") setDialog({ kind: "delete" });
-    if (id === "make-template") setDialog({ kind: "template" });
   };
 
   const submitForm = (value: MenuFormValue) => {
@@ -90,9 +80,6 @@ export function MenuRowActions({ node }: { node: MenuNode }) {
           // её идентификатор, и создаётся один пункт меню, без таблицы.
           ...(dialog.type === "TABLE" && !dialog.existing ? { slug: value.slug } : {}),
           ...(dialog.existing ? { tableId: value.tableId } : {}),
-          ...(dialog.type === "MICROFRONTEND"
-            ? { microfrontendId: value.microfrontendId }
-            : {}),
           attributes: menuAttributes(dialog.type, value),
         },
         { onSuccess: () => setDialog(null) },
@@ -170,7 +157,6 @@ export function MenuRowActions({ node }: { node: MenuNode }) {
           type={dialog.type}
           needsSlug={dialog.type === "TABLE" && !dialog.existing}
           needsTable={Boolean(dialog.existing)}
-          needsRemote={dialog.type === "MICROFRONTEND"}
           busy={create.isPending}
           onSubmit={submitForm}
           onClose={() => setDialog(null)}
@@ -179,14 +165,6 @@ export function MenuRowActions({ node }: { node: MenuNode }) {
 
       {dialog?.kind === "move" && (
         <MoveMenuDialog node={node} onClose={() => setDialog(null)} />
-      )}
-
-      {dialog?.kind === "template" && (
-        <TemplateCreateDialog
-          menuId={node.id}
-          menuLabel={node.label}
-          onClose={() => setDialog(null)}
-        />
       )}
 
       {dialog?.kind === "delete" && (

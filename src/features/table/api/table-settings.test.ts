@@ -88,3 +88,10 @@ test("незнакомый способ входа отбрасывается: �
 
   expect(table.loginStrategies).toEqual(["email", "phone"]);
 });
+
+test("системная таблица — attributes.protected, и только строгое true", () => {
+  expect(toTableSettings(DTO).isProtected).toBe(false);
+  expect(toTableSettings({ ...DTO, attributes: { protected: true } }).isProtected).toBe(true);
+  // Строка — не флаг: «false» в JSON-редакторе не должно запирать таблицу.
+  expect(toTableSettings({ ...DTO, attributes: { protected: "false" } }).isProtected).toBe(false);
+});

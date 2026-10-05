@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { LayoutTemplateIcon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useGlobalRight } from "@/features/auth";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem } from "@/shared/ui/popover";
-import { TemplateDialog } from "@/features/templates";
 import { useCreateMenu } from "../api/mutations";
 import { byType } from "./MenuIcon";
 import {
@@ -42,8 +41,6 @@ export function AddMenuButton({ parentId, label }: { parentId: string; label?: s
   const canCreate = useGlobalRight("menu_button");
   /** Что заводим. `existing` — пункт на уже существующую таблицу. */
   const [form, setForm] = useState<{ type: CreatableType; existing?: boolean } | null>(null);
-  /** Открыт выбор шаблона: готовый набор таблиц разворачивается целиком. */
-  const [templates, setTemplates] = useState(false);
   const create = useCreateMenu();
 
   if (!canCreate) return null;
@@ -60,7 +57,6 @@ export function AddMenuButton({ parentId, label }: { parentId: string; label?: s
         parentId,
         ...(type === "TABLE" && !existing ? { slug: value.slug } : {}),
         ...(existing ? { tableId: value.tableId } : {}),
-        ...(type === "MICROFRONTEND" ? { microfrontendId: value.microfrontendId } : {}),
         attributes: menuAttributes(type, value),
       },
       { onSuccess: () => setForm(null) },
@@ -129,38 +125,9 @@ export function AddMenuButton({ parentId, label }: { parentId: string; label?: s
             >
               {t("menuAction.createFiles")}
             </PopoverItem>
-            <PopoverItem
-              icon={itemIcon(byType.LINK!)}
-              onClick={() => {
-                close();
-                setForm({ type: "LINK" });
-              }}
-            >
-              {t("menuAction.createLink")}
-            </PopoverItem>
-            <PopoverItem
-              icon={itemIcon(byType.MICROFRONTEND!)}
-              onClick={() => {
-                close();
-                setForm({ type: "MICROFRONTEND" });
-              }}
-            >
-              {t("menuAction.createMicrofrontend")}
-            </PopoverItem>
-            <PopoverItem
-              icon={itemIcon(LayoutTemplateIcon)}
-              onClick={() => {
-                close();
-                setTemplates(true);
-              }}
-            >
-              {t("menuAction.fromTemplate")}
-            </PopoverItem>
           </>
         )}
       </Popover>
-
-      {templates && <TemplateDialog onClose={() => setTemplates(false)} />}
 
       {form && (
         <MenuFormDialog
@@ -169,7 +136,6 @@ export function AddMenuButton({ parentId, label }: { parentId: string; label?: s
           type={form.type}
           needsSlug={form.type === "TABLE" && !form.existing}
           needsTable={Boolean(form.existing)}
-          needsRemote={form.type === "MICROFRONTEND"}
           busy={create.isPending}
           onSubmit={submit}
           onClose={() => setForm(null)}

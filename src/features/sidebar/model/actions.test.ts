@@ -25,6 +25,7 @@ const node = (over: Partial<MenuNode> = {}): MenuNode => ({
   params: {},
   order: 0,
   isStatic: false,
+  isProtected: false,
   isModule: false,
   parentId: "root",
   children: [],
@@ -55,7 +56,6 @@ test("создание вложенного идёт по праву write", () 
 
   expect(ids(folder)).not.toContain("create-table");
   expect(ids(folder)).not.toContain("create-folder");
-  expect(ids(folder)).not.toContain("create-link");
 });
 
 test("у микрофронтенда есть перенос, правка и удаление", () => {
@@ -99,20 +99,6 @@ test("действия без своего экрана не показываю�
   expect(ids(node({ type: "FOLDER", kind: "group" }), true)).not.toContain("settings");
 });
 
-test("шаблон делают из папки и из таблицы, и только администратор", () => {
-  const folder = node({ type: "FOLDER", kind: "group" });
-
-  expect(ids(folder, true)).toContain("make-template");
-  // Не администратору шаблоны недоступны — так было и в старой админке.
-  expect(ids(folder, false)).not.toContain("make-template");
-  // В старом меню TABLE «Make Template» был (MenuButtons.jsx:320): таблицы
-  // шаблона выбирают в форме, а от пункта нужно только его дерево.
-  expect(ids(node({ type: "TABLE" }), true)).toContain("make-template");
-  // У микрофронтенда и ссылки таблиц нет — шаблон вышел бы пустым.
-  expect(ids(node({ type: "MICROFRONTEND" }), true)).not.toContain("make-template");
-  expect(ids(node({ type: "LINK", kind: "link" }), true)).not.toContain("make-template");
-});
-
 test("у системного пункта нет удаления", () => {
   // Бэкенд его всё равно не удалит (STATIC_MENU_IDS), кнопка была бы ложью.
   expect(ids(node({ isStatic: true }))).not.toContain("delete");
@@ -139,4 +125,20 @@ test("ссылка на существующую таблицу открывае
   expect(showsTable({ type: "LINK", tableId: "" })).toBe(false);
   expect(showsTable({ type: "TABLE", tableId: "" })).toBe(true);
   expect(showsTable({ type: "WIKI", tableId: "t1" })).toBe(false);
+});
+
+test("пункт omni4: суперадмин только переименовывает, внутрь заводить можно", () => {
+  const folder = node({ type: "FOLDER", kind: "group", isProtected: true });
+  const table = node({ type: "TABLE", isProtected: true });
+
+  expect(ids(folder, true)).toEqual([
+    "create-table",
+    "link-table",
+    "create-folder",
+    "create-files",
+    "edit",
+  ]);
+  expect(ids(table, true)).toEqual(["edit"]);
+  // Не суперадмину — ни имени, ни иконки, даже с правом update.
+  expect(ids(table, false)).toEqual([]);
 });

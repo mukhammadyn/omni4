@@ -163,6 +163,7 @@ export function toMenuNode(
     params: pickParams(dto.attributes),
     order: index,
     isStatic: dto.is_static ?? false,
+    isProtected: dto.attributes?.["protected"] === true,
     isModule: dto.attributes?.["is_tab"] === true,
     parentId: dto.parent_id || null,
     can: pickPermissions(dto),

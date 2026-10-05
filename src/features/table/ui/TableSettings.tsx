@@ -10,6 +10,7 @@ import { Icon } from "@/shared/ui/icon";
 import {
   LOGIN_STRATEGIES,
   useDeleteTable,
+  useSchemaLocked,
   useTableSettings,
   useUpdateTableSettings,
   type LoginStrategy,
@@ -47,6 +48,7 @@ export function TableSettings({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { table, isLoading } = useTableSettings(tableSlug);
+  const locked = useSchemaLocked(tableSlug);
   const update = useUpdateTableSettings(tableSlug);
   const remove = useDeleteTable();
   const [confirming, setConfirming] = useState(false);
@@ -61,6 +63,11 @@ export function TableSettings({
 
   if (isLoading || !table) {
     return <p className="px-2 py-1.5 text-xs text-fg-subtle">{t("common.loading")}</p>;
+  }
+
+  // Системную таблицу не переименовать и не удалить — форма ей не нужна.
+  if (locked) {
+    return <p className="px-2 py-1.5 text-xs text-fg-subtle">{t("tableSettings.protected")}</p>;
   }
 
   const login = table.isLoginTable || wantLogin;

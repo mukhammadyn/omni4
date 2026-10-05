@@ -54,6 +54,13 @@ export type TableSettings = {
   loginStrategies: LoginStrategy[];
   /** Отмечать время последнего входа полем `last_activity`. */
   lastActivity: boolean;
+  /**
+   * Системная таблица omni4 — `attributes.protected`. Её структуру
+   * (поля, связи, настройки, раскладку карточки) из интерфейса не
+   * меняют никому; записи правятся как обычно. Бэкенд флага не знает
+   * и не проверяет: это запрет интерфейса, а не сервера.
+   */
+  isProtected: boolean;
   raw: Record<string, unknown>;
 };
 
@@ -87,6 +94,26 @@ export function useTableSettings(tableSlug: string | undefined, enabled = true) 
   });
 
   return { table: query.data, isLoading: query.isLoading, error: query.error };
+}
+
+/**
+ * Заперта ли структура таблицы (CONTEXT.md, «Protected»). Один ответ
+ * для всех экранов: маршрут таблицы, вкладка связи, настройки таблицы.
+ *
+ * `menuProtected` — защищён ли пункт меню, из которого таблицу открыли.
+ * Нужен таблице входа: её attributes бэкенд пересобирает с нуля
+ * и `protected` роняет (object_builder storage/postgres/table.go:1285,
+ * docs/backend-notes.md). Там, где пункта меню нет, — во вкладке связи —
+ * такая таблица остаётся незапертой.
+ *
+ * Пока ответ не пришёл — не заперта, как и права
+ * (features/auth/model/permissions): экран, у которого кнопки исчезают
+ * из-за медленного ответа, читается как сломанный. Что успели открыть
+ * за это время, закрывает вызывающий.
+ */
+export function useSchemaLocked(tableSlug: string | undefined, menuProtected = false): boolean {
+  const { table } = useTableSettings(tableSlug);
+  return menuProtected || table?.isProtected === true;
 }
 
 export type TableEdit = {
@@ -274,6 +301,7 @@ export function toTableSettings(dto: TableDto): TableSettings {
     isLoginTable: dto.is_login_table === true,
     loginStrategies: toStrategies(authInfo["login_strategy"]),
     lastActivity: attributes["last_activity"] === true,
+    isProtected: attributes["protected"] === true,
     raw: { ...dto },
   };
 }

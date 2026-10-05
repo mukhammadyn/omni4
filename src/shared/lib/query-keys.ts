@@ -215,15 +215,7 @@ export const keys = {
     folder: (folder: string) => [...keys.files.all, folder] as const,
     list: (folder: string, search: string) => [...keys.files.folder(folder), search] as const,
   },
-  /** Шаблоны проекта: готовые наборы таблиц. Список один на проект. */
-  templates: {
-    all: ["templates"] as const,
-    list: () => [...keys.templates.all] as const,
-  },
-  /**
-   * Шаблоны ДОКУМЕНТОВ: печатные формы записи, свои у каждой таблицы.
-   * Не путать с `templates` выше — там наборы таблиц целого проекта.
-   */
+  /** Шаблоны ДОКУМЕНТОВ: печатные формы записи, свои у каждой таблицы. */
   docs: {
     all: ["docs"] as const,
     templates: (tableSlug: string) => [...keys.docs.all, tableSlug] as const,

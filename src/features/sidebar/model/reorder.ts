@@ -68,6 +68,10 @@ export function planMove(source: DragSource, drop: DropContext): MovePlan | null
   const { target, position, targetSiblings, targetParentId, targetPath, insideSiblings } = drop;
 
   if (node.id === target.id) return null;
+  // Пункт omni4 не переносят (CONTEXT, «Protected»). Проверка здесь,
+  // а не только в draggable: перетаскивание выделенного текста внутри
+  // строки всплывает до обёртки и начинается без этого атрибута.
+  if (node.isProtected) return null;
 
   /*
    * Папка внутрь собственного потомка. Новым родителем становится либо

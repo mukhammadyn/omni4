@@ -36,7 +36,7 @@ import {
   type Sort,
 } from "@/features/item";
 import { PrintButton } from "@/features/docs";
-import { useTableSchema, type Field, type Relation } from "@/features/table";
+import { useSchemaLocked, useTableSchema, type Field, type Relation } from "@/features/table";
 import type { DataLanguage } from "@/features/workspace";
 import { toast } from "@/shared/lib/toast";
 import { useUi } from "@/shared/lib/ui-store";
@@ -358,6 +358,8 @@ export function RelationView({
 
   /** Права роли на ЧУЖУЮ таблицу: у неё они свои. */
   const can = useTablePermission(tab.tableSlug);
+  /** Системная таблица: новых полей из Excel ей не заводят. */
+  const schemaLocked = useSchemaLocked(tab.tableSlug);
 
 
   /** Постоянная ссылка: литерал в аргументе перезапрашивал бы строки. */
@@ -890,6 +892,7 @@ export function RelationView({
           // и в колонку, которой во вкладке не видно.
           fields={fields}
           language={language}
+          canAddFields={can.addField && !schemaLocked}
           onClose={() => setImporting(false)}
         />
       )}

@@ -1,9 +1,6 @@
 import {
   FolderIcon,
   FolderSymlinkIcon,
-  LayoutGridIcon,
-  LayoutTemplateIcon,
-  LinkIcon,
   PaintBucketIcon,
   PencilIcon,
   Table2Icon,
@@ -11,7 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { TranslationKey } from "@/shared/lib/i18n";
-import { showsTable, type MenuNode } from "./types";
+import type { MenuNode } from "./types";
 
 /**
  * Реестр действий над пунктом меню.
@@ -26,13 +23,10 @@ export type MenuActionId =
   | "create-table"
   | "link-table"
   | "create-folder"
-  | "create-link"
   | "create-files"
-  | "create-microfrontend"
   | "edit"
   | "move"
   | "settings"
-  | "make-template"
   | "delete";
 
 export type MenuAction = {
@@ -58,14 +52,7 @@ const ALL: readonly MenuAction[] = [
    */
   { id: "link-table", labelKey: "menuAction.linkTable", requires: "write", icon: Table2Icon },
   { id: "create-folder", labelKey: "menuAction.createFolder", requires: "write", icon: FolderIcon },
-  { id: "create-link", labelKey: "menuAction.createLink", requires: "write", icon: LinkIcon },
   { id: "create-files", labelKey: "menuAction.createFiles", requires: "write", icon: PaintBucketIcon },
-  {
-    id: "create-microfrontend",
-    labelKey: "menuAction.createMicrofrontend",
-    requires: "write",
-    icon: LayoutGridIcon,
-  },
   { id: "edit", labelKey: "menuAction.edit", requires: "update", icon: PencilIcon },
   /*
    * «Перенести» — старое «Move table / Move microfrontend»
@@ -79,12 +66,6 @@ const ALL: readonly MenuAction[] = [
    * кроме DEFAULT ADMIN, которому права не проверяли вовсе.
    */
   { id: "move", labelKey: "menuAction.move", requires: "update", icon: FolderSymlinkIcon },
-  {
-    id: "make-template",
-    labelKey: "menuAction.makeTemplate",
-    requires: "update",
-    icon: LayoutTemplateIcon,
-  },
   /*
    * «Настройки пункта» здесь была и ничего не делала: обработчика у неё
    * нет, экрана за ней не написано. Рабочая на вид кнопка без действия
@@ -106,10 +87,15 @@ const ONLY_GROUPS = new Set<MenuActionId>([
   "create-table",
   "link-table",
   "create-folder",
-  "create-link",
   "create-files",
-  "create-microfrontend",
 ]);
+
+/**
+ * Что запрещено у пункта omni4 (`isProtected`). Создание внутри — нет.
+ * «Изменить» — имя и иконка, у папки и таблицы форма больше ничего
+ * не правит, — остаётся суперадмину.
+ */
+const CHANGES_ITSELF = new Set<MenuActionId>(["move", "delete"]);
 
 /**
  * Действия, у которых пока нет своего экрана. Они остаются в типах
@@ -134,25 +120,9 @@ export function actionsFor(node: MenuNode, isAdmin: boolean): MenuAction[] {
      */
     if (!isAdmin && !node.can[action.requires]) return false;
     if (ONLY_GROUPS.has(action.id) && node.kind !== "group") return false;
-    // Шаблон делает только администратор — так было и раньше.
-    if (action.id === "make-template" && !isAdmin) return false;
-    /*
-     * Шаблон делают из папки и из таблицы (MenuButtons.jsx:320 —
-     * в старом меню TABLE он тоже был). Список таблиц шаблона задают
-     * в самой форме, а `menu_id` решает только, какое дерево пунктов
-     * уедет вместе с ними (шлюз, template.go:201 — GetMenuTree);
-     * у таблицы это дерево из одного пункта, и оно осмысленно.
-     *
-     * У ссылки, микрофронтенда и папки хранилища таблиц нет вовсе —
-     * шаблон из них был бы пустым.
-     */
-    if (
-      action.id === "make-template" &&
-      node.kind !== "group" &&
-      !showsTable(node)
-    ) {
-      return false;
-    }
+    // Пункт omni4 не переносит и не удаляет никто, суперадмин тоже.
+    if (node.isProtected && CHANGES_ITSELF.has(action.id)) return false;
+    if (node.isProtected && action.id === "edit" && !isAdmin) return false;
     // Системные пункты бэкенд удалять запрещает (STATIC_MENU_IDS),
     // поэтому кнопки, которая всегда вернёт ошибку, быть не должно.
     if (action.id === "delete" && node.isStatic) return false;

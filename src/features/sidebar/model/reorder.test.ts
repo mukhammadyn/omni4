@@ -16,6 +16,7 @@ const node = (id: string, over: Partial<MenuNode> = {}): MenuNode => ({
   params: {},
   order: 0,
   isStatic: false,
+  isProtected: false,
   isModule: false,
   parentId: "root",
   children: [],
@@ -142,4 +143,13 @@ test("переносить некуда внутрь себя и своих по
 
   expect(moveTargets(tree, f).map((match) => match.node.id)).toEqual(["other"]);
   expect(moveTargets(tree, a).map((match) => match.node.id)).toEqual(["f", "inner", "other"]);
+});
+
+test("пункт omni4 не переносится, а свой пункт к нему в папку — да", () => {
+  const locked = node("p", { isProtected: true });
+
+  expect(planMove({ node: locked, parentId: "root" }, drop(a, "before"))).toBeNull();
+  expect(planMove({ node: locked, parentId: "root" }, drop(f, "inside"))).toBeNull();
+  const lockedFolder = node("pf", { type: "FOLDER", kind: "group", isProtected: true });
+  expect(planMove({ node: a, parentId: "root" }, drop(lockedFolder, "inside"))).not.toBeNull();
 });

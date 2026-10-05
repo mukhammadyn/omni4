@@ -95,12 +95,17 @@ function MenuRow({
   // Обработчики перетаскивания живут на обёртке, а не на ссылке: внутри
   // строки есть вторая кнопка, и тащить нужно строку целиком.
   // Без права `menu_drag` их нет вовсе: строка, которая тащится, но
-  // никуда не встаёт, хуже неподвижной.
+  // никуда не встаёт, хуже неподвижной. Пункт omni4 не тащится, но
+  // принимает: свой пункт в системную папку положить можно.
   const dragHandlers = !dnd.enabled
     ? {}
     : {
-        draggable: true,
+        draggable: !node.isProtected,
         onDragStart: (event: DragEvent<HTMLElement>) => {
+          if (node.isProtected) {
+            event.preventDefault();
+            return;
+          }
           dnd.start({ node, parentId });
           event.dataTransfer.effectAllowed = "move";
           // Без данных Firefox не начинает перетаскивание.

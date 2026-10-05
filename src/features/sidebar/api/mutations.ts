@@ -23,11 +23,6 @@ export type MenuInput = {
    * создаётся, заводится один пункт меню; см. useCreateMenu.
    */
   tableId?: string;
-  /**
-   * Только у MICROFRONTEND: какое приложение показывать. Задаётся
-   * ОДИН РАЗ, при создании: PUT колонку не пишет — см. menuUpdateBody.
-   */
-  microfrontendId?: string;
   /** Свободный мешок бэкенда: адрес ссылки и подписи по языкам. */
   attributes?: Record<string, unknown>;
 };
@@ -92,7 +87,6 @@ export function useCreateMenu() {
       parent_id: input.parentId,
       project_id: projectId,
       ...(input.tableId ? { table_id: input.tableId } : {}),
-      ...(input.microfrontendId ? { microfrontend_id: input.microfrontendId } : {}),
       attributes: { ...labelAttributes(input.labels), ...input.attributes },
     });
   });

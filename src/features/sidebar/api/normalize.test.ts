@@ -132,3 +132,12 @@ test("модуль — только папка с is_tab: true, а не любо
   expect(node({ is_tab: "true" }).isModule).toBe(false);
   expect(node({}).isModule).toBe(false);
 });
+
+test("пункт omni4 — только attributes.protected: true", () => {
+  const node = (attributes: Record<string, unknown>) =>
+    toMenuNode({ id: "m1", type: "TABLE", label: "Сделки", attributes }, "ru");
+
+  expect(node({ protected: true }).isProtected).toBe(true);
+  expect(node({ protected: "true" }).isProtected).toBe(false);
+  expect(node({}).isProtected).toBe(false);
+});
