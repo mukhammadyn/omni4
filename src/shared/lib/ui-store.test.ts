@@ -26,15 +26,15 @@ describe("clampDrawerWidth", () => {
 });
 
 describe("toggleMenu", () => {
-  it("раскрывает и схлопывает папку, не трогая соседние", () => {
+  it("схлопывает и раскрывает папку, не трогая соседние", () => {
     const { toggleMenu } = useUi.getState();
 
     toggleMenu("orders");
     toggleMenu("clients");
-    expect(useUi.getState().expandedMenus).toEqual(["orders", "clients"]);
+    expect(useUi.getState().collapsedMenus).toEqual(["orders", "clients"]);
 
     toggleMenu("orders");
-    expect(useUi.getState().expandedMenus).toEqual(["clients"]);
+    expect(useUi.getState().collapsedMenus).toEqual(["clients"]);
   });
 
   it("забывает удалённый пункт, не трогая соседние", () => {
@@ -42,16 +42,16 @@ describe("toggleMenu", () => {
 
     // Стор один на весь модуль, и предыдущий тест оставил в нём своё:
     // начинаем с известного состояния, а не с чужого.
-    useUi.setState({ expandedMenus: ["orders", "clients"] });
+    useUi.setState({ collapsedMenus: ["orders", "clients"] });
 
     // Пункт удалили: его id больше ничему не отвечает, и помнить
     // раскрытие по нему нечего.
     forgetMenu("orders");
-    expect(useUi.getState().expandedMenus).toEqual(["clients"]);
+    expect(useUi.getState().collapsedMenus).toEqual(["clients"]);
 
     // Чужого не трогаем: неизвестный id — это просто ничего.
     forgetMenu("unknown");
-    expect(useUi.getState().expandedMenus).toEqual(["clients"]);
+    expect(useUi.getState().collapsedMenus).toEqual(["clients"]);
   });
 });
 

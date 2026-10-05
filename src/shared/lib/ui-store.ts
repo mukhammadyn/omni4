@@ -40,17 +40,17 @@ type UiState = {
    */
   columnWidths: Record<string, Record<string, number>>;
   /**
-   * Раскрытые папки меню — по id пункта.
+   * Свёрнутые папки меню — по id пункта. Папка по умолчанию раскрыта,
+   * как группа прототипа, поэтому помнится не раскрытие, а сворачивание:
+   * новая папка открыта сама, без записи здесь.
    *
-   * Раскрытие живёт здесь, а не в строке меню: уровень меню грузится
-   * своим запросом, и без памяти каждый рефреш схлопывал бы дерево
-   * до корня — вместе с путём к тому пункту, в котором человек работает.
+   * Живёт здесь, а не в строке меню: без памяти каждый рефреш
+   * раскрывал бы обратно то, что человек свернул.
    *
-   * Список, а не карта: закрытая папка из него уходит, и вырасти он
-   * может только до числа одновременно раскрытых. Удалённый пункт
+   * Список, а не карта: раскрытая папка из него уходит. Удалённый пункт
    * забывается вместе с самим пунктом — см. forgetMenu.
    */
-  expandedMenus: string[];
+  collapsedMenus: string[];
   /**
    * Язык ДАННЫХ, на котором показаны значения и подписи. Не локаль
    * интерфейса: язык интерфейса выбирает человек для себя, а этот —
@@ -77,12 +77,6 @@ type UiState = {
   closeCopilot: () => void;
   setCopilotWidth: (width: number) => void;
   toggleMenu: (id: string) => void;
-  /**
-   * Раскрыть сразу несколько папок — дорогу до найденного поиском.
-   * Раскрытые не трогает: щелчок по результату не должен закрывать
-   * то, что человек открыл сам.
-   */
-  expandMenus: (ids: string[]) => void;
   /** Забыть раскрытие удалённого пункта: его id больше ничему не отвечает. */
   forgetMenu: (id: string) => void;
   setDataLanguage: (code: string) => void;
@@ -151,7 +145,7 @@ export const useUi = create<UiState>()(
       tableLimits: {},
       tableFilters: {},
       columnWidths: {},
-      expandedMenus: [],
+      collapsedMenus: [],
       dataLanguage: "",
       copilotOpen: false,
       copilotWidth: COPILOT_DEFAULT_WIDTH,
@@ -162,15 +156,13 @@ export const useUi = create<UiState>()(
       closeCopilot: () => set({ copilotOpen: false }),
       setCopilotWidth: (width) => set({ copilotWidth: clampCopilotWidth(width) }),
       forgetMenu: (id) =>
-        set((s) => ({ expandedMenus: s.expandedMenus.filter((item) => item !== id) })),
+        set((s) => ({ collapsedMenus: s.collapsedMenus.filter((item) => item !== id) })),
       toggleMenu: (id) =>
         set((s) => ({
-          expandedMenus: s.expandedMenus.includes(id)
-            ? s.expandedMenus.filter((item) => item !== id)
-            : [...s.expandedMenus, id],
+          collapsedMenus: s.collapsedMenus.includes(id)
+            ? s.collapsedMenus.filter((item) => item !== id)
+            : [...s.collapsedMenus, id],
         })),
-      expandMenus: (ids) =>
-        set((s) => ({ expandedMenus: [...new Set([...s.expandedMenus, ...ids])] })),
       setSidebarWidth: (width) => set({ sidebarWidth: clampSidebarWidth(width) }),
       setModule: (moduleId) => set({ moduleId }),
       setDrawerWidth: (width) => set({ drawerWidth: clampDrawerWidth(width) }),

@@ -79,14 +79,15 @@ function MenuRow({
   const dnd = useDnd();
   const expandable = node.kind === "group";
   /*
-   * Раскрытие переживает перезагрузку — оно в ui-store (см. expandedMenus).
+   * Папка раскрыта, пока её не свернули; свёрнутое переживает
+   * перезагрузку — оно в ui-store (см. collapsedMenus).
    * Подписка селектором, а не всем стором: строк меню на экране десятки,
    * и правка ширины сайдбара перерисовывала бы каждую.
    */
-  const open = useUi((state) => state.expandedMenus.includes(node.id));
+  const open = useUi((state) => !state.collapsedMenus.includes(node.id));
   const toggleMenu = useUi((state) => state.toggleMenu);
 
-  // Запрос уходит только когда папку раскрыли.
+  // Запрос уходит, только пока папка раскрыта.
   const children = useMenuChildren(node.id, expandable && open);
 
   const dragging = dnd.source?.node.id === node.id;
