@@ -57,6 +57,15 @@ body {
   --color-bg: #f7f7f5;           /* фон приложения и сайдбара */
   --color-surface: #ffffff;      /* контент, карточки, поповеры */
   --color-card: #ffffff;         /* карточка поверх контента: полоса таймлайна (--bg-card прототипа) */
+  --color-surface-soft: #fbfbfa; /* шапка карточки и таблицы, холст схемы (--bg-soft прототипа) */
+  --color-callout-blue: #e7f3f8; /* плашка-сводка, `.callout.blue` (--cb-blue прототипа) */
+  --color-logo-tile: #ffffff;    /* плашка под логотип бренда: белая и в тёмной теме — логотипы рисованы под белый фон */
+  /* Цвет модуля — плашка его иконки во вкладках настроек (`.dn-mic`,
+     `MODS[].color` прототипа). Под белую иконку, одинаковый в обеих темах. */
+  --color-module-org: #0f7b6c;
+  --color-module-crm: #2383e2;
+  --color-module-hrms: #448361;
+  --color-module-pm: #c14c8a;
   --color-surface-hover: rgba(55, 53, 47, 0.06);
   --color-surface-active: rgba(55, 53, 47, 0.09);
   --color-overlay: #00000059;    /* затемнение под модалкой */
@@ -126,6 +135,16 @@ body {
      дают текстом 4.50, 3.28 и 3.48. Подложка — тот же цвет на 12%:
      мягкие фоны прототипа под текстом не проходят. Текст обязан
      читаться и на белом, и на своей подложке. */
+  /*
+   * Подсветка кода — `.dx-pre` прототипа (--c-blue, --c-orange, --c-green,
+   * --c-purple). В светлой теме оранжевый, синий и фиолетовый темнее
+   * прототипа: #d9730d, #337ea9 и #9065b0 дают на белом 3.2, 4.3 и 4.49
+   * при нужных 4.5.
+   */
+  --color-code-keyword: #2f73a0;
+  --color-code-string: #b35c00;
+  --color-code-comment: #448361;
+  --color-code-number: #8a5eab;
   --color-success: #2b7550;
   --color-success-subtle: #2b75501f;
   --color-warning: #9c5400;
@@ -308,6 +327,12 @@ body {
     --color-bg: #202020;
     --color-surface: #191919;
     --color-card: #252525;
+    --color-surface-soft: #1f1f1f;
+    --color-callout-blue: #143a4e;
+    --color-code-keyword: #5e87c9;
+    --color-code-string: #c77d48;
+    --color-code-comment: #529e72;
+    --color-code-number: #a87fd9;
     --color-surface-hover: rgba(255, 255, 255, 0.055);
     --color-surface-active: rgba(255, 255, 255, 0.085);
     --color-overlay: #00000099;

@@ -17,16 +17,12 @@ import { reportError, toast } from "@/shared/lib/toast";
  */
 
 type LanguageDto = { id?: string; name?: string; short_name?: string; native_name?: string };
-type NamedDto = { id?: string; name?: string };
-
 type ProjectDto = {
   project_id?: string;
   company_id?: string;
   title?: string;
   logo?: string;
   language?: LanguageDto[];
-  timezone?: NamedDto | null;
-  currency?: NamedDto | null;
   /**
    * Наборы значков, из которых выбирают иконку пункта меню. Значения —
    * `<префикс iconify>#<имя набора>`: так их пишет старая админка, и так
@@ -35,7 +31,6 @@ type ProjectDto = {
   icon_categories?: string[];
 };
 
-export type ProjectOption = { id: string; name: string };
 
 export type ProjectSettings = {
   id: string;
@@ -50,9 +45,6 @@ export type ProjectSettings = {
   logo: string;
   /** Языки данных проекта — id из справочника LANGUAGE. */
   languageIds: string[];
-  timezoneId: string;
-  /** Валюта проекта — id из справочника CURRENCY. */
-  currencyId: string;
   /** Наборы значков: `<префикс>#<имя>`, см. ProjectDto.icon_categories. */
   iconCategories: string[];
   raw: Record<string, unknown>;
@@ -93,33 +85,6 @@ export function useWorkspaceTitle() {
 }
 
 /**
- * Справочник настроек проекта: языки, часовые пояса, валюты.
- *
- * Ручка одна на три списка и различает их параметром `type`, поэтому
- * и ключ кэша включает тип: иначе языки и пояса делили бы одну ячейку.
- */
-export function useProjectOptions(type: "LANGUAGE" | "TIMEZONE" | "CURRENCY", enabled = true) {
-  const projectId = useSession().getProjectId() ?? "";
-
-  const query = useQuery({
-    queryKey: keys.settings.options(projectId, type),
-    queryFn: () =>
-      api.get<SettingsResponse>("/v1/project/setting", {
-        params: { "project-id": projectId, type, limit: 200 },
-      }),
-    enabled: enabled && Boolean(projectId),
-    // Справочник меняется раз в никогда.
-    staleTime: 30 * 60_000,
-    select: (data): ProjectOption[] =>
-      listOf(data, type)
-        .filter((item) => item.id)
-        .map((item) => ({ id: item.id!, name: item.name || item.id! })),
-  });
-
-  return { options: query.data ?? [], isLoading: query.isLoading };
-}
-
-/**
  * Справочник завёрнут ДВАЖДЫ: общий конверт ответа снимает http-клиент,
  * а внутри лежит ещё один `data` — `{data: {count, language: []}}`.
  * Читаем оба вида: у соседних ручек второго слоя нет.
@@ -136,8 +101,6 @@ function listOf(body: SettingsResponse, type: string): LanguageDto[] {
 export type ProjectDraft = {
   title?: string;
   languageIds?: string[];
-  timezoneId?: string;
-  currencyId?: string;
   iconCategories?: string[];
   /** Адрес логотипа в нашем CDN. Пусто — логотипа нет. */
   logo?: string;
@@ -169,13 +132,6 @@ export function useUpdateProject(languages: LanguageOption[]) {
         ...(draft.languageIds === undefined
           ? {}
           : { language: ids.map((id) => languages.find((item) => item.id === id)).filter(Boolean) }),
-        ...(draft.timezoneId === undefined ? {} : { timezone: { id: draft.timezoneId } }),
-        /*
-         * Валюта и часовой пояс уезжают объектом с одним id: остальное
-         * бэкенд подставляет сам из справочника, а список из голого
-         * идентификатора он не примет — как и языки.
-         */
-        ...(draft.currencyId === undefined ? {} : { currency: { id: draft.currencyId } }),
         ...(draft.iconCategories === undefined ? {} : { icon_categories: draft.iconCategories }),
         ...(draft.logo === undefined ? {} : { logo: draft.logo }),
       });
@@ -200,9 +156,10 @@ export type LanguageOption = { id: string; name: string; short_name: string; nat
 /**
  * Языки справочника — с кодами.
  *
- * Отдельный разбор, но ТОТ ЖЕ ключ, что у useProjectOptions("LANGUAGE"):
- * запрос один, а каждый потребитель берёт из ответа своё. С отдельным
- * ключом тот же адрес приезжал бы дважды на одном экране.
+ * Справочник проекта (`/v1/project/setting`) один на языки, пояса
+ * и валюты и различает их параметром `type`; нам из него нужны только
+ * языки. Пояс и валюта компании — `org_settings` (раздел «Локализация»),
+ * свои у проекта ucode мы не показываем: два источника расходились бы молча.
  */
 export function useLanguageOptions(enabled = true) {
   const projectId = useSession().getProjectId() ?? "";
@@ -238,8 +195,6 @@ export function toProjectSettings(dto: ProjectDto): ProjectSettings {
     // («<id>/Media/x.png»), наша загрузка — готовый адрес. Читаем оба.
     logo: fileUrl(dto.logo ?? ""),
     languageIds: (dto.language ?? []).map((item) => item.id ?? "").filter(Boolean),
-    timezoneId: dto.timezone?.id ?? "",
-    currencyId: dto.currency?.id ?? "",
     iconCategories: (dto.icon_categories ?? []).filter(Boolean),
     raw: { ...dto },
   };

@@ -28,7 +28,7 @@ import {
 } from "../api/api-keys";
 import { useClientTypes } from "../api/client-types";
 import { useRoles } from "../api/roles";
-import { Empty, Pager, SectionHeader, Td, Th, formatDateTime } from "./parts";
+import { Empty, Pager, Td, Th, Toolbar, formatDateTime } from "./parts";
 
 /**
  * API-ключи: чем чужая программа входит вместо человека.
@@ -62,7 +62,13 @@ export function ApiKeySettings() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <SectionHeader title={t("apiKeys.title")} hint={t("apiKeys.hint")}>
+      <Toolbar>
+        {/* Окружение ключа — не видно из списка, а ключ из dev в prod
+            не работает: говорим это у самого списка, а не в шапке раздела. */}
+        <span className="mr-auto min-w-0 truncate text-xs text-fg-muted" title={t("apiKeys.hint")}>
+          {t("apiKeys.hint")}
+        </span>
+
         {/* Ширину задаёт обёртка — см. UserSettings. */}
         <div className="w-48">
           <Input
@@ -81,7 +87,7 @@ export function ApiKeySettings() {
           <Icon as={PlusIcon} size={14} />
           {t("apiKeys.create")}
         </Button>
-      </SectionHeader>
+      </Toolbar>
 
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full border-separate border-spacing-0">

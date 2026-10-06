@@ -54,6 +54,8 @@ type EntryDto = {
   api_key?: string;
   date?: string;
   method_api?: string;
+  time_started?: string;
+  time_completed?: string;
   status_code?: number;
   duration?: number;
   request?: string;
@@ -69,10 +71,19 @@ type HistoryResponse = { histories?: EntryDto[]; count?: number };
 export type ActivityEntry = {
   id: string;
   action: string;
+  /**
+   * Адрес запроса. Пусто, если ручка его не записала: в `action_source`
+   * одни кладут `c.Request.URL.String()`, другие — имя сущности
+   * («VIEW», «MENU», `api/handlers/v2/view.go`), и это не адрес.
+   */
+  url: string;
   /** Что менялось: подпись таблицы, если она есть, иначе слаг. */
   table: string;
   user: string;
   date: string;
+  /** Начало и конец обработки. Есть не у всех записей — тогда пусто. */
+  started: string;
+  completed: string;
   method: string;
   statusCode: number;
   /** Сколько заняло, мс. 0 — ручка не замеряла. */
@@ -191,6 +202,7 @@ function toEntry(dto: EntryDto): ActivityEntry {
   return {
     id: dto.id ?? "",
     action: dto.action_type?.trim() || dto.action_source?.trim() || "—",
+    url: dto.action_source?.startsWith("/") ? dto.action_source : "",
     table: dto.table_label?.trim() || dto.table_slug?.trim() || "",
     /*
      * В журнале лежит ЛОГИН, а не идентификатор: шлюз меняет одно
@@ -199,6 +211,8 @@ function toEntry(dto: EntryDto): ActivityEntry {
      */
     user: dto.user_info?.trim() || dto.api_key?.trim() || "",
     date: dto.date ?? "",
+    started: dto.time_started ?? "",
+    completed: dto.time_completed ?? "",
     method: dto.method_api?.trim() ?? "",
     statusCode: dto.status_code ?? 0,
     duration: dto.duration ?? 0,

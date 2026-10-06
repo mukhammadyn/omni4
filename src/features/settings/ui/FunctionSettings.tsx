@@ -28,7 +28,7 @@ import {
   type FunctionDraft,
   type ProjectFunction,
 } from "../api/functions";
-import { Empty, Pager, SectionHeader, Td, Th } from "./parts";
+import { Empty, Pager, SubHeader, Td, Th } from "./parts";
 
 /**
  * Функции проекта: список, карточка, запуск и ПРОСМОТР кода.
@@ -61,9 +61,10 @@ export function FunctionSettings() {
   const [running, setRunning] = useState<ProjectFunction | null>(null);
   const [viewing, setViewing] = useState<ProjectFunction | null>(null);
 
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <SectionHeader title={t("functions.title")} hint={t("functions.hint")}>
+      <SubHeader title={t("functions.title")} hint={t("functions.hint")}>
         <div className="w-48">
           <Input
             value={query}
@@ -81,7 +82,7 @@ export function FunctionSettings() {
           <Icon as={PlusIcon} size={14} />
           {t("functions.create")}
         </Button>
-      </SectionHeader>
+      </SubHeader>
 
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full border-separate border-spacing-0">

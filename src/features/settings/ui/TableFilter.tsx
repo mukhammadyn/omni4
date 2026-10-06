@@ -17,7 +17,19 @@ import { Dropdown } from "@/shared/ui/dropdown";
  * и с подписью (`version_history.go:158`), но подпись переводится
  * и повторяется у разных таблиц, а слаг один.
  */
-export function TableFilter({ value, onChange }: { value: string; onChange: (slug: string) => void }) {
+export function TableFilter({
+  value,
+  onChange,
+  clearable = true,
+  size = "sm",
+}: {
+  value: string;
+  onChange: (slug: string) => void;
+  /** Можно ли остаться без таблицы. Выбору, где она нужна всегда (SDK), — нет. */
+  clearable?: boolean;
+  /** Высота — как у соседних полей в строке: в журнале `md`, в SDK `control`. */
+  size?: "sm" | "md" | "control";
+}) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const { current: language } = useDataLanguages();
@@ -30,7 +42,7 @@ export function TableFilter({ value, onChange }: { value: string; onChange: (slu
 
   const items = [
     // Первым пунктом — снять отбор: стереть выбор в списке больше нечем.
-    ...(value ? [{ value: "", label: t("table.clearFilters") }] : []),
+    ...(value && clearable ? [{ value: "", label: t("table.clearFilters") }] : []),
     /*
      * Выбранная таблица остаётся в списке, даже когда поиск её не нашёл:
      * иначе набранное в поиске чужое слово стирает подпись с кнопки,
@@ -57,7 +69,7 @@ export function TableFilter({ value, onChange }: { value: string; onChange: (slu
       onSearch={setSearch}
       onLoadMore={tables.loadMore}
       onChange={onChange}
-      size="sm"
+      size={size}
     />
   );
 }

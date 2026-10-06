@@ -58,26 +58,30 @@ type ExecDto = {
  * Здесь остаётся честная нормализация — пусто значит пусто.
  */
 export function useRunSql() {
-  return useMutation({
-    mutationFn: async (sql: string): Promise<SqlResult> => {
-      const dto = await api.post<ExecDto>(EXEC_QUERY, { sql });
+  return useMutation({ mutationFn: execSql });
+}
 
-      const rows = (dto.rows ?? []).filter((row): row is Record<string, unknown> => Boolean(row));
-      const types = dto.types ?? {};
+/**
+ * Сам поход в базу — отдельно от мутации: им же читает схему диаграмма
+ * (`api/schema-map`), у которой запрос свой, а ответ тот же.
+ */
+export async function execSql(sql: string): Promise<SqlResult> {
+  const dto = await api.post<ExecDto>(EXEC_QUERY, { sql });
 
-      /*
-       * Колонки — из первой строки, а когда строк нет, из типов: их
-       * бэкенд собирает по описанию полей ответа (`rows.FieldDescriptions()`),
-       * поэтому у SELECT без единой строки заголовки всё равно есть.
-       */
-      return {
-        columns: Object.keys(rows[0] ?? types),
-        rows,
-        types,
-        rowsAffected: dto.rows_affected ?? 0,
-      };
-    },
-  });
+  const rows = (dto.rows ?? []).filter((row): row is Record<string, unknown> => Boolean(row));
+  const types = dto.types ?? {};
+
+  /*
+   * Колонки — из первой строки, а когда строк нет, из типов: их
+   * бэкенд собирает по описанию полей ответа (`rows.FieldDescriptions()`),
+   * поэтому у SELECT без единой строки заголовки всё равно есть.
+   */
+  return {
+    columns: Object.keys(rows[0] ?? types),
+    rows,
+    types,
+    rowsAffected: dto.rows_affected ?? 0,
+  };
 }
 
 /**

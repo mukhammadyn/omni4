@@ -27,6 +27,7 @@ const node = (over: Partial<MenuNode> = {}): MenuNode => ({
   isStatic: false,
   isProtected: false,
   isModule: false,
+  isSettings: false,
   parentId: "root",
   children: [],
   raw: {},

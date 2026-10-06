@@ -133,6 +133,15 @@ test("модуль — только папка с is_tab: true, а не любо
   expect(node({}).isModule).toBe(false);
 });
 
+test("вход в настройки — только attributes.screen: \"settings\"", () => {
+  const node = (attributes: Record<string, unknown>) =>
+    toMenuNode({ id: "m1", type: "LINK", label: "Настройки", attributes }, "ru");
+
+  expect(node({ screen: "settings" }).isSettings).toBe(true);
+  expect(node({ screen: "other" }).isSettings).toBe(false);
+  expect(node({}).isSettings).toBe(false);
+});
+
 test("пункт omni4 — только attributes.protected: true", () => {
   const node = (attributes: Record<string, unknown>) =>
     toMenuNode({ id: "m1", type: "TABLE", label: "Сделки", attributes }, "ru");

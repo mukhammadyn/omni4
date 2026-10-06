@@ -28,7 +28,8 @@ import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Field, Input } from "@/shared/ui/input";
 import { Modal } from "@/shared/ui/modal";
-import { Empty, SectionHeader, Td, Th } from "./parts";
+import { IntegrationAccounts } from "./IntegrationAccounts";
+import { Empty, SubHeader, Td, Th } from "./parts";
 
 /**
  * Микрофронтенды: список, заведение, версии с откатом, публикация.
@@ -48,14 +49,15 @@ export function MicrofrontendSettings() {
   const [deleting, setDeleting] = useState<ManagedMicrofrontend | null>(null);
   const [versions, setVersions] = useState<ManagedMicrofrontend | null>(null);
 
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <SectionHeader title={t("microfrontends.title")} hint={t("microfrontends.hint")}>
+      <SubHeader title={t("microfrontends.title")} hint={t("microfrontends.hint")}>
         <Button size="sm" onClick={() => setCreating(true)}>
           <Icon as={PlusIcon} size={14} />
           {t("microfrontends.create")}
         </Button>
-      </SectionHeader>
+      </SubHeader>
 
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full border-separate border-spacing-0">
@@ -138,6 +140,10 @@ export function MicrofrontendSettings() {
       </div>
 
       <LoginBinding items={items} />
+
+      {/* OAuth-аккаунты репозиториев — для синхронизации микрофронтенда
+          с чужим репозиторием; больше они ни для чего не нужны. */}
+      <IntegrationAccounts />
 
       {creating && <CreateDialog onClose={() => setCreating(false)} />}
       {versions && <VersionsDialog item={versions} onClose={() => setVersions(null)} />}

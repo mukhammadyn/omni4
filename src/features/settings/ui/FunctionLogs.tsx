@@ -1,8 +1,6 @@
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
-import { Chip } from "@/shared/ui/chip";
-import { DatePicker } from "@/shared/ui/date-picker";
 import { Dropdown } from "@/shared/ui/dropdown";
 import {
   FUNCTION_LOGS_PAGE,
@@ -12,22 +10,28 @@ import {
 } from "../api/function-logs";
 import { useProjectFunctions } from "../api/functions";
 import { relativeTime } from "../model/time";
-import { Empty, MethodBadge, Pager, SectionHeader, Td, Th, formatDateTime } from "./parts";
+import {
+  LogEmpty,
+  LogField,
+  LogLayout,
+  MethodBadge,
+  Pager,
+  Period,
+  StatusPill,
+  formatDateTime,
+} from "./parts";
 import { TableFilter } from "./TableFilter";
 
 /**
  * Выполнение функций: когда вызвали, что вызвали и чем кончилось.
+ * Вид «Логи функций» прототипа — та же рамка, что у журнала изменений.
  *
- * Вкладка рядом с журналом изменений, а не строки в нём: предмет
- * другой — не правка проекта, а вызов, — и колонки не совпадают
- * ни одной, кроме даты.
- *
- * Раскрытой записи нет: в отличие от журнала изменений, где хранятся
- * «было» и «стало», здесь у строки нет ни тела запроса, ни ответа —
+ * Строка не раскрывается: в отличие от журнала изменений, где хранятся
+ * «было» и «стало», здесь у записи нет ни тела запроса, ни ответа —
  * `FunctionLogModel` их не несёт (`pg_version_history.proto:70`).
- * Показывать пустое окно по щелчку хуже, чем не открывать его.
+ * Всё, что есть, помещается в саму строку.
  */
-export function FunctionLogs() {
+export function FunctionLogs({ kindField }: { kindField: ReactNode }) {
   const { t, i18n } = useTranslation();
 
   const [filters, setFilters] = useState<FunctionLogFilters>(NO_LOG_FILTERS);
@@ -43,150 +47,118 @@ export function FunctionLogs() {
   };
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <SectionHeader title={t("functionLogs.title")} hint={t("functionLogs.hint")} />
+    <LogLayout
+      hint={t("functionLogs.hint")}
+      filters={
+        <>
+          {kindField}
 
-      <div className="flex shrink-0 flex-wrap items-end gap-2 border-b border-border px-4 py-2">
-        <div className="w-44">
-          <FunctionFilter
-            value={filters.functionId}
-            onChange={(functionId) => put({ functionId })}
-          />
-        </div>
+          <LogField label={t("functionLogs.function")}>
+            <FunctionFilter
+              value={filters.functionId}
+              onChange={(functionId) => put({ functionId })}
+            />
+          </LogField>
 
-        {/*
-          Статус — список из двух значений, и это не догадка: в журнал
-          его пишут ровно два места, и оба знают только «success»
-          и «error» (`helper/invoke_function.go:61,101` и
-          `function_service/api/handlers/function.go:1241,1271`).
-          Третьего не бывает.
+          {/*
+            Статус — список из двух значений, и это не догадка: в журнал
+            его пишут ровно два места, и оба знают только «success»
+            и «error» (`helper/invoke_function.go:61,101` и
+            `function_service/api/handlers/function.go:1241,1271`).
 
-          Список здесь обязателен, а не желателен: сравнение ТОЧНОЕ,
-          `l.status = $1` (`version_history.go:396`), — в отличие
-          от журнала изменений, где всё через ILIKE. Набранное руками
-          «succ» молча вернуло бы пустой список.
-        */}
-        <div className="w-36">
-          <Dropdown
-            value={filters.status}
-            items={[
-              ...(filters.status ? [{ value: "", label: t("table.clearFilters") }] : []),
-              { value: "success", label: t("functionLogs.success") },
-              { value: "error", label: t("functionLogs.error") },
-            ]}
-            placeholder={t("activity.status")}
-            ariaLabel={t("activity.status")}
-            onChange={(status) => put({ status })}
-            size="sm"
-          />
-        </div>
+            Список здесь обязателен: сравнение ТОЧНОЕ, `l.status = $1`
+            (`version_history.go:396`), — набранное руками «succ»
+            молча вернуло бы пустой список.
+          */}
+          <LogField label={t("functionLogs.status")} className="w-40">
+            <Dropdown
+              value={filters.status}
+              items={[
+                ...(filters.status ? [{ value: "", label: t("table.clearFilters") }] : []),
+                { value: "success", label: t("functionLogs.success") },
+                { value: "error", label: t("functionLogs.error") },
+              ]}
+              placeholder={t("functionLogs.anyStatus")}
+              ariaLabel={t("functionLogs.status")}
+              onChange={(status) => put({ status })}
+            />
+          </LogField>
 
-        {/* Таблица — тот же выбор из списка, что и в журнале изменений:
-            здесь сравнение тоже точное (`l.table_slug = $1`), и слаг
-            по памяти не набирают. */}
-        <div className="w-40">
-          <TableFilter value={filters.table} onChange={(table) => put({ table })} />
-        </div>
+          {/* Таблица — выбор из списка: сравнение тоже точное
+              (`l.table_slug = $1`), и слаг по памяти не набирают. */}
+          <LogField label={t("activity.table")}>
+            <TableFilter value={filters.table} onChange={(table) => put({ table })} size="md" />
+          </LogField>
 
-        <div className="w-36">
-          <DatePicker
-            value={filters.from}
-            locale={i18n.language}
-            placeholder={t("activity.from")}
-            ariaLabel={t("activity.from")}
-            clearLabel={t("table.clearFilters")}
-            onChange={(from) => put({ from })}
-            className="h-7"
-          />
-        </div>
+          <LogField label={t("activity.period")} className="w-80">
+            <Period from={filters.from} to={filters.to} onChange={(from, to) => put({ from, to })} />
+          </LogField>
 
-        <div className="w-36">
-          <DatePicker
-            value={filters.to}
-            locale={i18n.language}
-            placeholder={t("activity.to")}
-            ariaLabel={t("activity.to")}
-            clearLabel={t("table.clearFilters")}
-            onChange={(to) => put({ to })}
-            className="h-7"
-          />
-        </div>
+          {Object.values(filters).some(Boolean) && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setFilters(NO_LOG_FILTERS);
+                setPage(1);
+              }}
+            >
+              {t("table.clearFilters")}
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="min-h-0 flex-1 divide-y divide-border overflow-auto">
+        {isLoading && <LogEmpty text={t("common.loading")} />}
+        {!isLoading && !logs.length && <LogEmpty text={error ?? t("functionLogs.empty")} />}
 
-        {Object.values(filters).some(Boolean) && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setFilters(NO_LOG_FILTERS);
-              setPage(1);
-            }}
-          >
-            {t("table.clearFilters")}
-          </Button>
-        )}
-      </div>
+        {logs.map((log) => (
+          <div key={log.id} className="flex items-center gap-3.5 px-4.5 py-3">
+            <MethodBadge method={log.method} />
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full border-separate border-spacing-0">
-          <thead>
-            <tr>
-              <Th className="w-44">{t("activity.date")}</Th>
-              <Th>{t("functionLogs.function")}</Th>
-              <Th>{t("activity.table")}</Th>
-              <Th className="w-32">{t("actions.type")}</Th>
-              <Th className="w-24">{t("functionLogs.duration")}</Th>
-              <Th className="w-28">{t("activity.status")}</Th>
-            </tr>
-          </thead>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">
+              {log.functionName || log.functionId}
+              {log.tableSlug && (
+                <span className="ml-2 font-normal text-fg-subtle">
+                  {log.tableSlug}
+                  {log.actionType && ` · ${log.actionType}`}
+                </span>
+              )}
+            </span>
 
-          <tbody>
-            {isLoading && <Empty text={t("common.loading")} colSpan={6} />}
-            {!isLoading && !logs.length && (
-              <Empty text={error ?? t("functionLogs.empty")} colSpan={6} />
+            {log.duration > 0 && (
+              <span className="hidden shrink-0 text-[13px] text-fg-subtle tabular-nums sm:inline">
+                {log.duration} ms
+              </span>
             )}
 
-            {logs.map((log) => (
-              <tr key={log.id} className="hover:bg-surface-hover">
-                <Td className="text-fg-muted">
-                  {formatDateTime(log.sentAt, i18n.language)}
-                  <span className="block text-2xs text-fg-subtle">
-                    {relativeTime(log.sentAt, i18n.language)}
-                  </span>
-                </Td>
-                <Td>{log.functionName || log.functionId}</Td>
-                <Td className="text-fg-muted">{log.tableSlug}</Td>
-                <Td>
-                  <span className="flex items-center gap-1.5 text-fg-muted">
-                    <MethodBadge method={log.method} />
-                    {log.actionType}
-                  </span>
-                </Td>
-                <Td className="text-fg-muted">{log.duration ? `${log.duration} ms` : ""}</Td>
-                <Td>
-                  {/*
-                    Исход — плашка, и здесь цвет достаётся именно ей:
-                    на этом экране главный вопрос не «что вызывали»,
-                    а «чем кончилось», и ради него список открывают.
-                    Значений ровно два, оба известны (см. отбор выше),
-                    поэтому зелёная и красная — весь набор.
+            <span
+              className="hidden shrink-0 text-[13px] whitespace-nowrap text-fg-subtle sm:inline"
+              title={formatDateTime(log.sentAt, i18n.language)}
+            >
+              {relativeTime(log.sentAt, i18n.language)}
+            </span>
 
-                    Слово из базы переводится, а не показывается как
-                    есть: «success» в русском интерфейсе — не термин,
-                    а недоделка. Незнакомое значение всё же покажем
-                    как есть, серым: соврать хуже, чем удивить.
-                  */}
-                  {log.status === "success" && (
-                    <Chip color="green">{t("functionLogs.success")}</Chip>
-                  )}
-                  {log.status === "error" && <Chip color="red">{t("functionLogs.error")}</Chip>}
-                  {log.status !== "success" && log.status !== "error" && log.status && (
-                    <Chip color="gray">{log.status}</Chip>
-                  )}
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            {/*
+              Слово из базы переводится, а не показывается как есть:
+              «success» в русском интерфейсе — не термин, а недоделка.
+              Незнакомое значение покажем как есть, серым: соврать хуже,
+              чем удивить.
+            */}
+            {log.status && (
+              <StatusPill
+                ok={log.status !== "error"}
+                tone={log.status === "success" ? "green" : log.status === "error" ? "red" : "gray"}
+              >
+                {log.status === "success"
+                  ? t("functionLogs.success")
+                  : log.status === "error"
+                    ? t("functionLogs.error")
+                    : log.status}
+              </StatusPill>
+            )}
+          </div>
+        ))}
       </div>
 
       <Pager
@@ -199,7 +171,7 @@ export function FunctionLogs() {
           setPage(1);
         }}
       />
-    </div>
+    </LogLayout>
   );
 }
 
@@ -250,7 +222,6 @@ function FunctionFilter({ value, onChange }: { value: string; onChange: (id: str
       loading={isLoading}
       onSearch={setSearch}
       onChange={onChange}
-      size="sm"
     />
   );
 }

@@ -79,6 +79,13 @@ const PAIRS: [fg: string, stack: string[], min: number][] = [
     [role, ["surface", `${role}-subtle`], 4.5],
   ]),
   ...HUES.map((hue): [string, string[], number] => [`chip-${hue}-fg`, [`chip-${hue}-bg`], 4.5]),
+  // Код лежит на поверхности карточки, а не на её шапке (surface-soft).
+  ...(["keyword", "string", "comment", "number"] as const).map(
+    (kind): [string, string[], number] => [`code-${kind}`, ["surface"], 4.5],
+  ),
+  // На плашке-сводке — только основной текст: приглушённый на синем
+  // тёмной темы даёт 4.07.
+  ["fg", ["callout-blue"], 4.5],
 ];
 
 test("высота строки грида совпадает с --spacing-row", () => {

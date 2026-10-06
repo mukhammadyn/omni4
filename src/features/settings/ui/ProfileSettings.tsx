@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "@/shared/api/use-session";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
-import { Field, Input } from "@/shared/ui/input";
+import { Input } from "@/shared/ui/input";
 import { PasswordInput } from "@/shared/ui/password-input";
 import {
   useChangePassword,
@@ -16,6 +16,7 @@ import {
 } from "../api/profile";
 import { useClientTypes } from "../api/client-types";
 import { ImagePicker } from "./ImagePicker";
+import { GroupTitle, SectionHeader, SettingRow } from "./parts";
 
 /**
  * Профиль: имя, как человека зовут в интерфейсе, и способы входа.
@@ -59,8 +60,15 @@ export function ProfileSettings() {
     });
   }, [profile]);
 
+  const header = <SectionHeader title={t("settings.profile")} hint={t("settings.profileHint")} />;
+
   if (isLoading || !profile) {
-    return <p className="text-sm text-fg-subtle">{t("common.loading")}</p>;
+    return (
+      <>
+        {header}
+        <p className="text-sm text-fg-subtle">{t("common.loading")}</p>
+      </>
+    );
   }
 
   const changed =
@@ -70,79 +78,70 @@ export function ProfileSettings() {
     draft.phone !== profile.phone ||
     draft.photo !== profile.photoUrl;
 
+  const reset = () =>
+    setDraft({
+      name: profile.name,
+      login: profile.login,
+      email: profile.email,
+      phone: profile.phone,
+      photo: profile.photoUrl,
+    });
+
+  const text = (key: "name" | "login" | "email" | "phone", label: string, type = "text") => (
+    <SettingRow label={label}>
+      <Input
+        type={type}
+        value={draft[key]}
+        aria-label={label}
+        onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}
+      />
+    </SettingRow>
+  );
+
   return (
-    /*
-     * Ширину берём от окна, а не держим узкой колонкой: окно настроек
-     * широкое ради матрицы прав, и профиль в нём выглядел строчкой слева
-     * с пустотой на пол-экрана. Верхний предел всё же есть — поле ввода
-     * во всю ширину монитора читается хуже, чем в две трети.
-     */
-    <div className="flex w-full max-w-5xl flex-col gap-6">
-      <section className="flex flex-col gap-4">
+    <>
+      {header}
+
+      <SettingRow label={t("settings.photo")} hint={t("settings.photoHint")}>
         <ImagePicker
           value={draft.photo}
           letter={(draft.name || profile.login || "?").slice(0, 1).toUpperCase()}
           label={t("settings.photo")}
-          hint={t("settings.photoHint")}
           round
           onChange={(photo) => setDraft({ ...draft, photo })}
         />
+      </SettingRow>
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          <Field label={t("settings.name")}>
-            <Input
-              value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-            />
-          </Field>
+      {text("name", t("settings.name"))}
+      {text("login", t("auth.login"))}
+      {text("email", t("auth.email"), "email")}
+      {text("phone", t("settings.phone"))}
 
-          <Field label={t("auth.login")}>
-            <Input
-              value={draft.login}
-              onChange={(event) => setDraft({ ...draft, login: event.target.value })}
-            />
-          </Field>
+      {/* Роль и тип клиента выдаёт проект, а не человек себе сам: поле
+          ввода, которое сервер всё равно перезапишет, — ложное обещание.
+          Поэтому — текстом. */}
+      <SettingRow label={t("settings.role")}>
+        <span className="truncate text-sm text-fg">{role || "—"}</span>
+      </SettingRow>
+      <SettingRow label={t("settings.clientType")}>
+        <span className="truncate text-sm text-fg">{clientType || "—"}</span>
+      </SettingRow>
 
-          <Field label={t("auth.email")}>
-            <Input
-              type="email"
-              value={draft.email}
-              onChange={(event) => setDraft({ ...draft, email: event.target.value })}
-            />
-          </Field>
-
-          <Field label={t("settings.phone")}>
-            <Input
-              value={draft.phone}
-              onChange={(event) => setDraft({ ...draft, phone: event.target.value })}
-            />
-          </Field>
-
-          {/* Роль и тип клиента выдаёт проект, а не человек себе сам:
-              поле ввода, которое сервер всё равно перезапишет, —
-              это ложное обещание. */}
-          <Field label={t("settings.role")}>
-            <Input value={role} disabled readOnly />
-          </Field>
-
-          <Field label={t("settings.clientType")}>
-            <Input value={clientType} disabled readOnly />
-          </Field>
-        </div>
-
-        <div className="flex justify-end">
-          <Button
-            disabled={!changed || update.isPending}
-            onClick={() => update.mutate({ profile, draft })}
-          >
-            {t("action.save")}
-          </Button>
-        </div>
-      </section>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="secondary" disabled={!changed || update.isPending} onClick={reset}>
+          {t("action.cancel")}
+        </Button>
+        <Button
+          disabled={!changed || update.isPending}
+          onClick={() => update.mutate({ profile, draft })}
+        >
+          {t("action.save")}
+        </Button>
+      </div>
 
       <PasswordSection />
       <SessionsSection />
-    </div>
+    </>
   );
 }
 
@@ -161,41 +160,42 @@ function PasswordSection() {
   const matches = password === repeat;
 
   return (
-    <section className="flex flex-col gap-4 border-t border-border pt-6">
-      <h3 className="text-sm font-medium">{t("settings.password")}</h3>
+    <>
+      <GroupTitle title={t("settings.password")} />
 
-      <div className="grid grid-cols-3 gap-4">
-        <Field label={t("settings.oldPassword")}>
-          {/* Браузеру здесь подставлять нечего: это не форма входа,
-              и подставленный им пароль человек примет за уже введённый. */}
-          <PasswordInput
-            autoComplete="new-password"
-            value={oldPassword}
-            onChange={(event) => setOldPassword(event.target.value)}
-          />
-        </Field>
+      {/* Браузеру здесь подставлять нечего: это не форма входа,
+          и подставленный им пароль человек примет за уже введённый. */}
+      <SettingRow label={t("settings.oldPassword")}>
+        <PasswordInput
+          autoComplete="new-password"
+          aria-label={t("settings.oldPassword")}
+          value={oldPassword}
+          onChange={(event) => setOldPassword(event.target.value)}
+        />
+      </SettingRow>
 
-        <Field label={t("settings.newPassword")}>
-          <PasswordInput
-            autoComplete="new-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </Field>
+      <SettingRow label={t("settings.newPassword")}>
+        <PasswordInput
+          autoComplete="new-password"
+          aria-label={t("settings.newPassword")}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+      </SettingRow>
 
-        <Field
-          label={t("settings.repeatPassword")}
-          {...(repeat && !matches ? { hint: t("settings.passwordMismatch") } : {})}
-        >
-          <PasswordInput
-            autoComplete="new-password"
-            value={repeat}
-            onChange={(event) => setRepeat(event.target.value)}
-          />
-        </Field>
-      </div>
+      <SettingRow
+        label={t("settings.repeatPassword")}
+        hint={repeat && !matches ? t("settings.passwordMismatch") : undefined}
+      >
+        <PasswordInput
+          autoComplete="new-password"
+          aria-label={t("settings.repeatPassword")}
+          value={repeat}
+          onChange={(event) => setRepeat(event.target.value)}
+        />
+      </SettingRow>
 
-      <div className="flex justify-end">
+      <div className="mt-4 flex justify-end">
         <Button
           variant="secondary"
           disabled={!filled || !matches || change.isPending}
@@ -215,7 +215,7 @@ function PasswordSection() {
           {t("settings.changePassword")}
         </Button>
       </div>
-    </section>
+    </>
   );
 }
 
@@ -232,18 +232,19 @@ function SessionsSection() {
   const remove = useDeleteSession();
 
   return (
-    <section className="flex flex-col gap-3 border-t border-border pt-6">
-      <h3 className="text-sm font-medium">{t("settings.sessions")}</h3>
+    <>
+      <GroupTitle title={t("settings.sessions")} />
 
-      {isLoading && <p className="text-sm text-fg-subtle">{t("common.loading")}</p>}
+      {isLoading && <p className="py-3 text-sm text-fg-subtle">{t("common.loading")}</p>}
       {!isLoading && !sessions.length && (
-        <p className="text-sm text-fg-subtle">{t("settings.noSessions")}</p>
+        <p className="py-3 text-sm text-fg-subtle">{t("settings.noSessions")}</p>
       )}
 
       {sessions.map((item) => (
+        /* Строка — как `.srow`: линия между устройствами, без рамки. */
         <div
           key={item.id}
-          className="flex items-center gap-3 rounded-md border border-border px-3 py-2"
+          className="flex items-center gap-3 border-b border-border py-3 last:border-b-0"
         >
           <Icon as={MonitorIcon} size={16} className="shrink-0 text-fg-muted" />
 
@@ -274,7 +275,7 @@ function SessionsSection() {
           )}
         </div>
       ))}
-    </section>
+    </>
   );
 }
 

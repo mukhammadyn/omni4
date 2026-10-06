@@ -1,7 +1,6 @@
 import { BellIcon, EllipsisIcon, LinkIcon, StarIcon, UserIcon, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { SettingsDialog } from "@/features/settings";
 import { useSession } from "@/shared/api/use-session";
 import { toast } from "@/shared/lib/toast";
 import { Icon } from "@/shared/ui/icon";
@@ -22,7 +21,7 @@ import { Tooltip } from "@/shared/ui/tooltip";
 export function TopbarActions() {
   const { t } = useTranslation();
   const profile = useSession().getProfile();
-  const [profileOpen, setProfileOpen] = useState(false);
+  const navigate = useNavigate();
 
   const name = profile?.name || t("workspace.noName");
 
@@ -64,7 +63,7 @@ export function TopbarActions() {
               icon={<Icon as={UserIcon} />}
               onClick={() => {
                 close();
-                setProfileOpen(true);
+                void navigate({ to: "/settings", search: { section: "profile" } });
               }}
             >
               {t("topbar.myProfile")}
@@ -94,8 +93,6 @@ export function TopbarActions() {
           </PopoverItem>
         )}
       </Popover>
-
-      {profileOpen && <SettingsDialog initialSection="profile" onClose={() => setProfileOpen(false)} />}
     </div>
   );
 }

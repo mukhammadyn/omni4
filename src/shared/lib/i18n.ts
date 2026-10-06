@@ -35,6 +35,9 @@ export interface Translate {
 export const LOCALES = ["ru", "en", "uz"] as const;
 export type Locale = (typeof LOCALES)[number];
 
+/** Имена языков — на них самих: их не переводят. */
+export const LOCALE_NAMES: Record<Locale, string> = { ru: "Русский", en: "English", uz: "O‘zbekcha" };
+
 /**
  * Язык интерфейса. Не путать с мультиязычными полями (enable_multilanguage) —
  * это язык данных пользователя, см. CONTEXT.md.

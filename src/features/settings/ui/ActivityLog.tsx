@@ -1,8 +1,9 @@
-import { Fragment, useDeferredValue, useState } from "react";
-import { ChevronDownIcon, ChevronUpIcon, DownloadIcon } from "lucide-react";
+import { useDeferredValue, useState, type ReactNode } from "react";
+import { BotIcon, ChevronDownIcon, CopyIcon, DownloadIcon, UserIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
-import { DatePicker } from "@/shared/ui/date-picker";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { Tabs } from "@/shared/ui/tabs";
@@ -12,62 +13,78 @@ import {
   useActivity,
   useActivityEntry,
   useExportActivity,
+  type ActivityEntry,
   type ActivityFilters,
 } from "../api/activity";
 import { diffEntry, unwrapEntry, type EntryChange } from "../model/activity";
 import { relativeTime } from "../model/time";
 import { FunctionLogs } from "./FunctionLogs";
-import { ActionBadge, Empty, Pager, SectionHeader, Td, Th, formatDateTime } from "./parts";
+import {
+  ActionBadge,
+  CAPS_LABEL,
+  CodeCard,
+  LogEmpty,
+  LogField,
+  LogLayout,
+  MethodBadge,
+  Pager,
+  Period,
+  StatusCode,
+  formatDateTime,
+} from "./parts";
 import { TableFilter } from "./TableFilter";
+import { AI_LOG, TableLog, WEBHOOK_LOG } from "./TableLogs";
 import { Usage } from "./Usage";
 
 /**
- * Журнал изменений: кто, когда и что поменял.
+ * Логи: кто, когда и что поменял — `#s-logs` прототипа.
  *
  * Запись хранит «было» и «стало», поэтому открытая строка отвечает
  * не только «кто трогал таблицу», но и «что именно в ней стало другим»
  * — ради этого журнал и читают.
  *
- * Отбор по подстроке, а не выбором из списка: типов действий в базе
- * четыре десятка (`CREATE ITEM`, `UPDATE FIELD`, `DELETE MENU`…),
- * список растёт вместе с ручками бэкенда, и зашитый в код перечень
- * устарел бы молча — так же, как он устарел в старой админке.
- * Сервер и сам сравнивает их через ILIKE.
+ * Отбор по подстроке, а не выбором из списка, как в прототипе: типов
+ * действий в базе четыре десятка (`CREATE ITEM`, `UPDATE FIELD`,
+ * `DELETE MENU`…), список растёт вместе с ручками бэкенда, и зашитый
+ * в код перечень устарел бы молча — так же, как он устарел в старой
+ * админке. Сервер и сам сравнивает их через ILIKE.
  *
- * Рядом — вкладка выполнения функций. Предмет у неё другой (как
- * отработал вызов, а не что поменялось в проекте), и общих колонок
- * с этим списком нет ни одной, кроме даты, — поэтому вкладка,
- * а не строки вперемешку. См. FunctionLogs.
- *
- * Третья вкладка — расход API-лимита: тоже журнал активности проекта,
- * только просуммированный по маршрутам. См. Usage.
+ * Вид журнала — первое поле отбора («Тип лога»), а не вкладки над
+ * заголовком: у выполнения функций (FunctionLogs), расхода лимита
+ * (Usage), вебхуков и AI-ассистента (TableLogs) предмет и колонки
+ * другие, но рамка та же.
  */
+export type LogKind = "changes" | "functions" | "usage" | "webhooks" | "ai";
+
 export function ActivityLog() {
   const { t } = useTranslation();
-  const [tab, setTab] = useState("changes");
+  const [kind, setKind] = useState<LogKind>("changes");
 
-  return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex h-11 shrink-0 border-b border-border px-4">
-        <Tabs
-          tabs={[
-            { id: "changes", label: t("activity.tabChanges") },
-            { id: "functions", label: t("activity.tabFunctions") },
-            { id: "usage", label: t("activity.tabUsage") },
-          ]}
-          activeId={tab}
-          onSelect={setTab}
-        />
-      </div>
-
-      {tab === "changes" && <ChangesLog />}
-      {tab === "functions" && <FunctionLogs />}
-      {tab === "usage" && <Usage />}
-    </div>
+  const kindField = (
+    <LogField label={t("activity.type")}>
+      <Dropdown
+        value={kind}
+        items={[
+          { value: "changes", label: t("activity.tabChanges") },
+          { value: "functions", label: t("activity.tabFunctions") },
+          { value: "usage", label: t("activity.tabUsage") },
+          { value: "webhooks", label: t("activity.tabWebhooks") },
+          { value: "ai", label: t("activity.tabAi") },
+        ]}
+        ariaLabel={t("activity.type")}
+        onChange={(next) => setKind(next as LogKind)}
+      />
+    </LogField>
   );
+
+  if (kind === "functions") return <FunctionLogs kindField={kindField} />;
+  if (kind === "usage") return <Usage kindField={kindField} />;
+  if (kind === "webhooks") return <TableLog key={kind} config={WEBHOOK_LOG} kindField={kindField} />;
+  if (kind === "ai") return <TableLog key={kind} config={AI_LOG} kindField={kindField} />;
+  return <ChangesLog kindField={kindField} />;
 }
 
-function ChangesLog() {
+function ChangesLog({ kindField }: { kindField: ReactNode }) {
   const { t, i18n } = useTranslation();
 
   const [filters, setFilters] = useState<ActivityFilters>(NO_FILTERS);
@@ -91,15 +108,12 @@ function ChangesLog() {
   };
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <SectionHeader title={t("activity.title")} hint={t("activity.hint")}>
-        {/* Выгружается отобранное, а не страница: файл делают, чтобы
-            посмотреть шире экрана.
-
-            Кнопка основная, как и в остальных разделах настроек: это
-            единственное действие в шапке. `secondary` здесь белая
-            на белой панели и держится на одном волоске границы —
-            вариант рассчитан на фон приложения, а не на поверхность. */}
+    <LogLayout
+      hint={t("activity.hint")}
+      actions={
+        /* Выгружается отобранное, а не страница: файл делают, чтобы
+           посмотреть шире экрана. Кнопка основная — единственное
+           действие в шапке, как и в остальных разделах настроек. */
         <Button
           size="sm"
           disabled={exportExcel.isPending}
@@ -108,228 +122,137 @@ function ChangesLog() {
           <Icon as={DownloadIcon} size={14} />
           {exportExcel.isPending ? t("common.loading") : t("activity.export")}
         </Button>
-      </SectionHeader>
+      }
+      filters={
+        <>
+          {kindField}
 
-      {/*
-        Ширину задаёт обёртка, а не само поле: у `Input` в базовых
-        классах стоит `w-full`, и своя ширина на нём — спор двух
-        одинаковых по весу правил, который выигрывает не тот, кто
-        написан последним.
-      */}
-      <div className="flex shrink-0 flex-wrap items-end gap-2 border-b border-border px-4 py-2">
-        <div className="w-40">
-          <Input
-            value={filters.action}
-            onChange={(event) => put({ action: event.target.value })}
-            placeholder={t("activity.action")}
-            aria-label={t("activity.action")}
-            className="h-7 text-sm"
-          />
-        </div>
+          <LogField label={t("activity.action")}>
+            <Input
+              value={filters.action}
+              onChange={(event) => put({ action: event.target.value })}
+              placeholder="UPDATE VIEW"
+              aria-label={t("activity.action")}
+            />
+          </LogField>
 
-        <div className="w-40">
-          <TableFilter value={filters.table} onChange={(table) => put({ table })} />
-        </div>
+          <LogField label={t("activity.table")}>
+            <TableFilter value={filters.table} onChange={(table) => put({ table })} size="md" />
+          </LogField>
 
-        <div className="w-40">
-          <Input
-            value={filters.user}
-            onChange={(event) => put({ user: event.target.value })}
-            placeholder={t("activity.user")}
-            aria-label={t("activity.user")}
-            className="h-7 text-sm"
-          />
-        </div>
+          <LogField label={t("activity.user")}>
+            <Input
+              value={filters.user}
+              onChange={(event) => put({ user: event.target.value })}
+              aria-label={t("activity.user")}
+            />
+          </LogField>
 
-        {/* Наш календарь, а не нативное поле: у `<input type="date">`
-            свой вид в каждой системе и светлый календарь в тёмной теме. */}
-        <div className="w-36">
-          <DatePicker
-            value={filters.from}
-            locale={i18n.language}
-            placeholder={t("activity.from")}
-            ariaLabel={t("activity.from")}
-            clearLabel={t("table.clearFilters")}
-            onChange={(from) => put({ from })}
-            className="h-7"
-          />
-        </div>
+          {/* Наш календарь, а не нативное поле: у `<input type="date">`
+              свой вид в каждой системе и светлый календарь в тёмной теме. */}
+          <LogField label={t("activity.period")} className="w-80">
+            <Period
+              from={filters.from}
+              to={filters.to}
+              onChange={(from, to) => put({ from, to })}
+            />
+          </LogField>
 
-        <div className="w-36">
-          <DatePicker
-            value={filters.to}
-            locale={i18n.language}
-            placeholder={t("activity.to")}
-            ariaLabel={t("activity.to")}
-            clearLabel={t("table.clearFilters")}
-            onChange={(to) => put({ to })}
-            className="h-7"
-          />
-        </div>
+          {/* Кнопка появляется по заполненности, а не по «трогали ли»:
+              стёртое поле — это тот же пустой отбор. */}
+          {Object.values(filters).some(Boolean) && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setFilters(NO_FILTERS);
+                setPage(1);
+              }}
+            >
+              {t("table.clearFilters")}
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="min-h-0 flex-1 divide-y divide-border overflow-auto">
+        {isLoading && <LogEmpty text={t("common.loading")} />}
+        {!isLoading && !entries.length && <LogEmpty text={t("activity.empty")} />}
 
-        {/* Кнопка появляется по заполненности, а не по «трогали ли»:
-            стёртое поле — это тот же пустой отбор. */}
-        {Object.values(filters).some(Boolean) && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setFilters(NO_FILTERS);
-              setPage(1);
-            }}
-          >
-            {t("table.clearFilters")}
-          </Button>
-        )}
-      </div>
+        {entries.map((entry) => {
+          const open = opened === entry.id;
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full border-separate border-spacing-0">
-          <thead>
-            <tr>
-              <Th className="w-44">{t("activity.date")}</Th>
-              <Th>{t("activity.action")}</Th>
-              <Th>{t("activity.table")}</Th>
-              <Th>{t("activity.user")}</Th>
-              <Th className="w-24">{t("activity.status")}</Th>
-              <Th className="w-10" />
-            </tr>
-          </thead>
-
-          <tbody>
-            {isLoading && <Empty text={t("common.loading")} colSpan={6} />}
-            {!isLoading && !entries.length && <Empty text={t("activity.empty")} colSpan={6} />}
-
-            {entries.map((entry) => (
-              /*
-               * Строка и её раскрытие — соседи, а не вложенные: в таблице
-               * подробности живут своей `<tr>` во всю ширину. Поэтому
-               * фрагмент с ключом, а не обёртка: лишний узел между
-               * `<tbody>` и `<tr>` разметку таблицы ломает.
-               */
-              <Fragment key={entry.id}>
-                <tr
-                  onClick={() => setOpened(opened === entry.id ? "" : entry.id)}
-                  /* Открытая строка — `surface-active`, а не `surface-hover`:
-                     наведением подсвечивается любая, и одинаковый тон
-                     не отличал бы открытую от той, под которой сейчас
-                     курсор. Это та же пара тонов, что у списка
-                     подключений. */
-                  className={`cursor-pointer transition-colors hover:bg-surface-hover ${
-                    opened === entry.id ? "bg-surface-active" : ""
-                  }`}
-                >
-                  <Td className="text-fg-muted">
-                    {formatDateTime(entry.date, i18n.language)}
-                    {/* Вторая строка отвечает на другой вопрос: не «когда
-                        именно», а «давно ли». Считать это в уме из даты
-                        человек не должен. */}
-                    <span className="block text-2xs text-fg-subtle">
-                      {relativeTime(entry.date, i18n.language)}
-                    </span>
-                  </Td>
-                  <Td>
-                    <ActionBadge action={entry.action} />
-                  </Td>
-                  <Td className="text-fg-muted">{entry.table}</Td>
-                  <Td className="text-fg-muted">{entry.user}</Td>
-                  <Td>
-                    {/*
-                      Метод здесь тихим текстом, а не плашкой, как
-                      в журнале функций: рядом уже стоит плашка
-                      действия, и она говорит то же самое — `UPDATE`
-                      это и есть `PUT`. Две цветные метки в одной
-                      строке об одном и том же — это не «заметнее»,
-                      а «пестрее»; цвет достаётся той, что несёт
-                      и глагол, и сущность.
-
-                      Код ответа рисуется только тогда, когда он есть:
-                      у записей до появления колонки он нулевой, и «0»
-                      читалось бы как настоящий ответ. Успех НЕ красим
-                      в зелёный: двухсотых подавляющее большинство,
-                      и зелёная стена перестаёт что-либо выделять —
-                      глаз ищет здесь отказ.
-                    */}
-                    <span className="flex items-baseline gap-1.5 font-mono text-2xs text-fg-subtle">
-                      {entry.method}
-
-                      {entry.statusCode > 0 && (
-                        <span
-                          className={`tabular-nums ${
-                            entry.statusCode < 400 ? "text-fg-muted" : "text-danger"
-                          }`}
-                        >
-                          {entry.statusCode}
-                        </span>
-                      )}
-                    </span>
-                  </Td>
-
-                  <Td className="text-right">
-                    {/* Кнопка, а не один значок на строке: строку мышью
-                        открывают целиком, но с клавиатуры до неё иначе
-                        не добраться — `<tr>` фокус не принимает.
-                        `stopPropagation` — чтобы нажатие не сосчиталось
-                        дважды: сначала кнопкой, потом строкой под ней. */}
-                    <button
-                      type="button"
-                      aria-expanded={opened === entry.id}
-                      aria-controls={`entry-${entry.id}`}
-                      aria-label={opened === entry.id ? t("tree.collapse") : t("tree.expand")}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpened(opened === entry.id ? "" : entry.id);
-                      }}
-                      /* `cursor-pointer` явно: у `<button>` курсор по
-                         умолчанию стрелка, а preflight Tailwind v4
-                         его больше не переопределяет. */
-                      className="grid size-6 cursor-pointer place-items-center rounded text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
-                    >
-                      <Icon
-                        as={ChevronDownIcon}
-                        size={14}
-                        className={`transition-transform ${opened === entry.id ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                  </Td>
-                </tr>
-
-                {opened === entry.id && (
-                  <tr>
-                    {/*
-                      Подробности лежат под своей строкой, а не поверх
-                      списка: соседние записи остаются видны, и чтобы
-                      посмотреть следующую, окно не надо закрывать.
-
-                      Полоса акцента слева связывает раскрытое с его
-                      строкой: без неё это просто серый прямоугольник
-                      между двумя записями, и к какой из них он
-                      относится — к той, что выше, или к той, что ниже,
-                      — приходится догадываться. Цвет тот же, которым
-                      в системе помечено активное (`docs/DESIGN.md`).
-                    */}
-                    <td
-                      colSpan={6}
-                      className="border-b border-b-border border-l-2 border-l-accent bg-bg px-4 py-3"
-                    >
-                      {/*
-                        Появление — та же анимация, что у всего, что
-                        открывается в этом приложении (`--animate-page`,
-                        180мс ease-out): высоту строки таблицы плавно
-                        не разогнать, а мгновенная подмена содержимого
-                        под курсором читается как подёргивание. При
-                        `prefers-reduced-motion` она гасится глобально.
-                      */}
-                      <div id={`entry-${entry.id}`} className="animate-page">
-                        <EntryDetails id={entry.id} />
-                      </div>
-                    </td>
-                  </tr>
+          return (
+            <div key={entry.id}>
+              {/*
+                Строка — кнопка целиком: открывают её и мышью, и с
+                клавиатуры. `cursor-pointer` явно — preflight Tailwind v4
+                курсор у `<button>` больше не переопределяет.
+              */}
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={`entry-${entry.id}`}
+                onClick={() => setOpened(open ? "" : entry.id)}
+                className={`flex w-full cursor-pointer items-center gap-3.5 px-4.5 py-3 text-left transition-colors hover:bg-surface-hover ${
+                  open ? "bg-surface-hover" : ""
+                }`}
+              >
+                {/*
+                  Метод и адрес — как в прототипе. Правки view, меню
+                  и полей пишутся без того и другого (`action_source`
+                  у них — имя сущности): тогда слева действие, справа
+                  таблица, — строка всё равно отвечает «что сделали».
+                */}
+                {entry.method ? (
+                  <MethodBadge method={entry.method} />
+                ) : (
+                  <ActionBadge action={entry.action} />
                 )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+
+                <span
+                  className="min-w-0 flex-1 truncate text-sm font-medium text-fg"
+                  title={entry.url || undefined}
+                >
+                  {entry.url ||
+                    (entry.method
+                      ? [entry.action, entry.table].filter(Boolean).join(" · ")
+                      : entry.table)}
+                </span>
+
+                {/* «Давно ли» в строке, «когда именно» — под курсором
+                    и в раскрытой записи. */}
+                <span
+                  className="hidden shrink-0 text-[13px] whitespace-nowrap text-fg-subtle sm:inline"
+                  title={formatDateTime(entry.date, i18n.language)}
+                >
+                  {relativeTime(entry.date, i18n.language)}
+                </span>
+
+                <StatusCode code={entry.statusCode} />
+
+                <Icon
+                  as={ChevronDownIcon}
+                  size={16}
+                  className={`shrink-0 text-fg-subtle transition-transform ${open ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {/*
+                Подробности под своей строкой, а не поверх списка:
+                соседние записи остаются видны, и чтобы посмотреть
+                следующую, ничего не надо закрывать.
+              */}
+              {open && (
+                <div
+                  id={`entry-${entry.id}`}
+                  className="animate-page border-t border-border bg-surface-soft"
+                >
+                  <EntryDetails summary={entry} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <Pager
@@ -344,35 +267,31 @@ function ChangesLog() {
           setPage(1);
         }}
       />
-    </div>
+    </LogLayout>
   );
 }
 
 /**
- * Подробности записи — под самой записью, а не поверх списка.
+ * Подробности записи — `.lg-det` прототипа: вкладки «Общее», «Изменения»
+ * и сырые поля.
  *
- * Модальное окно здесь было не на месте: журнал читают строку за
- * строкой, а окно накрывало список целиком, и ради соседней записи его
- * приходилось закрывать. Раскрытая строка оставляет соседей на виду.
- * Так же сделано у ugen (`logs-view.tsx`, аккордеон), и это
- * единственное, что оттуда стоило взять: содержимое у них — тот же
- * сырой JSON в трёх вкладках.
+ * «Общее» собрано из строки списка — оно есть сразу, без ожидания.
+ * Остальное — из своего запроса записи (`useActivityEntry`).
  *
- * Сверху только разошедшиеся поля, каждое строкой. «Было» и «стало»
- * целиком — два полотна по две сотни строк, отличающиеся номером
- * порядка да одним идентификатором; открывали запись ради этого
- * отличия, а находить его приходилось глазами. Полотна остались,
- * но под кнопкой — для случая, когда нужно свериться с ответом
- * целиком.
+ * «Изменения» — только разошедшиеся поля, каждое строкой. «Было»
+ * и «стало» целиком — два полотна по две сотни строк, отличающиеся
+ * номером порядка да одним идентификатором; открывали запись ради
+ * этого отличия, а находить его приходилось глазами. Полотна остались
+ * своими вкладками — для случая, когда нужно свериться целиком.
  *
- * Пустые разделы не рисуются вовсе: у записи о чтении нет ни «было»,
- * ни «стало», и четыре подписи с прочерками только мешают.
+ * Пустые поля вкладок не получают: у записи о чтении нет ни «было»,
+ * ни «стало», и вкладки с прочерком только мешают.
  */
-function EntryDetails({ id }: { id: string }) {
+function EntryDetails({ summary }: { summary: ActivityEntry }) {
   const { t } = useTranslation();
-  const { entry, isLoading } = useActivityEntry(id);
+  const { entry, isLoading } = useActivityEntry(summary.id);
 
-  const [raw, setRaw] = useState(false);
+  const [tab, setTab] = useState("general");
 
   const changes = entry ? diffEntry(entry.before, entry.after) : [];
 
@@ -404,66 +323,150 @@ function EntryDetails({ id }: { id: string }) {
     ([, value], index) => payloads.findIndex(([, other]) => other === value) === index,
   );
 
+  const raw = parts.find(([key]) => key === tab);
+
   return (
-    <div className="space-y-3">
-      {isLoading && <p className="text-sm text-fg-muted">{t("common.loading")}</p>}
+    <>
+      <div className="flex h-10 border-b border-border px-4">
+        <Tabs
+          tabs={[
+            { id: "general", label: t("activity.general") },
+            ...(changes.length ? [{ id: "changes", label: t("activity.diff") }] : []),
+            ...parts.map(([key]) => ({ id: key, label: t(key) })),
+          ]}
+          activeId={tab}
+          onSelect={setTab}
+        />
+      </div>
 
-      {/* Длительность — единственное, чего нет в самой строке. */}
-      {entry?.duration ? (
-        <p className="text-2xs text-fg-subtle tabular-nums">{entry.duration} ms</p>
-      ) : null}
+      {tab === "general" && <General entry={summary} />}
 
-      {!isLoading && !parts.length && (
-        <p className="text-sm text-fg-subtle">{t("activity.noPayload")}</p>
-      )}
+      {tab === "changes" && (
+        <div className="p-4.5">
+          <div className="overflow-hidden rounded-md border border-border bg-surface">
+            {changes.map((change) => (
+              <div
+                key={change.path}
+                className="flex flex-col gap-1 border-b border-border px-3 py-2 last:border-b-0 sm:flex-row sm:gap-3"
+              >
+                {/* Путь — слева постоянной ширины: список читается
+                    колонкой имён, а не лесенкой. */}
+                <p className="shrink-0 truncate font-mono text-xs text-fg-muted sm:w-52">
+                  {change.path}
+                </p>
 
-      {changes.length > 0 && (
-        <div className="overflow-hidden rounded-md border border-border bg-surface">
-          {changes.map((change) => (
-            <div
-              key={change.path}
-              className="flex flex-col gap-1 border-b border-border px-3 py-2 last:border-b-0 sm:flex-row sm:gap-3"
-            >
-              {/* Путь — слева постоянной ширины: список читается
-                  колонкой имён, а не лесенкой. */}
-              <p className="shrink-0 truncate font-mono text-xs text-fg-muted sm:w-52">
-                {change.path}
-              </p>
-
-              <div className="min-w-0 flex-1">
-                <Change change={change} />
+                <div className="min-w-0 flex-1">
+                  <Change change={change} />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Поля есть, а различий нет: правка ничего не изменила
-          (такое пишется в журнал), — и это ответ, а не пустой экран. */}
-      {!isLoading && !changes.length && parts.length > 0 && (
-        <p className="text-sm text-fg-subtle">{t("activity.noChanges")}</p>
-      )}
-
-      {parts.length > 0 && (
-        <div>
-          <Button size="sm" variant="ghost" onClick={() => setRaw(!raw)}>
-            <Icon as={raw ? ChevronUpIcon : ChevronDownIcon} size={14} />
-            {raw ? t("activity.hideRaw") : t("activity.showRaw")}
-          </Button>
+      {raw && (
+        <div className="p-4.5">
+          <CodeCard
+            title={t(raw[0])}
+            code={raw[1]}
+            className="max-h-105 bg-surface"
+            actions={
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  void navigator.clipboard.writeText(raw[1]);
+                  toast.success(t("cell.copied"));
+                }}
+              >
+                <Icon as={CopyIcon} size={13} />
+                {t("cell.copy")}
+              </Button>
+            }
+          />
         </div>
       )}
 
-      {raw &&
-        parts.map(([key, value]) => (
-          <section key={key}>
-            <h3 className="mb-1 text-xs font-medium text-fg-muted">{t(key)}</h3>
-            {/* Своя горизонтальная прокрутка: длинная строка JSON
-                иначе растягивает строку таблицы шире экрана. */}
-            <pre className="max-h-64 overflow-auto rounded-md bg-surface p-3 font-mono text-xs text-fg">
-              {value}
-            </pre>
-          </section>
-        ))}
+      {/* Поля есть, а различий нет: правка ничего не изменила (такое
+          пишется в журнал), — это ответ, и место ему в «Общем». */}
+      {tab === "general" && !isLoading && entry && !changes.length && parts.length > 0 && (
+        <p className="px-5 pb-4 text-sm text-fg-subtle">{t("activity.noChanges")}</p>
+      )}
+      {tab === "general" && !isLoading && entry && !parts.length && (
+        <p className="px-5 pb-4 text-sm text-fg-subtle">{t("activity.noPayload")}</p>
+      )}
+    </>
+  );
+}
+
+/** Вкладка «Общее» — `.lg-gen` прототипа: сетка подпись — значение. */
+function General({ entry }: { entry: ActivityEntry }) {
+  const { t, i18n } = useTranslation();
+  const at = (value: string) => formatDateTime(value, i18n.language);
+
+  return (
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-5 px-5 pt-4.5 pb-5 sm:grid-cols-3">
+      {entry.url && (
+        <Fact label={t("activity.url")}>
+          <span className="break-all">{entry.url}</span>
+        </Fact>
+      )}
+
+      {entry.method && (
+        <Fact label={t("activity.method")}>
+          <MethodBadge method={entry.method} />
+        </Fact>
+      )}
+
+      <Fact label={t("activity.status")}>
+        {entry.statusCode || "—"}
+        {entry.duration > 0 && (
+          <span className="ml-1 text-[13px] text-fg-subtle tabular-nums">({entry.duration}ms)</span>
+        )}
+      </Fact>
+
+      {/* Начало и конец пишутся не всеми ручками: нет начала — есть
+          дата записи, она и есть момент события. */}
+      <Fact label={t("activity.time")}>
+        <span className="grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-0.5 text-sm">
+          <span className="text-fg-muted">{t("activity.started")}:</span>
+          {at(entry.started || entry.date)}
+          {entry.completed && (
+            <>
+              <span className="text-fg-muted">{t("activity.completed")}:</span>
+              {at(entry.completed)}
+            </>
+          )}
+        </span>
+      </Fact>
+
+      <Fact label={t("activity.who")}>
+        <span className="inline-flex items-center gap-1.75">
+          <Icon as={entry.user ? UserIcon : BotIcon} size={15} className="text-accent-text" />
+          {entry.user || "system"}
+        </span>
+      </Fact>
+
+      <Fact label={t("activity.actionType")}>
+        <ActionBadge action={entry.action} />
+      </Fact>
+
+      {entry.table && (
+        <Fact label={t("activity.table")}>
+          <code className="rounded bg-surface-hover px-1.5 py-0.5 font-mono text-[13px]">
+            {entry.table}
+          </code>
+        </Fact>
+      )}
+    </dl>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className={`mb-1.5 ${CAPS_LABEL}`}>{label}</dt>
+      <dd className="text-sm text-fg">{children}</dd>
     </div>
   );
 }

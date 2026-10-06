@@ -1,162 +1,271 @@
 import { useState } from "react";
 import {
-  EyeIcon,
-  PencilIcon,
-  PlusIcon,
+  ChartColumnIcon,
+  CodeXmlIcon,
+  DatabaseIcon,
+  PlugIcon,
+  PuzzleIcon,
+  SearchIcon,
+  ShieldCheckIcon,
   Trash2Icon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { TranslationKey } from "@/shared/lib/i18n";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
+import { Input } from "@/shared/ui/input";
 import {
-  useDeleteResource,
-  useResources,
+  CREATABLE,
+  RESOURCE_GROUPS,
   RESOURCE_LABELS,
   RESOURCE_SPECS,
+  useDeleteResource,
+  useResources,
   type Resource,
+  type ResourceGroup,
 } from "../../api/resources";
-import { Empty, SectionHeader, Td, Th } from "../parts";
-import { IntegrationAccounts } from "./IntegrationAccounts";
+import { CAPS_LABEL, SectionHeader } from "../parts";
 import { CreateResourceDialog, EditResourceDialog } from "./ResourceDialog";
-import { ResourceIcon } from "./ResourceIcon";
-import { ResourceTypePicker } from "./ResourceTypePicker";
+import { ResourceLogo } from "./ResourceIcon";
 
 /**
- * Ресурсы проекта — чужие службы, которыми он пользуется.
+ * Интеграции — `#s-integrations` прототипа: сверху подключённое,
+ * ниже каталог того, что можно подключить, по категориям.
  *
- * Отправка кодов подтверждения, репозиторий с кодом, панель аналитики.
- * Строка списка — это «чем проект пользуется», а не «что у него внутри»:
- * база самого проекта тоже здесь, но только чтобы её было видно, —
- * заводится и удаляется она вместе с окружением.
+ * В ucode это РЕСУРСЫ проекта — чужие службы, которыми он пользуется:
+ * отправка кодов, репозиторий, аналитика, базы. Секреты интеграций
+ * модулей (Payme, Telegram, Didox…) по PRD тоже лежат в ресурсах
+ * (PRD §7.5), так что каталог один. Папка меню «Интеграции» в проекте —
+ * другое: в ней журналы (входящие вебхуки, аудит AI), а не настройки.
+ *
+ * Логотипы — настоящие, из ugen (ResourceLogo), а не цветные плашки
+ * с буквами прототипа: те держатся на захардкоженных цветах.
  *
  * Ресурс принадлежит ОКРУЖЕНИЮ: заведённый в dev в prod не появится.
- * Отдельного переключателя окружения тут нет — он в шапке приложения,
- * и второй, свой, означал бы два разных ответа на вопрос «где я».
+ * Переключатель окружения — в шапке приложения, своего здесь нет.
  */
 export function ResourceSettings() {
   const { t } = useTranslation();
   const { resources, isLoading } = useResources();
   const remove = useDeleteResource();
 
-  /** Выбранный в первом шаге тип. Пусто — форма создания закрыта. */
+  const [query, setQuery] = useState("");
+  const [group, setGroup] = useState<ResourceGroup | "">("");
+
+  /** Выбранный тип. Пусто — форма подключения закрыта. */
   const [creating, setCreating] = useState("");
-  const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState<Resource | null>(null);
   const [deleting, setDeleting] = useState<Resource | null>(null);
 
   const clashing = duplicatedSenders(resources);
+  const needle = query.trim().toLowerCase();
+  const groupLabel = (value: ResourceGroup) => t(`resources.group.${value}` as TranslationKey);
+
+  /** Подходит ли тип под поиск и категорию. Имя ресурса — тоже в поиске. */
+  const fits = (kind: string, name = "") => {
+    const spec = RESOURCE_SPECS[kind];
+    if (group && spec?.group !== group) return false;
+    const label = RESOURCE_LABELS[kind] ?? kind;
+    const about = spec ? t(`resources.about.${kind}` as TranslationKey) : "";
+    return !needle || `${name} ${label} ${about}`.toLowerCase().includes(needle);
+  };
+
+  const connected = resources.filter((resource) => fits(resource.kind, resource.name));
+  const available = CREATABLE.map(({ group: id, kinds }) => ({
+    id,
+    kinds: kinds.filter((kind) => fits(kind)),
+  })).filter((item) => item.kinds.length);
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <SectionHeader title={t("resources.title")} hint={t("resources.hint")}>
-        <Button size="sm" onClick={() => setPicking(true)}>
-          <Icon as={PlusIcon} size={14} />
-          {t("resources.create")}
-        </Button>
-      </SectionHeader>
+    /* Прокрутка своя: раздел широкий, и страница настроек её не даёт. */
+    <div className="min-h-0 flex-1 overflow-y-auto pb-10">
+      <SectionHeader title={t("resources.title")} hint={t("resources.hint")} />
+
+      {/* `.ig-bar`: поиск во всю ширину и категория рядом. */}
+      <div className="mb-4.5 flex flex-wrap gap-2.5">
+        <div className="relative min-w-50 flex-1">
+          <Icon
+            as={SearchIcon}
+            size={16}
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-subtle"
+          />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("resources.search")}
+            aria-label={t("resources.search")}
+            className="pl-9"
+          />
+        </div>
+
+        <div className="w-full sm:w-48">
+          <Dropdown
+            value={group}
+            ariaLabel={t("resources.category")}
+            items={[
+              { value: "", label: t("resources.allCategories") },
+              ...RESOURCE_GROUPS.map((value) => ({ value, label: groupLabel(value) })),
+            ]}
+            onChange={(value) => setGroup(value as ResourceGroup | "")}
+          />
+        </div>
+      </div>
 
       {clashing.length > 0 && (
-        <p className="shrink-0 border-b border-border bg-warning-subtle px-4 py-2 text-xs text-warning">
+        <p className="mb-4 rounded-md bg-warning-subtle px-3 py-2 text-xs text-warning">
           {t("resources.duplicate", { kinds: clashing.join(", ") })}
         </p>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full border-separate border-spacing-0">
-          <thead>
-            <tr>
-              <Th>{t("settings.name")}</Th>
-              <Th className="w-40">{t("resources.type")}</Th>
-              <Th>{t("resources.note")}</Th>
-              <Th className="w-20" />
-            </tr>
-          </thead>
+      {isLoading && <p className="text-sm text-fg-subtle">{t("common.loading")}</p>}
 
-          <tbody>
-            {isLoading && <Empty text={t("common.loading")} colSpan={4} />}
-            {!isLoading && !resources.length && <Empty text={t("resources.empty")} colSpan={4} />}
-
-            {resources.map((resource) => {
+      {connected.length > 0 && (
+        <>
+          <Heading label={t("resources.connected")} count={connected.length} />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {connected.map((resource) => {
               const spec = RESOURCE_SPECS[resource.kind];
-              /* Незнакомый тип открывается на чтение: его настроек мы
-                 не знаем, а сохранение стёрло бы их целиком. */
-              const managed = !spec || Boolean(spec.managed);
+              const label = RESOURCE_LABELS[resource.kind] ?? resource.kind;
+              const info = spec?.fields?.find(
+                (field) => field.kind === "text" && resource.settings[field.key],
+              );
 
               return (
-                <tr key={resource.id} className="group/row hover:bg-surface-hover">
-                  <Td>
-                    <span className="flex items-center gap-2">
-                      <span className="text-fg-subtle">
-                        <ResourceIcon kind={resource.kind} size={14} />
-                      </span>
-                      <span className="truncate">{resource.name}</span>
-                    </span>
-                  </Td>
+                /* `.ig-card.on`: полоса слева — признак подключённого.
+                   Карточка открывает настройки ресурса целиком; удаление —
+                   отдельной кнопкой, чтобы не попасть в него случайно. */
+                <div
+                  key={resource.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setEditing(resource)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setEditing(resource);
+                    }
+                  }}
+                  className="group/card flex min-w-0 cursor-pointer flex-col gap-2.5 rounded-[10px] border border-border border-l-3 border-l-success bg-surface p-3.5 text-left transition-colors hover:bg-surface-hover"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <ResourceLogo kind={resource.kind} />
+                    <div className="min-w-0 flex-1">
+                      <b className="block truncate text-[14.5px] font-semibold text-fg">
+                        {resource.name}
+                      </b>
+                      <small className="block truncate text-xs text-fg-subtle">{label}</small>
+                    </div>
 
-                  <Td className="text-fg-muted">
-                    {RESOURCE_LABELS[resource.kind] ?? resource.kind}
-                  </Td>
-
-                  <Td className="text-xs text-fg-subtle">
-                    {spec?.system
-                      ? t("resources.systemShort")
-                      : managed
-                        ? t("resources.managedShort")
-                        : ""}
-                  </Td>
-
-                  <Td className="text-right">
-                    <span className="inline-flex gap-1 opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100">
+                    {/* Удаления нет там, где оно не сработает: строку
+                        проекта эта ручка не найдёт, а Telegram отклонит
+                        со ссылкой на свою. */}
+                    {!spec?.system && !spec?.noDelete ? (
                       <button
                         type="button"
-                        onClick={() => setEditing(resource)}
-                        aria-label={t(managed ? "action.open" : "action.edit")}
-                        title={t(managed ? "action.open" : "action.edit")}
-                        className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-active hover:text-fg"
+                        aria-label={t("action.delete")}
+                        title={t("action.delete")}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDeleting(resource);
+                        }}
+                        className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md text-fg-subtle opacity-0 transition-opacity group-hover/card:opacity-100 hover:bg-danger-subtle hover:text-danger focus-visible:opacity-100"
                       >
-                        <Icon as={managed ? EyeIcon : PencilIcon} size={14} />
+                        <Icon as={Trash2Icon} size={14} />
                       </button>
+                    ) : null}
 
-                      {/* Удаления нет там, где оно не сработает: строку
-                          проекта эта ручка не найдёт, а Telegram отклонит
-                          со ссылкой на свою. */}
-                      {!spec?.system && !spec?.noDelete && (
-                        <button
-                          type="button"
-                          onClick={() => setDeleting(resource)}
-                          aria-label={t("action.delete")}
-                          title={t("action.delete")}
-                          className="grid size-7 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"
-                        >
-                          <Icon as={Trash2Icon} size={14} />
-                        </button>
-                      )}
+                    <span className="shrink-0 rounded-[5px] bg-chip-green-bg px-1.75 py-0.75 text-[10.5px] font-bold tracking-[.05em] text-chip-green-fg uppercase">
+                      {t("resources.badgeConnected")}
                     </span>
-                  </Td>
-                </tr>
+                  </div>
+
+                  {/* Главная настройка — как «Мерчант: udevs_crm» у
+                      прототипа: первое заполненное текстовое поле типа.
+                      Секретов здесь не бывает — пароли и токены не текст. */}
+                  <p className="text-[13px] leading-snug text-fg-muted">
+                    {info ? (
+                      <>
+                        {t(`resources.field.${info.key}` as TranslationKey)}:{" "}
+                        <b className="font-semibold text-fg">{resource.settings[info.key]}</b>
+                      </>
+                    ) : spec?.system ? (
+                      t("resources.systemShort")
+                    ) : spec ? (
+                      t(`resources.about.${resource.kind}` as TranslationKey)
+                    ) : (
+                      t("resources.managedShort")
+                    )}
+                  </p>
+                </div>
               );
             })}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </>
+      )}
 
-      {picking && (
-        <ResourceTypePicker
-          onClose={() => setPicking(false)}
-          onPick={(kind) => {
-            setPicking(false);
-            setCreating(kind);
-          }}
-        />
+      {available.length > 0 && (
+        <>
+          <Heading
+            label={t("resources.available")}
+            count={available.reduce((sum, item) => sum + item.kinds.length, 0)}
+          />
+
+          {available.map(({ id, kinds }) => (
+            <section key={id} className="mt-5 first-of-type:mt-0">
+              {/* `.ig-cat`: значок категории в рамке, имя и сколько в ней. */}
+              <div className="mb-2.5 flex items-center gap-2.5">
+                <span className="grid size-7.5 shrink-0 place-items-center rounded-lg border border-border text-fg-muted">
+                  <Icon as={GROUP_ICONS[id]} size={15} />
+                </span>
+                <div>
+                  <b className="block text-[14.5px] font-semibold text-fg">{groupLabel(id)}</b>
+                  <small className="text-xs text-fg-subtle">
+                    {t("resources.availableCount", { count: kinds.length })}
+                  </small>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {kinds.map((kind) => (
+                  <div
+                    key={kind}
+                    className="flex min-w-0 flex-col gap-2.5 rounded-[10px] border border-border bg-surface p-3.5"
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <ResourceLogo kind={kind} />
+                      <div className="min-w-0 flex-1">
+                        <b className="block truncate text-[14.5px] font-semibold text-fg">
+                          {RESOURCE_LABELS[kind]}
+                        </b>
+                        <small className="block truncate text-xs text-fg-subtle">
+                          {groupLabel(id)}
+                        </small>
+                      </div>
+                    </div>
+
+                    <p className="flex-1 text-[13px] leading-snug text-fg-muted">
+                      {t(`resources.about.${kind}` as TranslationKey)}
+                    </p>
+
+                    <Button variant="secondary" size="sm" onClick={() => setCreating(kind)}>
+                      <Icon as={PlugIcon} size={14} />
+                      {t("resources.connect")}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </>
+      )}
+
+      {!isLoading && !connected.length && !available.length && (
+        <p className="p-7 text-center text-[13.5px] text-fg-subtle">{t("resources.notFound")}</p>
       )}
 
       {creating && <CreateResourceDialog kind={creating} onClose={() => setCreating("")} />}
-
-      {/* Подключённые аккаунты репозиториев. Отдельная сущность,
-          а не поле ресурса GITHUB, — см. api/integrations. */}
-      <IntegrationAccounts />
-
       {editing && <EditResourceDialog id={editing.id} onClose={() => setEditing(null)} />}
 
       {deleting && (
@@ -172,6 +281,25 @@ export function ResourceSettings() {
     </div>
   );
 }
+
+const GROUP_ICONS: Record<ResourceGroup, typeof PlugIcon> = {
+  otp: ShieldCheckIcon,
+  code: CodeXmlIcon,
+  bi: ChartColumnIcon,
+  db: DatabaseIcon,
+  other: PuzzleIcon,
+};
+
+/** `.ig-h`: подпись капителью и число справа. */
+function Heading({ label, count }: { label: string; count: number }) {
+  return (
+    <div className={`mt-5.5 mb-2.5 flex items-center justify-between first:mt-0 ${CAPS_LABEL}`}>
+      {label}
+      <span className="text-[12.5px] font-medium tracking-normal normal-case">{count}</span>
+    </div>
+  );
+}
+
 
 /**
  * Отправители кодов, заведённые дважды.

@@ -122,6 +122,13 @@ export type MenuNode = {
    * дерево показывает содержимое выбранной. См. CONTEXT.md, «Module».
    */
   isModule: boolean;
+  /**
+   * Вход в настройки проекта (`attributes.screen: "settings"`) — пункт
+   * «Настройки» в папке «Система» модуля, как в меню прототипа. Щелчок
+   * открывает окно настроек, а не экран пункта. Тип у пункта — LINK:
+   * своего типа под это у бэкенда нет (config.MENU_TYPES).
+   */
+  isSettings: boolean;
   parentId: string | null;
   children: MenuNode[];
   /** Права текущей роли на этот пункт. */

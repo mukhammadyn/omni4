@@ -50,6 +50,8 @@ export { relationDataKey } from "./model/types";
 export type { Item } from "./model/types";
 export { rowErrors } from "./model/validate";
 export type { CellError } from "./model/validate";
+export { Cell } from "./ui/Cell";
+export { ActiveCell } from "./ui/CellEditor";
 export { DataGrid, GridSkeleton } from "./ui/DataGrid";
 export { ListSkeleton, RecordList } from "./ui/RecordList";
 export { Gallery, GallerySkeleton } from "./ui/Gallery";

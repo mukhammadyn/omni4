@@ -13,7 +13,7 @@ export type SqlCellKind = "null" | "boolean" | "number" | "uuid" | "date" | "tex
  * строки), и тот же приём уже стоит на датах в `ActivityLog`/`FunctionLogs`
  * (`Td className="text-fg-muted"`) — здесь та же дата, тот же смысл.
  */
-const UUID_TYPES = new Set(["uuid"]);
+const UUID_TYPES = new Set(["uuid", "lookup"]);
 const DATE_TYPES = new Set(["date", "time", "timestamp", "timestamptz", "interval"]);
 
 /**
@@ -47,8 +47,11 @@ export function sqlCell(value: unknown, pgType = ""): { text: string; kind: SqlC
   if (typeof value === "number") return { text: String(value), kind: "number" };
   if (typeof value === "object") return { text: JSON.stringify(value), kind: "text" };
 
-  if (UUID_TYPES.has(pgType)) return { text: String(value), kind: "uuid" };
-  if (DATE_TYPES.has(pgType)) return { text: String(value), kind: "date" };
+  /* Регистр не важен: вкладка «Таблицы» отдаёт типы ucode (`UUID`,
+     `LOOKUP` — ссылка, тот же uuid), SQL — типы postgres строчными. */
+  const type = pgType.toLowerCase();
+  if (UUID_TYPES.has(type)) return { text: String(value), kind: "uuid" };
+  if (DATE_TYPES.has(type)) return { text: String(value), kind: "date" };
 
   return { text: String(value), kind: "text" };
 }

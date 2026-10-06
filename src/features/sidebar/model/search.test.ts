@@ -18,6 +18,7 @@ const node = (label: string, labels: Record<string, string> = {}): MenuNode => (
   isStatic: false,
   isProtected: false,
   isModule: false,
+  isSettings: false,
   parentId: "root",
   children: [],
   raw: {},

@@ -165,6 +165,7 @@ export function toMenuNode(
     isStatic: dto.is_static ?? false,
     isProtected: dto.attributes?.["protected"] === true,
     isModule: dto.attributes?.["is_tab"] === true,
+    isSettings: dto.attributes?.["screen"] === "settings",
     parentId: dto.parent_id || null,
     can: pickPermissions(dto),
     children: [],

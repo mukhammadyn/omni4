@@ -1,7 +1,7 @@
 import { UserPlusIcon, type LucideIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { SettingsDialog } from "@/features/settings";
 import { Icon } from "@/shared/ui/icon";
 
 /**
@@ -11,17 +11,18 @@ import { Icon } from "@/shared/ui/icon";
  */
 export function SidebarFooter() {
   const { t } = useTranslation();
-  const [inviting, setInviting] = useState(false);
+  const navigate = useNavigate();
 
   return (
     /* Высота — 44px вместе с линией, как у подвала таблицы (GridFooter,
        `h-11`): обе полосы у нижнего края, и их линии стоят вровень. */
     <div className="-mx-2 -mb-2 flex h-11 shrink-0 flex-col justify-center border-t border-border px-2">
-      <FooterRow icon={UserPlusIcon} onClick={() => setInviting(true)}>
+      <FooterRow
+        icon={UserPlusIcon}
+        onClick={() => void navigate({ to: "/settings", search: { section: "users" } })}
+      >
         {t("workspace.invite")}
       </FooterRow>
-
-      {inviting && <SettingsDialog initialSection="users" onClose={() => setInviting(false)} />}
     </div>
   );
 }

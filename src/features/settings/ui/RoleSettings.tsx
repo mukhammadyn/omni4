@@ -50,6 +50,7 @@ import {
   type RolePermissions,
   type TablePermission,
 } from "../model/permissions";
+import { SectionHeader } from "./parts";
 
 /**
  * Роли и их права.
@@ -98,155 +99,168 @@ export function RoleSettings() {
 
   const shown = useMemo(() => matching(draft?.tables ?? [], query), [draft?.tables, query]);
 
-  if (isLoading) return <p className="p-4 text-sm text-fg-muted">{t("common.loading")}</p>;
-  if (!roles.length) return <p className="p-4 text-sm text-fg-muted">{t("roles.empty")}</p>;
+  const header = <SectionHeader title={t("settings.roles")} />;
+
+  if (isLoading || !roles.length) {
+    return (
+      <>
+        {header}
+        <p className="text-sm text-fg-muted">{t(isLoading ? "common.loading" : "roles.empty")}</p>
+      </>
+    );
+  }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1">
-      {/* Роли — вторым столбцом слева: их единицы, и переключаются они
-          чаще, чем что-либо ещё на этом экране. */}
-      <nav className="flex w-52 shrink-0 flex-col border-r border-border">
-        {/* «Новая роль» вверху и всегда на виду: ролей в живом проекте
-            два десятка, и внизу списка кнопка оказывалась за краем. */}
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border px-3 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
-        >
-          <Icon as={PlusIcon} size={14} />
-          {t("roles.create")}
-        </button>
-
-        <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-        {roles.map((role) => (
-          <div
-            key={role.id}
-            className={`group/role flex h-8 shrink-0 items-center rounded-md pr-1 transition-colors ${
-              role.id === active ? "bg-surface-active" : "hover:bg-surface-hover"
-            }`}
+    <>
+      {header}
+      {/* Рамка вокруг: столбец ролей и матрица — один блок под заголовком,
+          а не две колонки, прилипшие к краю страницы. */}
+      <div className="mb-6 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-border">
+        {/* Роли — вторым столбцом слева: их единицы, и переключаются они
+            чаще, чем что-либо ещё на этом экране. */}
+        <nav className="flex w-52 shrink-0 flex-col border-r border-border">
+          {/* «Новая роль» вверху и всегда на виду: ролей в живом проекте
+              два десятка, и внизу списка кнопка оказывалась за краем. */}
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border px-3 text-sm text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
           >
-            <button
-              type="button"
-              onClick={() => setRoleId(role.id)}
-              className={`flex h-full min-w-0 flex-1 items-center px-2 text-left text-sm ${
-                role.id === active ? "text-fg" : "text-fg-muted group-hover/role:text-fg"
+            <Icon as={PlusIcon} size={14} />
+            {t("roles.create")}
+          </button>
+
+          <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
+          {roles.map((role) => (
+            <div
+              key={role.id}
+              className={`group/role flex h-8 shrink-0 items-center rounded-md pr-1 transition-colors ${
+                role.id === active ? "bg-surface-active" : "hover:bg-surface-hover"
               }`}
             >
-              <span className="truncate">{role.name}</span>
-            </button>
-
-            {/* Системную роль бэкенд удалить не даст — не предлагаем. */}
-            {!role.isSystem && (
               <button
                 type="button"
-                onClick={() => setDeleting(role)}
-                aria-label={t("roles.delete")}
-                title={t("roles.delete")}
-                className="hidden size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors group-hover/role:grid hover:bg-danger-subtle hover:text-danger"
+                onClick={() => setRoleId(role.id)}
+                className={`flex h-full min-w-0 flex-1 items-center px-2 text-left text-sm ${
+                  role.id === active ? "text-fg" : "text-fg-muted group-hover/role:text-fg"
+                }`}
               >
-                <Icon as={Trash2Icon} size={14} />
+                <span className="truncate">{role.name}</span>
               </button>
-            )}
-          </div>
-        ))}
 
-        </div>
-      </nav>
-
-      {creating && (
-        <RoleCreateDialog
-          onClose={() => setCreating(false)}
-          onCreated={() => setCreating(false)}
-        />
-      )}
-
-      {deleting && (
-        <ConfirmDialog
-          title={t("roles.deleteTitle", { name: deleting.name })}
-          description={t("roles.deleteDescription")}
-          confirmLabel={t("action.delete")}
-          busy={remove.isPending}
-          onClose={() => setDeleting(null)}
-          onConfirm={() =>
-            remove.mutate(deleting.id, {
-              onSuccess: () => {
-                // Открытая роль исчезла — возвращаемся к первой.
-                if (deleting.id === active) setRoleId("");
-                setDeleting(null);
-              },
-            })
-          }
-        />
-      )}
-
-      {/*
-        min-w-0 обязателен: без него у flex-элемента ширина не может
-        стать меньше содержимого, и широкая матрица распирала бы всё
-        окно наружу вместо того, чтобы прокручиваться внутри себя.
-      */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {loadingPermissions || !draft ? (
-          <p className="p-4 text-sm text-fg-muted">{t("common.loading")}</p>
-        ) : (
-          <>
-            <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-              <Tab active={tab === "tables"} onClick={() => setTab("tables")}>
-                {t("roles.tables")}
-              </Tab>
-              <Tab active={tab === "menu"} onClick={() => setTab("menu")}>
-                {t("roles.menu")}
-              </Tab>
-              <Tab active={tab === "global"} onClick={() => setTab("global")}>
-                {t("roles.global")}
-              </Tab>
-              <Tab active={tab === "custom"} onClick={() => setTab("custom")}>
-                {t("customRights.title")}
-              </Tab>
-
-              {tab === "tables" && (
-                <div className="ml-auto w-56">
-                  <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={t("roles.searchTable")}
-                    aria-label={t("roles.searchTable")}
-                  />
-                </div>
+              {/* Системную роль бэкенд удалить не даст — не предлагаем. */}
+              {!role.isSystem && (
+                <button
+                  type="button"
+                  onClick={() => setDeleting(role)}
+                  aria-label={t("roles.delete")}
+                  title={t("roles.delete")}
+                  className="hidden size-6 shrink-0 place-items-center rounded text-fg-subtle transition-colors group-hover/role:grid hover:bg-danger-subtle hover:text-danger"
+                >
+                  <Icon as={Trash2Icon} size={14} />
+                </button>
               )}
             </div>
+          ))}
 
-            {tab === "tables" && <TableMatrix tables={shown} draft={draft} onChange={setDraft} />}
-            {tab === "global" && <GlobalRights draft={draft} onChange={setDraft} />}
-            {/* Права на меню — своя пара ручек и своё сохранение:
-                дерево грузится по уровню, и класть его в общий черновик
-                прав на таблицы нечем. */}
-            {tab === "menu" && <MenuRights roleId={active} />}
-            {/* Свои права — тоже своя ручка и своё дерево: право живёт
-                у типа клиента роли, а не у неё самой. */}
-            {tab === "custom" && (
-              <CustomRights
-                roleId={active}
-                clientTypeId={roles.find((role) => role.id === active)?.clientTypeId ?? ""}
-              />
-            )}
+          </div>
+        </nav>
 
-            {tab !== "menu" && tab !== "custom" && (
-              <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-t border-border px-3">
-                <p className="text-xs text-fg-subtle">{t("roles.hint")}</p>
-
-                <Button
-                  size="sm"
-                  disabled={!dirty || update.isPending}
-                  onClick={() => update.mutate(draft)}
-                >
-                  {update.isPending ? t("common.saving") : t("action.save")}
-                </Button>
-              </div>
-            )}
-          </>
+        {creating && (
+          <RoleCreateDialog
+            onClose={() => setCreating(false)}
+            onCreated={() => setCreating(false)}
+          />
         )}
+
+        {deleting && (
+          <ConfirmDialog
+            title={t("roles.deleteTitle", { name: deleting.name })}
+            description={t("roles.deleteDescription")}
+            confirmLabel={t("action.delete")}
+            busy={remove.isPending}
+            onClose={() => setDeleting(null)}
+            onConfirm={() =>
+              remove.mutate(deleting.id, {
+                onSuccess: () => {
+                  // Открытая роль исчезла — возвращаемся к первой.
+                  if (deleting.id === active) setRoleId("");
+                  setDeleting(null);
+                },
+              })
+            }
+          />
+        )}
+
+        {/*
+          min-w-0 обязателен: без него у flex-элемента ширина не может
+          стать меньше содержимого, и широкая матрица распирала бы всё
+          окно наружу вместо того, чтобы прокручиваться внутри себя.
+        */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {loadingPermissions || !draft ? (
+            <p className="p-4 text-sm text-fg-muted">{t("common.loading")}</p>
+          ) : (
+            <>
+              <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+                <Tab active={tab === "tables"} onClick={() => setTab("tables")}>
+                  {t("roles.tables")}
+                </Tab>
+                <Tab active={tab === "menu"} onClick={() => setTab("menu")}>
+                  {t("roles.menu")}
+                </Tab>
+                <Tab active={tab === "global"} onClick={() => setTab("global")}>
+                  {t("roles.global")}
+                </Tab>
+                <Tab active={tab === "custom"} onClick={() => setTab("custom")}>
+                  {t("customRights.title")}
+                </Tab>
+
+                {tab === "tables" && (
+                  <div className="ml-auto w-56">
+                    <Input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder={t("roles.searchTable")}
+                      aria-label={t("roles.searchTable")}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {tab === "tables" && <TableMatrix tables={shown} draft={draft} onChange={setDraft} />}
+              {tab === "global" && <GlobalRights draft={draft} onChange={setDraft} />}
+              {/* Права на меню — своя пара ручек и своё сохранение:
+                  дерево грузится по уровню, и класть его в общий черновик
+                  прав на таблицы нечем. */}
+              {tab === "menu" && <MenuRights roleId={active} />}
+              {/* Свои права — тоже своя ручка и своё дерево: право живёт
+                  у типа клиента роли, а не у неё самой. */}
+              {tab === "custom" && (
+                <CustomRights
+                  roleId={active}
+                  clientTypeId={roles.find((role) => role.id === active)?.clientTypeId ?? ""}
+                />
+              )}
+
+              {tab !== "menu" && tab !== "custom" && (
+                <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-t border-border px-3">
+                  <p className="text-xs text-fg-subtle">{t("roles.hint")}</p>
+
+                  <Button
+                    size="sm"
+                    disabled={!dirty || update.isPending}
+                    onClick={() => update.mutate(draft)}
+                  >
+                    {update.isPending ? t("common.saving") : t("action.save")}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

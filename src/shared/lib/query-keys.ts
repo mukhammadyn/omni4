@@ -190,6 +190,26 @@ export const keys = {
      * что и сами данные, — то есть у каждого окружения свои.
      */
     sqlQueries: (envId: string) => [...keys.settings.all, "sql-queries", envId] as const,
+    /**
+     * Схема базы целиком — таблицы, поля, связи — для диаграммы. Читается
+     * из базы окружения, поэтому окружение в ключе, как у SQL.
+     */
+    schemaMap: (projectId: string, envId: string) =>
+      [...keys.settings.all, "schema-map", projectId, envId] as const,
+    /**
+     * Тариф и оплата. Всё — про ПРОЕКТ: подписка и баланс общие
+     * на все его окружения.
+     */
+    billingAll: (projectId: string) => [...keys.settings.all, "billing", projectId] as const,
+    billingStatus: (projectId: string) =>
+      [...keys.settings.billingAll(projectId), "status"] as const,
+    subscription: (projectId: string) =>
+      [...keys.settings.billingAll(projectId), "subscription"] as const,
+    fare: (projectId: string, fareId: string) =>
+      [...keys.settings.billingAll(projectId), "fare", fareId] as const,
+    cards: (projectId: string) => [...keys.settings.billingAll(projectId), "cards"] as const,
+    transactions: (projectId: string, page: number, limit: number) =>
+      [...keys.settings.billingAll(projectId), "transactions", page, limit] as const,
   },
   icons: {
     all: ["icons"] as const,

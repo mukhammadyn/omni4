@@ -17,7 +17,7 @@ import {
   type EnvironmentDraft,
 } from "../api/environments";
 import { useProject } from "../api/project";
-import { Empty, SectionHeader, Td, Th } from "./parts";
+import { Empty, SubHeader, Td, Th } from "./parts";
 
 /**
  * Окружения проекта.
@@ -48,14 +48,15 @@ export function EnvironmentSettings() {
   const [editing, setEditing] = useState<Environment | "new" | null>(null);
   const [deleting, setDeleting] = useState<Environment | null>(null);
 
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <SectionHeader title={t("environments.title")} hint={t("environments.hint")}>
+      <SubHeader title={t("environments.title")} hint={t("environments.hint")}>
         <Button size="sm" onClick={() => setEditing("new")}>
           <Icon as={PlusIcon} size={14} />
           {t("environments.create")}
         </Button>
-      </SectionHeader>
+      </SubHeader>
 
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full border-separate border-spacing-0">

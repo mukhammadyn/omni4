@@ -6,17 +6,16 @@ import {
   LanguagesIcon,
   LogOutIcon,
   MoonIcon,
-  SettingsIcon,
   UserPlusIcon,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { logout } from "@/features/auth";
-import { SettingsDialog, useWorkspaceTitle } from "@/features/settings";
+import { useWorkspaceTitle } from "@/features/settings";
 import { WorkspaceSwitcher } from "@/features/workspace";
 import { useSession } from "@/shared/api/use-session";
-import { LOCALES, setLocale, type Locale } from "@/shared/lib/i18n";
+import { LOCALE_NAMES, LOCALES, setLocale, type Locale } from "@/shared/lib/i18n";
 import { useUi } from "@/shared/lib/ui-store";
 import { BrandMark } from "@/shared/ui/brand-mark";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
@@ -30,7 +29,8 @@ import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
  * компании их несколько, и переключаются именно они.
  *
  * Меню — «Рабочее пространство», как `wsMenu` прототипа: карточка
- * проекта, его настройки, приглашение. Переключатель проектов остаётся
+ * проекта и приглашение. Настройки проекта — не здесь, а пунктом
+ * «Настройки» в папке «Система» модуля, как в меню прототипа (`NAV`). Переключатель проектов остаётся
  * здесь же: в прототипе его нет, но без него проект не сменить. Ниже —
  * тема, язык (подменю, как `themeMenu` прототипа) и выход.
  *
@@ -38,11 +38,7 @@ import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
  * профилем нет. Имя проекта — из его карточки (useWorkspaceTitle).
  */
 export function WorkspaceHeader({ floating = false }: { floating?: boolean }) {
-  /*
-   * Окно настроек живёт здесь, а не в поповере: поповер закрывается
-   * щелчком по своей же кнопке, и окно исчезло бы вместе с ним.
-   */
-  const [settings, setSettings] = useState<string | null>(null);
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const profile = useSession().getProfile();
 
@@ -100,19 +96,10 @@ export function WorkspaceHeader({ floating = false }: { floating?: boolean }) {
             <PopoverSeparator />
 
             <PopoverItem
-              icon={<Icon as={SettingsIcon} />}
-              onClick={() => {
-                close();
-                setSettings("project");
-              }}
-            >
-              {t("workspace.spaceSettings")}
-            </PopoverItem>
-            <PopoverItem
               icon={<Icon as={UserPlusIcon} />}
               onClick={() => {
                 close();
-                setSettings("users");
+                void navigate({ to: "/settings", search: { section: "users" } });
               }}
             >
               {t("workspace.invite")}
@@ -131,8 +118,6 @@ export function WorkspaceHeader({ floating = false }: { floating?: boolean }) {
           </div>
         )}
       </Popover>
-
-      {settings && <SettingsDialog initialSection={settings} onClose={() => setSettings(null)} />}
     </>
   );
 }
@@ -220,8 +205,6 @@ function initials(title: string) {
   return (words.length > 1 ? words[0]![0]! + words[1]![0]! : (words[0]?.[0] ?? "")).toUpperCase();
 }
 
-/** Имена языков — на них самих: их не переводят. */
-const LOCALE_NAMES: Record<Locale, string> = { ru: "Русский", en: "English", uz: "O‘zbekcha" };
 
 /**
  * Пункт с подменю: справа текущее значение и стрелка, варианты — отдельным

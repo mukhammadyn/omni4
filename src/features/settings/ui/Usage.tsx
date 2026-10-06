@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Tabs } from "@/shared/ui/tabs";
 import {
@@ -9,7 +9,7 @@ import {
   type UsageActor,
   type UsageRow,
 } from "../api/usage";
-import { Empty, SectionHeader, Td, Th } from "./parts";
+import { Empty, LogLayout, Td, Th, formatSize } from "./parts";
 
 /**
  * Расход API-запросов: сколько осталось от месячного лимита и какие
@@ -29,7 +29,7 @@ import { Empty, SectionHeader, Td, Th } from "./parts";
  * трафик (клики по билдеру, включая сам этот экран) лимит расходует,
  * но не блокируется никогда — режется только клиентское API.
  */
-export function Usage() {
+export function Usage({ kindField }: { kindField: ReactNode }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState("all");
   // Путь вглубь: выбранный маршрут, затем выбранный отправитель.
@@ -49,13 +49,8 @@ export function Usage() {
 
   const amount = (value: number) => value.toLocaleString(i18n.language);
 
-  /* Мегабайты человеку: до гигабайта — целыми, дальше — гигабайтами
-     с десятой долей. «1234 МБ» читается хуже, чем «1,2 ГБ», а «0,2 МБ»
-     хуже, чем «0 МБ»: точность здесь никому не нужна. */
   const size = (mb: number) =>
-    mb >= 1024
-      ? `${(mb / 1024).toLocaleString(i18n.language, { maximumFractionDigits: 1 })} ${t("usage.gb")}`
-      : `${Math.round(mb).toLocaleString(i18n.language)} ${t("usage.mb")}`;
+    formatSize(mb, i18n.language, { mb: t("usage.mb"), gb: t("usage.gb") });
 
   const authLabel = (authType: string) =>
     authType === "bearer"
@@ -94,9 +89,7 @@ export function Usage() {
   const columns = view === "route" ? 5 : view === "actor" ? 4 : 3;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <SectionHeader title={t("usage.title")} hint={t("usage.hint")} />
-
+    <LogLayout hint={t("usage.hint")} filters={kindField}>
       {(usage || storage) && (
         <div className="shrink-0 space-y-1 border-b border-border px-4 py-3">
           {usage?.blocked && <p className="text-sm text-danger">{t("usage.blocked")}</p>}
@@ -252,6 +245,6 @@ export function Usage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </LogLayout>
   );
 }

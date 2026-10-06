@@ -1386,3 +1386,85 @@ table.go:1285`) — и пишет их поверх. Всё остальное, 
 (`table.go:760` против `:821`). Список показывает `is_cached: true`
 у таблиц, у которых кэш выключен; настоящее значение отдаёт только
 `GET /v1/table/{id}`.
+
+## Тариф и оплата (billing)
+
+**`GET /v1/transaction?all=true` отдаёт транзакции всех проектов.**
+С `all=true` шлюз не ставит `project_id` в запрос
+(`ucode_go_admin_api_gateway/api/handlers/v1/billing.go:441`), а права
+на это не проверяет: любой вошедший видит платежи чужих проектов.
+Фронт параметр не передаёт (`features/settings/api/billing.ts`).
+
+**`GET /v1/payment/card-list` отдаёт `payme_token`.** Платёжный токен
+карты уезжает на фронт вместе с маскированным номером
+(`ucode_go_company_service/storage/postgres/card.go:33`). Фронту он
+не нужен; в DTO его нет.
+
+**Валюта сводки — не валюта её сумм.** `GET /v1/billing/status`:
+`next_charge` — цена тарифа, умноженная на курс к суму
+(`ucode_go_company_service/storage/postgres/billing.go:1381`), баланс
+с ним сравнивается — то есть все суммы ответа в UZS. А `currency_code`
+— валюта тарифа (`billing.go:1333`). Подписанные ею суммы выглядят как
+«3 533 535 USD» при тарифе 300 USD. Фронт подписывает суммы сводки UZS.
+
+**Нет подписки — ошибка, а не пустота.** `GET /v1/subscription/current`
+ищет строку через `QueryRow` и отдаёт `ErrNoRows` наверх
+(`billing.go:1175`). Есть ли подписка, фронт узнаёт из
+`subscription_status` сводки и только тогда просит подписку.
+
+**`GET /v1/fare/{id}` без валюты.** `GetFare` не джойнит `currency`:
+цена приходит числом без единицы.
+
+**Тариф ucode отсюда не сменить.** `PATCH /v1/company/project/attach-fare`
+отказывает тарифам ucode: «ucode plans cannot be changed via AttachFare»
+(`ucode_go_company_service/storage/postgres/project.go:1717`). omni4 —
+проект ucode (Small, Medium), поэтому кнопки «Сменить тариф» нет.
+`discount_id` ручка игнорирует, а `environment_id` требует, не используя.
+
+**`receipt-pay` отвечает 200 и на неоплаченный чек.** Исход — только
+текст `status`: «Cheque paid.» у оплаченного (`config/constants.go:86`),
+иначе другое состояние чека Payme. Фронт считает успехом ровно эту
+строку (`features/settings/api/billing.ts`, `useTopUp`).
+
+**Тип карты всегда UZCARD.** `get-verify-code` пишет `type` строкой
+`UZCARD` (`grpc/service/payme.go:71`), и HUMO в списке тоже «UZCARD».
+`card-list` отдаёт только подтверждённые карты (`storage/postgres/card.go:145`).
+
+**Дыры в оплате — не обходятся фронтом, сказать бэкенду:**
+- `POST /v1/transaction` с `transaction_type: "topup"`,
+  `payment_status: "accepted"` зачисляет деньги любому проекту без
+  оплаты (`ucode_go_admin_api_gateway/api/handlers/v1/billing.go:355` —
+  ни проверки проекта, ни роли). Клиент её не зовёт.
+- `PUT /v1/transaction` с `accepted` зачисляет `amount` заново на каждый
+  вызов, для любого типа (`storage/postgres/billing.go:1050`).
+- `PUT /v1/subscription`: SQL собран `fmt.Sprintf` из `end_date`
+  (`storage/postgres/billing.go:1583`) — инъекция; проект из тела.
+- Карты без проверки владельца: `receipt-pay` не сверяет
+  `card.project_id` с проектом (`grpc/service/payme.go:179`), `verify`
+  переписывает проект карты (`:126`), удаление — любой карты
+  (`api/handlers/v1/card.go:116`).
+- `receipt-pay` по API-ключу паникует: `user_id` не выставлен
+  (`api/handlers/v1/card.go:103`).
+
+## API строк по ключу
+
+**`DELETE /v2/items/{slug}/{id}` без тела — 400.** Ручка делает
+`ShouldBindJSON` до всего остального
+(`ucode_go_admin_api_gateway/api/handlers/v2/items.go:1479`), хотя
+из тела ей ничего не нужно. Код SDK шлёт `{}`
+(`features/settings/model/sdk.ts`).
+
+## Сортировка get-list по `created_at`
+
+**`order: {created_at: …}` — пустой `ORDER BY` и ошибка SQL.**
+`POST /v2/object/get-list/{slug}` с `{"order": {"created_at": -1}}`
+отвечает `syntax error at or near "LIMIT"`. В разборе `order`
+(`ucode_go_object_builder_service/storage/postgres/object_builder.go:1210`)
+строка `" ORDER BY "` дописывается, как только карта не пуста, а ключ
+`created_at` затем пропускается (`:1216`) — других ключей нет, и
+запрос уходит с `ORDER BY` без выражения. С другими ключами рядом
+`created_at` просто молча теряется.
+
+Обход: не слать `created_at` в `order`. Без `order` ручка и так
+сортирует `a.created_at DESC` (`object_builder.go:836`) — так читают
+журналы вебхуков и AI (`features/settings/ui/TableLogs.tsx`).
