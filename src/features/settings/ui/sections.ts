@@ -26,7 +26,7 @@ import { DIRECTORY_TABS, type Directory, type RecordSection } from "./directorie
  * все экраны настроек в общий бандл незачем.
  *
  * Группы — как навигация прототипа: основное, люди и доступ,
- * интеграции, разработка, журнал. Личный профиль — в конце,
+ * интеграции, разработка, журнал. Личный профиль — первым,
  * «Аккаунтом»: в прототипе он вне настроек пространства, но свой
  * экран ему заводить незачем.
  */
@@ -92,6 +92,10 @@ export type SettingsTab = {
 };
 
 const GROUPS: SettingsGroup[] = [
+  {
+    titleKey: "settings.groupAccount",
+    items: [{ id: "profile", labelKey: "settings.profile", icon: UserIcon }],
+  },
   {
     titleKey: "settings.groupMain",
     right: "settings_button",
@@ -179,10 +183,6 @@ const GROUPS: SettingsGroup[] = [
         wide: true,
       },
     ],
-  },
-  {
-    titleKey: "settings.groupAccount",
-    items: [{ id: "profile", labelKey: "settings.profile", icon: UserIcon }],
   },
 ];
 
