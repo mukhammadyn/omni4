@@ -23,6 +23,8 @@ export const VIEW_TYPES = [
   "TABLE",
   "LIST",
   "GALLERY",
+  "PEOPLE",
+  "ORG",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -56,6 +58,9 @@ export const IMPLEMENTED_VIEW_TYPES = new Set<string>([
    * в проектах уже есть — галереей им становиться нельзя.
    */
   "GALLERY",
+  /* Сетка людей и оргструктура — см. FIXED_VIEW_TYPES. */
+  "PEOPLE",
+  "ORG",
   "TREE",
   "BOARD",
   "CALENDAR",
@@ -97,7 +102,19 @@ export const IMPLEMENTED_VIEW_TYPES = new Set<string>([
  * черновиком прямо в таблице, а у них черновика нет — «Новая запись»
  * создала бы пустую строку. Нужна своя карточка создания поверх вкладки.
  */
-const NOT_IN_TABS = new Set<string>(["CHART", "LIST", "GALLERY"]);
+const NOT_IN_TABS = new Set<string>(["CHART", "LIST", "GALLERY", "PEOPLE", "ORG"]);
+
+/**
+ * Типы, которые человек не заводит и не выбирает сменой типа: экран
+ * сделан под одну таблицу модуля, и на чужой он показал бы чепуху.
+ * Запись view заводится один раз, на свой пункт меню, через API; дальше
+ * вкладка живёт как любая — имя, порядок, «Свойства», права.
+ *
+ * PEOPLE — «Сетка» сотрудников HRMS (`employees.html` прототипа).
+ * ORG — «Оргструктура» там же (features/hrms): читает таблицы HRMS
+ * по слагам, и на любой другой таблице ей нечего показать.
+ */
+export const FIXED_VIEW_TYPES = new Set<string>(["PEOPLE", "ORG"]);
 export const TAB_VIEW_TYPES = VIEW_TYPES.filter(
   (type) => IMPLEMENTED_VIEW_TYPES.has(type) && !NOT_IN_TABS.has(type),
 );

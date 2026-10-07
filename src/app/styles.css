@@ -570,3 +570,161 @@ main:has(> [data-fullbleed]) {
   border-radius: 0;
   box-shadow: none;
 }
+
+/*
+ * Линии оргструктуры (features/item, OrgChart) — `.org-tree` прототипа
+ * (employees.html). Дерево — вложенные <ul>/<li>, а связи рисуют
+ * псевдоэлементы: половинки горизонтальной черты над каждым узлом
+ * и вертикаль от родителя. Так линии растягиваются вместе с раскладкой
+ * сами, без расчёта координат. Классами Tailwind это не записать:
+ * правила ссылаются на соседей (`:first-child`, `:only-child`).
+ *
+ * `.org-tree.h` — та же схема, повёрнутая набок: дети справа.
+ */
+.org-tree,
+.org-tree ul {
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+.org-tree ul {
+  padding-top: 28px;
+}
+.org-tree li {
+  position: relative;
+  padding: 28px 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.org-tree > li {
+  padding-top: 0;
+}
+.org-tree li::before,
+.org-tree li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 28px;
+  border-top: 1.5px solid var(--color-border-strong);
+}
+.org-tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1.5px solid var(--color-border-strong);
+}
+.org-tree li:only-child::before,
+.org-tree li:only-child::after,
+.org-tree > li::before,
+.org-tree > li::after {
+  display: none;
+}
+.org-tree li:only-child {
+  padding-top: 0;
+}
+.org-tree li:first-child::before,
+.org-tree li:last-child::after {
+  border: 0;
+}
+.org-tree li:last-child::before {
+  border-right: 1.5px solid var(--color-border-strong);
+  border-radius: 0 6px 0 0;
+}
+.org-tree li:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+.org-tree ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 28px;
+  border-left: 1.5px solid var(--color-border-strong);
+}
+
+.org-tree.h,
+.org-tree.h ul {
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+.org-tree.h ul {
+  padding: 0 0 0 32px;
+}
+.org-tree.h li {
+  flex-direction: row;
+  align-items: center;
+  padding: 7px 0 7px 32px;
+}
+.org-tree.h > li {
+  padding-left: 0;
+}
+.org-tree.h li::before {
+  top: 0;
+  bottom: 50%;
+  left: 0;
+  right: auto;
+  width: 0;
+  height: auto;
+  border-top: 0;
+  border-right: 0;
+  border-left: 1.5px solid var(--color-border-strong);
+  border-radius: 0;
+}
+.org-tree.h li::after {
+  top: 50%;
+  bottom: 0;
+  left: 0;
+  right: auto;
+  width: 32px;
+  height: auto;
+  border-top: 1.5px solid var(--color-border-strong);
+  border-left: 1.5px solid var(--color-border-strong);
+  border-radius: 0;
+}
+.org-tree.h li:first-child::before {
+  display: none;
+}
+.org-tree.h li:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+.org-tree.h li:last-child::before {
+  display: block;
+  width: 32px;
+  border-right: 0;
+  border-bottom: 1.5px solid var(--color-border-strong);
+  border-radius: 0 0 0 6px;
+}
+.org-tree.h li:last-child::after {
+  border-left: 0;
+  bottom: auto;
+  height: 0;
+}
+.org-tree.h li:only-child::before {
+  display: none;
+}
+.org-tree.h li:only-child::after {
+  display: block;
+  border-left: 0;
+  height: 0;
+  border-radius: 0;
+}
+.org-tree.h li:only-child {
+  padding-top: 7px;
+}
+.org-tree.h ul::before {
+  top: 50%;
+  left: 0;
+  height: 0;
+  width: 32px;
+  border-left: 0;
+  border-top: 1.5px solid var(--color-border-strong);
+}
+/* `!important`: у `li:last-child::before` выше специфичность, и без него
+   последний корень тянул бы линию к соседнему корню. */
+.org-tree.h > li::before,
+.org-tree.h > li::after {
+  display: none !important;
+}

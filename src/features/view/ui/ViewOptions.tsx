@@ -54,7 +54,13 @@ import { moveBefore } from "@/shared/lib/order";
 import { TAB_GROUP_TYPES, subGroupField, tabGroupField } from "../api/tab-group";
 import { columnGroup, columnKey, toggleColumn } from "../model/columns";
 import { type UrlTemplate } from "../model/url-template";
-import { IMPLEMENTED_VIEW_TYPES, TAB_VIEW_TYPES, VIEW_TYPES, type View } from "../model/types";
+import {
+  FIXED_VIEW_TYPES,
+  IMPLEMENTED_VIEW_TYPES,
+  TAB_VIEW_TYPES,
+  VIEW_TYPES,
+  type View,
+} from "../model/types";
 import { CalendarFields, dateFields } from "./CalendarFields";
 import { VIEW_ICON_CHOICES, viewIcon } from "./view-icon";
 
@@ -236,7 +242,7 @@ export function ViewOptions({
    * нет колонок, а дерево и графики строят порядок сами.
    */
   const canGroup =
-    !["TREE", "BOARD", "CALENDAR", "CHART", "LIST", "GALLERY"].includes(view.type);
+    !["TREE", "BOARD", "CALENDAR", "CHART", "LIST", "GALLERY", "PEOPLE", "ORG"].includes(view.type);
   /** Первое поле группировки — подписью на кнопке, остальные счётом. */
   const grouped = view.groupByIds
     .map((id) => fields.find((field) => field.id === id || field.relationId === id))
@@ -1018,7 +1024,7 @@ function Panel({
    * закреплять, ни делить их на группы нечем. Страницы, отбор и
    * раскладка вкладками — как у таблицы.
    */
-  const isList = view.type === "LIST" || view.type === "GALLERY";
+  const isList = ["LIST", "GALLERY", "PEOPLE", "ORG"].includes(view.type);
   /** Поле начала события — подписью в строке настроек. Здесь это слаг. */
   const dateFrom = fields.find((field) => field.slug === view.dateFromSlug);
   /** Поле раскладки вкладками — подписью в строке настроек. */
@@ -1596,7 +1602,9 @@ function switchableTypes(view: View): string[] {
      (см. TAB_VIEW_TYPES) и показало бы всю чужую таблицу. */
   const allowed = view.isRelationView ? new Set(TAB_VIEW_TYPES) : IMPLEMENTED_VIEW_TYPES;
 
-  return VIEW_TYPES.filter((type) => allowed.has(type) || type === view.type);
+  return VIEW_TYPES.filter(
+    (type) => (allowed.has(type) && !FIXED_VIEW_TYPES.has(type)) || type === view.type,
+  );
 }
 
 /**

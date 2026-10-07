@@ -14,6 +14,7 @@ import {
   ItemDrawer,
   Gallery,
   GallerySkeleton,
+  PeopleGallery,
   ListSkeleton,
   RecordList,
   TreeGrid,
@@ -69,6 +70,7 @@ import {
 import { useTablePermissions } from "@/features/auth";
 import { CopilotButton } from "@/features/copilot";
 import { FileBrowser } from "@/features/files";
+import { OrgStructure } from "@/features/hrms";
 import { MicrofrontendPage } from "@/features/microfrontend";
 import {
   EmbeddedPage,
@@ -235,6 +237,15 @@ const searchSchema = z.object({
  * и день. Не влезло — в шапке календаря появляется «Показать ещё».
  */
 const CALENDAR_LIMIT = 200;
+
+/*
+ * Сколько людей оргструктура догружает самое большее. Дереву нужен
+ * весь набор, поэтому порции по MAX_LIMIT идут одна за другой без
+ * прокрутки; предел — чтобы огромная таблица не грузилась без конца,
+ * а холст из десятков тысяч карточек всё равно не читается. Сверх
+ * него экран говорит, что дерево неполное.
+ */
+const ORG_CAP = 10_000;
 
 /**
  * Сколько строк берут графики, пока не выбрали иначе.
@@ -568,6 +579,10 @@ function MenuPage() {
   const listView = supportedView && view?.type === "LIST";
   /** Галерея (`r_gallery` прототипа) — то же самое карточками. */
   const galleryView = supportedView && view?.type === "GALLERY";
+  /** «Сетка» сотрудников — та же галерея, карточка человека. */
+  const peopleView = supportedView && view?.type === "PEOPLE";
+  /** «Оргструктура» сотрудников: дереву нужны все люди сразу, без страниц. */
+  const orgView = supportedView && view?.type === "ORG";
   /** Экраны, отбирающие строки по видимому диапазону дат. */
   const dateView = calendarView || timelineView;
   /** Режим: из адреса, иначе из настроек view, иначе месяц. */
@@ -649,6 +664,8 @@ function MenuPage() {
        */
       chartView
     ? search.limit ?? CHART_SAMPLE
+    : orgView
+    ? MAX_LIMIT
     : dateView || pivotView
     ? CALENDAR_LIMIT
     : search.limit ??
@@ -963,10 +980,10 @@ function MenuPage() {
   /* Сводная и графики считают загруженное, поэтому и грузят прокруткой:
      страницы здесь означали бы «итог по третьей странице». */
   const infinite =
-    view?.infiniteScroll === true || boardView || dateView || pivotView || chartView;
+    view?.infiniteScroll === true || boardView || dateView || pivotView || chartView || orgView;
 
   /** Экраны, на которых порядок строк не виден и сортировать нечего. */
-  const sortless = boardView || dateView || pivotView || chartView;
+  const sortless = boardView || dateView || pivotView || chartView || orgView;
 
   const {
     page: rows,
@@ -992,7 +1009,10 @@ function MenuPage() {
       : undefined,
     {
       limit,
-      page: search.page,
+      /* Оргструктура страниц не листает: номер из чужой ссылки
+         показал бы людей с тысяча первого, а подвала, чтобы вернуться,
+         у неё нет. */
+      page: orgView ? 1 : search.page,
       infinite,
       sorts: querySorts,
       filters: effectiveFilters,
@@ -1176,6 +1196,11 @@ function MenuPage() {
    * — и удалилась бы вместе с теми, что человек видит.
    */
   const rowSetKey = `${view?.id}|${search.page}|${limit}|${search.sort}|${searchText}|${JSON.stringify(effectiveFilters)}`;
+  /* Оргструктура: следующая порция — сразу, как пришла прошлая. */
+  useEffect(() => {
+    if (orgView && hasMore && rows.rows.length < ORG_CAP) loadMore();
+  }, [orgView, hasMore, rows.rows.length]);
+
   useEffect(() => setSelected(new Set()), [rowSetKey]);
 
   /**
@@ -1827,7 +1852,7 @@ function MenuPage() {
           ) : rowsLoading || tabGroup.pending ? (
             listView ? (
               <ListSkeleton />
-            ) : galleryView ? (
+            ) : orgView ? null : galleryView || peopleView ? (
               <GallerySkeleton />
             ) : (
               <GridSkeleton columns={columns.length} />
@@ -2065,6 +2090,27 @@ function MenuPage() {
               {...(can.write ? { onAdd: createRecord } : {})}
               {...(infinite && hasMore ? { onEndReached: loadMore } : {})}
             />
+          ) : orgView ? (
+            <OrgStructure
+              rows={rows.rows}
+              total={rows.count}
+              /* Ещё едут порции: дерево ждёт их, иначе оно перестраивалось
+                 бы на глазах, а свёрнутые узлы считались по неполному. */
+              pending={(hasMore || loadingMore) && rows.rows.length < ORG_CAP}
+              onOpenRow={openRow}
+            />
+          ) : peopleView ? (
+            <PeopleGallery
+              tableSlug={view.tableSlug}
+              columns={columns}
+              rows={rows.rows}
+              relations={schema.relations}
+              locale={i18n.language}
+              language={language}
+              onOpenRow={openRow}
+              {...(can.write ? { onAdd: createRecord } : {})}
+              {...(infinite && hasMore ? { onEndReached: loadMore } : {})}
+            />
           ) : listView ? (
             <RecordList
               tableSlug={view.tableSlug}
@@ -2200,7 +2246,7 @@ function MenuPage() {
               их не листают, а размер порции там не «строк на странице»,
               а «по скольким строкам считать», и стоит он над графиками,
               рядом с тем, что от него зависит. */}
-          {!rowsError && !boardView && !dateView && !pivotView && !chartView && (
+          {!rowsError && !boardView && !dateView && !pivotView && !chartView && !orgView && (
           <GridFooter
             /* Со страницами подвал листает, с прокруткой — считает. */
             {...(infinite ? {} : { page: search.page, onPage: (next: number) => setSearch({ page: next }) })}

@@ -6,7 +6,7 @@ import type { TranslationKey } from "@/shared/lib/i18n";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { Popover, PopoverItem } from "@/shared/ui/popover";
-import { IMPLEMENTED_VIEW_TYPES, VIEW_TYPES } from "../model/types";
+import { FIXED_VIEW_TYPES, IMPLEMENTED_VIEW_TYPES, VIEW_TYPES } from "../model/types";
 import { CalendarFields, dateFields } from "./CalendarFields";
 import { viewIcon } from "./view-icon";
 
@@ -33,7 +33,9 @@ import { viewIcon } from "./view-icon";
  * Имя необязательно: без него вкладка называется своим типом, ровно как
  * все view, созданные до появления имён.
  */
-const CREATABLE = VIEW_TYPES.filter((type) => IMPLEMENTED_VIEW_TYPES.has(type));
+const CREATABLE = VIEW_TYPES.filter(
+  (type) => IMPLEMENTED_VIEW_TYPES.has(type) && !FIXED_VIEW_TYPES.has(type),
+);
 
 /** Типы, которым нужны поля дат. Без начала им нечего показывать. */
 const DATED = new Set<string>(["CALENDAR", "TIMELINE"]);

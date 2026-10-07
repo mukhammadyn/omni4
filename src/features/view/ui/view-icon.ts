@@ -38,6 +38,8 @@ const ICONS: Record<string, LucideIcon> = {
   TABLE: Table2Icon,
   LIST: ListIcon,
   GALLERY: LayoutGridIcon,
+  PEOPLE: LayoutGridIcon,
+  ORG: NetworkIcon,
   BOARD: SquareKanbanIcon,
   CALENDAR: CalendarDaysIcon,
   CHART: ChartPieIcon,
