@@ -55,11 +55,7 @@ export function MenuLevel({ items, path }: { items: MenuNode[]; path: string[] }
     /* Пункты — встык, как `.sb-item` прототипа (margin 0). */
     <ul className="flex flex-col">
       {items.map((node, index) => (
-        /* Над группой — воздух, как `.sb-section` прототипа (6px), кроме
-           первой: над ней и так заголовок «Меню». */
-        <li key={node.id} className={node.kind === "group" && index > 0 ? "mt-1.5" : ""}>
-          <MenuRow node={node} siblings={items} path={path} />
-        </li>
+        <MenuRow key={node.id} node={node} siblings={items} path={path} first={index === 0} />
       ))}
     </ul>
   );
@@ -69,10 +65,12 @@ function MenuRow({
   node,
   siblings,
   path,
+  first,
 }: {
   node: MenuNode;
   siblings: MenuNode[];
   path: string[];
+  first: boolean;
 }) {
   const parentId = path[path.length - 1] ?? "";
   const depth = path.length - 1;
@@ -87,8 +85,12 @@ function MenuRow({
   const open = useUi((state) => !state.collapsedMenus.includes(node.id));
   const toggleMenu = useUi((state) => state.toggleMenu);
 
-  // Запрос уходит, только пока папка раскрыта.
-  const children = useMenuChildren(node.id, expandable && open);
+  /*
+   * Детей папки читаем и у свёрнутой: иначе не узнать, что в ней одни
+   * скрытые пункты (useMenuChildren, onlyHidden), и пустая «Система»
+   * висела бы, стоило её свернуть. Запрос — один на папку и кэшируется.
+   */
+  const children = useMenuChildren(node.id, expandable);
 
   const dragging = dnd.source?.node.id === node.id;
   const hit = dnd.target?.id === node.id ? dnd.target.position : null;
@@ -203,8 +205,12 @@ function MenuRow({
     </Link>
   );
 
+  if (expandable && children.onlyHidden) return null;
+
   return (
-    <>
+    /* Над группой — воздух, как `.sb-section` прототипа (6px), кроме
+       первой: над ней и так заголовок «Меню». */
+    <li className={expandable && !first ? "mt-1.5" : ""}>
       <div
         className={`${expandable ? groupRow : row} ${dragging ? "opacity-40" : ""} ${
           hit === "inside" ? "bg-accent-subtle ring-1 ring-accent ring-inset" : ""
@@ -230,7 +236,7 @@ function MenuRow({
           <MenuLevel items={children.items} path={[...path, node.id]} />
         </>
       )}
-    </>
+    </li>
   );
 }
 

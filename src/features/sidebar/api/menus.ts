@@ -68,14 +68,29 @@ export function useMenuChildren(parentId: string, enabled = true) {
     staleTime: 5 * 60_000,
     // Постоянная ссылка: со стрелкой на месте дерево пересобиралось
     // на каждый рендер, и сайдбар перерисовывался вместе с ним.
-    select: useCallback(
-      (data: MenusResponseDto) => toNodes(data.menus ?? [], languages),
-      [languages],
-    ),
+    select: useCallback((data: MenusResponseDto) => {
+      const items = toNodes(data.menus ?? [], languages);
+      /*
+       * Пункты есть, но все скрыты — системные, «Настройки» модуля, без
+       * права чтения. Такую папку сайдбар не рисует: «Система» модуля
+       * держит один пункт «Настройки», а он живёт в подвале сайдбара,
+       * и папка висела пустой. Пустая без пунктов вовсе — другое дело:
+       * её только что завели, и прятать её нельзя.
+       */
+      const onlyHidden = items.length === 0 && (data.menus ?? []).some((dto) => dto.id);
+      return { items, onlyHidden };
+    }, [languages]),
   });
 
-  return { items: query.data ?? [], isLoading: query.isLoading, error: query.error };
+  return {
+    items: query.data?.items ?? NO_NODES,
+    onlyHidden: query.data?.onlyHidden ?? false,
+    isLoading: query.isLoading,
+    error: query.error,
+  };
 }
+
+const NO_NODES: MenuNode[] = [];
 
 export function toNodes(menus: MenuDto[], languages: string | string[]): MenuNode[] {
   // Порядок ответа сохраняем как есть: сервер уже отсортировал по "order",
