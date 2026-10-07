@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -31,5 +32,13 @@ function useCrumbs() {
 }
 
 function SettingsRoute() {
-  return <SettingsPage section={Route.useSearch().section} />;
+  const { t } = useTranslation();
+
+  /* Страница грузится своим чанком (features/settings/index.ts):
+     первый заход ждёт его, дальше — из кэша браузера. */
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-fg-subtle">{t("common.loading")}</p>}>
+      <SettingsPage section={Route.useSearch().section} />
+    </Suspense>
+  );
 }
