@@ -20,7 +20,7 @@ export {
 export { EMPTY_RELATION_DRAFT, isRelationReady } from "./model/relation-draft";
 export type { RelationDraft } from "./model/relation-draft";
 export { ALL_VIEW_RIGHTS, useTableDetails } from "./api/table-details";
-export { useSchemaLocked } from "./api/table-settings";
+export { useSchemaLocked, useTableSettings } from "./api/table-settings";
 export type { ViewRights } from "./api/table-details";
 export { toDraft } from "./model/field-draft";
 export {

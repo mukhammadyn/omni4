@@ -52,6 +52,12 @@ export type TableSettings = {
   isLoginTable: boolean;
   /** Способы входа. Пусто у обычной таблицы. */
   loginStrategies: LoginStrategy[];
+  /**
+   * Слаги полей, которые бэкенд синхронизирует с auth: логин, пароль,
+   * почта, телефон, роль, тип клиента — значения `auth_info`, а не
+   * имена по памяти: слаг поля входа может остаться прежним (table.go:1019).
+   */
+  authSlugs: string[];
   /** Отмечать время последнего входа полем `last_activity`. */
   lastActivity: boolean;
   /**
@@ -300,11 +306,17 @@ export function toTableSettings(dto: TableDto): TableSettings {
     orderBy: dto.order_by === true,
     isLoginTable: dto.is_login_table === true,
     loginStrategies: toStrategies(authInfo["login_strategy"]),
+    authSlugs: AUTH_KEYS.map((key) => authInfo[key]).filter(
+      (slug): slug is string => typeof slug === "string" && slug !== "",
+    ),
     lastActivity: attributes["last_activity"] === true,
     isProtected: attributes["protected"] === true,
     raw: { ...dto },
   };
 }
+
+/** Ключи `auth_info`, в которых лежат слаги полей (models.AuthInfo в object_builder). */
+const AUTH_KEYS = ["login", "password", "email", "phone", "tin", "role_id", "client_type_id"];
 
 /** Чужие значения отбрасываются: способ, которого бэкенд не знает, он не заведёт. */
 function toStrategies(value: unknown): LoginStrategy[] {

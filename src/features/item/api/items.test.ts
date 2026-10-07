@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { nextPage, patchRow, toPage, toPages } from "./items";
+import { authBypass, nextPage, patchRow, toPage, toPages } from "./items";
 
 const page = {
   data: { count: 2, response: [{ guid: "a", title: "раз" }, { guid: "b", title: "два" }] },
@@ -109,4 +109,13 @@ test("строки нет ни в одном куске — кэш не трог
   const cached = { pageParams: [0], pages: [{ data: { count: 1, response: [{ guid: "a" }] } }] };
 
   expect(patchRow(cached, { guid: "нет такой", values: { title: "x" } })).toBe(cached);
+});
+
+test("правка таблицы входа без полей входа идёт мимо auth, с ними — через него", () => {
+  const table = { isLoginTable: true, authSlugs: ["email", "role_id"] };
+
+  expect(authBypass({ skills: ["go"] }, table)).toEqual({ from_auth_service: true });
+  expect(authBypass({ skills: ["go"], email: "a@b.c" }, table)).toEqual({});
+  expect(authBypass({ skills: ["go"] }, { ...table, isLoginTable: false })).toEqual({});
+  expect(authBypass({ skills: ["go"] }, undefined)).toEqual({});
 });

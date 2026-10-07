@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTableSettings } from "@/features/table";
 import { api } from "@/shared/api/client";
 import { keys } from "@/shared/lib/query-keys";
 import { errorMessage, reportError } from "@/shared/lib/toast";
@@ -200,6 +201,30 @@ export function toPages(data: { pages: ItemsResponseDto[] }): ItemsPage {
 export type RowEdit = { guid: string; values: Record<string, unknown> };
 
 /**
+ * Обход бэкенда: правка строки таблицы входа, не задевающая полей входа,
+ * уходит с `from_auth_service` — и `Update` пропускает синхронизацию
+ * с auth (object_builder storage/postgres/items.go:693).
+ *
+ * Без флага он на ЛЮБУЮ правку требует у строки role_id и client_type_id
+ * (items.go:708) и зовёт auth. Сотрудник без роли — заведённый импортом,
+ * без учётки — не правился вовсе, даже навыки (docs/backend-notes.md,
+ * «Строка таблицы входа без роли»).
+ *
+ * Правка почты, телефона, логина, пароля, роли идёт как раньше: её
+ * auth обязан узнать. Поэтому роль такой строке отсюда всё ещё
+ * не поставить. Настройки таблицы ещё не приехали — флага нет.
+ */
+export function authBypass(
+  values: Record<string, unknown>,
+  table: { isLoginTable: boolean; authSlugs: string[] } | undefined,
+) {
+  if (!table?.isLoginTable) return {};
+  return Object.keys(values).some((slug) => table.authSlugs.includes(slug))
+    ? {}
+    : { from_auth_service: true };
+}
+
+/**
  * Правка строки.
  *
  * Уходят ровно те поля, что правили, и guid: бэкенд собирает UPDATE из
@@ -216,10 +241,11 @@ export type RowEdit = { guid: string; values: Record<string, unknown> };
 export function useUpdateItem(tableSlug: string | undefined) {
   const queryClient = useQueryClient();
   const slug = tableSlug ?? "";
+  const { table } = useTableSettings(tableSlug);
 
   return useMutation({
     mutationFn: ({ guid, values }: RowEdit) =>
-      api.put<unknown>(`/v2/items/${slug}`, { data: { guid, ...values } }),
+      api.put<unknown>(`/v2/items/${slug}`, { data: { guid, ...values, ...authBypass(values, table) } }),
 
     onMutate: async (edit) => {
       // Летящий запрос списка перезапишет наш патч своим старым ответом.
