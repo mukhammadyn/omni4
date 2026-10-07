@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SettingsIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
@@ -23,9 +23,16 @@ function useCrumbs() {
   const { t } = useTranslation();
   const { section } = Route.useSearch();
   const { tab, active } = useSettingsSections(section);
+  const navigate = useNavigate();
 
   return [
-    { icon: SettingsIcon, label: t("workspace.settings") },
+    /* «Настройки» — к первому доступному разделу. Группа разделов
+       своего экрана не имеет — она подпись. */
+    {
+      icon: SettingsIcon,
+      label: t("workspace.settings"),
+      onClick: () => void navigate({ to: "/settings", search: {} }),
+    },
     ...(tab ? [{ label: t(tab.labelKey) }] : []),
     ...(active ? [{ label: t(active.labelKey) }] : []),
   ];

@@ -26,8 +26,13 @@ import { Icon } from "@/shared/ui/icon";
  */
 export const Route = createFileRoute("/_authed/_static")({ component: StaticLayout });
 
-/** Звено крошек после имени проекта. Кликабельных нет: путь — не меню. */
-export type Crumb = { label: string; icon?: LucideIcon };
+/**
+ * Звено крошек после имени проекта. С `onClick` — ведёт на свой экран
+ * («Сотрудники» — к списку); без него — просто подпись: у группы
+ * разделов настроек своего экрана нет, а последнее звено — текущая
+ * страница.
+ */
+export type Crumb = { label: string; icon?: LucideIcon; onClick?: () => void };
 
 declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
@@ -82,15 +87,38 @@ function StaticLayout() {
 }
 
 function Crumbs({ useCrumbs }: { useCrumbs: () => Crumb[] }) {
-  return useCrumbs().map((crumb, index) => (
-    <Fragment key={index}>
-      <span className="text-fg-subtle">/</span>
-      {/* Последнее звено сжимается первым: длинное имя раздела
-          не должно выдавливать «Настройки» за край. */}
-      <span className="flex min-w-0 shrink-0 items-center gap-1.5 px-1.5 py-0.5 text-fg last:shrink">
+  const crumbs = useCrumbs();
+
+  return crumbs.map((crumb, index) => {
+    const body = (
+      <>
         {crumb.icon && <Icon as={crumb.icon} className="shrink-0" />}
         <span className="truncate">{crumb.label}</span>
-      </span>
-    </Fragment>
-  ));
+      </>
+    );
+    /* Последнее звено сжимается первым: длинное имя раздела
+       не должно выдавливать «Настройки» за край. */
+    const box = `flex min-w-0 items-center gap-1.5 rounded-[5px] px-1.5 py-0.5 text-fg ${
+      index === crumbs.length - 1 ? "shrink" : "shrink-0"
+    }`;
+
+    return (
+      <Fragment key={index}>
+        <span className="text-fg-subtle">/</span>
+        {/* Текущая страница не нажимается, даже если звену дали переход:
+            вести некуда — мы уже здесь. */}
+        {crumb.onClick && index < crumbs.length - 1 ? (
+          <button
+            type="button"
+            onClick={crumb.onClick}
+            className={`${box} transition-colors hover:bg-surface-hover`}
+          >
+            {body}
+          </button>
+        ) : (
+          <span className={box}>{body}</span>
+        )}
+      </Fragment>
+    );
+  });
 }
