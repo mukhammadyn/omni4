@@ -70,7 +70,7 @@ import {
 import { useTablePermissions } from "@/features/auth";
 import { CopilotButton } from "@/features/copilot";
 import { FileBrowser } from "@/features/files";
-import { OrgStructure } from "@/features/hrms";
+import { EMPLOYEES, OrgStructure } from "@/features/hrms";
 import { MicrofrontendPage } from "@/features/microfrontend";
 import {
   EmbeddedPage,
@@ -954,6 +954,13 @@ function MenuPage() {
       rows.rows.find((item) => item.guid === guid) ??
       undated.find((item) => item.guid === guid);
     if (view && row && openRowUrl(view, row)) return;
+
+    /* Сотрудника открывают страницей, а не карточкой сбоку: разделов
+       у него больше, чем помещается в drawer (features/hrms, EmployeePage). */
+    if (view?.tableSlug === EMPLOYEES) {
+      void navigate({ to: "/employees/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
 
     if (draftTouched()) {
       setPendingRow(guid);

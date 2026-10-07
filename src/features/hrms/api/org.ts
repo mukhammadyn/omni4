@@ -18,9 +18,12 @@ export type Person = {
   position: string;
   department: string;
   departmentId: string;
+  location: string;
   locationId: string;
   /** Руководитель — самосвязь `employees_id`. */
   managerId: string;
+  managerName: string;
+  managerPhoto: string;
 };
 
 export type Department = {
@@ -51,12 +54,23 @@ export type Unit = {
   color: string;
 };
 
-const text = (value: unknown) => (typeof value === "string" ? value : "");
-const related = (row: Item, slug: string) => {
+export const text = (value: unknown) => (typeof value === "string" ? value : "");
+export const related = (row: Item, slug: string) => {
   const data = row[`${slug}_data`];
   return data && typeof data === "object" && !Array.isArray(data) ? (data as Item) : {};
 };
-const firstText = (value: unknown) => text(Array.isArray(value) ? value[0] : value);
+export const firstText = (value: unknown) => text(Array.isArray(value) ? value[0] : value);
+
+/** Руководитель записи: самосвязь на сотрудника, `employees_id`. */
+const head = (row: Item) => {
+  const person = related(row, "employees_id");
+  return { headName: text(person.full_name), headPhoto: firstText(person.photo) };
+};
+
+const managerOf = (row: Item) => {
+  const { headName, headPhoto } = head(row);
+  return { managerName: headName, managerPhoto: headPhoto };
+};
 
 export function toPerson(row: Item): Person {
   return {
@@ -66,16 +80,12 @@ export function toPerson(row: Item): Person {
     position: text(related(row, "positions_id").name),
     department: text(related(row, "departments_id").name),
     departmentId: text(row.departments_id),
+    location: text(related(row, "locations_id").name),
     locationId: text(row.locations_id),
     managerId: text(row.employees_id),
+    ...managerOf(row),
   };
 }
-
-/** Руководитель записи: самосвязь на сотрудника, `employees_id`. */
-const head = (row: Item) => {
-  const person = related(row, "employees_id");
-  return { headName: text(person.full_name), headPhoto: firstText(person.photo) };
-};
 
 function toDepartment(row: Item): Department {
   return {

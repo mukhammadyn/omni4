@@ -236,6 +236,8 @@ const AVATAR_SIZES = {
   md: "size-6 text-[11px]",
   lg: "size-8 text-xs",
   xl: "size-14 text-xl",
+  /* `.avatar.emp-xl` — шапка страницы сотрудника, с обводкой фоном. */
+  "2xl": "size-26 text-4xl ring-4 ring-surface",
 };
 
 /**
