@@ -204,18 +204,20 @@ export function DirectorySettings({
           />
         </div>
 
-        {directory.parent && (
-          <>
+        {/* Одна кнопка: свёрнута хоть одна ветка — раскрыть всё,
+            иначе свернуть всё. */}
+        {directory.parent &&
+          (closed.size ? (
             <Button variant="secondary" onClick={() => setClosed(new Set())}>
               <Icon as={ChevronsUpDownIcon} size={14} />
               {t("dir.expandAll")}
             </Button>
+          ) : (
             <Button variant="secondary" onClick={() => setClosed(new Set(parents))}>
               <Icon as={ChevronsDownUpIcon} size={14} />
               {t("dir.collapseAll")}
             </Button>
-          </>
-        )}
+          ))}
 
         {can.write && (
           <Button
