@@ -59,6 +59,21 @@ export function hasSortOrder(row: Item, fieldSlug: string): boolean {
   return data !== undefined && SORT_ORDER in data;
 }
 
+/**
+ * Связанная запись колонки — для черновика новой карточки.
+ *
+ * Поле-связь показывается по `<поле>_data`, а не по id: черновик
+ * с одним id открывает дровер с пустым полем, хотя колонка выбрана.
+ * Записи у колонки свои — её строки; берём из любой. Наружу `_data`
+ * не уходит: его отбрасывает useCreateItem.
+ */
+export function relatedEntry(field: Field, row: Item | undefined): Record<string, unknown> {
+  if (!field.relationId || !row) return {};
+
+  const data = relatedOf(row, field.slug);
+  return data ? { [relationDataKey(field.slug)]: data } : {};
+}
+
 /** HEX связанной записи. Не строка или пусто — цвета нет. */
 export function colorOf(row: Item, fieldSlug: string): string | undefined {
   const value = relatedOf(row, fieldSlug)?.[COLOR];

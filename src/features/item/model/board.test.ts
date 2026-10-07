@@ -9,6 +9,7 @@ import {
   groupValue,
   NO_GROUP,
   orderAt,
+  relatedEntry,
   sortOrderOf,
 } from "./board";
 
@@ -268,4 +269,15 @@ test("у каждой дорожки свои строки и одинаковы
 
   const nobody = lanes[2]?.columns.find((column) => column.id === "todo");
   expect(nobody?.rows.map((row) => row.guid)).toEqual(["3"]);
+});
+
+test("черновик карточки получает связанную запись колонки, а не один id", () => {
+  const stage = { guid: "s1", name: "Новая заявка" };
+  const relation = { slug: "stage", relationId: "r1" } as Field;
+
+  expect(relatedEntry(relation, { stage: "s1", stage_data: stage })).toEqual({ stage_data: stage });
+  // Не связь, нет строк, нет записи — нечего класть.
+  expect(relatedEntry({ slug: "stage", relationId: null } as Field, { stage_data: stage })).toEqual({});
+  expect(relatedEntry(relation, undefined)).toEqual({});
+  expect(relatedEntry(relation, { stage: null, stage_data: null })).toEqual({});
 });

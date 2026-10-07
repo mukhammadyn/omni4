@@ -16,10 +16,13 @@ import {
   columnOrderEdits,
   groupValue,
   hasSortOrder,
+  relatedEntry,
   sortOrderOf,
   BOARD_ORDER,
   NO_GROUP,
   SORT_ORDER,
+  type BoardColumn,
+  type BoardLane,
 } from "../model/board";
 import { cellKind } from "../model/cell-kind";
 import { isBlank } from "../model/cell-value";
@@ -230,6 +233,16 @@ export function Board({
     ...(laneField ? { [laneField.slug]: groupValue(laneField, lane) } : {}),
   });
 
+  /** Черновик новой карточки: значения клетки и связанные записи для подписи. */
+  const draftValues = (lane: BoardLane, column: BoardColumn): Record<string, unknown> => ({
+    ...cellValues(lane.id, column.id),
+    ...relatedEntry(field, column.rows[0]),
+    // У всех строк дорожки одна и та же запись дорожки — годится любая.
+    ...(laneField
+      ? relatedEntry(laneField, lane.columns.find((item) => item.rows.length)?.rows[0])
+      : {}),
+  });
+
   const drop = (lane: string, column: string) => {
     const target = lanes
       .find((item) => item.id === lane)
@@ -414,7 +427,7 @@ export function Board({
                       {onAddCard && (
                         <button
                           type="button"
-                          onClick={() => onAddCard(cellValues(lane.id, column.id))}
+                          onClick={() => onAddCard(draftValues(lane, column))}
                           aria-label={t("table.addRow")}
                           title={t("table.addRow")}
                           className="ml-auto grid size-6 shrink-0 place-items-center rounded-[4px] text-fg-subtle opacity-0 transition hover:bg-surface hover:text-fg focus-visible:opacity-100 group-hover/column:opacity-100"
@@ -567,7 +580,7 @@ export function Board({
                     {onAddCard && (
                       <button
                         type="button"
-                        onClick={() => onAddCard(cellValues(lane.id, column.id))}
+                        onClick={() => onAddCard(draftValues(lane, column))}
                         className="flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-fg-subtle transition-colors hover:bg-surface hover:text-fg"
                       >
                         <Icon as={PlusIcon} size={16} />
