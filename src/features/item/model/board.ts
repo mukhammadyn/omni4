@@ -1,6 +1,6 @@
 import type { Field } from "@/features/table";
 import { toList } from "./cell-value";
-import type { Item } from "./types";
+import { relationDataKey, type Item } from "./types";
 
 /**
  * Доска: те же строки, разложенные по колонкам значения одного поля.
@@ -24,6 +24,63 @@ import type { Item } from "./types";
  */
 export const BOARD_ORDER = "board_order";
 
+/**
+ * Поле порядка в справочниках модулей (`erp.dbml`: этапы, статусы,
+ * воронки — у всех `sort_order NUMBER`). Колонки доски по связи
+ * встают по нему, и перетаскивание колонки пишет его же: порядок
+ * этапов один на все доски, а не своя копия в настройках каждой.
+ */
+export const SORT_ORDER = "sort_order";
+
+/**
+ * Номер колонки по связи — из связанной записи, приехавшей в строке
+ * (`<поле>_data`). `undefined` — у записи нет поля номера или оно пустое.
+ */
+export function sortOrderOf(row: Item, fieldSlug: string): number | undefined {
+  const data = row[relationDataKey(fieldSlug)];
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return undefined;
+
+  const value = (data as Record<string, unknown>)[SORT_ORDER];
+  if (value === null || value === undefined || value === "") return undefined;
+
+  const order = Number(value);
+  return Number.isFinite(order) ? order : undefined;
+}
+
+/** Есть ли у связанной записи поле номера вообще — пусть даже пустое. */
+export function hasSortOrder(row: Item, fieldSlug: string): boolean {
+  const data = row[relationDataKey(fieldSlug)];
+  return typeof data === "object" && data !== null && !Array.isArray(data) && SORT_ORDER in data;
+}
+
+/**
+ * Какие записи и какими номерами переписать, чтобы колонка `moved`
+ * встала на место `at` среди `rest` (колонок без неё и без «пустой»).
+ *
+ * Номера у всех соседей — одна запись, номер между ними, как у карточек.
+ * Есть безномерные — нумеруются ВСЕ по порядку: безномерные стоят после
+ * пронумерованных, и число «между соседями» их места не выражает —
+ * колонка, брошенная среди них, уехала бы к пронумерованным. Один раз:
+ * после этого номера есть у всех.
+ */
+export function columnOrderEdits(
+  rest: BoardColumn[],
+  moved: string,
+  at: number,
+): { guid: string; order: number }[] {
+  if (rest.every((column) => column.order !== undefined)) {
+    return [{ guid: moved, order: orderAt(rest.map((column) => column.order), at) }];
+  }
+
+  const ids = rest.map((column) => column.id);
+  ids.splice(at, 0, moved);
+  const current = new Map(rest.map((column) => [column.id, column.order]));
+
+  return ids.flatMap((guid, index) =>
+    current.get(guid) === index + 1 ? [] : [{ guid, order: index + 1 }],
+  );
+}
+
 /** Колонка «без значения». Пустая строка — значения в поле нет вовсе. */
 export const NO_GROUP = "";
 
@@ -32,6 +89,8 @@ export type BoardColumn = {
   id: string;
   label: string;
   rows: Item[];
+  /** Место колонки из данных (SORT_ORDER связанной записи). Нет — после пронумерованных. */
+  order?: number | undefined;
 };
 
 /** Готовая колонка: значение поля и его подпись. */
@@ -54,10 +113,12 @@ export type BoardTab = { id: string; label: string };
  *                  Так же считала и старая админка — сервер отдавал ей
  *                  только те группы, которые есть в данных.
  *
- * Ручного порядка колонок нет сознательно: старая админка хранила его
- * в `attributes.tabs` отдельным списком, он расходился со значениями
- * поля, и её же экран, обнаружив расхождение длин, молча откатывался
- * к серверному порядку.
+ * Порядка колонок в настройках view нет сознательно: старая админка
+ * хранила его в `attributes.tabs` отдельным списком, он расходился
+ * со значениями поля, и её же экран, обнаружив расхождение длин, молча
+ * откатывался к серверному порядку. Колонки по связи стоят по номеру
+ * в самой связанной записи (`orderOf`, см. SORT_ORDER) — он со
+ * значениями разойтись не может.
  *
  * Строка с MULTISELECT попадает сразу в несколько колонок — по одной
  * на каждое значение. Это не дубль по ошибке: у записи действительно
@@ -69,6 +130,7 @@ export function boardColumns({
   slug,
   unassigned,
   labelOf,
+  orderOf,
 }: {
   rows: Item[];
   /** Варианты поля. Пусто — колонки целиком из данных. */
@@ -81,6 +143,8 @@ export function boardColumns({
    * Не задана — подписью служит само значение.
    */
   labelOf?: ((row: Item, value: string) => string) | undefined;
+  /** Номер колонки из данных — по любой её строке. */
+  orderOf?: ((row: Item, value: string) => number | undefined) | undefined;
 }): BoardColumn[] {
   const byValue = new Map<string, Item[]>();
 
@@ -105,19 +169,29 @@ export function boardColumns({
    * убранный из поля вариант, оставшийся в строках. Без этой ветки
    * карточки просто исчезли бы с доски, и человек искал бы их в базе.
    *
-   * По подписи, а не в порядке появления в строках: порядок строк
-   * задаёт сервер, у карточек без номера позиции он между запросами
-   * гуляет — и колонки менялись бы местами после каждой правки.
+   * По номеру из данных, при равных и без номера — по подписи, а не
+   * в порядке появления в строках: порядок строк задаёт сервер, у карточек
+   * без номера позиции он между запросами гуляет — и колонки менялись бы
+   * местами после каждой правки.
    */
   const extra: BoardColumn[] = [];
   for (const [value, list] of byValue) {
     if (value === NO_GROUP || known.has(value)) continue;
 
     const first = list[0];
-    extra.push({ id: value, label: (first && labelOf?.(first, value)) || value, rows: list });
+    extra.push({
+      id: value,
+      label: (first && labelOf?.(first, value)) || value,
+      rows: list,
+      order: first && orderOf?.(first, value),
+    });
   }
 
-  extra.sort((a, b) => a.label.localeCompare(b.label));
+  // Infinity − Infinity — NaN, и `||` уводит обе безномерные к подписи.
+  extra.sort(
+    (a, b) =>
+      (a.order ?? Infinity) - (b.order ?? Infinity) || a.label.localeCompare(b.label),
+  );
   columns.push(...extra);
 
   /*
@@ -176,6 +250,7 @@ export function boardLanes({
   slug: string;
   unassigned: string;
   labelOf?: ((row: Item, value: string) => string) | undefined;
+  orderOf?: ((row: Item, value: string) => number | undefined) | undefined;
 }): BoardLane[] {
   if (!lane) {
     return [
@@ -235,13 +310,24 @@ export function groupValue(field: Field, columnId: string): unknown {
  * теми же соседями, между которыми карточку и бросили.
  */
 export function boardOrderAt(rows: Item[], at: number): number {
+  return orderAt(
+    rows.map((row) => row[BOARD_ORDER]),
+    at,
+  );
+}
+
+/**
+ * То же правило для любого списка номеров: колонки доски двигаются им же
+ * (номера — SORT_ORDER связанных записей, без самой перетаскиваемой).
+ */
+export function orderAt(orders: unknown[], at: number): number {
   const orderOf = (index: number) => {
-    const value = Number(rows[index]?.[BOARD_ORDER]);
+    const value = Number(orders[index]);
     return Number.isFinite(value) ? value : index + 1;
   };
 
   const before = at > 0 ? orderOf(at - 1) : undefined;
-  const after = at < rows.length ? orderOf(at) : undefined;
+  const after = at < orders.length ? orderOf(at) : undefined;
 
   if (before === undefined) return after === undefined ? 1 : after - 1;
   if (after === undefined) return before + 1;

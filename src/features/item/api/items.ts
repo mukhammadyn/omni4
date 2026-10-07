@@ -2,7 +2,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { api } from "@/shared/api/client";
 import { keys } from "@/shared/lib/query-keys";
 import { errorMessage, reportError } from "@/shared/lib/toast";
-import type { Item } from "../model/types";
+import { relationDataKey, type Item } from "../model/types";
 import { type ItemsQuery, toRequestBody } from "../model/query";
 
 /**
@@ -245,13 +245,64 @@ export function useUpdateItem(tableSlug: string | undefined) {
 }
 
 /**
+ * Номера колонок доски — SORT_ORDER в записях связанной таблицы
+ * (`tableSlug`), по запросу на запись.
+ *
+ * Связанная запись приезжает ВНУТРИ строк доски (`<поле>_data`), поэтому
+ * до ответа номер подменяется прямо там: иначе колонка на время
+ * перезапроса прыгала бы обратно. При отказе кэш возвращается целиком.
+ */
+export function useMoveBoardColumns(tableSlug: string | undefined, fieldSlug: string) {
+  const queryClient = useQueryClient();
+  const dataKey = relationDataKey(fieldSlug);
+
+  return useMutation({
+    mutationFn: (edits: RowEdit[]) =>
+      Promise.all(
+        edits.map(({ guid, values }) =>
+          api.put<unknown>(`/v2/items/${tableSlug ?? ""}`, { data: { guid, ...values } }),
+        ),
+      ),
+
+    onMutate: async (edits) => {
+      await queryClient.cancelQueries({ queryKey: keys.items.all });
+
+      const snapshot = queryClient.getQueriesData({ queryKey: keys.items.all });
+      const byGuid = new Map(edits.map((edit) => [edit.guid, edit.values]));
+
+      queryClient.setQueriesData({ queryKey: keys.items.all }, (page: unknown) =>
+        mapRows(page, (row) => {
+          const data = row[dataKey] as Record<string, unknown> | null | undefined;
+          const values = typeof data?.["guid"] === "string" ? byGuid.get(data["guid"]) : undefined;
+          return values ? { ...row, [dataKey]: { ...data, ...values } } : row;
+        }),
+      );
+
+      return snapshot;
+    },
+
+    onError: (error, _edits, snapshot) => {
+      snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      reportError(error, "common.saveFailed");
+    },
+
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.items.all }),
+  });
+}
+
+/**
  * Тот же ответ с изменённой строкой. Кэш хранит сырой ответ бэкенда
  * (select применяется на выходе), поэтому и патчится он в этой форме.
  *
  * Чужая форма проходит насквозь: под ключом items лежат и одиночные
  * записи, и ответы других ручек.
  */
-export function patchRow(page: unknown, edit: RowEdit): unknown {
+export function patchRow(page: unknown, { guid, values }: RowEdit): unknown {
+  return mapRows(page, (row) => (row["guid"] === guid ? { ...row, ...values } : row));
+}
+
+/** Строки ответа через `fix`. Ничего не поменялось — та же ссылка. */
+function mapRows(page: unknown, fix: (row: Item) => Item): unknown {
   /*
    * В кэше лежит НЕ один ответ, а куски бесконечного запроса:
    * `{pages, pageParams}` — useItems всегда useInfiniteQuery, даже
@@ -262,7 +313,7 @@ export function patchRow(page: unknown, edit: RowEdit): unknown {
    */
   const chunks = (page as { pages?: unknown[] } | undefined)?.pages;
   if (Array.isArray(chunks)) {
-    const pages = chunks.map((chunk) => patchRow(chunk, edit));
+    const pages = chunks.map((chunk) => mapRows(chunk, fix));
     // Ссылка та же, если ничего не поменялось: иначе перерисовывается
     // каждый список под ключом items, включая чужие.
     return pages.some((chunk, index) => chunk !== chunks[index])
@@ -270,15 +321,16 @@ export function patchRow(page: unknown, edit: RowEdit): unknown {
       : page;
   }
 
-  const { guid, values } = edit;
   const rows = (page as ItemsResponseDto | undefined)?.data?.response;
   if (!Array.isArray(rows)) return page;
 
-  const index = rows.findIndex((row) => row.guid === guid);
-  if (index === -1) return page;
-
-  const next = rows.slice();
-  next[index] = { ...rows[index], ...values };
+  let changed = false;
+  const next = rows.map((row) => {
+    const fixed = fix(row);
+    if (fixed !== row) changed = true;
+    return fixed;
+  });
+  if (!changed) return page;
 
   const dto = page as ItemsResponseDto;
   return { ...dto, data: { ...dto.data, response: next } };

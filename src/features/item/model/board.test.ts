@@ -1,6 +1,15 @@
 import { expect, test } from "vitest";
 import type { Field } from "@/features/table";
-import { boardColumns, boardLanes, boardOrderAt, groupValue, NO_GROUP } from "./board";
+import {
+  boardColumns,
+  boardLanes,
+  boardOrderAt,
+  columnOrderEdits,
+  groupValue,
+  NO_GROUP,
+  orderAt,
+  sortOrderOf,
+} from "./board";
 
 const tabs = [
   { id: "todo", label: "К работе" },
@@ -120,6 +129,64 @@ test("колонки из данных стоят по алфавиту, а не
   expect(boardColumns({ rows, tabs: [], slug: "status", unassigned: "—" }).map((c) => c.id)).toEqual(
     ["a", "b", NO_GROUP],
   );
+});
+
+test("колонки по связи стоят по номеру записи, безномерные — после, по алфавиту", () => {
+  const rows = [
+    { guid: "1", stage: "won" },
+    { guid: "2", stage: "lead" },
+    { guid: "3", stage: "b" },
+    { guid: "4", stage: "a" },
+  ];
+  const orders: Record<string, number> = { won: 6, lead: 1 };
+
+  expect(
+    boardColumns({
+      rows,
+      tabs: [],
+      slug: "stage",
+      unassigned: "—",
+      orderOf: (_row, value) => orders[value],
+    }).map((c) => c.id),
+  ).toEqual(["lead", "won", "a", "b", NO_GROUP]);
+});
+
+test("номер колонки — между соседями", () => {
+  expect(orderAt([1, 6], 1)).toBe(3.5);
+  expect(orderAt([1, 6], 0)).toBe(0);
+  expect(orderAt([1, 6], 2)).toBe(7);
+});
+
+test("перенос колонки среди пронумерованных — одна запись, номер между соседями", () => {
+  const rest = [
+    { id: "lead", label: "", rows: [], order: 1 },
+    { id: "won", label: "", rows: [], order: 6 },
+  ];
+
+  expect(columnOrderEdits(rest, "deal", 1)).toEqual([{ guid: "deal", order: 3.5 }]);
+});
+
+test("есть колонки без номера — нумеруются все, и колонка встаёт куда бросили", () => {
+  // lead=1, won=6, a и b без номера. lead бросают после a.
+  const rest = [
+    { id: "won", label: "", rows: [], order: 6 },
+    { id: "a", label: "", rows: [] },
+    { id: "b", label: "", rows: [] },
+  ];
+
+  expect(columnOrderEdits(rest, "lead", 2)).toEqual([
+    { guid: "won", order: 1 },
+    { guid: "a", order: 2 },
+    { guid: "lead", order: 3 },
+    { guid: "b", order: 4 },
+  ]);
+});
+
+test("номер колонки читается из связанной записи, пустой — не номер", () => {
+  expect(sortOrderOf({ stage_data: { sort_order: 3 } }, "stage")).toBe(3);
+  expect(sortOrderOf({ stage_data: { sort_order: "4" } }, "stage")).toBe(4);
+  expect(sortOrderOf({ stage_data: { sort_order: null } }, "stage")).toBeUndefined();
+  expect(sortOrderOf({ stage_data: null }, "stage")).toBeUndefined();
 });
 
 test("бросок в колонку без значения снимает значение, а не пишет пустую строку", () => {

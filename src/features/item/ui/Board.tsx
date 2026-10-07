@@ -1,12 +1,25 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type UIEvent } from "react";
 import { PencilIcon, PlusIcon, XIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useTablePermissions } from "@/features/auth";
 import { localized, optionOf, type Field, type Relation } from "@/features/table";
 import { CHIP_SURFACE, Chip, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { openPreview } from "@/shared/ui/file-preview";
 import { Icon } from "@/shared/ui/icon";
 import { Tooltip } from "@/shared/ui/tooltip";
-import { boardLanes, boardOrderAt, groupValue, BOARD_ORDER } from "../model/board";
+import { useMoveBoardColumns } from "../api/items";
+import {
+  boardColumns,
+  boardLanes,
+  boardOrderAt,
+  columnOrderEdits,
+  groupValue,
+  hasSortOrder,
+  sortOrderOf,
+  BOARD_ORDER,
+  NO_GROUP,
+  SORT_ORDER,
+} from "../model/board";
 import { cellKind } from "../model/cell-kind";
 import { isBlank } from "../model/cell-value";
 import { valueLabelOf } from "../model/relation";
@@ -116,6 +129,28 @@ export function Board({
    */
   const [editing, setEditing] = useState<string | null>(null);
 
+  /*
+   * Перенос колонки. Двигать можно только колонки по связи, у записей
+   * которой есть SORT_ORDER: номер пишется в саму запись (этап, статус),
+   * поэтому нужно право на правку ЕЁ таблицы, а не нашей.
+   */
+  const permissionOf = useTablePermissions();
+  const columnTable = field.relationId
+    ? relations.find((relation) => relation.id === field.relationId)?.toSlug
+    : undefined;
+  const moveColumns = useMoveBoardColumns(columnTable, field.slug);
+  const columnsMovable =
+    Boolean(columnTable) &&
+    permissionOf(columnTable).update &&
+    rows.some((row) => hasSortOrder(row, field.slug));
+  /* Дорожка — чтобы черта и бледность были только там, где мышь. */
+  const [columnDrag, setColumnDrag] = useState<{ lane: string; column: string } | null>(null);
+  const [columnOver, setColumnOver] = useState<{
+    lane: string;
+    column: string;
+    after: boolean;
+  } | null>(null);
+
   // Связи по id — ровно так их ждёт ячейка. Собираются здесь, как
   // и в таблице: наружу отдаётся тот же список, что приехал схемой.
   const byId = useMemo(
@@ -143,20 +178,31 @@ export function Board({
     return make;
   }, [relations, language]);
 
-  const lanes = useMemo(() => {
+  /*
+   * `allColumns` — колонки всей доски, без разреза на дорожки. Номер
+   * колонки считается по ним: в дорожке видны только колонки с её
+   * карточками, и число «между видимыми соседями» могло бы совпасть
+   * с номером колонки, которой в этой дорожке просто нет.
+   */
+  const { lanes, allColumns } = useMemo(() => {
     const group = groupOf(field);
     const lane = laneField ? groupOf(laneField) : undefined;
-
-    return boardLanes({
+    const layout = {
       rows,
       slug: field.slug,
       tabs: group.tabs,
       labelOf: group.labelOf,
+      orderOf: (row: Item) => sortOrderOf(row, field.slug),
+      unassigned: t("board.unassigned"),
+    };
+    const lanes = boardLanes({
+      ...layout,
       lane: laneField?.slug ?? "",
       laneTabs: lane?.tabs ?? [],
       ...(lane ? { laneLabelOf: lane.labelOf } : {}),
-      unassigned: t("board.unassigned"),
     });
+
+    return { lanes, allColumns: laneField ? boardColumns(layout) : (lanes[0]?.columns ?? []) };
   }, [rows, field, laneField, groupOf, t]);
 
   /*
@@ -211,6 +257,32 @@ export function Board({
     });
   };
 
+  /** Бросок колонки — новые номера записям связанной таблицы. */
+  const dropColumn = () => {
+    const moved = columnDrag?.column;
+    const target = columnOver;
+
+    setColumnDrag(null);
+    setColumnOver(null);
+
+    if (!moved || !target || moved === target.column) return;
+
+    const rest = allColumns.filter((column) => column.id !== NO_GROUP && column.id !== moved);
+    const index = rest.findIndex((column) => column.id === target.column);
+    if (index === -1) return;
+
+    const at = index + (target.after ? 1 : 0);
+    // Бросили на своё же место — запрос ничего не изменит.
+    if (allColumns.findIndex((column) => column.id === moved) === at) return;
+
+    moveColumns.mutate(
+      columnOrderEdits(rest, moved, at).map(({ guid, order }) => ({
+        guid,
+        values: { [SORT_ORDER]: order },
+      })),
+    );
+  };
+
   return (
     <div
       ref={box}
@@ -248,12 +320,48 @@ export function Board({
               const color: ChipColor = option?.color ? hexToChipColor(option.color) : "gray";
               const tint = CHIP_SURFACE[color];
               const isOver = over?.lane === lane.id && over.column === column.id;
+              const movable = columnsMovable && column.id !== NO_GROUP;
+              const columnHit =
+                columnOver?.lane === lane.id && columnOver.column === column.id ? columnOver : null;
 
               return (
                 <section
                   key={column.id || NO_GROUP_KEY}
-                  className="group/column flex w-[260px] shrink-0 flex-col"
+                  className={`group/column relative flex w-[260px] shrink-0 flex-col ${
+                    columnDrag?.lane === lane.id && columnDrag.column === column.id
+                      ? "opacity-40"
+                      : ""
+                  }`}
+                  onDragOver={(event) => {
+                    if (!columnDrag || !movable) return;
+                    event.preventDefault();
+
+                    const area = event.currentTarget.getBoundingClientRect();
+                    const after = event.clientX > area.left + area.width / 2;
+
+                    setColumnOver((current) =>
+                      current?.lane === lane.id &&
+                      current.column === column.id &&
+                      current.after === after
+                        ? current
+                        : { lane: lane.id, column: column.id, after },
+                    );
+                  }}
+                  onDrop={(event) => {
+                    if (!columnDrag) return;
+                    event.preventDefault();
+                    dropColumn();
+                  }}
                 >
+                  {/* Куда встанет колонка — черта посреди промежутка (gap-3). */}
+                  {columnHit && (
+                    <span
+                      aria-hidden
+                      className={`absolute inset-y-0 z-20 w-0.5 rounded-full bg-accent ${
+                        columnHit.after ? "-right-[7px]" : "-left-[7px]"
+                      }`}
+                    />
+                  )}
                   {/*
                    * Шапка липнет к верху доски. Подложка двойная: цвет
                    * колонки полупрозрачный, и сквозь него просвечивали бы
@@ -267,7 +375,21 @@ export function Board({
                    * карточка, то есть радиус на глазах пропадал бы.
                    */}
                   <div className={`shrink-0 bg-bg ${laneField ? "" : "sticky top-0 z-10"}`}>
-                    <header className={`flex h-11 items-center gap-2 rounded-t-[8px] px-2 ${tint}`}>
+                    <header
+                      draggable={movable}
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData("text/plain", column.id);
+                        event.dataTransfer.effectAllowed = "move";
+                        setColumnDrag({ lane: lane.id, column: column.id });
+                      }}
+                      onDragEnd={() => {
+                        setColumnDrag(null);
+                        setColumnOver(null);
+                      }}
+                      className={`flex h-11 items-center gap-2 rounded-t-[8px] px-2 ${tint} ${
+                        movable ? "cursor-grab" : ""
+                      }`}
+                    >
                       <Chip color={color} dot={isStage(field)}>
                         {column.label}
                       </Chip>
