@@ -1468,3 +1468,18 @@ table.go:1285`) — и пишет их поверх. Всё остальное, 
 Обход: не слать `created_at` в `order`. Без `order` ручка и так
 сортирует `a.created_at DESC` (`object_builder.go:836`) — так читают
 журналы вебхуков и AI (`features/settings/ui/TableLogs.tsx`).
+
+## Список связей таблицы режется на 60
+
+**`GET /v2/relations/{slug}` без `limit` отдаёт 60 связей, а `count`
+считает другое.** Шлюз подставляет `DefaultLimit = "60"`
+(`ucode_go_admin_api_gateway/config/config.go:263`,
+`api/handlers/v2/handler.go:158`), а в список попадают и связи, ведущие
+В таблицу (`storage/postgres/relation.go`, GetList: `r.table_to = …`),
+отсортированные по `created_at DESC`. У `employees` их 70: свои связи
+(должность, отдел, локация, грейд) заведены раньше и в первые 60
+не попадали — колонки-ссылки были пустыми. `count` при этом 11: он
+считает не то, что отдал список.
+
+Обход: `?limit=0` — GetList понимает ноль как «без LIMIT»
+(`if data.Limit > 0`). Так читает `features/table/api/schema.ts`.

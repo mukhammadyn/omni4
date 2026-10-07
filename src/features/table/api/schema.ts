@@ -49,7 +49,16 @@ export function useTableSchema(tableSlug: string | undefined, columnIds?: string
       },
       {
         queryKey: keys.tables.relations(slug),
-        queryFn: () => api.get<RelationsResponseDto>(`/v2/relations/${slug}`),
+        /*
+         * `limit=0` — без предела. Без параметра шлюз подставляет 60
+         * (gateway, config/config.go:263, DefaultLimit), а в список идут
+         * и связи, ведущие В таблицу: на `employees` ссылаются почти все
+         * таблицы ERP, и её собственные связи (должность, отдел) в первые
+         * 60 не попадали — колонки-ссылки оставались пустыми. Ноль
+         * object_builder понимает как «всё» (storage/postgres/relation.go,
+         * GetList: `if data.Limit > 0`).
+         */
+        queryFn: () => api.get<RelationsResponseDto>(`/v2/relations/${slug}?limit=0`),
         enabled: Boolean(slug),
         staleTime: SCHEMA_STALE,
       },
@@ -73,13 +82,21 @@ export function useTableSchema(tableSlug: string | undefined, columnIds?: string
    * Настройки нужны не всем связям, а только тем, чьи колонки показаны:
    * у таблицы их бывает полтора десятка, а во view выведены три, и
    * остальные тринадцать запросов уходят в никуда на каждую загрузку
-   * страницы. View перечисляет колонки-связи id СВЯЗИ — по нему и
-   * отбираем.
+   * страницы. Колонку-связь view перечисляет id связи, id поля или
+   * обоими (см. view/model/columns) — отбираем по любому.
+   *
+   * Без списка колонок — связи, у которых есть поле в ЭТОЙ таблице.
+   * Поля показа читаются только через него (`field.relationId`), а
+   * связи, ведущие сюда из чужих таблиц, колонок здесь не дают: на
+   * `employees` их шесть десятков, и запрос на каждую был бы впустую.
    */
-  const shown = columnIds ? new Set(columnIds) : undefined;
-  const needed = shown
-    ? base.schema.relations.filter((relation) => shown.has(relation.id))
-    : base.schema.relations;
+  const fieldRelations = new Set<string>();
+  for (const field of base.schema.fields) {
+    if (field.relationId && (!columnIds || columnIds.includes(field.id) || columnIds.includes(field.relationId))) {
+      fieldRelations.add(field.relationId);
+    }
+  }
+  const needed = base.schema.relations.filter((relation) => fieldRelations.has(relation.id));
 
   const details = useQueries({
     queries: needed.map((relation) => ({
