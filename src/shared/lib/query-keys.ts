@@ -16,6 +16,14 @@ export const keys = {
     fields: (tableSlug: string) => [...keys.tables.all, "fields", tableSlug] as const,
     relations: (tableSlug: string) => [...keys.tables.all, "relations", tableSlug] as const,
     /**
+     * Схема базы целиком — таблицы, поля, связи — для диаграммы. Читается
+     * из базы окружения, поэтому окружение в ключе, как у SQL. Под
+     * `tables.all`, а не `settings`: каждая правка схемы инвалидирует
+     * `tables.all`, и диаграмма перерисовывается вместе с конструктором.
+     */
+    schemaMap: (projectId: string, envId: string) =>
+      [...keys.tables.all, "schema-map", projectId, envId] as const,
+    /**
      * Подробности таблицы: поля с флагом `is_search` и view с правами
      * роли. Отдельный запрос, потому что и то и другое отдаёт только
      * POST /v1/table-details — ни в GET /v2/fields, ни в списке view
@@ -190,12 +198,6 @@ export const keys = {
      * что и сами данные, — то есть у каждого окружения свои.
      */
     sqlQueries: (envId: string) => [...keys.settings.all, "sql-queries", envId] as const,
-    /**
-     * Схема базы целиком — таблицы, поля, связи — для диаграммы. Читается
-     * из базы окружения, поэтому окружение в ключе, как у SQL.
-     */
-    schemaMap: (projectId: string, envId: string) =>
-      [...keys.settings.all, "schema-map", projectId, envId] as const,
     /**
      * Тариф и оплата. Всё — про ПРОЕКТ: подписка и баланс общие
      * на все его окружения.

@@ -8,11 +8,47 @@
  * `information_schema` показала бы таблицы без единой стрелки.
  */
 
-export type SchemaField = { slug: string; type: string };
+export type SchemaField = { slug: string; type: string; required: boolean; unique: boolean };
+
+/**
+ * Группа таблицы на диаграмме — вкладка над холстом.
+ *
+ * Модуль omni4 узнаётся по префиксу слага (`crm_`, `hr_`, `pm_`, `int_`),
+ * остальные его таблицы — «Ядро». Не по меню: справочники модулей лежат
+ * в папке «Настройки модулей», а «Проекты» временно не модуль
+ * (docs/STATUS.md), и папка-предок назвала бы группу неверно.
+ *
+ * Таблица, которую завёл пользователь, — «other»: её отличает то, что
+ * она не [[Protected]]. Модуль у неё не угадывается и по префиксу:
+ * `crm_notes` пользователя — всё равно его таблица, а не CRM.
+ */
+export const SCHEMA_GROUPS = ["platform", "core", "crm", "pm", "hr", "integrations", "other"] as const;
+export type SchemaGroup = (typeof SCHEMA_GROUPS)[number];
+
+const PREFIX_GROUPS: [string, SchemaGroup][] = [
+  ["crm_", "crm"],
+  ["pm_", "pm"],
+  ["hr_", "hr"],
+  ["int_", "integrations"],
+];
+
+export function groupOf(slug: string, isSystem: boolean, isProtected: boolean): SchemaGroup {
+  if (isSystem) return "platform";
+  if (!isProtected) return "other";
+  return PREFIX_GROUPS.find(([prefix]) => slug.startsWith(prefix))?.[1] ?? "core";
+}
 
 export type SchemaTable = {
   slug: string;
   label: string;
+  group: SchemaGroup;
+  /**
+   * Подгруппа внутри группы — подвкладка над холстом. Папка меню,
+   * лежащая прямо в модуле (`CRM / Продажи`, `HRMS / Время`), или
+   * унаследованная по ссылке (inheritSections). null — своей папки нет
+   * и сослаться не на кого: справочник.
+   */
+  section: string | null;
   fields: SchemaField[];
   /**
    * Строк в таблице — ОЦЕНКА postgres (`pg_class.reltuples`), а не
@@ -55,6 +91,8 @@ export function toSchemaMap(
     .map((row) => ({
       slug: String(row["slug"] ?? ""),
       label: String(row["label"] ?? ""),
+      group: groupOf(String(row["slug"] ?? ""), row["is_system"] === true, row["protected"] === true),
+      section: typeof row["section"] === "string" && row["section"] ? row["section"] : null,
       fields: parseFields(row["fields"]),
       rows: toRows(row["rows"]),
     }))
@@ -71,7 +109,49 @@ export function toSchemaMap(
     }))
     .filter((link) => known.has(link.from) && known.has(link.to));
 
+  inheritSections(tables, links);
   return { tables, links };
+}
+
+/**
+ * Подгруппа для таблиц без своей папки в модуле — от тех, на кого они
+ * ссылаются. Дочерние таблицы лежат в меню в «Служебных», но по смыслу
+ * принадлежат родителю: `hr_training_participants` → `hr_trainings` →
+ * «Обучение». Ссылка на таблицу без подгруппы не считается, но та может
+ * получить её на этом же проходе — поэтому до неподвижной точки:
+ * участник маршрута → маршрут → … наследует по цепочке.
+ *
+ * Голосуют только таблицы той же группы: `hr_job_history` ссылается
+ * и на `employees`, но «Люди» в Ядре — не подгруппа HR. Поровну —
+ * по алфавиту, чтобы раскладка не зависела от порядка связей.
+ *
+ * Не на кого сослаться — остаётся null: таблицу никто не трогает
+ * изнутри модуля, на неё ссылаются сами. Это и есть справочник.
+ */
+function inheritSections(tables: SchemaTable[], links: SchemaLink[]) {
+  const bySlug = new Map(tables.map((table) => [table.slug, table]));
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const table of tables) {
+      if (table.section) continue;
+
+      const votes = new Map<string, number>();
+      for (const link of links) {
+        const target = link.from === table.slug && link.to !== table.slug ? bySlug.get(link.to) : undefined;
+        if (target?.section && target.group === table.group) {
+          votes.set(target.section, (votes.get(target.section) ?? 0) + 1);
+        }
+      }
+
+      const best = [...votes].sort(([a, x], [b, y]) => y - x || a.localeCompare(b))[0];
+      if (best) {
+        table.section = best[0];
+        changed = true;
+      }
+    }
+  }
 }
 
 /** reltuples = -1 — «не анализировали», это не ноль строк. */
@@ -94,13 +174,37 @@ function parseFields(value: unknown): SchemaField[] {
 
   return list.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
-    const { slug, type } = item as Record<string, unknown>;
-    return typeof slug === "string" && slug ? [{ slug, type: typeof type === "string" ? type : "" }] : [];
+    const { slug, type, required, unique } = item as Record<string, unknown>;
+    return typeof slug === "string" && slug
+      ? [{ slug, type: typeof type === "string" ? type : "", required: required === true, unique: unique === true }]
+      : [];
   });
 }
 
-/** Карточка таблицы — `.dx-ent` прототипа: 200px, шапка 28, строка 22. */
-export const BOX_WIDTH = 200;
+/**
+ * Часть схемы: таблицы, которые прошли `keep`, и связи только между ними —
+ * стрелке в спрятанную таблицу некуда упереться.
+ */
+export function pickSchema(map: SchemaMap, keep: (table: SchemaTable) => boolean): SchemaMap {
+  const tables = map.tables.filter(keep);
+  const slugs = new Set(tables.map((table) => table.slug));
+  return { tables, links: map.links.filter((link) => slugs.has(link.from) && slugs.has(link.to)) };
+}
+
+/**
+ * Совпадение поиска: слаг или подпись таблицы, либо слаг любого поля.
+ * Строка поиска — уже в нижнем регистре.
+ */
+export function matchesTable(table: SchemaTable, query: string): boolean {
+  return (
+    table.slug.toLowerCase().includes(query) ||
+    table.label.toLowerCase().includes(query) ||
+    table.fields.some((field) => field.slug.toLowerCase().includes(query))
+  );
+}
+
+/** Карточка таблицы — `.dx-ent` прототипа, шире на флажки NN/UQ: шапка 28, строка 22. */
+export const BOX_WIDTH = 240;
 export const HEAD_HEIGHT = 28;
 export const ROW_HEIGHT = 22;
 const GAP_X = 80;

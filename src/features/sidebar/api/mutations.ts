@@ -32,13 +32,21 @@ export type MenuInput = {
  * мог переехать между уровнями, и точечная инвалидация одного уровня
  * оставила бы второй устаревшим.
  */
-function useMenuMutation<TVars>(run: (vars: TVars, projectId: string) => Promise<unknown>) {
+function useMenuMutation<TVars>(
+  run: (vars: TVars, projectId: string) => Promise<unknown>,
+  /** Мутация заводит таблицу: устарели и список таблиц, и схема базы. */
+  touchesTables = false,
+) {
   const queryClient = useQueryClient();
   const projectId = useSession().getProjectId() ?? "";
 
   return useMutation({
     mutationFn: (vars: TVars) => run(vars, projectId),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.menus.all }),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.menus.all }),
+        touchesTables && queryClient.invalidateQueries({ queryKey: keys.tables.all }),
+      ]),
   });
 }
 
@@ -89,7 +97,7 @@ export function useCreateMenu() {
       ...(input.tableId ? { table_id: input.tableId } : {}),
       attributes: { ...labelAttributes(input.labels), ...input.attributes },
     });
-  });
+  }, true);
 }
 
 /** Что меняем у существующего пункта. Остальное берётся из него самого. */

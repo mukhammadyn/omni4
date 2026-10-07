@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutSchema, toDbml, toSchemaMap } from "./schema-map";
+import { groupOf, layoutSchema, matchesTable, pickSchema, toDbml, toSchemaMap } from "./schema-map";
 
 const tableRows = [
   { slug: "deal", label: "Deals", rows: 12, fields: [{ slug: "guid", type: "UUID" }, { slug: "company_id", type: "LOOKUP" }] },
@@ -24,6 +24,72 @@ describe("toSchemaMap", () => {
     expect(map.tables.map((table) => table.fields.length)).toEqual([2, 1, 0]);
     expect(map.tables.map((table) => table.rows)).toEqual([12, null, null]);
     expect(map.links).toEqual([{ from: "deal", field: "company_id", to: "company", type: "Many2One" }]);
+  });
+});
+
+describe("groupOf", () => {
+  it("модуль — по префиксу у таблиц omni4, пользовательская — в «Другое»", () => {
+    expect(groupOf("role", true, false)).toBe("platform");
+    expect(groupOf("crm_deals", false, true)).toBe("crm");
+    expect(groupOf("hr_shifts", false, true)).toBe("hr");
+    expect(groupOf("int_ai_audit", false, true)).toBe("integrations");
+    expect(groupOf("employees", false, true)).toBe("core");
+    // Префикс модуля у своей таблицы её модульной не делает.
+    expect(groupOf("crm_notes", false, false)).toBe("other");
+  });
+
+  it("protected приходит из SQL строгим true", () => {
+    const [crm, own] = toSchemaMap(
+      [
+        { slug: "crm_deals", protected: true, fields: [] },
+        { slug: "crm_mine", protected: "true", fields: [] },
+      ],
+      [],
+    ).tables;
+
+    expect([crm?.group, own?.group]).toEqual(["crm", "other"]);
+  });
+});
+
+describe("подгруппы", () => {
+  const row = (slug: string, section?: string) => ({ slug, protected: true, section, fields: [] });
+  const link = (from: string, to: string) => ({ table_from: from, field_from: `${to}_id`, table_to: to });
+
+  it("дочерняя наследует подгруппу родителя по цепочке, справочник остаётся без неё", () => {
+    const map = toSchemaMap(
+      [
+        row("hr_trainings", "Обучение"),
+        row("hr_training_participants"),
+        row("hr_participant_notes"),
+        row("hr_absence_types"),
+        row("employees", "Люди"),
+        row("hr_job_history"),
+      ],
+      [
+        link("hr_participant_notes", "hr_training_participants"),
+        link("hr_training_participants", "hr_trainings"),
+        link("hr_training_participants", "hr_absence_types"),
+        // «Люди» — подгруппа Ядра, а не HR: из другой группы не наследуется.
+        link("hr_job_history", "employees"),
+      ],
+    );
+    const section = (slug: string) => map.tables.find((table) => table.slug === slug)?.section;
+
+    expect(section("hr_training_participants")).toBe("Обучение");
+    expect(section("hr_participant_notes")).toBe("Обучение");
+    expect(section("hr_absence_types")).toBeNull();
+    expect(section("hr_job_history")).toBeNull();
+  });
+});
+
+describe("pickSchema", () => {
+  it("оставляет связи только между оставшимися и ищет по полям", () => {
+    const map = toSchemaMap(tableRows, linkRows);
+    const picked = pickSchema(map, (table) => matchesTable(table, "company_id"));
+
+    expect(picked.tables.map((table) => table.slug)).toEqual(["deal"]);
+    expect(picked.links).toEqual([]);
+    expect(pickSchema(map, () => true).links).toHaveLength(1);
   });
 });
 
