@@ -88,8 +88,9 @@ export function toNodes(menus: MenuDto[], languages: string | string[]): MenuNod
     // не показать: человек будет думать, что сломалось.
     .filter((node) => node.can.read)
     // Системные пункты (Настройки, Файлы, Пользователи) живут на своих
-    // экранах, а не в дереве меню.
-    .filter((node) => !isSystemMenu(node.id));
+    // экранах, а не в дереве меню. Пункт «Настройки» модуля — тоже:
+    // вход в настройки один, в низу сайдбара (SidebarFooter).
+    .filter((node) => !isSystemMenu(node.id) && !node.isSettings);
 }
 
 /**
@@ -225,7 +226,14 @@ type Move = {
   movedId?: string;
 };
 
-/** Переставляет сырые пункты уровня в порядке, который задал пользователь. */
+/**
+ * Переставляет сырые пункты уровня в порядке, который задал пользователь.
+ *
+ * Пункты уровня, которых в дереве не видно (системные, «Настройки»
+ * модуля — см. toNodes), уходят в конец, а не пропадают: порядок
+ * пишется всему уровню (`order = индекс + 1`), и выпавший из списка
+ * пункт остался бы со старым номером — тем же, что у видимого соседа.
+ */
 export function applyOrder(
   cached: MenusResponseDto | undefined,
   order: MenuNode[],
@@ -234,7 +242,11 @@ export function applyOrder(
   const byId = new Map((cached?.menus ?? []).map((dto) => [dto.id, dto]));
   if (moved?.id) byId.set(moved.id, moved);
 
-  const menus = order.map((node) => byId.get(node.id)).filter((dto): dto is MenuDto => Boolean(dto));
+  const ordered = new Set(order.map((node) => node.id));
+  const menus = [
+    ...order.map((node) => byId.get(node.id)).filter((dto): dto is MenuDto => Boolean(dto)),
+    ...(cached?.menus ?? []).filter((dto) => !ordered.has(dto.id ?? "")),
+  ];
 
   return { ...cached, menus, count: menus.length };
 }
@@ -266,8 +278,16 @@ export function useReorderMenus() {
         await api.put("/v3/menus", menuUpdateBody(node, { parentId }, projectId));
       }
 
+      /*
+       * Уровень целиком, вместе со скрытыми пунктами: onMutate уже
+       * разложил его в кэше через applyOrder. Без кэша — хотя бы видимые.
+       */
+      const level = queryClient.getQueryData<MenusResponseDto>(
+        keys.menus.children(projectId, envId, parentId),
+      )?.menus;
+
       await api.put("/v3/menus/menu-order", {
-        menus: siblings.map((node) => ({ id: node.id })),
+        menus: (level ?? siblings).map((item) => ({ id: item.id })),
         project_id: projectId,
       });
     },

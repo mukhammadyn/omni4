@@ -179,19 +179,6 @@ function MenuRow({
     >
       {inner}
     </button>
-  ) : node.isSettings ? (
-    /* Страница настроек одна на все модули. Горит на любом разделе:
-       раздел — в поиске адреса, и он в сравнение не входит. */
-    <Link
-      to="/settings"
-      draggable={false}
-      className={inner_row}
-      style={style}
-      activeOptions={{ includeSearch: false }}
-      activeProps={{ className: `${inner_row} ${activeRow}` }}
-    >
-      {inner}
-    </Link>
   ) : node.kind === "link" && node.href ? (
     <a
       href={node.href}

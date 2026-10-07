@@ -54,6 +54,15 @@ test("пункт, которого нет ни в кэше, ни в перено
   expect(next.count).toBe(1);
 });
 
+test("скрытые пункты уровня остаются в нём — в конце", () => {
+  // Иначе порядок уходит без них, и их старый номер совпадает с чужим.
+  const cached = { menus: [{ id: "a" }, { id: "settings" }, { id: "b" }] };
+
+  const next = applyOrder(cached, [node("b"), node("a")], undefined);
+
+  expect(next.menus?.map((m) => m.id)).toEqual(["b", "a", "settings"]);
+});
+
 test("пустой кэш не роняет перестановку", () => {
   expect(applyOrder(undefined, [node("a")], undefined).menus).toEqual([]);
 });
