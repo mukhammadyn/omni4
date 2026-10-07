@@ -4,6 +4,7 @@ import {
   boardColumns,
   boardLanes,
   boardOrderAt,
+  colorOf,
   columnOrderEdits,
   groupValue,
   NO_GROUP,
@@ -187,6 +188,22 @@ test("номер колонки читается из связанной зап�
   expect(sortOrderOf({ stage_data: { sort_order: "4" } }, "stage")).toBe(4);
   expect(sortOrderOf({ stage_data: { sort_order: null } }, "stage")).toBeUndefined();
   expect(sortOrderOf({ stage_data: null }, "stage")).toBeUndefined();
+});
+
+test("колонка по связи берёт цвет из связанной записи", () => {
+  const rows = [{ guid: "1", stage: "s1", stage_data: { guid: "s1", color: "#3b82f6" } }];
+
+  const [column] = boardColumns({
+    rows,
+    tabs: [],
+    slug: "stage",
+    unassigned: "—",
+    colorOf: (row) => colorOf(row, "stage"),
+  });
+
+  expect(column?.color).toBe("#3b82f6");
+  expect(colorOf({ stage_data: { color: "" } }, "stage")).toBeUndefined();
+  expect(colorOf({ stage_data: null }, "stage")).toBeUndefined();
 });
 
 test("бросок в колонку без значения снимает значение, а не пишет пустую строку", () => {

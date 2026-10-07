@@ -1,5 +1,6 @@
 import type { Field } from "@/features/table";
 import { toList } from "./cell-value";
+import { COLOR } from "./relation";
 import { relationDataKey, type Item } from "./types";
 
 /**
@@ -32,15 +33,20 @@ export const BOARD_ORDER = "board_order";
  */
 export const SORT_ORDER = "sort_order";
 
+/** Связанная запись, приехавшая в строке (`<поле>_data`). Список — не запись. */
+function relatedOf(row: Item, fieldSlug: string): Record<string, unknown> | undefined {
+  const data = row[relationDataKey(fieldSlug)];
+  return typeof data === "object" && data !== null && !Array.isArray(data)
+    ? (data as Record<string, unknown>)
+    : undefined;
+}
+
 /**
- * Номер колонки по связи — из связанной записи, приехавшей в строке
- * (`<поле>_data`). `undefined` — у записи нет поля номера или оно пустое.
+ * Номер колонки по связи — из связанной записи.
+ * `undefined` — у записи нет поля номера или оно пустое.
  */
 export function sortOrderOf(row: Item, fieldSlug: string): number | undefined {
-  const data = row[relationDataKey(fieldSlug)];
-  if (typeof data !== "object" || data === null || Array.isArray(data)) return undefined;
-
-  const value = (data as Record<string, unknown>)[SORT_ORDER];
+  const value = relatedOf(row, fieldSlug)?.[SORT_ORDER];
   if (value === null || value === undefined || value === "") return undefined;
 
   const order = Number(value);
@@ -49,8 +55,14 @@ export function sortOrderOf(row: Item, fieldSlug: string): number | undefined {
 
 /** Есть ли у связанной записи поле номера вообще — пусть даже пустое. */
 export function hasSortOrder(row: Item, fieldSlug: string): boolean {
-  const data = row[relationDataKey(fieldSlug)];
-  return typeof data === "object" && data !== null && !Array.isArray(data) && SORT_ORDER in data;
+  const data = relatedOf(row, fieldSlug);
+  return data !== undefined && SORT_ORDER in data;
+}
+
+/** HEX связанной записи. Не строка или пусто — цвета нет. */
+export function colorOf(row: Item, fieldSlug: string): string | undefined {
+  const value = relatedOf(row, fieldSlug)?.[COLOR];
+  return typeof value === "string" && value ? value : undefined;
 }
 
 /**
@@ -91,6 +103,8 @@ export type BoardColumn = {
   rows: Item[];
   /** Место колонки из данных (SORT_ORDER связанной записи). Нет — после пронумерованных. */
   order?: number | undefined;
+  /** HEX колонки из данных (COLOR связанной записи). У вариантов поля цвет свой. */
+  color?: string | undefined;
 };
 
 /** Готовая колонка: значение поля и его подпись. */
@@ -131,6 +145,7 @@ export function boardColumns({
   unassigned,
   labelOf,
   orderOf,
+  colorOf,
 }: {
   rows: Item[];
   /** Варианты поля. Пусто — колонки целиком из данных. */
@@ -145,6 +160,8 @@ export function boardColumns({
   labelOf?: ((row: Item, value: string) => string) | undefined;
   /** Номер колонки из данных — по любой её строке. */
   orderOf?: ((row: Item, value: string) => number | undefined) | undefined;
+  /** Цвет колонки из данных — по любой её строке. */
+  colorOf?: ((row: Item, value: string) => string | undefined) | undefined;
 }): BoardColumn[] {
   const byValue = new Map<string, Item[]>();
 
@@ -184,6 +201,7 @@ export function boardColumns({
       label: (first && labelOf?.(first, value)) || value,
       rows: list,
       order: first && orderOf?.(first, value),
+      color: first && colorOf?.(first, value),
     });
   }
 
@@ -251,6 +269,7 @@ export function boardLanes({
   unassigned: string;
   labelOf?: ((row: Item, value: string) => string) | undefined;
   orderOf?: ((row: Item, value: string) => number | undefined) | undefined;
+  colorOf?: ((row: Item, value: string) => string | undefined) | undefined;
 }): BoardLane[] {
   if (!lane) {
     return [

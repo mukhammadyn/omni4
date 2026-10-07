@@ -12,6 +12,7 @@ import {
   boardColumns,
   boardLanes,
   boardOrderAt,
+  colorOf,
   columnOrderEdits,
   groupValue,
   hasSortOrder,
@@ -193,6 +194,7 @@ export function Board({
       tabs: group.tabs,
       labelOf: group.labelOf,
       orderOf: (row: Item) => sortOrderOf(row, field.slug),
+      colorOf: (row: Item) => colorOf(row, field.slug),
       unassigned: t("board.unassigned"),
     };
     const lanes = boardLanes({
@@ -317,7 +319,11 @@ export function Board({
           <div className={`flex gap-3 pt-3 ${laneField ? "pb-1" : "flex-1"}`}>
             {lane.columns.map((column) => {
               const option = optionOf(field, column.id);
-              const color: ChipColor = option?.color ? hexToChipColor(option.color) : "gray";
+              /* Цвет — у варианта поля; у колонки по связи — у связанной
+                 записи (COLOR). HEX читается как намерение и рисуется
+                 токенами палитры: иначе тёмная тема ломается. */
+              const hex = option?.color ?? column.color;
+              const color: ChipColor = hex ? hexToChipColor(hex) : "gray";
               const tint = CHIP_SURFACE[color];
               const isOver = over?.lane === lane.id && over.column === column.id;
               const movable = columnsMovable && column.id !== NO_GROUP;

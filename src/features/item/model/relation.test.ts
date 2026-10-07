@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import type { Relation } from "@/features/table";
-import { autoFilterValues, selfDefaults } from "./relation";
+import type { Field, Relation } from "@/features/table";
+import { autoFilterValues, relationSelection, selfDefaults } from "./relation";
 
 /** Связь с настроенным автофильтром: город отбирается по региону строки. */
 function relationWith(autoFilters: unknown): Relation {
@@ -95,4 +95,20 @@ test("подставлять нечего — колонки в новой за�
 test("входящая связь ничего не подставляет", () => {
   const incoming = selfRelation("user", { direction: "incoming" });
   expect(selfDefaults([incoming], ME)).toEqual({});
+});
+
+test("цвет связанной записи едет вместе с подписью, пустой — не цвет", () => {
+  const field = { slug: "stage_id" } as Field;
+  const fields = [{ slug: "name", type: "SINGLE_LINE" }];
+
+  expect(
+    relationSelection(
+      { stage_id_data: { guid: "s1", name: "КП готов", color: "#3b82f6" } },
+      field,
+      fields,
+    ),
+  ).toEqual([{ guid: "s1", label: "КП готов", color: "#3b82f6" }]);
+  expect(
+    relationSelection({ stage_id_data: { guid: "s2", name: "Без", color: "" } }, field, fields),
+  ).toEqual([{ guid: "s2", label: "Без" }]);
 });

@@ -33,6 +33,17 @@ export type RelationEdit = {
 };
 
 /**
+ * Поле цвета связанной записи — у справочников модулей оно везде одно
+ * (`color COLOR` в `erp.dbml`: этапы, статусы, источники). Им красится
+ * и значение связи в ячейке, и колонка доски по связи.
+ *
+ * ponytail: имя поля — договорённость, а не поиск по типу. Назовут
+ * цвет иначе — искать поле типа COLOR в схеме связанной таблицы
+ * (лишний запрос, и решать, какое из нескольких).
+ */
+export const COLOR = "color";
+
+/**
  * Что показывать вместо uuid: поля связанной строки, выбранные
  * в настройках связи (view_fields). Связанная строка приходит рядом
  * со значением: author_id → author_id_data.
@@ -46,7 +57,7 @@ export function relationSelection(
   fields: ViewField[] | undefined,
   /** Язык ДАННЫХ: им отбирается колонка мультиязычного поля показа. */
   language = "",
-): { guid: string; label: string }[] {
+): { guid: string; label: string; color?: string }[] {
   if (!fields?.length) return [];
 
   const related = row[relationDataKey(field.slug)];
@@ -58,6 +69,7 @@ export function relationSelection(
     .map((item) => ({
       guid: String(item["guid"] ?? ""),
       label: relationLabel(item, fields, language),
+      ...(typeof item[COLOR] === "string" && item[COLOR] ? { color: item[COLOR] } : {}),
     }))
     .filter((item) => item.guid || item.label);
 }

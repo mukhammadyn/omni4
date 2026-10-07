@@ -543,9 +543,25 @@ function RelationCell({
 }) {
   const { t } = useTranslation();
   const slugs = field.relationId ? relations.get(field.relationId)?.viewFields : undefined;
-  const parts = relationSelection(row, field, slugs, language)
-    .map((item) => item.label)
-    .filter(Boolean);
+  const selected = relationSelection(row, field, slugs, language).filter((item) => item.label);
+  const parts = selected.map((item) => item.label);
+
+  /*
+   * У связанной записи есть цвет (этап, статус из справочника) — значение
+   * рисуется чипом его цвета, как вариант поля, и совпадает с колонкой
+   * доски по этой связи. HEX — через палитру, как у вариантов.
+   */
+  if (selected.some((item) => item.color)) {
+    return (
+      <span className="flex min-w-0 gap-1 overflow-hidden">
+        {selected.map((item) => (
+          <Chip key={item.guid || item.label} color={item.color ? hexToChipColor(item.color) : "gray"}>
+            {item.label}
+          </Chip>
+        ))}
+      </span>
+    );
+  }
 
   /*
    * Ссылка на запись — `.rel` прототипа: стрелка «перейти» и линия
