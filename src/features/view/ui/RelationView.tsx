@@ -38,6 +38,7 @@ import {
 import { PrintButton } from "@/features/docs";
 import { useSchemaLocked, useTableSchema, type Field, type Relation } from "@/features/table";
 import type { DataLanguage } from "@/features/workspace";
+import { nowLocal } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { useUi } from "@/shared/lib/ui-store";
 import { pinnedIds, resolveColumnIds } from "../model/columns";
@@ -241,7 +242,7 @@ export function RelationView({
 
   const [period, setPeriod] = useState<CalendarPeriod>(() => toPeriod(tab.view.period));
   const [scale, setScale] = useState<TimelineScale>("DAY");
-  const [cursor, setCursor] = useState(() => new Date());
+  const [cursor, setCursor] = useState(() => nowLocal());
   /** Сколько месяцев ленты загружено вокруг курсора: MONTH — лента недель. */
   const [span, setSpan] = useState({ past: 1, future: 1 });
   /** Видимый диапазон: он же отбор строк календаря. */

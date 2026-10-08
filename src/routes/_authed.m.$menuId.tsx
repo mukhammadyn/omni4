@@ -141,6 +141,7 @@ import {
 } from "@/features/view";
 import { useDataLanguages } from "@/features/workspace";
 import { useSession } from "@/shared/api/use-session";
+import { nowLocal } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { useUi } from "@/shared/lib/ui-store";
 import type { TranslationKey } from "@/shared/lib/i18n";
@@ -265,10 +266,10 @@ function parseDay(value: string | undefined): Date {
   const parts = (value ?? "").split("-").map(Number);
   const [year, month, day] = parts;
 
-  if (parts.length !== 3 || !year || !month || !day) return new Date();
+  if (parts.length !== 3 || !year || !month || !day) return nowLocal();
 
   const date = new Date(year, month - 1, day);
-  return Number.isNaN(date.getTime()) ? new Date() : date;
+  return Number.isNaN(date.getTime()) ? nowLocal() : date;
 }
 
 export const Route = createFileRoute("/_authed/m/$menuId")({

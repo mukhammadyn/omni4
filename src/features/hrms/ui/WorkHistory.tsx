@@ -15,6 +15,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { ItemDrawer, relationDataKey, rowErrors, type Item } from "@/features/item";
 import type { DataLanguage } from "@/features/workspace";
+import { todayInput } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { Chip, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
@@ -85,7 +86,7 @@ export function WorkHistory({
       if (data) copy[relationDataKey(field.slug)] = data;
     }
     setShowErrors(false);
-    setDraft({ ...copy, [link]: employee, date_from: new Date().toLocaleDateString("sv") });
+    setDraft({ ...copy, [link]: employee, date_from: todayInput() });
   };
 
   return (

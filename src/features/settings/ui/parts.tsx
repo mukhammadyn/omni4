@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
    вопрос «сколько строк показывать», и два разных набора значений
    разошлись бы на первой же правке. */
 import { PAGE_SIZES } from "@/features/item";
+import { timeZone } from "@/shared/lib/date-value";
 import { CHIP_STYLES, Chip, type ChipColor } from "@/shared/ui/chip";
 import { DatePicker } from "@/shared/ui/date-picker";
 import { Dropdown } from "@/shared/ui/dropdown";
@@ -578,7 +579,7 @@ export function formatDateTime(value: string, locale: string): string {
   if (!value) return "";
 
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString(locale);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString(locale, { timeZone: timeZone() });
 }
 
 /** Пустой список или загрузка — `.dx-empty` прототипа. */

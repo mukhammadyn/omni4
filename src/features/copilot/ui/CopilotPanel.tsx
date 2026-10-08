@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useGlobalRight } from "@/features/auth";
+import { timeZone } from "@/shared/lib/date-value";
 import { COPILOT_MAX_WIDTH, COPILOT_MIN_WIDTH, useUi } from "@/shared/lib/ui-store";
 import type { TranslationKey } from "@/shared/lib/i18n";
 import { Icon } from "@/shared/ui/icon";
@@ -423,6 +424,7 @@ function when(iso: string): string {
   if (Number.isNaN(date.getTime())) return "";
 
   return date.toLocaleString(undefined, {
+    timeZone: timeZone(),
     day: "numeric",
     month: "short",
     hour: "2-digit",

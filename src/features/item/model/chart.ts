@@ -1,4 +1,4 @@
-import { toDateValue, type DateKind } from "@/shared/lib/date-value";
+import { toDateValue, wallClock, type DateKind } from "@/shared/lib/date-value";
 import { pivotKey, pivotTable, reduce, toAggregation, toNumber, type Aggregation } from "./pivot";
 import type { Item } from "./types";
 
@@ -676,24 +676,13 @@ export function bucketKey(value: unknown, kind: DateKind, bucket: ChartBucket): 
   const parsed = toDateValue(value, kind);
   if (!parsed) return null;
 
-  // Значение без пояса лежит в Date как UTC — так же его и читаем,
-  // иначе браузер пересчитает в местное время и сдвинет день.
-  const date = parsed.date;
-  const get = parsed.naive
-    ? {
-        year: date.getUTCFullYear(),
-        month: date.getUTCMonth() + 1,
-        day: date.getUTCDate(),
-        hour: date.getUTCHours(),
-        weekday: date.getUTCDay(),
-      }
-    : {
-        year: date.getFullYear(),
-        month: date.getMonth() + 1,
-        day: date.getDate(),
-        hour: date.getHours(),
-        weekday: date.getDay(),
-      };
+  // Момент — в поясе пользователя, значение без пояса — как лежит
+  // (shared/lib/date-value, wallClock). День недели — от этих же частей.
+  const clock = wallClock(parsed);
+  const get = {
+    ...clock,
+    weekday: new Date(Date.UTC(clock.year, clock.month - 1, clock.day)).getUTCDay(),
+  };
 
   const pad = (n: number) => String(n).padStart(2, "0");
 

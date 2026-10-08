@@ -3,6 +3,7 @@ import { useTablePermissions } from "@/features/auth";
 import { MAX_LIMIT, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
 import { ALL_VIEW_RIGHTS, localized, useTableDetails, useTableSchema } from "@/features/table";
 import { relationTabs, useMenuViews } from "@/features/view";
+import { todayInput } from "@/shared/lib/date-value";
 import { firstText, related, text, toPerson } from "./org";
 
 /** Таблица сотрудников ERP (`ucode/erp/erp.dbml`, «Сотрудник = пользователь»). */
@@ -53,14 +54,13 @@ export function useEmployee(menuId: string, guid: string, language: string) {
     can: permissionOf(EMPLOYEES),
     edit: (slug: string, value: unknown) => update.mutate({ guid, values: { [slug]: value } }),
     /**
-     * Увольнение: статус «Уволен» и дата — сегодня, местная («ГГГГ-ММ-ДД»,
-     * как пишет поле DATE; `sv` — локаль с этим форматом). Причину
-     * и прочее правят полями.
+     * Увольнение: статус «Уволен» и дата — сегодня в поясе пользователя
+     * («ГГГГ-ММ-ДД», как пишет поле DATE). Причину и прочее правят полями.
      */
     dismiss: () =>
       update.mutate({
         guid,
-        values: { status: "dismissed", dismissal_date: new Date().toLocaleDateString("sv") },
+        values: { status: "dismissed", dismissal_date: todayInput() },
       }),
   };
 }
