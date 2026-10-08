@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { MonitorIcon, Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSession } from "@/shared/api/use-session";
+import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { PasswordInput } from "@/shared/ui/password-input";
@@ -12,11 +14,13 @@ import {
   useProfile,
   useSessions,
   useUpdateProfile,
+  useUpdateTimezone,
+  useUserTimezone,
   type ProfileDraft,
 } from "../api/profile";
 import { useClientTypes } from "../api/client-types";
 import { ImagePicker } from "./ImagePicker";
-import { GroupTitle, SectionHeader, SettingRow } from "./parts";
+import { GroupTitle, SectionHeader, SettingRow, formatDateTime } from "./parts";
 
 /**
  * Профиль: имя, как человека зовут в интерфейсе, и способы входа.
@@ -139,11 +143,70 @@ export function ProfileSettings() {
         </Button>
       </div>
 
+      <TimezoneSection />
       <PasswordSection />
       <SessionsSection />
     </>
   );
 }
+
+/**
+ * Часовой пояс — [[User Timezone]]. Уезжает сразу, без кнопки: это одна
+ * настройка, а не форма, как язык интерфейса.
+ *
+ * У ADMIN учётной записи в `users` нет — и пояса тоже (ADR-0014).
+ */
+function TimezoneSection() {
+  const { t } = useTranslation();
+  const { timezone, hasAccount } = useUserTimezone();
+  const update = useUpdateTimezone();
+  const [query, setQuery] = useState("");
+
+  if (!hasAccount) return null;
+
+  const needle = query.trim().toLowerCase();
+  // Выбранный — всегда в списке: кнопка ищет подпись среди `items`
+  // и без него пустела бы на время поиска.
+  const items = TIME_ZONES.filter(
+    (item) => item.value === timezone || !needle || item.label.toLowerCase().includes(needle),
+  );
+
+  return (
+    <>
+      <GroupTitle title={t("settings.timezone")} hint={t("settings.timezoneHint")} />
+      <SettingRow label={t("settings.timezone")}>
+        <div className="w-full">
+          <Dropdown
+            value={timezone}
+            items={items}
+            ariaLabel={t("settings.timezone")}
+            disabled={update.isPending}
+            search={query}
+            searchPlaceholder={t("settings.searchTimezone")}
+            emptyText={t("settings.timezoneNotFound")}
+            onSearch={setQuery}
+            onChange={(next) =>
+              update.mutate(next, { onSuccess: () => toast.success(t("settings.saved")) })
+            }
+          />
+        </div>
+      </SettingRow>
+    </>
+  );
+}
+
+/**
+ * Все пояса, которые знает браузер, — «GMT+5 · Asia/Tashkent». Смещение —
+ * на сегодня: у поясов с летним временем оно полгода другое.
+ */
+const TIME_ZONES = Intl.supportedValuesOf("timeZone").map((name) => {
+  const offset =
+    new Intl.DateTimeFormat("en", { timeZone: name, timeZoneName: "shortOffset" })
+      .formatToParts()
+      .find((part) => part.type === "timeZoneName")?.value ?? "";
+
+  return { value: name, label: offset ? `${offset} · ${name}` : name };
+});
 
 /**
  * Смена пароля. Отдельной формой: для неё нужен прежний пароль, и
@@ -258,7 +321,7 @@ function SessionsSection() {
               )}
             </p>
             <p className="truncate text-2xs text-fg-subtle">
-              {[item.ip, formatDate(item.updatedAt, i18n.language)].filter(Boolean).join(" · ")}
+              {[item.ip, formatDateTime(item.updatedAt, i18n.language)].filter(Boolean).join(" · ")}
             </p>
           </div>
 
@@ -277,12 +340,4 @@ function SessionsSection() {
       ))}
     </>
   );
-}
-
-/** Дата сессии — как её отдал сервер. Мусор не показываем вовсе. */
-function formatDate(value: string, locale: string): string {
-  if (!value) return "";
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString(locale);
 }

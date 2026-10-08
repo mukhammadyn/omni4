@@ -12,3 +12,4 @@ export const SettingsPage = lazy(() =>
 );
 export { useSettingsSections } from "./ui/sections";
 export { useProject, useWorkspaceTitle } from "./api/project";
+export { useProfile, useUpdateTimezone, useUserTimezone } from "./api/profile";
