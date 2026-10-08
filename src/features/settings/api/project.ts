@@ -9,7 +9,7 @@ import { keys } from "@/shared/lib/query-keys";
 import { reportError, toast } from "@/shared/lib/toast";
 
 /**
- * Настройки проекта: имя, языки данных, часовой пояс.
+ * Настройки проекта: имя, языки данных, наборы значков.
  *
  * Языки здесь — те самые [[Data Language]], на которых размечены подписи
  * полей, имена view и мультиязычные колонки. Меняя их здесь, человек
@@ -158,8 +158,9 @@ export type LanguageOption = { id: string; name: string; short_name: string; nat
  *
  * Справочник проекта (`/v1/project/setting`) один на языки, пояса
  * и валюты и различает их параметром `type`; нам из него нужны только
- * языки. Пояс и валюта компании — `org_settings` (раздел «Локализация»),
- * свои у проекта ucode мы не показываем: два источника расходились бы молча.
+ * языки. Валюта компании — `org_settings` (раздел «Локализация»), пояс —
+ * личный (ADR-0014); свои у проекта ucode мы не показываем: два
+ * источника расходились бы молча.
  */
 export function useLanguageOptions(enabled = true) {
   const projectId = useSession().getProjectId() ?? "";
