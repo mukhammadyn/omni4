@@ -73,7 +73,16 @@ import {
 import { useTablePermissions } from "@/features/auth";
 import { CopilotButton } from "@/features/copilot";
 import { FileBrowser } from "@/features/files";
-import { EMPLOYEES, OrgStructure } from "@/features/hrms";
+import {
+  CANDIDATES,
+  EMPLOYEES,
+  OrgStructure,
+  VACANCIES,
+  VacancyCards,
+  VacancyPlan,
+  VacancyPlanTools,
+  useVacancyColumns,
+} from "@/features/hrms";
 import { MicrofrontendPage } from "@/features/microfrontend";
 import {
   EmbeddedPage,
@@ -355,14 +364,19 @@ function MenuPage() {
    */
   const viewForbidden = Boolean(view) && !rightsOf(view?.id ?? "").view;
 
-  // Колонки view — не только «что показать», но и «что грузить»:
-  // настройки связей за пределами этого списка никому не нужны.
+  /*
+   * Колонки view — не только «что показать», но и «что грузить»:
+   * настройки связей грузятся для колонок. Но открытой карточке нужны
+   * все связи: её поля — своя раскладка, а не колонки, и связь вне
+   * колонок осталась бы без полей показа — «—» вместо значения и голые
+   * id в выборе. Поэтому, пока запись открыта, список не сужается.
+   */
   const {
     schema,
     isLoading: schemaLoading,
     error: schemaError,
     refetch: refetchSchema,
-  } = useTableSchema(view?.tableSlug, view?.columnIds);
+  } = useTableSchema(view?.tableSlug, search.item ? undefined : view?.columnIds);
   /*
    * Порядок полей в drawer — свой, из раскладки пункта меню, и с колонками
    * таблицы не связан: перестановка в карточке не двигает колонки, а
@@ -601,8 +615,14 @@ function MenuPage() {
   const galleryView = supportedView && view?.type === "GALLERY";
   /** «Сетка» сотрудников — та же галерея, карточка человека. */
   const peopleView = supportedView && view?.type === "PEOPLE";
+  /** «Карточки» вакансий (features/hrms) — та же галерея, карточка вакансии. */
+  const vacancyCardsView = supportedView && view?.type === "VACANCIES";
   /** «Оргструктура» сотрудников: дереву нужны все люди сразу, без страниц. */
   const orgView = supportedView && view?.type === "ORG";
+  /** «Планирование» вакансий (features/hrms): итогам нужны все вакансии. */
+  const vacancyPlanView = supportedView && view?.type === "VACANCY_PLAN";
+  /** Экраны, которым нужен весь набор строк сразу, без страниц. */
+  const wholeView = orgView || vacancyPlanView;
   /** Экраны, отбирающие строки по видимому диапазону дат. */
   const dateView = calendarView || timelineView;
   /** Режим: из адреса, иначе из настроек view, иначе месяц. */
@@ -684,7 +704,7 @@ function MenuPage() {
        */
       chartView
     ? search.limit ?? CHART_SAMPLE
-    : orgView
+    : wholeView
     ? MAX_LIMIT
     : dateView || pivotView
     ? CALENDAR_LIMIT
@@ -981,6 +1001,12 @@ function MenuPage() {
       void navigate({ to: "/employees/$itemId", params: { itemId: guid }, search: { menu: menuId } });
       return;
     }
+    /* Вакансию — тоже страницей: воронка с кандидатами по этапам
+       в drawer не помещается (features/hrms, VacancyPage). */
+    if (view?.tableSlug === VACANCIES) {
+      void navigate({ to: "/vacancies/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
 
     if (draftTouched()) {
       setPendingRow(guid);
@@ -1007,10 +1033,10 @@ function MenuPage() {
   /* Сводная и графики считают загруженное, поэтому и грузят прокруткой:
      страницы здесь означали бы «итог по третьей странице». */
   const infinite =
-    view?.infiniteScroll === true || boardView || dateView || pivotView || chartView || orgView;
+    view?.infiniteScroll === true || boardView || dateView || pivotView || chartView || wholeView;
 
   /** Экраны, на которых порядок строк не виден и сортировать нечего. */
-  const sortless = boardView || dateView || pivotView || chartView || orgView;
+  const sortless = boardView || dateView || pivotView || chartView || wholeView;
 
   const {
     page: rows,
@@ -1039,12 +1065,17 @@ function MenuPage() {
       /* Оргструктура страниц не листает: номер из чужой ссылки
          показал бы людей с тысяча первого, а подвала, чтобы вернуться,
          у неё нет. */
-      page: orgView ? 1 : search.page,
+      page: wholeView ? 1 : search.page,
       infinite,
       sorts: querySorts,
       filters: effectiveFilters,
       search: searchText,
     },
+  );
+
+  /* Воронка и счётчики кандидатов — у таблицы вакансий (features/hrms). */
+  const vacancyColumns = useVacancyColumns(
+    view?.tableSlug === VACANCIES && view.type === "TABLE" ? rows.rows : undefined,
   );
 
   /*
@@ -1166,6 +1197,18 @@ function MenuPage() {
      проекта, если админ её задал (`attributes.url_object`). */
   const createRecord = () => {
     if (view && openCreateUrl(view)) return;
+    /* Вакансию заводят страницей, как правят: форма по секциям
+       (vacancy.html?new=1 прототипа), а не карточкой сбоку. */
+    if (view?.tableSlug === VACANCIES) {
+      void navigate({ to: "/vacancies/new", search: { menu: menuId } });
+      return;
+    }
+    /* Кандидата — тоже страницей (candidate.html?new=1): вакансию
+       и этап выбирают в форме. */
+    if (view?.tableSlug === CANDIDATES) {
+      void navigate({ to: "/candidates/new", search: { vac: "", menu: menuId } });
+      return;
+    }
     startDraft(blankItem(drawerColumns, newRowDefaults));
   };
 
@@ -1223,10 +1266,10 @@ function MenuPage() {
    * — и удалилась бы вместе с теми, что человек видит.
    */
   const rowSetKey = `${view?.id}|${search.page}|${limit}|${search.sort}|${searchText}|${JSON.stringify(effectiveFilters)}`;
-  /* Оргструктура: следующая порция — сразу, как пришла прошлая. */
+  /* Оргструктура и планирование: следующая порция — сразу, как пришла прошлая. */
   useEffect(() => {
-    if (orgView && hasMore && rows.rows.length < ORG_CAP) loadMore();
-  }, [orgView, hasMore, rows.rows.length]);
+    if (wholeView && hasMore && rows.rows.length < ORG_CAP) loadMore();
+  }, [wholeView, hasMore, rows.rows.length]);
 
   useEffect(() => setSelected(new Set()), [rowSetKey]);
 
@@ -1465,6 +1508,10 @@ function MenuPage() {
                       : {})}
                   />
                 )}
+
+              {/* Группировка и вид строки «Планирования» — личные, свои
+                  (features/hrms), а не настройки view из ⋮. */}
+              {vacancyPlanView && <VacancyPlanTools viewId={view.id} />}
 
               {/* Действия таблицы: функции проекта над отмеченными
                   строками. Рядом с настройками, а не среди поиска
@@ -1882,7 +1929,7 @@ function MenuPage() {
           ) : rowsLoading || tabGroup.pending ? (
             listView ? (
               <ListSkeleton />
-            ) : orgView ? null : galleryView || peopleView ? (
+            ) : wholeView ? null : galleryView || peopleView || vacancyCardsView ? (
               <GallerySkeleton />
             ) : (
               <GridSkeleton columns={columns.length} />
@@ -2129,6 +2176,26 @@ function MenuPage() {
               pending={(hasMore || loadingMore) && rows.rows.length < ORG_CAP}
               onOpenRow={openRow}
             />
+          ) : vacancyPlanView ? (
+            <VacancyPlan
+              viewId={view.id}
+              rows={rows.rows}
+              fields={schema.fields}
+              language={language}
+              pending={(hasMore || loadingMore) && rows.rows.length < ORG_CAP}
+              onOpenRow={openRow}
+            />
+          ) : vacancyCardsView ? (
+            <VacancyCards
+              tableSlug={view.tableSlug}
+              fields={schema.fields}
+              rows={rows.rows}
+              relations={schema.relations}
+              language={language}
+              onOpenRow={openRow}
+              {...(can.write ? { onAdd: createRecord } : {})}
+              {...(infinite && hasMore ? { onEndReached: loadMore } : {})}
+            />
           ) : peopleView ? (
             <PeopleGallery
               tableSlug={view.tableSlug}
@@ -2159,6 +2226,7 @@ function MenuPage() {
             <DataGrid
               tableSlug={view.tableSlug}
               columns={columns}
+              extra={vacancyColumns}
               /* Та же подстановка, что и в карточке: настройка, которая
                  работает в одном из двух мест, хуже отсутствующей. */
               newRowDefaults={newRowDefaults}
@@ -2276,7 +2344,7 @@ function MenuPage() {
               их не листают, а размер порции там не «строк на странице»,
               а «по скольким строкам считать», и стоит он над графиками,
               рядом с тем, что от него зависит. */}
-          {!rowsError && !boardView && !dateView && !pivotView && !chartView && !orgView && (
+          {!rowsError && !boardView && !dateView && !pivotView && !chartView && !wholeView && (
           <GridFooter
             /* Со страницами подвал листает, с прокруткой — считает. */
             {...(infinite ? {} : { page: search.page, onPage: (next: number) => setSearch({ page: next }) })}

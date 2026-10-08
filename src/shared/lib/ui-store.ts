@@ -31,6 +31,13 @@ type UiState = {
    */
   tableFilters: Record<string, unknown>;
   /**
+   * Своё состояние экрана — по id view: группировка и период
+   * «Планирования» вакансий. Не в адресе: это взгляд одного человека,
+   * а не ссылка, и вернувшись, он ждёт тот же разрез.
+   * Форму знает экран, здесь она непрозрачна и проверяется при чтении.
+   */
+  viewState: Record<string, unknown>;
+  /**
    * Ширины колонок — по паре «таблица + поле».
    *
    * Здесь, а не в настройках view: ширина — это про экран человека,
@@ -85,6 +92,7 @@ type UiState = {
   setDrawerMode: (mode: DrawerMode) => void;
   setTableLimit: (tableSlug: string, limit: number) => void;
   setTableFilters: (key: string, filters: unknown) => void;
+  setViewState: (viewId: string, state: unknown) => void;
   /** Ширина колонки. Ноль — вернуть исходную. */
   setColumnWidth: (tableSlug: string, fieldId: string, width: number) => void;
 };
@@ -144,6 +152,7 @@ export const useUi = create<UiState>()(
       drawerMode: "side",
       tableLimits: {},
       tableFilters: {},
+      viewState: {},
       columnWidths: {},
       collapsedMenus: [],
       dataLanguage: "",
@@ -171,6 +180,8 @@ export const useUi = create<UiState>()(
         set((s) => ({ tableLimits: { ...s.tableLimits, [tableSlug]: limit } })),
       setTableFilters: (key, filters) =>
         set((s) => ({ tableFilters: { ...s.tableFilters, [key]: filters } })),
+      setViewState: (viewId, state) =>
+        set((s) => ({ viewState: { ...s.viewState, [viewId]: state } })),
       setColumnWidth: (tableSlug, fieldId, width) =>
         set((s) => {
           const table = { ...s.columnWidths[tableSlug] };

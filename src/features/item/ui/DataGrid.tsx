@@ -129,6 +129,24 @@ const EMPTY_PINS: ReadonlySet<string> = new Set<string>();
 /** Постоянная ссылка: литерал в значении по умолчанию — новый массив на рендер. */
 const EMPTY_GROUPS: Field[] = [];
 
+/**
+ * Колонка, которой нет в схеме: значение считает фича по другим
+ * таблицам — воронка вакансии по её кандидатам (features/hrms).
+ * Только читается: сортировать, фильтровать и править её бэкенду
+ * нечем. Стоит после колонок view, ширина постоянная.
+ */
+export type ExtraColumn = {
+  id: string;
+  label: string;
+  width: number;
+  /** Число — по правому краю, как остальные числовые колонки. */
+  numeric?: boolean;
+  render: (row: Item) => ReactNode;
+};
+
+/** Постоянная ссылка: см. EMPTY_GROUPS. */
+const NO_EXTRA: ExtraColumn[] = [];
+
 /** Какая ячейка раскрыта. Одна на таблицу: двух курсоров не бывает. */
 type Active = { index: number; slug: string; anchor: DOMRect };
 
@@ -189,6 +207,7 @@ function pinLayout(
 export function DataGrid({
   tableSlug,
   columns,
+  extra = NO_EXTRA,
   pinned,
   widths,
   onWidth,
@@ -217,6 +236,8 @@ export function DataGrid({
   /** Слаг таблицы: ячейка-связь пишет не только в свою строку. */
   tableSlug: string;
   columns: Field[];
+  /** Вычисляемые колонки после колонок view — см. ExtraColumn. */
+  extra?: ExtraColumn[] | undefined;
   /**
    * Чем заполнена новая строка сверх настроек полей — «свой» по связи,
    * помеченной подстановкой (см. features/item/model/relation).
@@ -513,7 +534,7 @@ export function DataGrid({
   }, [onEndReached, lastIndex, total]);
 
   /** Столбцов в строке — для распорок, у которых своих ячеек нет. */
-  const span = columns.length + 2;
+  const span = columns.length + extra.length + 2;
 
   /**
    * «Выделить всё» — только про загруженную страницу. Отметить строки,
@@ -634,9 +655,21 @@ export function DataGrid({
                */
               {...(index === ordered.length - 1 &&
               !virtualColumns &&
+              !extra.length &&
               widths?.[column.id] === undefined
                 ? {}
                 : { style: { width: widthOf(column, index) } })}
+            />
+          ))}
+
+          {/* Последняя вычисляемая забирает свободное место — как
+              последняя колонка view, когда вычисляемых нет. */}
+          {extra.map((column, index) => (
+            <col
+              key={column.id}
+              {...(index === extra.length - 1 && !virtualColumns
+                ? {}
+                : { style: { width: column.width } })}
             />
           ))}
 
@@ -673,7 +706,7 @@ export function DataGrid({
                 sorts={sorts}
                 left={lefts.get(column.id)}
                 lastPinned={index === pinnedCount - 1}
-                last={!virtualColumns && index === ordered.length - 1}
+                last={!virtualColumns && !extra.length && index === ordered.length - 1}
                 {...(onWidth
                   ? {
                       onResize: (event: ReactPointerEvent) => startResize(event, column, index),
@@ -688,6 +721,24 @@ export function DataGrid({
                     : undefined
                 }
               />
+            ))}
+
+            {extra.map((column, index) => (
+              <th
+                key={column.id}
+                className={`${cell} border-r font-normal text-fg-muted ${
+                  column.numeric ? "text-right" : "text-left"
+                }`}
+              >
+                {/* Пол последней — как у HeaderCell (`last`): без ширины
+                    в colgroup она иначе сжимается в ноль на широкой таблице. */}
+                <span
+                  className="block truncate"
+                  style={index === extra.length - 1 ? { minWidth: column.width - 16 } : undefined}
+                >
+                  {column.label}
+                </span>
+              </th>
             ))}
 
             <th className={`${pinCell} ${pinRight} z-30`}>
@@ -911,6 +962,18 @@ export function DataGrid({
                   );
                 })}
 
+                {extra.map((column) => (
+                  <td key={column.id} className={`${cell} border-r`}>
+                    <span
+                      className={`flex h-full min-w-0 items-center ${
+                        column.numeric ? "justify-end tabular-nums" : ""
+                      }`}
+                    >
+                      {column.render(row)}
+                    </span>
+                  </td>
+                ))}
+
                 {/* Правый край строки: урна удаляет эту строку. В дереве
                     вместо неё «+» дочерней записи, а урна показывается
                     у отмеченной флажком. Раскрытие строки живёт в первой
@@ -1021,6 +1084,11 @@ export function DataGrid({
                   </td>
                 );
               })}
+
+              {/* Считать вычисляемым пока не по чему: строки ещё нет. */}
+              {extra.map((column) => (
+                <td key={column.id} className={`${cell} border-r`} />
+              ))}
 
               <td className={`${pinCell} ${pinRight}`}>
                 <span className="grid h-full place-items-center">

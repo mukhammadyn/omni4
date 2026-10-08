@@ -94,6 +94,11 @@ const TimeList = lazy(() =>
   import("@/shared/ui/calendar").then((module) => ({ default: module.TimeList })),
 );
 
+/* Редактор текста с разметкой — tiptap, ~400 КБ: тоже по требованию. */
+const RichText = lazy(() =>
+  import("@/shared/ui/rich-text").then((module) => ({ default: module.RichText })),
+);
+
 /** Место под календарь, пока он едет: без него карточка прыгает. */
 const CalendarFallback = () => <div className="h-64 w-64" />;
 
@@ -244,6 +249,23 @@ export function ActiveCell({
         onClose();
       }
     : undefined;
+
+  /*
+   * MULTI_LINE — HTML (docs/adr/0015-rich-text-tiptap.md), правится
+   * редактором с разметкой. Кроме заголовка карточки: там это имя
+   * записи, и правится оно строкой тем же кеглем.
+   */
+  if (field.type === "MULTI_LINE" && !heading)
+    return (
+      <RichTextEditor
+        value={value}
+        folder={uploadFolder(field.attributes)}
+        anchor={anchor}
+        check={check}
+        onEdit={onEdit}
+        onClose={onClose}
+      />
+    );
 
   switch (kind) {
     case "status":
@@ -642,6 +664,70 @@ function TextEditor({
           }`}
         />
 
+        {error && <p className="px-0.5 pt-1 text-2xs text-danger">{error}</p>}
+      </div>
+    </Anchored>
+  );
+}
+
+/**
+ * Текст с разметкой в ячейке. Как TextEditor: правка копится и уходит
+ * при закрытии (клик мимо, Cmd/Ctrl+Enter), Escape — отмена. Карточка
+ * шире ячейки: панели кнопок нужно место.
+ */
+function RichTextEditor({
+  value,
+  folder,
+  anchor,
+  check,
+  onEdit,
+  onClose,
+}: {
+  value: unknown;
+  folder: string;
+  anchor: DOMRect;
+  check: (value: unknown) => string | null;
+  onEdit: (value: unknown) => void;
+  onClose: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const latest = useRef(isBlank(value) ? "" : String(value));
+  const upload = useUploadFiles();
+
+  const commit = () => {
+    const next = latest.current;
+    if (sameValue(next, value) || (!next && isBlank(value))) return onClose();
+
+    // Не прошло — не закрываемся: набранное пропало бы вместе с карточкой.
+    const problem = check(next);
+    if (problem) return setError(problem);
+
+    onEdit(next);
+    onClose();
+  };
+
+  return (
+    <Anchored anchor={anchor} onClose={commit} onCancel={onClose}>
+      <div
+        className={`${card} ${error ? "border-danger" : "border-accent"} w-[min(560px,calc(100vw-16px))] p-1.5`}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            commit();
+          }
+        }}
+      >
+        <Suspense fallback={<div className="h-52" />}>
+          <RichText
+            autoFocus
+            value={latest.current}
+            onChange={(html) => {
+              latest.current = html;
+              setError(null);
+            }}
+            onUpload={(file) => upload.mutateAsync({ files: [file], folder }).then((urls) => urls[0] ?? "")}
+          />
+        </Suspense>
         {error && <p className="px-0.5 pt-1 text-2xs text-danger">{error}</p>}
       </div>
     </Anchored>
