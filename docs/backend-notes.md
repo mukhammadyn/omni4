@@ -1505,3 +1505,31 @@ information not fully given». Затем зовёт `UpdateUser` в auth — т
 (`items.go:693`). Это `authBypass` в `features/item/api/items.ts`.
 Строке без роли роль по-прежнему не поставить: это правка поля входа.
 Таким сотрудникам учётку заводят отдельно.
+
+## Правка пользователя (`PUT /v2/user`)
+
+**Ручка не сверяет, кого правят, с тем, кто правит.** `ucode_go_auth_service/
+api/api.go:113` — за `AuthMiddleware`, который проверяет только, что
+токен валиден. `V2UpdateUser` (`api/handlers/user_v2.go:252`) берёт `id`
+из тела и не сравнивает его с пользователем токена. Тело
+(`UpdateUserRequest`, `protos/auth_service/user_service.proto:227`)
+несёт `role_id`, `client_type_id`, `active` — и `V2UpdateUser`
+(`grpc/service/user_service_v2.go:1153`) отдаёт его целиком
+в `UpdateByUserIdAuth` таблицы входа. Любой вошедший может сменить
+роль или выключить любого пользователя проекта, независимо от прав
+на таблицу.
+
+Там же — то, чем мы пользуемся: `UpdateByUserIdAuth`
+(`ucode_go_object_builder_service/storage/postgres/items.go:1590`) пишет
+каждое поле тела, у которого в таблице входа есть колонка с тем же
+слагом. Так пояс пользователя уезжает полем `timezone_id` (ADR-0014).
+
+## Автофильтры на изменение и удаление
+
+**Сохраняются, но не применяются.** Роль хранит автофильтры по методам
+(`storage/postgres/permission.go:1382` — update, рядом delete), а
+применяет их только `GetAutomaticFilter` с `method = 'read'`
+(`ucode_go_object_builder_service/pkg/helper/automaticFilter.go:29`).
+`itemsRepo.Update` (`storage/postgres/items.go:564`) не проверяет ни
+строку, ни поле. «Правь только своё» средствами ролей не выразить:
+право «изменять» на таблицу — это право на любую её строку и любое поле.
