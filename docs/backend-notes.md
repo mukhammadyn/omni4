@@ -1533,3 +1533,48 @@ api/api.go:113` — за `AuthMiddleware`, который проверяет т�
 `itemsRepo.Update` (`storage/postgres/items.go:564`) не проверяет ни
 строку, ни поле. «Правь только своё» средствами ролей не выразить:
 право «изменять» на таблицу — это право на любую её строку и любое поле.
+
+## «Своя строка» в токене подделывается
+
+**Claim `tables` берётся из тела запроса входа.** Автофильтр роли
+находит «мою» строку чужой таблицы по claim `tables`
+(`ucode_go_object_builder_service/pkg/helper/automaticFilter.go:85`,
+`FindOneTableFromParams` — первое совпадение). Откуда он в токене:
+
+- `V2Login` (`ucode_go_auth_service/grpc/service/session_service_v2.go:959`)
+  кладёт в токен `req.Tables` как прислали, без сверки с вариантами,
+  которые выдаёт сам сервер (`GetConnectionOptions`);
+- `V2LoginWithOption` с `is_connections` вычисляет строки на сервере
+  (`resolveConnectionTables`, `:1572`), но ставит присланные клиентом
+  ВПЕРЕДИ своих (`:1516`), и фильтр берёт первое.
+
+Сотрудник, отправивший `/v2/login` руками с
+`tables: [{table_slug: "employees", object_id: <чужой guid>}]`, видит
+чужие записи под фильтром «мои» и подставляет чужого в «ответственного».
+
+Исправление — на бэкенде: в `V2Login` принимать `tables` только из
+`GetConnectionOptions` этого пользователя; в `LoginMiddleware` при
+`is_connections` отбрасывать присланные. omni4 берёт из `tables` только
+значение фильтра «Я» (ADR-0014) — подделка меняет лишь то, что человек
+видит под «Я», а видно ему и так всё.
+
+## Автофильтр роли обходится
+
+**Ограничение «видит только свои» действует только на списки.**
+`GetAutomaticFilter` зовут `GetAll`, `GetListV2`, доска и дерево
+(`ucode_go_object_builder_service/storage/postgres/object_builder.go:821,
+2379, 3082`, `ag_grid_tree.go:94`). Не зовут:
+
+- `items.GetSingle` (`storage/postgres/items.go:863`) — одна запись по guid,
+  `GET /v2/items/{collection}/{id}`. Проверено 2026-10-08: роль
+  с автофильтром «мои сделки» читала чужую сделку целиком;
+- `GetSingleSlim` (`object_builder.go:2540`), `/v1/object-slim/...`;
+- `GetListInExcel` (`object_builder.go:1634`), `/v1/object/excel/...` —
+  выгрузка всех строк;
+- `GetList2` (`object_builder.go:1381`).
+
+Там же, `GetListAggregation` (`object_builder.go:2711`,
+`/v2/items/{collection}/aggregation`): конструктор запроса с
+произвольными `table`, `where`, `joins` и `operation: "UPDATE"`.
+Роли без прав отвечает «Permission denied», но кому открыт — тот
+читает и меняет любую таблицу проекта, мимо прав на таблицы и поля.
