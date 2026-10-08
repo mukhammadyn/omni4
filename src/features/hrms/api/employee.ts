@@ -1,13 +1,13 @@
 import { useMemo } from "react";
 import { useTablePermissions } from "@/features/auth";
-import { MAX_LIMIT, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
+import { MAX_LIMIT, PEOPLE, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
 import { ALL_VIEW_RIGHTS, localized, useTableDetails, useTableSchema } from "@/features/table";
 import { relationTabs, useMenuViews } from "@/features/view";
 import { todayInput } from "@/shared/lib/date-value";
 import { firstText, related, text, toPerson } from "./org";
 
 /** Таблица сотрудников ERP (`ucode/erp/erp.dbml`, «Сотрудник = пользователь»). */
-export const EMPLOYEES = "employees";
+export const EMPLOYEES = PEOPLE;
 
 /**
  * Всё, что нужно странице сотрудника: запись, схема, вкладки и права.

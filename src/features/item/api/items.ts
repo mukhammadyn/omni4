@@ -1,10 +1,11 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTableSettings } from "@/features/table";
 import { api } from "@/shared/api/client";
+import { session } from "@/shared/api/session";
 import { keys } from "@/shared/lib/query-keys";
 import { errorMessage, reportError } from "@/shared/lib/toast";
 import { relationDataKey, type Item } from "../model/types";
-import { type ItemsQuery, toRequestBody } from "../model/query";
+import { type ItemsQuery, resolveMe, toRequestBody } from "../model/query";
 
 /**
  * Строки таблицы.
@@ -42,7 +43,10 @@ export function useItems(tableSlug: string | undefined, query: ItemsQuery) {
    * на страницу и вверх было бы нечего показать. При номерах страниц,
    * наоборот, смещение в ключе обязано быть — это разные экраны.
    */
-  const body = toRequestBody(infinite ? { ...query, page: 1 } : query);
+  // «Я» в фильтре — своя строка из токена (resolveMe); в ключ кэша
+  // попадает уже guid, и у каждого он свой.
+  const filters = query.filters && resolveMe(query.filters, session.getObjectIds());
+  const body = toRequestBody({ ...query, filters, ...(infinite ? { page: 1 } : {}) });
   const first = Math.max(query.page, 1) - 1;
 
   const result = useInfiniteQuery({

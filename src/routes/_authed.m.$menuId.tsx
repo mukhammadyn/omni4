@@ -22,6 +22,9 @@ import {
   MAX_LIMIT,
   MIN_LIMIT,
   TableToolbar,
+  MineToggle,
+  PEOPLE,
+  type WhoField,
   emptyFilter,
   filterKind,
   formatSorts,
@@ -90,6 +93,7 @@ import {
   languageGroups,
   localizeKeys,
   localizeSlug,
+  localized,
   toDraft,
   useCreateField,
   useCreateRelation,
@@ -388,6 +392,21 @@ function MenuPage() {
       ),
     [schema.fields, drawerLayout.rights],
   );
+
+  /**
+   * Поля «кто» — для «Все | Мои» (MineToggle): исходящие связи с людьми.
+   * Без своей строки сотрудника (ADMIN) «мои» пусты — переключателя нет.
+   */
+  const whoFields = useMemo((): WhoField[] => {
+    if (!session.getObjectIds()[PEOPLE]) return [];
+
+    return schema.relations
+      .filter((relation) => relation.direction === "outgoing" && relation.toSlug === PEOPLE)
+      .flatMap((relation) => {
+        const field = tableFields.find((item) => item.slug === relation.linkField);
+        return field ? [{ slug: field.slug, label: localized(field.labels, language, field.label) }] : [];
+      });
+  }, [session, schema.relations, tableFields, language]);
 
   /** Колонки view. Карточка берёт не их, а все поля таблицы — см. orderedFields. */
   const viewFields = useMemo(() => resolveColumns(view, tableFields), [view, tableFields]);
@@ -1406,6 +1425,9 @@ function MenuPage() {
             <div className="ml-auto flex shrink-0 items-center gap-0.5">
               {/* Поиск, отбор и сортировка — про таблицу: у нарисованного
                   заглушкой view искать нечего, а ручка дерева их не читает. */}
+              {supportedView && !treeView && whoFields.length > 0 && (
+                <MineToggle fields={whoFields} filters={filters} onFilters={applyFilters} />
+              )}
               {supportedView && !treeView && (
                   <TableToolbar
                     tableSlug={view.tableSlug}

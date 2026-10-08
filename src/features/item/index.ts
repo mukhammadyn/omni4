@@ -34,15 +34,20 @@ export type { FilterKind } from "./model/filter-kind";
 export { filtersSchema, parseFilters } from "./model/query";
 export {
   FILTER_OPERATORS,
+  ME,
+  PEOPLE,
   activeFilterCount,
   formatSorts,
   fromConditions,
   isFilterSet,
+  mineField,
   nextSorts,
   parseSorts,
+  resolveMe,
   seedFilters,
   toConditions,
   toRequestBody,
+  withMine,
 } from "./model/query";
 export type { Filter, FilterOperator, Filters, ItemsQuery, Sort, SortDirection } from "./model/query";
 export { selfDefaults } from "./model/relation";
@@ -66,3 +71,4 @@ export { ItemDrawer } from "./ui/ItemDrawer";
 export { GridFooter, MAX_LIMIT, MIN_LIMIT, PAGE_SIZES } from "./ui/GridFooter";
 export { SortPanel } from "./ui/SortPanel";
 export { TableToolbar } from "./ui/TableToolbar";
+export { MineToggle, type WhoField } from "./ui/MineToggle";

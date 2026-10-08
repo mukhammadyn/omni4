@@ -8,7 +8,7 @@ import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem } from "@/shared/ui/popover";
 import { useRelationItems } from "../api/relations";
 import { filterKind, kindOfOperator, operatorsFor, rangeBound } from "../model/filter-kind";
-import { isFilterSet, type Filter, type FilterOperator } from "../model/query";
+import { ME, PEOPLE, isFilterSet, type Filter, type FilterOperator } from "../model/query";
 import { relationLabel } from "../model/relation";
 import { fieldIcon } from "./field-icon";
 
@@ -197,7 +197,11 @@ function summary(
    * надписи на чипе запрашивать её — это запрос на каждый чип при
    * каждой загрузке страницы. Число выбранных строк говорит то же самое.
    */
-  if (filterKind(field) === "relation") return t("table.filterChosen", { count: values.length });
+  if (filterKind(field) === "relation") {
+    return values.length === 1 && values[0] === ME
+      ? t("table.filterMe")
+      : t("table.filterChosen", { count: values.length });
+  }
 
   if (filter.op === "any") {
     const [first, ...rest] = values.map((item) => {
@@ -375,9 +379,10 @@ function RelationInput({
     ? items.filter((item) => relationLabel(item, slugs, language).toLowerCase().includes(needle))
     : items;
 
-  const labels = new Map(
-    items.map((item) => [String(item["guid"] ?? ""), relationLabel(item, slugs, language)]),
-  );
+  const labels = new Map([
+    [ME, t("table.filterMe")],
+    ...items.map((item): [string, string] => [String(item["guid"] ?? ""), relationLabel(item, slugs, language)]),
+  ]);
 
   const toggle = (guid: string) =>
     onChange(values.includes(guid) ? values.filter((item) => item !== guid) : [...values, guid]);
@@ -409,6 +414,15 @@ function RelationInput({
       />
 
       <div className="max-h-64 overflow-y-auto">
+        {/* «Я», как «Me» в Notion: у каждого своя строка, поэтому вкладка
+            с этим фильтром у каждого показывает его записи (resolveMe). */}
+        {relation.toSlug === PEOPLE && !needle && (
+          <label className="flex h-8 cursor-pointer items-center gap-2 rounded-md px-1 text-sm font-medium transition-colors hover:bg-surface-hover">
+            <Checkbox checked={values.includes(ME)} onChange={() => toggle(ME)} />
+            <span className="truncate">{t("table.filterMe")}</span>
+          </label>
+        )}
+
         {visible.map((item) => {
           const guid = String(item["guid"] ?? "");
 
