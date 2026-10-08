@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toConditions, type Filters } from "@/features/item";
+import { resolveMe, toConditions, type Filters } from "@/features/item";
 import { api } from "@/shared/api/client";
+import { session } from "@/shared/api/session";
 import i18n from "@/shared/lib/i18n";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError, toast } from "@/shared/lib/toast";
@@ -55,7 +56,7 @@ export function useExportExcel(tableSlug: string | undefined) {
     }) => {
       const dto = await api.post<ExcelLinkDto>(`/v1/object/excel/${tableSlug ?? ""}`, {
         data: {
-          ...toConditions(filters),
+          ...toConditions(resolveMe(filters, session.getObjectIds())),
           field_ids: fieldIds,
           view_fields: fieldIds,
           language: i18n.language,

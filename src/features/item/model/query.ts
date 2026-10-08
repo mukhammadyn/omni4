@@ -72,6 +72,65 @@ export type Filter = { op: FilterOperator; values: string[] };
 export type Filters = Record<string, Filter>;
 
 /**
+ * Таблица людей: на неё ссылаются все поля «кто» — ответственный,
+ * исполнитель, автор (CONTEXT.md, PRD D3).
+ * В фильтре по связи с ней первым пунктом стоит «Я».
+ */
+export const PEOPLE = "employees";
+
+/**
+ * «Я» — значение фильтра по связи, как «Me» в Notion: «Ответственный — я».
+ *
+ * В адресе и в настройке view лежит само это слово, а не guid: вкладку
+ * «Мои сделки» настраивает один человек, а открывает каждый — и видит
+ * свои. В guid его превращает resolveMe перед запросом.
+ */
+export const ME = "@me";
+
+/** Строки с таким guid нет: «я» без своей строки находит ничего, а не всё. */
+const NOBODY = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * «Мои» — переключатель на панели view: фильтр «поле кто — Я» по одному
+ * из полей `slugs` (колонки связей с PEOPLE). Включён, когда у какого-то
+ * из них в фильтре ровно «Я» и ничего больше: «Я и Алишер» — уже
+ * не «мои», а ручной отбор, и переключатель его не трогает.
+ */
+export function mineField(filters: Filters, slugs: string[]): string | undefined {
+  return slugs.find((slug) => {
+    const values = filters[slug]?.values ?? [];
+    return values.length === 1 && values[0] === ME;
+  });
+}
+
+/** Включить «Мои» по полю `slug` или выключить (undefined). Другие фильтры не трогаются. */
+export function withMine(filters: Filters, slugs: string[], slug: string | undefined): Filters {
+  const next = { ...filters };
+  const current = mineField(filters, slugs);
+  if (current) delete next[current];
+  if (slug) next[slug] = { op: "is", values: [ME] };
+  return next;
+}
+
+/**
+ * «Я» → своя строка в таблице связи: claim `tables` токена, [[App Table]]
+ * (`session.getObjectIds()`). Таблица — из слага поля: ucode называет
+ * колонку связи `<таблица>_id`, вторую на ту же таблицу — `<таблица>_id_2`.
+ */
+export function resolveMe(filters: Filters, objectIds: Record<string, string>): Filters {
+  const resolved: Filters = {};
+
+  for (const [slug, filter] of Object.entries(filters)) {
+    const mine = objectIds[slug.replace(/_id(_\d+)?$/, "")] ?? NOBODY;
+    resolved[slug] = filter.values.includes(ME)
+      ? { ...filter, values: filter.values.map((value) => (value === ME ? mine : value)) }
+      : filter;
+  }
+
+  return resolved;
+}
+
+/**
  * Разбор фильтров из чужого источника: адресной строки и localStorage.
  * Схема одна на оба — форма у них одинаковая, а испорченному значению
  * веры нет ни там, ни там.
