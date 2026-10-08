@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { CopilotPanel } from "@/features/copilot";
-import { useProject } from "@/features/settings";
+import { useProfile, useProject, useUpdateTimezone, useUserTimezone } from "@/features/settings";
 import { Sidebar } from "@/features/sidebar";
 import { ensureAccessToken } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
+import { browserTimeZone, setTimeZone, timeZone } from "@/shared/lib/date-value";
 
 /**
  * Всё под этим маршрутом требует сессии. Проверка одна и в одном месте —
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/_authed")({
 
 function AppShell() {
   useProjectBranding();
+  const zone = useAppTimeZone();
 
   return (
     /*
@@ -67,7 +69,10 @@ function AppShell() {
       <main
         className="relative z-10 flex min-w-0 flex-1 flex-col overflow-clip bg-surface"
       >
-        <Outlet />
+        {/* Пояс — часть ключа: время в ячейках считается при отрисовке,
+            и сменивший пояс экран иначе показывал бы прежнее до первой
+            перерисовки. Меняется он редко — при первом входе и в профиле. */}
+        <Outlet key={zone} />
       </main>
 
       {/* Помощник отодвигает контент, а не накрывает его: он правит то,
@@ -104,6 +109,34 @@ function useProjectBranding() {
       document.title = DEFAULT_TITLE;
     };
   }, [title]);
+}
+
+/**
+ * Пояс пользователя — [[User Timezone]] (ADR-0014): по нему показывается
+ * и вводится время на всех экранах.
+ *
+ * Ставится прямо при отрисовке, а не в эффекте: дети читают его в той же
+ * отрисовке, и эффект опоздал бы на кадр с поясом браузера.
+ *
+ * Пустой пояс у учётной записи один раз заполняется поясом браузера:
+ * серверу браузер не виден, а пояс ему нужен. Дальше он меняется только
+ * в профиле — командировка не перепишет его молча.
+ */
+function useAppTimeZone(): string {
+  const { timezone, hasAccount } = useUserTimezone();
+  const { profile } = useProfile();
+  const { mutate } = useUpdateTimezone();
+  const filled = useRef(false);
+
+  setTimeZone(timezone);
+
+  useEffect(() => {
+    if (!hasAccount || timezone || !profile || filled.current) return;
+    filled.current = true;
+    mutate(browserTimeZone());
+  }, [hasAccount, timezone, profile, mutate]);
+
+  return timeZone();
 }
 
 /** Заголовок вкладки вне проекта — тот же, что в index.html. */

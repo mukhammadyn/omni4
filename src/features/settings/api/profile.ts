@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useItems } from "@/features/item";
 import { authApi } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { useSession } from "@/shared/api/use-session";
+import { setTimeZone } from "@/shared/lib/date-value";
 import i18n from "@/shared/lib/i18n";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError, toast } from "@/shared/lib/toast";
@@ -116,6 +118,61 @@ export function useUpdateProfile() {
 
       toast.success(i18n.t("settings.saved"));
       await queryClient.invalidateQueries({ queryKey: keys.settings.profile(userId) });
+    },
+  });
+}
+
+/** Учётные записи — таблица входа типа «Сотрудник» (ADR-0014). */
+const USERS = "users";
+
+/**
+ * Пояс пользователя — [[User Timezone]], `users.timezone_id` своей строки.
+ *
+ * Строка ищется по `user_id_auth`, а не по `user_id` токена: так она
+ * одна и та же при любом входе. У ADMIN строки в `users` нет —
+ * `hasAccount: false`, и личного пояса у него нет (ADR-0014).
+ *
+ * `GET /v2/user/{id}` пояс не отдаёт: из строки входа он берёт только
+ * роль, тип клиента, `active` и имя (auth_service, user_service_v2.go:778).
+ */
+export function useUserTimezone() {
+  const authId = useSession().getAuthUserId();
+  const { page, isLoading } = useItems(authId ? USERS : undefined, {
+    limit: 1,
+    page: 1,
+    filters: { user_id_auth: { op: "contains", values: [authId] } },
+  });
+  const row = page.rows[0];
+
+  return {
+    hasAccount: Boolean(row),
+    timezone: typeof row?.timezone_id === "string" ? row.timezone_id : "",
+    isLoading,
+  };
+}
+
+/**
+ * Смена пояса — тем же `PUT /v2/user`, что и профиль: auth передаёт тело
+ * в таблицу входа, и та пишет каждое поле, у которого есть колонка
+ * с тем же слагом (object_builder storage/postgres/items.go:1590).
+ * Отсюда и слаг `timezone_id`: это поле тела (user_service.proto:243).
+ *
+ * Тело — поверх ответа профиля: без `company_id` ручка падает на пустом
+ * uuid, а собранное заново обнулило бы роль и тип клиента.
+ */
+export function useUpdateTimezone() {
+  const queryClient = useQueryClient();
+  const { profile } = useProfile();
+
+  return useMutation({
+    mutationFn: (timezone: string) => {
+      if (!profile) throw new Error("profile is not loaded");
+      return authApi.put<unknown>("/v2/user", { ...profile.raw, id: profile.id, timezone_id: timezone });
+    },
+    onError: (error) => reportError(error, "common.saveFailed"),
+    onSuccess: async (_data, timezone) => {
+      setTimeZone(timezone);
+      await queryClient.invalidateQueries({ queryKey: keys.items.table(USERS) });
     },
   });
 }
