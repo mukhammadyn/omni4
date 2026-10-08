@@ -12,12 +12,14 @@ import {
   useLoginWithOtp,
   useSendCode,
 } from "../api/auth";
-import type {
-  Connection,
-  Credentials,
-  LoginContext,
-  LoginResult,
-  OtpCredentials,
+import {
+  onlyChoice,
+  type Connection,
+  type ConnectionSelection,
+  type Credentials,
+  type LoginContext,
+  type LoginResult,
+  type OtpCredentials,
 } from "../model/types";
 import { AuthCard } from "./AuthCard";
 import { ErrorText } from "./ErrorText";
@@ -77,10 +79,26 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       ? { type: "phone", phone: normalized, otp: otp.trim(), sms_id: smsId }
       : { type: "email", email: normalized, otp: otp.trim(), sms_id: smsId };
 
-  const handle = (result: LoginResult) =>
-    result.kind === "session"
-      ? onSuccess()
-      : setPendingChoice({ connections: result.connections, context: result.context });
+  const choose = (choice: { connections: Connection[]; context: LoginContext }, selection: ConnectionSelection) =>
+    withConnections.mutate(
+      {
+        // Чем входили — тем и подтверждаем выбор: /v2/login
+        // проверяет пароль или код заново.
+        credentials: mode === "password" ? credentials : otpAuth,
+        selection,
+        ...choice,
+      },
+      { onSuccess: handle },
+    );
+
+  function handle(result: LoginResult) {
+    if (result.kind === "session") return onSuccess();
+
+    const choice = { connections: result.connections, context: result.context };
+    const only = onlyChoice(result.connections);
+    if (only) choose(choice, only);
+    else setPendingChoice(choice);
+  }
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -140,18 +158,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         connections={pendingChoice.connections}
         busy={busy}
         error={error}
-        onSubmit={(selection) =>
-          withConnections.mutate(
-            {
-              // Чем входили — тем и подтверждаем выбор: /v2/login
-              // проверяет пароль или код заново.
-              credentials: mode === "password" ? credentials : otpAuth,
-              selection,
-              ...pendingChoice,
-            },
-            { onSuccess: handle },
-          )
-        }
+        onSubmit={(selection) => choose(pendingChoice, selection)}
       />
     );
   }

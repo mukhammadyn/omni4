@@ -105,6 +105,17 @@ export type LoginContext = {
 /** Что выбрано: id connection → id записи. */
 export type ConnectionSelection = Record<string, string>;
 
+/**
+ * Выбор, который делать не нужно: у каждой связи ровно одна запись.
+ * Так входит сотрудник — его строку в `employees` сервер находит сам
+ * по `users.employees_id` (object_builder login.go:385), и экран выбора
+ * с единственным вариантом был бы лишним шагом. Иначе — null.
+ */
+export function onlyChoice(connections: Connection[]): ConnectionSelection | null {
+  if (!connections.every((connection) => connection.options.length === 1)) return null;
+  return Object.fromEntries(connections.map((connection) => [connection.id, connection.options[0]!.id]));
+}
+
 export type LoginResult =
   | { kind: "session"; session: AuthSession }
   | { kind: "choose-connections"; connections: Connection[]; context: LoginContext };
