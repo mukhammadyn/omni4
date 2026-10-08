@@ -9,6 +9,7 @@ import {
   type UsageActor,
   type UsageRow,
 } from "../api/usage";
+import { timeZone } from "@/shared/lib/date-value";
 import { Empty, LogLayout, Td, Th, formatSize } from "./parts";
 
 /**
@@ -71,6 +72,7 @@ export function Usage({ kindField }: { kindField: ReactNode }) {
     return Number.isNaN(date.getTime())
       ? bucket
       : date.toLocaleString(i18n.language, {
+          timeZone: timeZone(),
           month: "2-digit",
           day: "2-digit",
           hour: "2-digit",

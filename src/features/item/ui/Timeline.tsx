@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, optionOf, type Field, type Relation } from "@/features/table";
+import { nowLocal } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
@@ -177,7 +178,7 @@ export function Timeline({
     [days, scale],
   );
   const axisWidth = days.length * width;
-  const today = dayKey(new Date());
+  const today = dayKey(nowLocal());
   const todayIndex = days.findIndex((day) => dayKey(day) === today);
 
   /** Список записей свёрнут: остаётся одна ось. */
@@ -791,7 +792,7 @@ export function Timeline({
           /* «Сегодня» — и день, и место на экране: лента прокручивается
              так, чтобы текущий день оказался по центру. */
           onClick={() => {
-            const day = new Date();
+            const day = nowLocal();
             onCursor(day);
             setFocus((current) => ({ day, align: "center", id: current.id + 1 }));
           }}

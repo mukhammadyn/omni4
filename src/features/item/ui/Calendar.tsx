@@ -11,6 +11,7 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { localized, optionOf, type Field, type Relation } from "@/features/table";
+import { nowLocal } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { CHIP_DOT, CHIP_STYLES, CHIP_SURFACE, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
@@ -321,7 +322,7 @@ export function CalendarView({
              так, чтобы текущая неделя оказалась по центру, а не под
              шапкой. */
           onClick={() => {
-            const today = new Date();
+            const today = nowLocal();
             onCursor(today);
             setFocus((current) => ({ day: today, align: "center", id: current.id + 1 }));
           }}
@@ -517,7 +518,7 @@ function MonthGrid({
 }) {
   const { t } = useTranslation();
   const weeks = useMemo(() => weeksBetween(from, to), [from, to]);
-  const today = dayKey(new Date());
+  const today = dayKey(nowLocal());
 
   /**
    * Что тянут мышью: выделение новых дней или край события.
@@ -940,7 +941,7 @@ function TimeGrid({
   onResizeEnd?: (() => void) | undefined;
 }) {
   const slots = useMemo(() => daySlots(), []);
-  const today = dayKey(new Date());
+  const today = dayKey(nowLocal());
   /** Колонка, в которой тянут край: по ней считается новое время. */
   const column = useRef<HTMLElement | null>(null);
   /** Когда край в последний раз отпустили — см. CLICK_GAP. */

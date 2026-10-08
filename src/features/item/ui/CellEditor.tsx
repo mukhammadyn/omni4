@@ -31,6 +31,7 @@ import { Anchored } from "@/shared/ui/anchored";
 import { Chip } from "@/shared/ui/chip";
 import { openPreview } from "@/shared/ui/file-preview";
 import { Icon } from "@/shared/ui/icon";
+import { todayInput } from "@/shared/lib/date-value";
 import { fileName } from "@/shared/lib/file-kind";
 import { toast } from "@/shared/lib/toast";
 import { useUploadFiles, uploadFolder, uploadRatio } from "../api/files";
@@ -704,7 +705,7 @@ function DateEditor({
           {withTime && (
             <TimeList
               value={time}
-              onChange={(next) => commit(day || toDayInput(new Date()), next)}
+              onChange={(next) => commit(day || todayInput(), next)}
             />
           )}
         </div>

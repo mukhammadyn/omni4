@@ -1,5 +1,5 @@
 import type { Field } from "@/features/table";
-import { toDateValue, type DateKind } from "@/shared/lib/date-value";
+import { toDateValue, wallClock, zonedToInstant, type DateKind } from "@/shared/lib/date-value";
 import { cellKind } from "./cell-kind";
 import type { Item } from "./types";
 
@@ -19,14 +19,11 @@ export function toDateInput(value: unknown, kind: DateKind): string {
   const parsed = toDateValue(value, kind);
   if (!parsed) return "";
 
-  const { date, naive } = parsed;
-  const year = naive ? date.getUTCFullYear() : date.getFullYear();
-  const month = pad((naive ? date.getUTCMonth() : date.getMonth()) + 1);
-  const day = pad(naive ? date.getUTCDate() : date.getDate());
-  const hour = pad(naive ? date.getUTCHours() : date.getHours());
-  const minute = pad(naive ? date.getUTCMinutes() : date.getMinutes());
+  // Момент — в поясе пользователя, значение без пояса — как лежит.
+  const clock = wallClock(parsed);
+  const day = `${clock.year}-${pad(clock.month)}-${pad(clock.day)}`;
 
-  return kind === "date" ? `${year}-${month}-${day}` : `${year}-${month}-${day}T${hour}:${minute}`;
+  return kind === "date" ? day : `${day}T${pad(clock.hour)}:${pad(clock.minute)}`;
 }
 
 /**
@@ -44,8 +41,12 @@ export function fromDateInput(text: string, kind: DateKind): string | null {
   if (kind === "date") return text;
   if (kind === "datetime_naive") return `${text}:00Z`;
 
-  const date = new Date(text);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  // Введённые «14:00» — это 14:00 в поясе пользователя, а не браузера.
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(text);
+  if (!match) return null;
+
+  const [year, month, day, hour, minute] = match.slice(1).map(Number);
+  return zonedToInstant({ year: year!, month: month!, day: day!, hour: hour!, minute: minute! }).toISOString();
 }
 
 /**

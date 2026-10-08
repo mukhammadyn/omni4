@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PlusIcon, WalletIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { timeZone } from "@/shared/lib/date-value";
 import type { TranslationKey } from "@/shared/lib/i18n";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
@@ -49,7 +50,12 @@ export function BillingSettings() {
   /* «1 октября 2026», как в сводке прототипа: дата в предложении, а не в таблице. */
   const date = (value: string) =>
     value
-      ? new Date(value).toLocaleDateString(i18n.language, { day: "numeric", month: "long", year: "numeric" })
+      ? new Date(value).toLocaleDateString(i18n.language, {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: timeZone(),
+        })
       : "—";
 
   if (isLoading) return <p className="text-sm text-fg-subtle">{t("common.loading")}</p>;
@@ -469,7 +475,7 @@ function Transactions({ money }: { money: (amount: number, currency: string) => 
             return (
               <tr key={row.id}>
                 <td className={`${PERM} text-left tabular-nums`}>
-                  {row.createdAt ? new Date(row.createdAt).toLocaleDateString(i18n.language) : ""}
+                  {row.createdAt ? new Date(row.createdAt).toLocaleDateString(i18n.language, { timeZone: timeZone() }) : ""}
                 </td>
                 <td className={PERM}>
                   {type ? t(type) : row.type}
