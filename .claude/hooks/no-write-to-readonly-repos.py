@@ -32,8 +32,8 @@ import sys
 # с ней лежит new-ucode, и его писать можно. Имя ловит и её копию вне
 # `ucode/`; слэш ему не нужен — оно уникально, а `git -C <путь> commit`
 # пишет путь без него. Прототип лежит соседом, из omni4 до него чаще
-# `../crm/`.
-PROTECTED = ("ucode_backend/", "ucode_admin_frontend", "omni4_core/crm/", "../crm/")
+# `../prototype/`.
+PROTECTED = ("ucode_backend/", "ucode_admin_frontend", "omni4_core/prototype/", "../prototype/")
 
 # Глаголы, которые меняют файлы или состояние git. Читающие подкоманды
 # git (status, log, diff, show, blame) сюда намеренно не попали.

@@ -7,8 +7,8 @@
       "Write(~/Documents/workspace/IT/udevs/ucode/ucode-frontend/ucode_admin_frontend/**)",
       "Edit(~/Documents/workspace/IT/udevs/ucode-frontend/**)",
       "Write(~/Documents/workspace/IT/udevs/ucode-frontend/**)",
-      "Edit(~/Documents/workspace/IT/udevs/ucode/omni4_core/crm/**)",
-      "Write(~/Documents/workspace/IT/udevs/ucode/omni4_core/crm/**)"
+      "Edit(~/Documents/workspace/IT/udevs/ucode/omni4_core/prototype/**)",
+      "Write(~/Documents/workspace/IT/udevs/ucode/omni4_core/prototype/**)"
     ]
   },
   "hooks": {
