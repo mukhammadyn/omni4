@@ -43,10 +43,16 @@ import { JOB_HISTORY } from "../api/job-history";
 import { toPerson } from "../api/org";
 import { monthsBetween, toDay } from "../model/job-history";
 import { Card, Meta, Row, SideProp } from "./page-parts";
+import { ABSENCES_TAB, ATTENDANCE_TAB } from "./employee-tabs";
+import { EmployeeAbsences } from "./EmployeeAbsences";
+import { EmployeeAttendance } from "./EmployeeAttendance";
 import { WorkHistory, spanText } from "./WorkHistory";
 
-/** Вкладка «Личное» — своя, остальные — вкладки связей пункта меню. */
+/** Свои вкладки — «Личное» и employee-tabs; остальные — вкладки связей пункта меню. */
 const PERSONAL = "personal";
+/** Своя вкладка → таблица вкладки связи, место которой она занимает. */
+const OWN_TABLES: Record<string, string> = { [ABSENCES_TAB]: "hr_requests", [ATTENDANCE_TAB]: "hr_attendance_days" };
+const OWN_TABS = new Set(Object.keys(OWN_TABLES));
 
 /*
  * Карточки «Личного» — `TABS.personal` прототипа (employee.html).
@@ -210,11 +216,29 @@ export function EmployeePage({
     );
 
   const label = (field: Field) => localized(field.labels, language, field.label);
+  /*
+   * Свои вкладки встают НА МЕСТО вкладок связей своей таблицы: имя
+   * и порядок по-прежнему задаёт админ, внутри — наш экран вместо таблицы
+   * связи. Нет такой вкладки у пункта — своя встаёт после «Работы»
+   * (истории назначений), как в прототипе.
+   */
+  const ownOf = (tableSlug: string) => Object.entries(OWN_TABLES).find(([, slug]) => slug === tableSlug)?.[0];
+  const relationTabs = employee.tabs.map((item) => {
+    const ownId = ownOf(item.tableSlug);
+    return { id: ownId ?? item.id, label: item.label };
+  });
+  const missing = Object.keys(OWN_TABLES)
+    .filter((id) => !relationTabs.some((item) => item.id === id))
+    .map((id) => ({ id, label: t(id === ABSENCES_TAB ? "employeeAbsences.title" : "employeeAttendance.title") }));
+  const work = employee.tabs.findIndex((item) => item.tableSlug === JOB_HISTORY);
   const allTabs = [
     { id: PERSONAL, label: t("employee.tab.personal") },
-    ...employee.tabs.map((item) => ({ id: item.id, label: item.label })),
+    ...relationTabs.slice(0, work + 1),
+    ...missing,
+    ...relationTabs.slice(work + 1),
   ];
-  const activeTab = tab?.id ?? PERSONAL;
+  const own = tabId && OWN_TABS.has(tabId) ? tabId : undefined;
+  const activeTab = own ?? tab?.id ?? PERSONAL;
   const lastSeen = formatDate(person.lastActivity, "datetime", locale);
   const password = employee.can.write ? bySlug.get("password") : undefined;
   const tabActions = TAB_ACTIONS.flatMap((action) => {
@@ -358,7 +382,11 @@ export function EmployeePage({
           />
         </div>
 
-        {tab?.tableSlug === JOB_HISTORY && tab.direction === "incoming" ? (
+        {own === ATTENDANCE_TAB ? (
+          <EmployeeAttendance employeeId={guid} />
+        ) : own === ABSENCES_TAB ? (
+          <EmployeeAbsences employeeId={guid} />
+        ) : tab?.tableSlug === JOB_HISTORY && tab.direction === "incoming" ? (
           <WorkHistory
             key={tab.id}
             employee={guid}

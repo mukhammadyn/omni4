@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useTablePermissions } from "@/features/auth";
 import { MAX_LIMIT, PEOPLE, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
-import { ALL_VIEW_RIGHTS, localized, useTableDetails, useTableSchema } from "@/features/table";
+import { ALL_VIEW_RIGHTS, localized, useTableDetails, useTableSchema, useTableSettings } from "@/features/table";
+import { useTableMenuId } from "@/features/sidebar";
 import { relationTabs, useMenuViews } from "@/features/view";
 import { todayInput } from "@/shared/lib/date-value";
 import { firstText, related, text, toPerson } from "./org";
@@ -63,6 +64,15 @@ export function useEmployee(menuId: string, guid: string, language: string) {
         values: { status: "dismissed", dismissal_date: todayInput() },
       }),
   };
+}
+
+/**
+ * Пункт меню сотрудников — для перехода на страницу сотрудника из чужого
+ * пункта (посещаемость): вкладки связей страница берёт из него.
+ */
+export function useEmployeesMenuId(): string | undefined {
+  const { table } = useTableSettings(EMPLOYEES);
+  return useTableMenuId(table?.id ?? "");
 }
 
 /** Подчинённые: у кого руководитель — этот сотрудник (`employees_id`). */

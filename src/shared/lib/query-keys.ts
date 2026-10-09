@@ -310,6 +310,9 @@ export const keys = {
      */
     tree: (projectId: string, envId: string) =>
       [...keys.menus.all, projectId, envId, "tree"] as const,
+    /** Пункты меню одной таблицы (`table_id`). */
+    byTable: (projectId: string, envId: string, tableId: string) =>
+      [...keys.menus.all, projectId, envId, "table", tableId] as const,
   },
   views: {
     all: ["views"] as const,

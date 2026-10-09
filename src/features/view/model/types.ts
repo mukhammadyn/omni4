@@ -27,6 +27,10 @@ export const VIEW_TYPES = [
   "ORG",
   "VACANCIES",
   "VACANCY_PLAN",
+  "ATTENDANCE",
+  "ATTENDANCE_LIST",
+  "ABSENCES",
+  "TIMESHEET",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -65,6 +69,10 @@ export const IMPLEMENTED_VIEW_TYPES = new Set<string>([
   "ORG",
   "VACANCIES",
   "VACANCY_PLAN",
+  "ATTENDANCE",
+  "ATTENDANCE_LIST",
+  "ABSENCES",
+  "TIMESHEET",
   "TREE",
   "BOARD",
   "CALENDAR",
@@ -106,7 +114,7 @@ export const IMPLEMENTED_VIEW_TYPES = new Set<string>([
  * черновиком прямо в таблице, а у них черновика нет — «Новая запись»
  * создала бы пустую строку. Нужна своя карточка создания поверх вкладки.
  */
-const NOT_IN_TABS = new Set<string>(["CHART", "LIST", "GALLERY", "PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN"]);
+const NOT_IN_TABS = new Set<string>(["CHART", "LIST", "GALLERY", "PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN", "ATTENDANCE", "ATTENDANCE_LIST", "TIMESHEET", "ABSENCES"]);
 
 /**
  * Типы, которые человек не заводит и не выбирает сменой типа: экран
@@ -120,8 +128,13 @@ const NOT_IN_TABS = new Set<string>(["CHART", "LIST", "GALLERY", "PEOPLE", "ORG"
  * VACANCIES — «Карточки» вакансий (`vacancies.html`, features/hrms):
  * поля `hr_vacancies` по слагам и воронка по кандидатам.
  * VACANCY_PLAN — «Планирование» найма там же: план и найм по месяцам.
+ * ATTENDANCE — «Календарь» посещаемости там же: статус дня значком.
+ * ATTENDANCE_LIST — «Список» посещаемости: строка — день сотрудника.
+ * ABSENCES — «Отсутствия» на `hr_requests`: заявки и их согласование.
+ * TIMESHEET — «Табель» посещаемости (`attendance.html`, features/hrms):
+ * сотрудники × дни по `hr_attendance_days`, смены и заявки рядом.
  */
-export const FIXED_VIEW_TYPES = new Set<string>(["PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN"]);
+export const FIXED_VIEW_TYPES = new Set<string>(["PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN", "ATTENDANCE", "ATTENDANCE_LIST", "TIMESHEET", "ABSENCES"]);
 export const TAB_VIEW_TYPES = VIEW_TYPES.filter(
   (type) => IMPLEMENTED_VIEW_TYPES.has(type) && !NOT_IN_TABS.has(type),
 );

@@ -1,4 +1,4 @@
-export { ROOT_MENU_ID, useMenu, useMenuChildren } from "./api/menus";
+export { ROOT_MENU_ID, useMenu, useMenuChildren, useTableMenuId } from "./api/menus";
 export { Sidebar, SidebarToggleButton } from "./ui/Sidebar";
 export { TopbarActions } from "./ui/TopbarActions";
 export { WorkspaceTile } from "./ui/WorkspaceHeader";

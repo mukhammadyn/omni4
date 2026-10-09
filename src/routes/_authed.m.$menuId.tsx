@@ -76,12 +76,18 @@ import { FileBrowser } from "@/features/files";
 import {
   CANDIDATES,
   EMPLOYEES,
+  Absences,
+  AttendanceCalendar,
+  AttendanceList,
   OrgStructure,
+  Timesheet,
   VACANCIES,
   VacancyCards,
   VacancyPlan,
   VacancyPlanTools,
+  useEmployeesMenuId,
   useVacancyColumns,
+  type EmployeeTab,
 } from "@/features/hrms";
 import { MicrofrontendPage } from "@/features/microfrontend";
 import {
@@ -284,6 +290,9 @@ function parseDay(value: string | undefined): Date {
   const date = new Date(year, month - 1, day);
   return Number.isNaN(date.getTime()) ? nowLocal() : date;
 }
+
+/** Экраны HRMS, которые грузят свои данные сами: общий запрос строк им не нужен. */
+const SELF_LOADING = new Set(["TIMESHEET", "ATTENDANCE", "ATTENDANCE_LIST", "ABSENCES"]);
 
 export const Route = createFileRoute("/_authed/m/$menuId")({
   validateSearch: searchSchema,
@@ -623,6 +632,9 @@ function MenuPage() {
   const vacancyPlanView = supportedView && view?.type === "VACANCY_PLAN";
   /** Экраны, которым нужен весь набор строк сразу, без страниц. */
   const wholeView = orgView || vacancyPlanView;
+  /** «Календарь», «Список», «Табель» посещаемости и «Отсутствия»
+      (features/hrms): данные за период грузят сами, строки view им не нужны. */
+  const sheetView = supportedView && SELF_LOADING.has(view?.type ?? "");
   /** Экраны, отбирающие строки по видимому диапазону дат. */
   const dateView = calendarView || timelineView;
   /** Режим: из адреса, иначе из настроек view, иначе месяц. */
@@ -985,6 +997,15 @@ function MenuPage() {
    */
   const [stepped, setStepped] = useState(false);
 
+  /*
+   * Страница сотрудника из экранов посещаемости — сразу на нужной вкладке,
+   * как `employee.html#att` прототипа. Пункт меню — сотрудников: из него
+   * страница берёт вкладки связей; не нашёлся — текущий.
+   */
+  const employeesMenu = useEmployeesMenuId();
+  const openEmployee = (guid: string, tab: EmployeeTab) =>
+    void navigate({ to: "/employees/$itemId", params: { itemId: guid }, search: { menu: employeesMenu ?? menuId, tab } });
+
   const openRow = (guid: string) => {
     setStepped(false);
     /* И среди записей без дат: у таймлайна они лежат отдельным списком,
@@ -1054,6 +1075,7 @@ function MenuPage() {
        не для чего. */
     supportedView &&
     !treeView &&
+    !sheetView &&
     can.read &&
     !tabGroup.pending &&
     (!boardView || Boolean(boardField)) &&
@@ -1468,10 +1490,10 @@ function MenuPage() {
             <div className="ml-auto flex shrink-0 items-center gap-0.5">
               {/* Поиск, отбор и сортировка — про таблицу: у нарисованного
                   заглушкой view искать нечего, а ручка дерева их не читает. */}
-              {supportedView && !treeView && whoFields.length > 0 && (
+              {supportedView && !treeView && !sheetView && whoFields.length > 0 && (
                 <MineToggle fields={whoFields} filters={filters} onFilters={applyFilters} />
               )}
-              {supportedView && !treeView && (
+              {supportedView && !treeView && !sheetView && (
                   <TableToolbar
                     tableSlug={view.tableSlug}
                     columns={columns}
@@ -1883,7 +1905,7 @@ function MenuPage() {
               анимируем: у чипов внутри есть выпадающие списки, а сжать
               высоту можно только обрезающим контейнером — он бы их
               срезал (см. shared/ui/popover: меню лежит в потоке). */}
-          {filtersVisible && (
+          {filtersVisible && !sheetView && (
             <FilterBar
               columns={columns}
               relations={schema.relations}
@@ -1903,7 +1925,17 @@ function MenuPage() {
 
           {/* Пока варианты вкладок едут, запрос строк не запущен вовсе —
               и пустая таблица врала бы «записей нет». */}
-          {boardNotReady ? (
+          {sheetView ? (
+            view.type === "ATTENDANCE" ? (
+              <AttendanceCalendar viewId={view.id} onOpenEmployee={openEmployee} />
+            ) : view.type === "ATTENDANCE_LIST" ? (
+              <AttendanceList viewId={view.id} onOpenEmployee={openEmployee} />
+            ) : view.type === "ABSENCES" ? (
+              <Absences viewId={view.id} onOpenRow={openRow} onOpenEmployee={openEmployee} />
+            ) : (
+              <Timesheet viewId={view.id} onOpenEmployee={openEmployee} />
+            )
+          ) : boardNotReady ? (
             /* Доска без поля раскладки — не пустая сетка: рисовать
                нечего, пока не выбрано, что считать колонками. */
             <Notice text={t("board.noGroupField")} />
@@ -2344,7 +2376,7 @@ function MenuPage() {
               их не листают, а размер порции там не «строк на странице»,
               а «по скольким строкам считать», и стоит он над графиками,
               рядом с тем, что от него зависит. */}
-          {!rowsError && !boardView && !dateView && !pivotView && !chartView && !wholeView && (
+          {!rowsError && !boardView && !dateView && !pivotView && !chartView && !wholeView && !sheetView && (
           <GridFooter
             /* Со страницами подвал листает, с прокруткой — считает. */
             {...(infinite ? {} : { page: search.page, onPage: (next: number) => setSearch({ page: next }) })}

@@ -242,7 +242,7 @@ export function ViewOptions({
    * нет колонок, а дерево и графики строят порядок сами.
    */
   const canGroup =
-    !["TREE", "BOARD", "CALENDAR", "CHART", "LIST", "GALLERY", "PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN"].includes(view.type);
+    !["TREE", "BOARD", "CALENDAR", "CHART", "LIST", "GALLERY", "PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN", "ATTENDANCE", "ATTENDANCE_LIST", "TIMESHEET", "ABSENCES"].includes(view.type);
   /** Первое поле группировки — подписью на кнопке, остальные счётом. */
   const grouped = view.groupByIds
     .map((id) => fields.find((field) => field.id === id || field.relationId === id))
@@ -1024,7 +1024,7 @@ function Panel({
    * закреплять, ни делить их на группы нечем. Страницы, отбор и
    * раскладка вкладками — как у таблицы.
    */
-  const isList = ["LIST", "GALLERY", "PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN"].includes(view.type);
+  const isList = ["LIST", "GALLERY", "PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN", "ATTENDANCE", "ATTENDANCE_LIST", "TIMESHEET", "ABSENCES"].includes(view.type);
   /** Поле начала события — подписью в строке настроек. Здесь это слаг. */
   const dateFrom = fields.find((field) => field.slug === view.dateFromSlug);
   /** Поле раскладки вкладками — подписью в строке настроек. */

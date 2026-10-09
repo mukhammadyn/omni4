@@ -1,5 +1,6 @@
 export { EMPLOYEES } from "./api/employee";
 export { EmployeePage } from "./ui/EmployeePage";
+export { ABSENCES_TAB, ATTENDANCE_TAB, type EmployeeTab } from "./ui/employee-tabs";
 export { OrgStructure } from "./ui/OrgStructure";
 export { VACANCIES } from "./api/vacancy";
 export { useVacancyColumns } from "./ui/vacancy-columns";
@@ -10,3 +11,8 @@ export { VacancyPage, type VacancyTab } from "./ui/VacancyPage";
 export { NewCandidate } from "./ui/NewCandidate";
 export { CANDIDATES } from "./api/vacancy-page";
 export { NewVacancy } from "./ui/NewVacancy";
+export { Timesheet } from "./ui/Timesheet";
+export { AttendanceCalendar } from "./ui/AttendanceCalendar";
+export { AttendanceList } from "./ui/AttendanceList";
+export { Absences } from "./ui/Absences";
+export { useEmployeesMenuId } from "./api/employee";

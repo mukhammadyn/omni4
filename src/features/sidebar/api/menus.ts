@@ -212,6 +212,31 @@ function flatten(levels: Levels, languages: string[]): MenuMatch[] {
 }
 
 /** Один пункт по id — для экрана. Дерево загружено не целиком, искать в нём нечего. */
+/**
+ * Первый пункт меню, показывающий таблицу. Экрану, который ведёт на
+ * страницу записи из чужого пункта (посещаемость → сотрудник), нужен
+ * «свой» пункт этой записи: из него страница берёт вкладки связей.
+ *
+ * `GET /v3/menus?table_id=` отбирает по таблице, а `parent_id` при этом
+ * не читает (object_builder storage/postgres/menu.go:693). `count` в ответе
+ * — число всех пунктов проекта, а не найденных; пункты бывают и повторами.
+ */
+export function useTableMenuId(tableId: string): string | undefined {
+  const session = useSession();
+  const projectId = session.getProjectId() ?? "";
+  const envId = session.getEnvironmentId() ?? "";
+
+  const query = useQuery({
+    queryKey: keys.menus.byTable(projectId, envId, tableId),
+    queryFn: () => api.get<MenusResponseDto>("/v3/menus", { params: { table_id: tableId } }),
+    enabled: Boolean(projectId) && Boolean(tableId),
+    staleTime: 5 * 60_000,
+    select: (data: MenusResponseDto) => (data.menus ?? []).find((menu) => menu.type === "TABLE")?.id,
+  });
+
+  return query.data ?? undefined;
+}
+
 export function useMenu(menuId: string) {
   const languages = useLabelLanguages();
   const session = useSession();
