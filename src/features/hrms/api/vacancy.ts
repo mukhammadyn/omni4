@@ -8,7 +8,8 @@ import { text } from "./org";
 /** Вакансии HRMS (`ucode/erp/erp.dbml`). */
 export const VACANCIES = "hr_vacancies";
 
-const ALL = { limit: MAX_LIMIT, page: 1 };
+/* Связи здесь не читаются: нужны только id, а без `_data` ответ в разы легче. */
+const ALL = { limit: MAX_LIMIT, page: 1, relations: false } as const;
 
 const toStage = (row: Item): Stage => ({
   id: text(row.guid),

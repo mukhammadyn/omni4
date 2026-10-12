@@ -130,6 +130,7 @@ export function useVacancy(guid: string) {
   const ids = useMemo(() => all.map((c) => text(c.guid)).filter(Boolean), [all]);
   const evaluations = useItems(ids.length ? EVALUATIONS : undefined, {
     ...ALL,
+    relations: false,
     filters: { hr_candidates_id: { op: "is", values: ids } },
   });
   const scores = useMemo(() => {

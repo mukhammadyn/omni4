@@ -7,7 +7,7 @@ import { Icon } from "@/shared/ui/icon";
 import { Popover } from "@/shared/ui/popover";
 import { Tooltip } from "@/shared/ui/tooltip";
 import { isWeekend, type Scale, type SheetCell, type SheetTotals } from "../model/timesheet";
-import { EmployeeName, PeriodBar, useAttendance, useDayHead, type OpenDay, type OpenEmployee } from "./attendance-parts";
+import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, useAttendance, useDayHead, type OpenDay, type OpenEmployee } from "./attendance-parts";
 import { ATTENDANCE_TAB } from "./employee-tabs";
 import { TimesheetDay } from "./TimesheetDay";
 
@@ -24,7 +24,7 @@ const SHEET_SCALES: readonly Scale[] = ["month", "week"];
  */
 export function Timesheet({ viewId, onOpenEmployee }: { viewId: string; onOpenEmployee: OpenEmployee }) {
   const { t, i18n } = useTranslation();
-  const view = useAttendance(viewId, SHEET_SCALES);
+  const view = useAttendance(viewId, SHEET_SCALES, SHEET_PAGE);
   const { scale, range, dates, today, sheet, rows } = view;
   const [open, setOpen] = useState<OpenDay | null>(null);
   const head = useDayHead();
@@ -47,7 +47,7 @@ export function Timesheet({ viewId, onOpenEmployee }: { viewId: string; onOpenEm
           <thead>
             <tr>
               <th className={`${headCell} left-0 z-30 min-w-[230px] px-3 text-left font-normal text-fg-muted`}>
-                {t("timesheet.employee")} <span className="text-fg-subtle">{rows.length || ""}</span>
+                {t("timesheet.employee")} <span className="text-fg-subtle">{sheet.total || ""}</span>
               </th>
               {dates.map((date) => (
                 <th
@@ -116,6 +116,7 @@ export function Timesheet({ viewId, onOpenEmployee }: { viewId: string; onOpenEm
             )}
           </tbody>
         </table>
+        <MoreRows sheet={sheet} />
       </div>
 
       {open && openCell && (

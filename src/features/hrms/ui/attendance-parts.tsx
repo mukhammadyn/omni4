@@ -1,11 +1,11 @@
-import { useDeferredValue, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon, XIcon } from "lucide-react";
 import { GAP, pageItems } from "@/shared/ui/pagination";
 import { useUi } from "@/shared/lib/ui-store";
 import { todayInput } from "@/shared/lib/date-value";
 import { Icon } from "@/shared/ui/icon";
-import { useTimesheet, type SheetEmployee } from "../api/timesheet";
+import { useTimesheet, type SheetEmployee, type Timesheet } from "../api/timesheet";
 import type { EmployeeTab } from "./employee-tabs";
 import { buildRow, datesOf, rangeOf, statusOf, stepAnchor, type DayStatus, type Scale, type SheetCell } from "../model/timesheet";
 
@@ -47,10 +47,10 @@ export function usePeriod(viewId: string, scales: readonly Scale[] = SCALES) {
 export type Period = ReturnType<typeof usePeriod>;
 
 /** Период, поиск, данные и строки сотрудников за период. */
-export function useAttendance(viewId: string, scales: readonly Scale[] = SCALES) {
+export function useAttendance(viewId: string, scales: readonly Scale[] = SCALES, pageSize?: number) {
   const period = usePeriod(viewId, scales);
   const { range, dates, today, query } = period;
-  const sheet = useTimesheet({ ...range, dates, today, search: query });
+  const sheet = useTimesheet({ ...range, dates, today, search: query, ...(pageSize ? { pageSize } : {}) });
   const rows = useMemo(
     () => sheet.employees.map((employee) => ({ employee, ...buildRow(sheet.inputOf(employee)) })),
     [sheet],
@@ -59,6 +59,34 @@ export function useAttendance(viewId: string, scales: readonly Scale[] = SCALES)
 }
 
 export type Attendance = ReturnType<typeof useAttendance>;
+
+/** Сотрудников за порцию у табеля и календаря — примерно экран. */
+export const SHEET_PAGE = 30;
+
+/**
+ * Маркер под таблицей, внутри её прокрутки: подъехал к низу — следующая
+ * порция сотрудников (табель HRMS, Time/Sheet).
+ */
+export function MoreRows({ sheet }: { sheet: Timesheet }) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  const { hasMore, loadMore } = sheet;
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || !hasMore) return;
+    const observer = new IntersectionObserver(([entry]) => entry?.isIntersecting && loadMore(), {
+      root: node.parentElement,
+      rootMargin: "300px",
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
+  return (
+    <div ref={ref} className="sticky left-0 py-2 text-center text-xs text-fg-subtle">
+      {sheet.loadingMore && !sheet.loading && t("common.loading")}
+    </div>
+  );
+}
 
 /** Открытый день: сотрудник и дата — окну дня (TimesheetDay). */
 export type OpenDay = { employee: SheetEmployee; date: string };

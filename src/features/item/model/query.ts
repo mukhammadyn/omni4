@@ -161,6 +161,12 @@ export type ItemsQuery = {
    * ручка в обоих случаях получает limit и offset.
    */
   infinite?: boolean | undefined;
+  /**
+   * false — без `<слаг>_data` связанных строк. Ручка разворачивает их
+   * по умолчанию, целиком, в каждую строку: у дня посещаемости это
+   * 3 КБ из 3,5 (GetListV2, object_builder.go:2424).
+   */
+  relations?: false | undefined;
 };
 
 /**
@@ -172,7 +178,7 @@ export type ItemsQuery = {
  * и выигрывают они, а не данные.
  */
 export function toRequestBody(query: ItemsQuery): Record<string, unknown> {
-  const { limit, page, sorts, filters, search } = query;
+  const { limit, page, sorts, filters, search, relations } = query;
 
   const body: Record<string, unknown> = toConditions(filters ?? {});
 
@@ -192,6 +198,7 @@ export function toRequestBody(query: ItemsQuery): Record<string, unknown> {
   }
   if (Object.keys(order).length) body["order"] = order;
   if (search?.trim()) body["search"] = search.trim();
+  if (relations === false) body["with_relations"] = false;
 
   return body;
 }

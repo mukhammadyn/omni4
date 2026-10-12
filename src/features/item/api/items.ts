@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTableSettings } from "@/features/table";
 import { api } from "@/shared/api/client";
@@ -66,6 +67,22 @@ export function useItems(tableSlug: string | undefined, query: ItemsQuery) {
     select: toPages,
   });
 
+  // Постоянная ссылка: её кладут в зависимости эффектов и useMemo.
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = result;
+  const loadMore = useCallback(() => {
+    /*
+     * `cancelRefetch: false` — иначе второй вызов, пришедший, пока
+     * первый ещё летит, ОТМЕНЯЕТ его и шлёт запрос заново: react-query
+     * по умолчанию считает, что повторный вызов важнее. А приходят они
+     * парами всегда — два события прокрутки в одном кадре, два прогона
+     * эффекта в StrictMode, — и в сети видно два запроса за одну
+     * страницу, из которых первый оборван.
+     */
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage({ cancelRefetch: false });
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   return {
     page: result.data ?? EMPTY_PAGE,
     isLoading: result.isLoading,
@@ -74,19 +91,7 @@ export function useItems(tableSlug: string | undefined, query: ItemsQuery) {
     /** Есть ли что грузить дальше и не грузится ли уже. */
     hasMore: result.hasNextPage && !result.isFetchingNextPage,
     loadingMore: result.isFetchingNextPage,
-    loadMore: () => {
-      /*
-       * `cancelRefetch: false` — иначе второй вызов, пришедший, пока
-       * первый ещё летит, ОТМЕНЯЕТ его и шлёт запрос заново: react-query
-       * по умолчанию считает, что повторный вызов важнее. А приходят они
-       * парами всегда — два события прокрутки в одном кадре, два прогона
-       * эффекта в StrictMode, — и в сети видно два запроса за одну
-       * страницу, из которых первый оборван.
-       */
-      if (result.hasNextPage && !result.isFetchingNextPage) {
-        void result.fetchNextPage({ cancelRefetch: false });
-      }
-    },
+    loadMore,
     /**
      * Причина отказа словами. null — всё в порядке.
      *

@@ -39,8 +39,8 @@ const num = (value: unknown): number | null => (typeof value === "number" && Num
  * Все строки по отбору, порциями по MAX_LIMIT. Месяц табеля — это
  * сотрудники × дни, и в июне их уже было больше одной порции.
  */
-function useAll(tableSlug: string | undefined, filters: Filters, search = "") {
-  const query = useItems(tableSlug, { limit: MAX_LIMIT, page: 1, infinite: true, filters, search });
+function useAll(tableSlug: string | undefined, filters: Filters, relations?: false) {
+  const query = useItems(tableSlug, { limit: MAX_LIMIT, page: 1, infinite: true, filters, relations });
   const { hasMore, loadMore } = query;
   useEffect(() => {
     if (hasMore) loadMore();
@@ -106,6 +106,12 @@ export type Timesheet = {
   absenceTypes: { title: string; code: string; icon: string; color: string }[];
   loading: boolean;
   fetching: boolean;
+  /** Есть ли ещё сотрудники, и подгрузить их следующую порцию. */
+  hasMore: boolean;
+  loadingMore: boolean;
+  /** Сотрудников по отбору всего, а не загруженных. */
+  total: number;
+  loadMore: () => void;
 };
 
 /**
@@ -120,6 +126,7 @@ export function useTimesheet({
   today,
   search,
   employeeId,
+  pageSize,
 }: {
   from: string;
   to: string;
@@ -128,14 +135,34 @@ export function useTimesheet({
   search: string;
   /** Один сотрудник — вкладка «Посещаемость» его страницы. */
   employeeId?: string;
+  /** Сотрудники порциями по столько — прокрутка табеля, как в HRMS. Без него — все. */
+  pageSize?: number;
 }): Timesheet {
+  const peopleQuery = useItems(EMPLOYEES, {
+    limit: pageSize ?? MAX_LIMIT,
+    page: 1,
+    infinite: true,
+    filters: employeeId ? { guid: { op: "any", values: [employeeId] } } : {},
+    search,
+    // Порции идут по алфавиту — иначе новая порция вставала бы между строк.
+    sorts: [{ field: "full_name", direction: "asc" }],
+  });
+  const { hasMore: peopleMore, loadMore: peopleNext } = peopleQuery;
+  useEffect(() => {
+    if (!pageSize && peopleMore) peopleNext();
+  }, [pageSize, peopleMore, peopleNext]);
+
+  /*
+   * Порциями — только сотрудники. Дни, смены и заявки — за период на всю
+   * компанию, как были: это порция-две MAX_LIMIT за месяц, а отбор по
+   * загруженным сотрудникам перезапрашивал бы их на каждой прокрутке
+   * (так в HRMS) — замер 2026-10-12: 5–7 с на порцию против 0,6 с.
+   */
   const one: Filters = employeeId ? { employees_id: { op: "any", values: [employeeId] } } : {};
   const range: Filters = { ...one, date: { op: "between", values: [from, to] } };
-  // ponytail: сотрудники одной порцией MAX_LIMIT и без подгрузки строк;
-  // при тысячах людей — прокрутка порциями, как в HRMS.
-  const people = useAll(EMPLOYEES, employeeId ? { guid: { op: "any", values: [employeeId] } } : {}, search);
-  const days = useAll(ATTENDANCE_DAYS, range);
-  const shifts = useAll("hr_shifts", range);
+  // Связи дням и сменам не нужны, а без них ответ в пять раз легче.
+  const days = useAll(ATTENDANCE_DAYS, range, false);
+  const shifts = useAll("hr_shifts", range, false);
   const requests = useAll(REQUESTS, {
     ...one,
     date_from: { op: "before", values: [plusDays(to, 1)] },
@@ -144,15 +171,18 @@ export function useTimesheet({
   const types = useAll("hr_absence_types", {});
   const holidays = useAll("hr_holidays", range);
 
-  const loading = people.loading || days.loading || shifts.loading || requests.loading || types.loading;
-  const fetching = people.fetching || days.fetching || shifts.fetching || requests.fetching;
+  const loading =
+    peopleQuery.isLoading || (!pageSize && (peopleMore || peopleQuery.loadingMore)) || days.loading || shifts.loading || requests.loading || types.loading;
+  // Догрузка порции — не обновление: прежние строки не приглушаются.
+  const loadingMore = peopleQuery.loadingMore;
+  const fetching = (peopleQuery.isFetching && !loadingMore) || days.fetching || shifts.fetching || requests.fetching;
+  const hasMore = Boolean(pageSize) && peopleMore;
 
   return useMemo(() => {
     // Принятые после периода и уволенные до него в нём не работали.
-    const employees = people.rows
+    const employees = peopleQuery.page.rows
       .map(toEmployee)
-      .filter((e) => (!e.hireDate || e.hireDate <= to) && (!e.dismissalDate || e.dismissalDate >= from))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .filter((e) => (!e.hireDate || e.hireDate <= to) && (!e.dismissalDate || e.dismissalDate >= from));
 
     const dayIndex = new Map<string, Map<string, AttendanceDay>>();
     for (const row of days.rows) {
@@ -205,8 +235,12 @@ export function useTimesheet({
         .map((row) => ({ title: text(row.name), code: text(row.code), icon: text(row.icon), color: text(row.color) })),
       loading,
       fetching,
+      hasMore,
+      loadingMore,
+      loadMore: peopleNext,
+      total: peopleQuery.page.count,
     };
-  }, [people.rows, days.rows, shifts.rows, requests.rows, types.rows, holidays.rows, from, to, dates, today, loading, fetching]);
+  }, [peopleQuery.page.count, peopleQuery.page.rows, hasMore, loadingMore, peopleNext, days.rows, shifts.rows, requests.rows, types.rows, holidays.rows, from, to, dates, today, loading, fetching]);
 }
 
 /** Отметки сотрудника за день — окну дня. */

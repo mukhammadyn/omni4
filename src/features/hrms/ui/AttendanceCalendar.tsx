@@ -20,7 +20,9 @@ import { markClock } from "../api/timesheet";
 import { isWeekend, runsOf, statusOf, type Leave, type SheetCell } from "../model/timesheet";
 import {
   EmployeeName,
+  MoreRows,
   PeriodBar,
+  SHEET_PAGE,
   STATUS_DOT,
   StatusChips,
   useAttendance,
@@ -46,7 +48,7 @@ import { TimesheetDay } from "./TimesheetDay";
  */
 export function AttendanceCalendar({ viewId, onOpenEmployee }: { viewId: string; onOpenEmployee: OpenEmployee }) {
   const { t } = useTranslation();
-  const view = useAttendance(viewId);
+  const view = useAttendance(viewId, undefined, SHEET_PAGE);
   const { scale, range, dates, today, sheet, rows } = view;
   const [open, setOpen] = useState<OpenDay | null>(null);
   const head = useDayHead();
@@ -72,7 +74,7 @@ export function AttendanceCalendar({ viewId, onOpenEmployee }: { viewId: string;
           <thead>
             <tr>
               <th className={`${headCell} left-0 z-30 min-w-[230px] px-3 text-left font-normal text-fg-muted`}>
-                {t("timesheet.employee")} <span className="text-fg-subtle">{rows.length || ""}</span>
+                {t("timesheet.employee")} <span className="text-fg-subtle">{sheet.total || ""}</span>
               </th>
               {dates.map((date) => (
                 <th
@@ -145,6 +147,7 @@ export function AttendanceCalendar({ viewId, onOpenEmployee }: { viewId: string;
             )}
           </tbody>
         </table>
+        <MoreRows sheet={sheet} />
       </div>
 
       {open && openCell && (
