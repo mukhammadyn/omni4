@@ -104,8 +104,9 @@ export function toNodes(menus: MenuDto[], languages: string | string[]): MenuNod
     .filter((node) => node.can.read)
     // Системные пункты (Настройки, Файлы, Пользователи) живут на своих
     // экранах, а не в дереве меню. Пункт «Настройки» модуля — тоже:
-    // вход в настройки один, в низу сайдбара (SidebarFooter).
-    .filter((node) => !isSystemMenu(node.id) && !node.isSettings);
+    // вход в настройки один, в низу сайдбара (SidebarFooter). Хранилище
+    // дашбордов — тоже: его открывают входы модулей (ADR-0013).
+    .filter((node) => !isSystemMenu(node.id) && !node.isSettings && node.screen !== "dashboards");
 }
 
 /**
@@ -374,4 +375,33 @@ export function useReorderMenus() {
 
     onSettled: () => queryClient.invalidateQueries({ queryKey: keys.menus.all }),
   });
+}
+
+/**
+ * Пункт корня меню со своим экраном (`attributes.screen`) — например,
+ * хранилище дашбордов. Из дерева такие пункты убраны (toNodes), поэтому
+ * ищутся по сырому ответу того же запроса: кэш общий с сайдбаром.
+ */
+export function useScreenMenu(screen: string) {
+  const languages = useLabelLanguages();
+  const session = useSession();
+  const projectId = session.getProjectId() ?? "";
+  const envId = session.getEnvironmentId() ?? "";
+
+  const query = useQuery({
+    queryKey: keys.menus.children(projectId, envId, ROOT_MENU_ID),
+    queryFn: () =>
+      api.get<MenusResponseDto>("/v3/menus", { params: { parent_id: ROOT_MENU_ID } }),
+    enabled: Boolean(projectId),
+    staleTime: 5 * 60_000,
+    select: useCallback(
+      (data: MenusResponseDto) => {
+        const dto = (data.menus ?? []).find((menu) => menu.id && menu.attributes?.["screen"] === screen);
+        return dto ? toMenuNode(dto, languages) : null;
+      },
+      [languages, screen],
+    ),
+  });
+
+  return { node: query.data ?? null, isLoading: query.isLoading };
 }

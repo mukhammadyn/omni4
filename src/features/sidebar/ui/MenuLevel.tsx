@@ -84,6 +84,7 @@ function MenuRow({
    */
   const open = useUi((state) => !state.collapsedMenus.includes(node.id));
   const toggleMenu = useUi((state) => state.toggleMenu);
+  const moduleId = useUi((state) => state.moduleId);
 
   /*
    * Детей папки читаем и у свёрнутой: иначе не узнать, что в ней одни
@@ -192,6 +193,19 @@ function MenuRow({
     >
       {inner}
     </a>
+  ) : node.type === "DASHBOARDS" ? (
+    /* Вход в дашборды: общий экран, развёрнутый на модуле, где стоит
+       вход (ADR-0013). Своего экрана у пункта нет. */
+    <Link
+      to="/dashboards"
+      search={{ module: moduleId }}
+      draggable={false}
+      className={inner_row}
+      style={style}
+      activeProps={{ className: `${inner_row} ${activeRow}` }}
+    >
+      {inner}
+    </Link>
   ) : (
     <Link
       to="/m/$menuId"

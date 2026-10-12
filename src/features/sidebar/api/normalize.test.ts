@@ -150,3 +150,9 @@ test("пункт omni4 — только attributes.protected: true", () => {
   expect(node({ protected: "true" }).isProtected).toBe(false);
   expect(node({}).isProtected).toBe(false);
 });
+
+test("вход в дашборды: LINK с screen=dashboards-entry — лист DASHBOARDS, в raw остаётся LINK", () => {
+  const node = toMenuNode({ id: "1", type: "LINK", attributes: { screen: "dashboards-entry" } }, "ru");
+
+  expect([node.type, node.kind, node.raw.type, node.screen]).toEqual(["DASHBOARDS", "leaf", "LINK", "dashboards-entry"]);
+});

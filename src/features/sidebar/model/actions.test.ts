@@ -28,6 +28,7 @@ const node = (over: Partial<MenuNode> = {}): MenuNode => ({
   isProtected: false,
   isModule: false,
   isSettings: false,
+  screen: "",
   parentId: "root",
   children: [],
   raw: {},

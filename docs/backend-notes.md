@@ -1639,3 +1639,12 @@ DATE_TIME_WITHOUT_TIME_ZONE (ADR-0014).
 а `count` в ответе — число всех пунктов проекта, а не найденных. Фронт
 шлёт только uuid из ответа `/v1/table/{slug}` и берёт первый пункт
 типа TABLE.
+
+## Тип пункта меню — закрытый список
+
+Проверено 2026-10-12 при заведении дашборда (ADR-0013). Create, Update
+и ещё одна запись меню (`object_builder storage/postgres/menu.go:36, 239,
+919`) сверяют `type` с `config.MENU_TYPES` (`config/constants.go:70`)
+и отклоняют чужой: «unsupported menu type». Свой экран поэтому заводится
+пунктом `LINK` с `attributes.screen` (`settings`, `dashboards`, `dashboards-entry`);
+различает их `toMenuNode` (features/sidebar).

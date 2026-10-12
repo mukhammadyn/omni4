@@ -146,7 +146,8 @@ export function toMenuNode(
   languages: string | string[],
   index = 0,
 ): MenuNode {
-  const type = dto.type ?? "";
+  const screen = typeof dto.attributes?.["screen"] === "string" ? dto.attributes["screen"] : "";
+  const type = screen === "dashboards-entry" ? "DASHBOARDS" : (dto.type ?? "");
   const href = pickHref(dto);
 
   return {
@@ -165,7 +166,8 @@ export function toMenuNode(
     isStatic: dto.is_static ?? false,
     isProtected: dto.attributes?.["protected"] === true,
     isModule: dto.attributes?.["is_tab"] === true,
-    isSettings: dto.attributes?.["screen"] === "settings",
+    isSettings: screen === "settings",
+    screen,
     parentId: dto.parent_id || null,
     can: pickPermissions(dto),
     children: [],

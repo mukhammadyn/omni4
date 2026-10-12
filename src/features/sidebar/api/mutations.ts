@@ -4,6 +4,8 @@ import { api } from "@/shared/api/client";
 import { useSession } from "@/shared/api/use-session";
 import { keys } from "@/shared/lib/query-keys";
 import type { MenuNode } from "../model/types";
+import type { MenuDto } from "./dto";
+import { toMenuNode } from "./normalize";
 
 /** Что можно задать при создании и изменении пункта меню. */
 export type MenuInput = {
@@ -179,4 +181,20 @@ function baseLabel(labels: Record<string, string>): string {
     if (value.trim()) return value.trim();
   }
   return "";
+}
+
+/**
+ * Один ключ `attributes` пункта меню — например, `dashboard` (ADR-0013).
+ *
+ * Пункт перечитывается прямо перед записью: PUT пишет строку целиком,
+ * и тело, собранное из закэшированного пункта, стёрло бы то, что
+ * за это время поменяли другие. Окно это сужает, но не закрывает.
+ */
+export function useSetMenuAttribute() {
+  return useMenuMutation<{ id: string; key: string; value: unknown }>(
+    async ({ id, key, value }, projectId) => {
+      const fresh = toMenuNode(await api.get<MenuDto>(`/v3/menus/${id}`), []);
+      return api.put("/v3/menus", menuUpdateBody(fresh, { attributes: { [key]: value } }, projectId));
+    },
+  );
 }

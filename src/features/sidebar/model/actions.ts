@@ -146,6 +146,7 @@ const TYPE_WORDS: Record<string, TranslationKey> = {
   WEBPAGE: "menuType.WEBPAGE",
   WIKI: "menuType.WIKI",
   MICROFRONTEND: "menuType.MICROFRONTEND",
+  DASHBOARDS: "menuType.DASHBOARDS",
   LINK: "menuType.LINK",
 };
 

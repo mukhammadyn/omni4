@@ -19,6 +19,7 @@ const node = (id: string): MenuNode => ({
   isProtected: false,
   isModule: false,
   isSettings: false,
+  screen: "",
   parentId: "root",
   children: [],
   raw: {},

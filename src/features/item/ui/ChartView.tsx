@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from "react";
+import { Fragment, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import {
   AudioWaveformIcon,
   BinaryIcon,
@@ -21,6 +21,7 @@ import { moveBefore } from "@/shared/lib/order";
 import { Button } from "@/shared/ui/button";
 import { CommitInput } from "@/shared/ui/commit-input";
 import { Dropdown } from "@/shared/ui/dropdown";
+import { Field as LabeledField } from "@/shared/ui/input";
 import { Icon } from "@/shared/ui/icon";
 import { Tooltip } from "@/shared/ui/tooltip";
 import type { DateKind } from "@/shared/lib/date-value";
@@ -459,7 +460,7 @@ const SAMPLES = [200, 500, 1000];
  * добавление — это не пункт меню где-то наверху, а пустая клетка там,
  * где появится результат.
  */
-function AddTile({ onClick, full = false }: { onClick: () => void; full?: boolean }) {
+export function AddTile({ onClick, full = false }: { onClick: () => void; full?: boolean }) {
   const { t } = useTranslation();
 
   return (
@@ -476,7 +477,7 @@ function AddTile({ onClick, full = false }: { onClick: () => void; full?: boolea
   );
 }
 
-function ChartCard({
+export function ChartCard({
   config,
   columns,
   relations,
@@ -492,6 +493,10 @@ function ChartCard({
   onMove,
   onChange,
   onRemove,
+  aside,
+  inlineSetup = true,
+  headerActions,
+  plain = false,
 }: {
   config: ChartConfig;
   columns: Field[];
@@ -508,14 +513,20 @@ function ChartCard({
   onMove: (delta: number) => void;
   onChange: (patch: Partial<ChartConfig>) => void;
   onRemove: () => void;
+  /** Над настройками графика: дашборд кладёт сюда выбор таблицы. */
+  aside?: ReactNode;
+  /** false — настройки графика живут не в карточке, а в диалоге (дашборд). */
+  inlineSetup?: boolean;
+  /** Кнопки в шапке карточки в режиме правки, перед «Убрать». */
+  headerActions?: ReactNode;
+  /** Без своей рамки и с крупным заголовком — предпросмотр в редакторе. */
+  plain?: boolean;
 }) {
   const { t, i18n } = useTranslation();
 
-  const label = (field: Field) => localized(field.labels, language, field.label);
   const bySlug = new Map(columns.map((field) => [field.slug, field]));
   const groupField = bySlug.get(config.groupSlug);
   const splitField = bySlug.get(config.splitSlug);
-  const valueField = bySlug.get(config.valueSlug);
 
   /*
    * Ось: чем свернуть значение в ключ и чем развернуть ключ в подпись.
@@ -554,14 +565,7 @@ function ChartCard({
    * amount · по status». Пустая карточка без подписи — это число,
    * о котором нельзя сказать, что оно считает.
    */
-  const derived = [
-    t(`pivot.aggregation.${config.aggregation}` as const),
-    valueField && config.aggregation !== "count" ? label(valueField) : "",
-    groupField && config.kind !== "stat" ? `· ${label(groupField)}` : "",
-    splitField && series.splits.length ? `× ${label(splitField)}` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const derived = chartTitle(config, columns, language, t);
 
   /*
    * Размер во время перетаскивания ручки — местный: иначе каждая
@@ -584,7 +588,7 @@ function ChartCard({
        * Не поместилось — прокручивается внутри, как и положено плитке
        * на панели.
        */
-      style={{ height: `${height * ROW_HEIGHT}px` }}
+      style={plain ? undefined : { height: `${height * ROW_HEIGHT}px` }}
       /* Выделение текста в заголовке — не бросок карточки: у поля ввода
          внутри draggable-родителя браузер начинает перетаскивание
          вместо выделения. */
@@ -608,9 +612,13 @@ function ChartCard({
         event.preventDefault();
         onDrop();
       }}
-      className={`relative flex flex-col gap-2 rounded-lg border bg-surface p-3 transition-colors ${
-        SPAN[width] ?? SPAN[6]
-      } ${dragged ? "opacity-40" : ""} ${over ? "border-accent bg-accent-subtle" : "border-border"}`}
+      className={
+        plain
+          ? "relative flex h-full min-h-0 flex-col gap-3"
+          : `relative flex flex-col gap-2 rounded-lg border bg-surface p-3 transition-colors ${
+              SPAN[width] ?? SPAN[6]
+            } ${dragged ? "opacity-40" : ""} ${over ? "border-accent bg-accent-subtle" : "border-border"}`
+      }
     >
       {/* Ручки размера — только в правке и только там, где сетка
           многоколоночная: на узком экране всё и так в одну колонку. */}
@@ -663,7 +671,7 @@ function ChartCard({
           </button>
         )}
 
-        {editing ? (
+        {editing && inlineSetup ? (
           <CommitInput
             value={config.title}
             placeholder={derived}
@@ -673,7 +681,7 @@ function ChartCard({
             className="h-7 min-w-0 flex-1 text-sm"
           />
         ) : (
-          <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-fg">
+          <h3 className={`min-w-0 flex-1 truncate text-fg ${plain ? "text-lg font-semibold" : "text-sm font-medium"}`}>
             {config.title || derived}
           </h3>
         )}
@@ -693,6 +701,8 @@ function ChartCard({
           </span>
         )}
 
+        {editing && headerActions}
+
         {editing && (
           <button
             type="button"
@@ -706,7 +716,9 @@ function ChartCard({
         )}
       </header>
 
-      {editing && (
+      {aside}
+
+      {editing && inlineSetup && (
         <ChartSetup config={config} columns={columns} language={language} onChange={onChange} />
       )}
 
@@ -766,17 +778,69 @@ function ChartCard({
   );
 }
 
-/** Настройки одного графика. Видны только в режиме правки. */
-function ChartSetup({
+/**
+ * Название графика из его настроек: «Отделы · Количество»,
+ * «Отделы · Сумма Оклад × Пол». Сначала то, ЧТО разбито, потом как
+ * посчитано — как в редакторе виджетов professio. Пустая карточка
+ * без подписи — это число, о котором нельзя сказать, что оно считает.
+ */
+export function chartTitle(
+  config: ChartConfig,
+  columns: Field[],
+  language: string,
+  t: (key: TranslationKey) => string,
+): string {
+  const bySlug = new Map(columns.map((field) => [field.slug, field]));
+  const label = (slug: string) => {
+    const field = bySlug.get(slug);
+    return field ? localized(field.labels, language, field.label) : "";
+  };
+  const value = config.aggregation !== "count" ? label(config.valueSlug) : "";
+  const calculation = [t(`pivot.aggregation.${config.aggregation}` as const), value].filter(Boolean).join(" ");
+  const group = config.kind !== "stat" ? label(config.groupSlug) : "";
+  const split = splittable(config.kind) ? label(config.splitSlug) : "";
+
+  return [group, calculation].filter(Boolean).join(" · ") + (split ? ` × ${split}` : "");
+}
+
+/** В форме — поле с подписью, в строке — как есть. */
+function Slot({
+  stacked,
+  label,
+  order = "",
+  children,
+}: {
+  stacked: boolean;
+  label: string;
+  /** Место в форме: там вопросы идут «что → как считать → как показать». */
+  order?: string;
+  children: ReactNode;
+}) {
+  return stacked ? (
+    <div className={order}>
+      <LabeledField label={label}>{children}</LabeledField>
+    </div>
+  ) : (
+    <>{children}</>
+  );
+}
+
+/**
+ * Настройки одного графика. Строкой — под карточкой в режиме правки;
+ * `stacked` — формой с подписями, в диалоге редактора дашборда.
+ */
+export function ChartSetup({
   config,
   columns,
   language,
   onChange,
+  stacked = false,
 }: {
   config: ChartConfig;
   columns: Field[];
   language: string;
   onChange: (patch: Partial<ChartConfig>) => void;
+  stacked?: boolean;
 }) {
   const { t } = useTranslation();
   const label = (field: Field) => localized(field.labels, language, field.label);
@@ -802,56 +866,93 @@ function ChartSetup({
       aggregationAllowed(config.kind, item) && (item === "count" || numeric.length > 0),
   );
 
+  const pickKind = (kind: ChartKind) =>
+    onChange({
+      kind,
+      // Смена формы не должна оставлять кольцо со средним.
+      ...(aggregationAllowed(kind, config.aggregation) ? {} : { aggregation: "count" as Aggregation }),
+      // Кольцу и числу второе поле не нужно; уносим его с собой,
+      // чтобы оно не всплыло при возврате к полосам как чужое.
+      ...(splittable(kind) ? {} : { splitSlug: "" }),
+    });
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
-      <Dropdown
-        value={config.kind}
-        ariaLabel={t("chart.kind")}
-        className="w-36"
-        items={CHART_KINDS.map((kind) => ({
-          value: kind,
-          label: t(`chart.kind.${kind}` as const),
-          icon: <Icon as={KIND_ICONS[kind]} size={14} className="text-fg-muted" />,
-        }))}
-        onChange={(value) => {
-          const kind = value as ChartKind;
-          onChange({
-            kind,
-            // Смена формы не должна оставлять кольцо со средним.
-            ...(aggregationAllowed(kind, config.aggregation)
-              ? {}
-              : { aggregation: "count" as Aggregation }),
-            // Кольцу и числу второе поле не нужно; уносим его с собой,
-            // чтобы оно не всплыло при возврате к полосам как чужое.
-            ...(splittable(kind) ? {} : { splitSlug: "" }),
-          });
-        }}
-      />
+    <div
+      className={
+        stacked
+          ? "flex flex-col gap-3"
+          : "flex flex-wrap items-center gap-1.5 border-t border-border pt-2"
+      }
+    >
+      {stacked ? (
+        /* В форме вид — плитками, как в редакторе professio: восемь форм
+           видны сразу, без раскрытия списка. */
+        <div className="order-3 flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-fg-muted">{t("chart.kind")}</span>
+          <div role="radiogroup" aria-label={t("chart.kind")} className="grid grid-cols-2 gap-1.5">
+            {CHART_KINDS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                role="radio"
+                aria-checked={config.kind === kind}
+                /* Длинное название в плитке обрезается — целиком оно в подсказке. */
+                title={t(`chart.kind.${kind}` as const)}
+                onClick={() => pickKind(kind)}
+                className={`flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-md border px-2.5 text-left text-sm transition-colors ${
+                  config.kind === kind
+                    ? "border-accent bg-accent-subtle text-fg"
+                    : "border-border text-fg-muted hover:bg-surface-hover hover:text-fg"
+                }`}
+              >
+                <Icon as={KIND_ICONS[kind]} size={15} className="shrink-0" />
+                <span className="truncate">{t(`chart.kind.${kind}` as const)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <Dropdown
+          value={config.kind}
+          ariaLabel={t("chart.kind")}
+          className="w-36"
+          items={CHART_KINDS.map((kind) => ({
+            value: kind,
+            label: t(`chart.kind.${kind}` as const),
+            icon: <Icon as={KIND_ICONS[kind]} size={14} className="text-fg-muted" />,
+          }))}
+          onChange={(value) => pickKind(value as ChartKind)}
+        />
+      )}
 
       {/* У одного числа поля разбивки нет: считать нечего по чему. */}
       {config.kind !== "stat" && (
         <>
-          <Dropdown
-            value={config.groupSlug}
-            ariaLabel={t("chart.group")}
-            placeholder={t("pivot.pick")}
-            className="w-40"
-            items={options(columns)}
-            onChange={(groupSlug) =>
-              // Поле сменили — прежняя единица времени к нему отношения
-              // не имеет: «по часам» у поля-списка означает пустой график.
-              onChange({ groupSlug, groupBucket: dated(bySlug.get(groupSlug)) ? config.groupBucket : "" })
-            }
-          />
+          <Slot stacked={stacked} label={t("chart.group")} order="order-1">
+            <Dropdown
+              value={config.groupSlug}
+              ariaLabel={t("chart.group")}
+              placeholder={t("pivot.pick")}
+              className={stacked ? "w-full" : "w-40"}
+              items={options(columns)}
+              onChange={(groupSlug) =>
+                // Поле сменили — прежняя единица времени к нему отношения
+                // не имеет: «по часам» у поля-списка означает пустой график.
+                onChange({ groupSlug, groupBucket: dated(bySlug.get(groupSlug)) ? config.groupBucket : "" })
+              }
+            />
+          </Slot>
 
           {dated(bySlug.get(config.groupSlug)) && (
-            <Dropdown
-              value={config.groupBucket}
-              ariaLabel={t("chart.bucket")}
-              className="w-40"
-              items={bucketOptions(t)}
-              onChange={(value) => onChange({ groupBucket: value as ChartBucket })}
-            />
+            <Slot stacked={stacked} label={t("chart.bucket")} order="order-1">
+              <Dropdown
+                value={config.groupBucket}
+                ariaLabel={t("chart.bucket")}
+                className={stacked ? "w-full" : "w-40"}
+                items={bucketOptions(t)}
+                onChange={(value) => onChange({ groupBucket: value as ChartBucket })}
+              />
+            </Slot>
           )}
         </>
       )}
@@ -861,73 +962,81 @@ function ChartSetup({
           в списке есть «без разбивки». */}
       {splittable(config.kind) && (
         <>
-          <Dropdown
-            value={config.splitSlug}
-            ariaLabel={t("chart.split")}
-            placeholder={t("chart.splitNone")}
-            className="w-40"
-            items={[
-              ...(needsSplit(config.kind) ? [] : [{ value: "", label: t("chart.splitNone") }]),
-              /*
-               * По себе делить нечего — кроме свёрнутой даты: «день × час»
-               * это ОДНО поле, разложенное двумя единицами времени, и ради
-               * этого случая поле остаётся в списке.
-               */
-              ...options(
-                columns.filter(
-                  (field) => field.slug !== config.groupSlug || Boolean(config.groupBucket),
+          <Slot stacked={stacked} label={t("chart.split")} order="order-4">
+            <Dropdown
+              value={config.splitSlug}
+              ariaLabel={t("chart.split")}
+              placeholder={t("chart.splitNone")}
+              className={stacked ? "w-full" : "w-40"}
+              items={[
+                ...(needsSplit(config.kind) ? [] : [{ value: "", label: t("chart.splitNone") }]),
+                /*
+                 * По себе делить нечего — кроме свёрнутой даты: «день × час»
+                 * это ОДНО поле, разложенное двумя единицами времени, и ради
+                 * этого случая поле остаётся в списке.
+                 */
+                ...options(
+                  columns.filter(
+                    (field) => field.slug !== config.groupSlug || Boolean(config.groupBucket),
+                  ),
                 ),
-              ),
-            ]}
-            onChange={(splitSlug) =>
-              onChange({
-                splitSlug,
-                splitBucket: dated(bySlug.get(splitSlug)) ? config.splitBucket : "",
-              })
-            }
-          />
+              ]}
+              onChange={(splitSlug) =>
+                onChange({
+                  splitSlug,
+                  splitBucket: dated(bySlug.get(splitSlug)) ? config.splitBucket : "",
+                })
+              }
+            />
+          </Slot>
 
           {dated(bySlug.get(config.splitSlug)) && (
-            <Dropdown
-              value={config.splitBucket}
-              ariaLabel={t("chart.bucket")}
-              className="w-40"
-              items={bucketOptions(t)}
-              onChange={(value) => onChange({ splitBucket: value as ChartBucket })}
-            />
+            <Slot stacked={stacked} label={t("chart.bucket")} order="order-4">
+              <Dropdown
+                value={config.splitBucket}
+                ariaLabel={t("chart.bucket")}
+                className={stacked ? "w-full" : "w-40"}
+                items={bucketOptions(t)}
+                onChange={(value) => onChange({ splitBucket: value as ChartBucket })}
+              />
+            </Slot>
           )}
         </>
       )}
 
-      <Dropdown
-        value={config.aggregation}
-        ariaLabel={t("pivot.value")}
-        className="w-32"
-        items={aggregations.map((item) => ({
-          value: item,
-          label: t(`pivot.aggregation.${item}` as const),
-        }))}
-        onChange={(value) => onChange({ aggregation: value as Aggregation })}
-      />
+      <Slot stacked={stacked} label={t("chart.calculation")} order="order-2">
+        <Dropdown
+          value={config.aggregation}
+          ariaLabel={t("pivot.value")}
+          className={stacked ? "w-full" : "w-32"}
+          items={aggregations.map((item) => ({
+            value: item,
+            label: t(`pivot.aggregation.${item}` as const),
+          }))}
+          onChange={(value) => onChange({ aggregation: value as Aggregation })}
+        />
+      </Slot>
 
       {/* Поле значения нужно всем, кроме количества. */}
       {config.aggregation !== "count" && (
-        <Dropdown
-          value={config.valueSlug}
-          ariaLabel={t("pivot.value")}
-          placeholder={t("pivot.pick")}
-          className="w-40"
-          items={options(numeric)}
-          onChange={(valueSlug) => onChange({ valueSlug })}
-        />
+        <Slot stacked={stacked} label={t("pivot.value")} order="order-2">
+          <Dropdown
+            value={config.valueSlug}
+            ariaLabel={t("pivot.value")}
+            placeholder={t("pivot.pick")}
+            className={stacked ? "w-full" : "w-40"}
+            items={options(numeric)}
+            onChange={(valueSlug) => onChange({ valueSlug })}
+          />
+        </Slot>
       )}
 
       {/* Размер карточки — ручками на её краях, а не кнопкой здесь:
           «во всю ширину» было выбором из двух, а сетка даёт десять. */}
-      <span className="ml-auto text-2xs tabular-nums text-fg-subtle">
+      {!stacked && <span className="ml-auto text-2xs tabular-nums text-fg-subtle">
         {config.width}/{MAX_SPAN}
         {config.height > 1 ? ` · ${config.height}` : ""}
-      </span>
+      </span>}
     </div>
   );
 }
@@ -1133,83 +1242,123 @@ function Funnel({ series, locale }: { series: ChartSeries; locale: string }) {
 function Stream({ series, locale }: { series: ChartSeries; locale: string }) {
   const count = series.points.length;
   const top = Math.max(...series.points.map((point) => point.value), 0);
+  const gradient = `stream-${useId()}`;
 
-  /** Полутолщина в единицах системы: 45 из 100 — почти вся высота. */
-  const half = (value: number) => (top > 0 ? Math.max(0.6, (value / top) * 45) : 0.6);
-  const x = (index: number) => (count > 1 ? (index / (count - 1)) * 100 : 50);
+  /** Полутолщина в единицах системы: ноль — тонкая линия, а не разрыв. */
+  const half = (value: number) => (top > 0 ? Math.max(0.3, (value / top) * 36) : 0.3);
+  /*
+   * Точка стадии — ЛЕВАЯ граница её колонки, как в «Моей аналитике»
+   * professio: пик стоит на разделителе, а переход к следующей стадии
+   * занимает всю ширину колонки.
+   */
+  const x = (index: number) => (index / count) * 100;
+  const share = (value: number) => (series.total > 0 ? (value / series.total) * 100 : 0);
 
-  /** Одна сторона ленты: точки в стадиях, между ними — плавный переход. */
-  const edge = (sign: number) =>
-    series.points
-      .map((point, index) => {
-        const y = 50 + sign * half(point.value);
-        if (index === 0) return `${x(index)},${y}`;
+  /*
+   * Одна сторона ленты: между соседними стадиями — S-кривая с ручками
+   * на середине и горизонтальными касательными в точках. Пик выходит
+   * колоколом, спад к нулю — плавным, и между точками кривая не выходит
+   * за их значения. После последней стадии — ровно до правого края.
+   */
+  const xs = series.points.map((_, index) => x(index));
+  const side = (sign: number) => {
+    const values = series.points.map((point) => point.value);
+    const px = [...xs, 100];
+    const py = [...values, values[count - 1] ?? 0].map((value) => 50 + sign * half(value));
+    return wave(px, py);
+  };
 
-        const previous = series.points[index - 1];
-        const middle = (x(index - 1) + x(index)) / 2;
-        const from = 50 + sign * half(previous?.value ?? 0);
-        return `C ${middle},${from} ${middle},${y} ${x(index)},${y}`;
-      })
+  const first = series.points[0]?.value ?? 0;
+  const last = series.points[count - 1]?.value ?? 0;
+  /* Нижняя сторона идёт слева направо, верхняя — обратно: верхнюю
+     собираем так же и разворачиваем зеркальным обходом. */
+  const reverse = (d: string, from: string) => {
+    const segments = d.split("C ").filter(Boolean).map((part) => part.trim().split(" "));
+    const points = [from, ...segments.map((part) => part[2]!)];
+    return segments
+      .map((part, index) => `C ${part[1]} ${part[0]} ${points[index]}`)
+      .reverse()
       .join(" ");
-
-  const back = [...series.points]
-    .map((point, index) => ({ point, index }))
-    .reverse()
-    .map(({ point, index }, at) => {
-      const y = 50 - half(point.value);
-      if (at === 0) return `L ${x(index)},${y}`;
-
-      const next = series.points[index + 1];
-      const middle = (x(index) + x(index + 1)) / 2;
-      const from = 50 - half(next?.value ?? 0);
-      return `C ${middle},${from} ${middle},${y} ${x(index)},${y}`;
-    })
-    .join(" ");
+  };
+  const lower = side(1);
+  const upper = side(-1);
+  const path = [
+    `M 0,${50 + half(first)} ${lower}`,
+    `L 100,${50 - half(last)}`,
+    reverse(upper, `0,${50 - half(first)}`),
+    "Z",
+  ].join(" ");
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-1">
-      {/* Стадии подписаны сверху: имя, число и доля. Внутри ленты
-          текста нет — он растянулся бы вместе с системой координат. */}
-      <div className="flex">
-        {series.points.map((point) => (
-          <div
+    <div className="relative flex h-full min-h-0 flex-col">
+      {/* Колонки стадий — и подписи, и разделители, и подсказка: полосы
+          идут через всю высоту, попасть мышью можно в любое место.
+          Слой поверх ленты: разделители видны и сквозь неё. */}
+      <div className="absolute inset-0 z-10 flex">
+        {series.points.map((point, index) => (
+          <Tooltip
             key={point.key}
-            className="min-w-0 flex-1 border-l border-chart-grid px-1 first:border-l-0"
+            label={`${point.label}: ${show(point.value, locale)} · ${percent(share(point.value))}`}
           >
-            <p className="truncate text-2xs text-fg-subtle" title={point.label}>
-              {point.label}
-            </p>
-            <p className="text-sm font-semibold text-fg">{show(point.value, locale)}</p>
-            <p className="text-2xs text-fg-subtle">
-              {percent(series.total > 0 ? (point.value / series.total) * 100 : 0)}
-            </p>
-          </div>
+            {/* Рамка по индексу, а не `first:`: Tooltip оборачивает каждую
+                колонку в свой span, и «первой» оказывается каждая. */}
+            <div className={`h-full min-w-0 flex-1 px-2 ${index ? "border-l border-border" : ""}`}>
+              <p className="truncate text-xs text-fg-muted" title={point.label}>
+                {point.label}
+              </p>
+              <p className="mt-0.5 text-2xl font-semibold tabular-nums text-fg">{show(point.value, locale)}</p>
+            </div>
+          </Tooltip>
         ))}
       </div>
 
-      <div className="relative min-h-0 flex-1">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="size-full" role="presentation">
-          <path d={`M ${edge(1)} ${back} Z`} className="fill-chart-1 opacity-70" />
+      {/* Лента — под шапками колонок, на всю оставшуюся высоту. */}
+      <div className="pointer-events-none relative mt-16 min-h-0 flex-1">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="size-full text-chart-1" role="presentation">
+          <defs>
+            {/* Из глубины к свету: начало воронки тяжёлое, хвост лёгкий. */}
+            <linearGradient id={gradient} x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="currentColor" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="currentColor" stopOpacity="0.85" />
+            </linearGradient>
+          </defs>
+          <path d={path} fill={`url(#${gradient})`} />
         </svg>
 
-        {/* Полосы поверх ленты — и подсказка, и разделители стадий:
-            попасть в саму ленту мышью можно только там, где она
-            толстая, а без линий непонятно, где кончается стадия. */}
-        <div className="absolute inset-0 flex">
-          {series.points.map((point) => (
-            <Tooltip
-              key={point.key}
-              label={`${point.label}: ${show(point.value, locale)} · ${percent(
-                series.total > 0 ? (point.value / series.total) * 100 : 0,
-              )}`}
-            >
-              <div className="h-full flex-1 border-l border-chart-grid first:border-l-0" />
-            </Tooltip>
-          ))}
-        </div>
+        {/* Доля — над лентой у своей стадии. Текст вне svg: в растянутой
+            системе координат он растянулся бы вместе с ней. */}
+        {series.points.map((point, index) => (
+          <span
+            key={point.key}
+            /* Первая стадия стоит на самом краю — её подпись не центруем,
+               иначе половина уйдёт за рамку. */
+            className={`absolute -translate-y-full pb-1 text-2xs font-medium tabular-nums text-fg-muted ${
+              index ? "-translate-x-1/2" : "pl-1"
+            }`}
+            style={{ left: `${xs[index]}%`, top: `${50 - half(point.value)}%` }}
+          >
+            {Math.round(share(point.value))}%
+          </span>
+        ))}
       </div>
     </div>
   );
+}
+
+/**
+ * Кубические Безье через точки: S-кривая между соседями, ручки
+ * на середине по x и на высоте своей точки. Касательная в каждой
+ * точке горизонтальна, поэтому выбросов между точками нет.
+ * Возвращает команды `C …` от первой точки до последней.
+ */
+export function wave(xs: number[], ys: number[]): string {
+  return xs
+    .slice(1)
+    .map((x2, i) => {
+      const middle = (xs[i]! + x2) / 2;
+      return `C ${middle},${ys[i]} ${middle},${ys[i + 1]} ${x2},${ys[i + 1]}`;
+    })
+    .join(" ");
 }
 
 /**

@@ -5,11 +5,20 @@ import type { MenuDto } from "../api/dto";
  * незнакомого типа рисуется, но ведёт на страницу «тип не поддерживается»,
  * а не исчезает молча — пропавший пункт меню выглядит как потеря данных.
  */
+/*
+ * DASHBOARDS бэкенд не знает: `MENU_TYPES` в object_builder
+ * (config/constants.go:70) закрытый, чужой тип отклоняется
+ * («unsupported menu type»). Вход в дашборды хранится пунктом `LINK`
+ * с `attributes.screen: "dashboards-entry"` и становится DASHBOARDS
+ * только в узле (toMenuNode). В `raw.type` остаётся LINK, его и пишет
+ * PUT. См. ADR-0013.
+ */
 export const MENU_TYPES = [
   "FOLDER",
   "TABLE",
   "LINK",
   "MICROFRONTEND",
+  "DASHBOARDS",
   "MINIO_FOLDER",
   "PIVOT",
   "REST",
@@ -130,6 +139,12 @@ export type MenuNode = {
    * нет (config.MENU_TYPES).
    */
   isSettings: boolean;
+  /**
+   * Свой экран omni4 за пунктом `LINK` (`attributes.screen`): settings,
+   * dashboards (хранилище дашбордов, в дереве не видно),
+   * dashboards-entry (вход в дашборды модуля). Пусто — обычный пункт.
+   */
+  screen: string;
   parentId: string | null;
   children: MenuNode[];
   /** Права текущей роли на этот пункт. */
