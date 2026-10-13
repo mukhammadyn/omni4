@@ -296,8 +296,7 @@ MULTI_LINE — HTML, правится tiptap ([ADR-0015](adr/0015-rich-text-tipt
 по `view.tableSlug`, а не по таблице пункта. Тот же view стоит и на пункте
 «Заявки».
 
-**«Список»** — тип `ATTENDANCE`, раскладка `list` (ADR-0016; до миграции —
-тип `ATTENDANCE_LIST`), компонент
+**«Список»** — тип `ATTENDANCE`, раскладка `list` (ADR-0016), компонент
 `AttendanceList`, как список отметок HRMS (`Time/Attendance`): строка —
 день сотрудника (`listOf` в `model/timesheet`); приход, уход,
 опоздание, переработка, статус, статус заявки (`review`), источник,
@@ -318,8 +317,7 @@ MULTI_LINE — HTML, правится tiptap ([ADR-0015](adr/0015-rich-text-tipt
 щелчок гасит остальные дни (`statusOf`). Клик по дню — то же окно дня.
 Данные, период, поиск — общие с табелем (`ui/attendance-parts`).
 
-**«Табель»** — тип `ATTENDANCE`, раскладка `sheet` (ADR-0016; до миграции —
-тип `TIMESHEET`; `FIXED_VIEW_TYPES`,
+**«Табель»** — тип `ATTENDANCE`, раскладка `sheet` (ADR-0016; `FIXED_VIEW_TYPES`,
 заведён через API первой вкладкой), компонент `Timesheet`. Логика и UX —
 табеля HRMS (`udevs_hrms_admin`, `modules/Time/Sheet`), вид — `sheetView`
 прототипа. Сотрудники × дни месяца или недели; в ячейке часы, ×
@@ -467,7 +465,7 @@ absence с типом из `hr_absence_types`, праздники — `hr_holida
 | calendar | CALENDAR | сделки, счета, задачи, контакты |
 | timeline | TIMELINE | сделки, счета, задачи |
 | **list** | нет | сделки, счета, задачи, контакты, компании, товары, план продаж |
-| **gallery** («Сетка») | GALLERY с `attributes.card: "person"` (ADR-0016; до миграции — тип PEOPLE), view заведён через API; карточка `PeopleGallery` годится любой таблице людей | сотрудники |
+| **gallery** («Сетка») | GALLERY с `attributes.card: "person"` (ADR-0016), view заведён через API; карточка `PeopleGallery` годится любой таблице людей | сотрудники |
 | **org** («Оргструктура») | ORG — только у сотрудников (`FIXED_VIEW_TYPES`), view заведён через API. Три дерева: сотрудники по руководителю, отделы, юрлицо → бизнес-юнит → локация (`features/hrms`); холст `OrgChart` общий. Регионов узлами нет — это поле `region` у локации | сотрудники |
 
 Неделя/месяц в `schedule`, `employee`, `attendance` — отдельные экраны
@@ -488,5 +486,3 @@ absence с типом из `hr_absence_types`, праздники — `hr_holida
 3. Шаг 4 редизайна — каркас.
 4. Недостающие типы view: LIST, GALLERY, ORG.
 5. Первый модуль целиком, потом остальные по тому же образцу.
-6. Слияние типов view ([ADR-0016](adr/0016-merge-view-types.md)):
-   признаки в одном месте, PEOPLE → GALLERY, посещаемость — один тип.
