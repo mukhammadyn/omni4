@@ -12,7 +12,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { MenuIcon, ROOT_MENU_ID, useMenuChildren } from "@/features/sidebar";
+import { ROOT_MENU_ID, useMenuChildren } from "@/features/sidebar";
 import { useSession } from "@/shared/api/use-session";
 import { keys } from "@/shared/lib/query-keys";
 import { Button } from "@/shared/ui/button";
@@ -30,8 +30,10 @@ import {
   type Widget,
   type Tree,
 } from "../model/dashboard";
+import type { DashFilter, FilterValues } from "../model/filters";
 import { readPrefs, toggle, writePrefs, type Prefs } from "../model/prefs";
-import { DashNav } from "./DashNav";
+import { DashFilters } from "./DashFilters";
+import { DashNav, ModuleMark } from "./DashNav";
 import { WidgetGrid } from "./WidgetGrid";
 
 /**
@@ -44,11 +46,16 @@ import { WidgetGrid } from "./WidgetGrid";
 export function DashboardsPage({
   dashboardId,
   moduleId,
+  values,
   onOpen,
+  onValues,
 }: {
   dashboardId: string;
   moduleId: string;
+  /** Значения общих фильтров — из адреса (ADR-0013). */
+  values: FilterValues;
   onOpen: (id: string) => void;
+  onValues: (values: FilterValues) => void;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -69,7 +76,7 @@ export function DashboardsPage({
    * «Сохранить» пишет одной записью, «Отмена» возвращает как было.
    * Привязан к дашборду: ушли на соседнюю вкладку — правка брошена.
    */
-  const [layout, setLayout] = useState<{ id: string; widgets: Widget[] } | null>(null);
+  const [layout, setLayout] = useState<{ id: string; widgets: Widget[]; filters: DashFilter[] } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const home = moduleId || modules[0]?.id || "";
@@ -188,7 +195,7 @@ export function DashboardsPage({
                 заголовок и описание правятся прямо на месте. */}
             <div className="pt-9">
               <div className="mb-2.5 flex items-center gap-1.5 text-[13px] text-fg-muted">
-                {module && <MenuIcon name={module.icon} type={module.type} />}
+                {module && <ModuleMark module={module} small />}
                 <span>{module?.label ?? t("dashboard.noModule")}</span>
                 <span className="text-fg-subtle">/</span>
                 <Icon as={FolderIcon} size={13} className="text-fg-subtle" />
@@ -273,7 +280,7 @@ export function DashboardsPage({
                           type="button"
                           size="sm"
                           onClick={() => {
-                            patchCurrent({ widgets: layout.widgets });
+                            patchCurrent({ widgets: layout.widgets, filters: layout.filters });
                             setLayout(null);
                           }}
                         >
@@ -284,7 +291,13 @@ export function DashboardsPage({
                     ) : (
                       <ViewAction
                         label={t("dashboard.manage")}
-                        onClick={() => setLayout({ id: current.dashboard.id, widgets: current.dashboard.widgets })}
+                        onClick={() =>
+                          setLayout({
+                            id: current.dashboard.id,
+                            widgets: current.dashboard.widgets,
+                            filters: current.dashboard.filters,
+                          })
+                        }
                         text
                       >
                         <Icon as={Settings2Icon} size={16} />
@@ -295,16 +308,25 @@ export function DashboardsPage({
               </div>
             </div>
 
-            <div className="pt-4">
+            <div className="flex flex-col gap-3 pt-4">
+              <DashFilters
+                filters={editing ? layout.filters : current.dashboard.filters}
+                values={values}
+                editing={editing}
+                onValues={onValues}
+                onFilters={(filters) => editing && setLayout({ ...layout, filters })}
+              />
               <WidgetGrid
                 key={current.dashboard.id}
                 widgets={editing ? layout.widgets : current.dashboard.widgets}
+                filters={editing ? layout.filters : current.dashboard.filters}
+                values={values}
                 editing={editing}
                 editable={canEdit}
                 /* Вне правки меняет только диалог «Добавить первый виджет» —
                    он сам и есть подтверждение, пишем сразу. */
                 onWidgets={(widgets) =>
-                  editing ? setLayout({ id: layout.id, widgets }) : patchCurrent({ widgets })
+                  editing ? setLayout({ ...layout, widgets }) : patchCurrent({ widgets })
                 }
               />
             </div>

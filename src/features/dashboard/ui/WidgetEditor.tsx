@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { XIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ChartCard, ChartSetup, chartTitle, useItems } from "@/features/item";
-import { localized, useTables, useTableSchema } from "@/features/table";
+import { ChartCard, ChartSetup, FilterBar, chartTitle, filterKind, useItems } from "@/features/item";
+import { localized, useTables, useTableSchema, type Field as TableField, type Relation } from "@/features/table";
 import { useDataLanguages } from "@/features/workspace";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
 import { Field, Input } from "@/shared/ui/input";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Modal } from "@/shared/ui/modal";
 import { SelectMenu } from "@/shared/ui/select-menu";
 import { SAMPLE, type Widget } from "../model/dashboard";
+import { filterKey, type Answer, type DashFilter } from "../model/filters";
 
 const noop = () => {};
 
@@ -21,10 +23,13 @@ const noop = () => {};
 export function WidgetEditor({
   initial,
   isNew,
+  filters,
   onSave,
   onClose,
 }: {
   initial: Widget;
+  /** Общие фильтры дашборда — виджет выбирает, каким полем на них отвечать. */
+  filters: DashFilter[];
   isNew: boolean;
   onSave: (widget: Widget) => void;
   onClose: () => void;
@@ -34,7 +39,7 @@ export function WidgetEditor({
   const [draft, setDraft] = useState(initial);
   const slug = draft.tableSlug || undefined;
   const { schema } = useTableSchema(slug);
-  const items = useItems(slug, { limit: SAMPLE, page: 1 });
+  const items = useItems(slug, { limit: SAMPLE, page: 1, filters: draft.filters });
   const change = (patch: Partial<Widget>) => setDraft((current) => ({ ...current, ...patch }));
 
   /*
@@ -77,10 +82,53 @@ export function WidgetEditor({
             <TablePicker
               value={draft.tableSlug}
               // Поля прежней таблицы в новой не значат ничего.
-              onPick={(tableSlug) => change({ tableSlug, groupSlug: "", splitSlug: "", valueSlug: "" })}
+              onPick={(tableSlug) =>
+                change({ tableSlug, groupSlug: "", splitSlug: "", valueSlug: "", filters: {}, answers: {} })
+              }
             />
             {slug ? (
-              <ChartSetup config={draft} columns={schema.fields} language={language} onChange={change} stacked />
+              <>
+                <ChartSetup config={draft} columns={schema.fields} language={language} onChange={change} stacked />
+                {filters.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-fg">{t("dashboard.answers")}</span>
+                    {filters.map((filter) => {
+                      const key = filterKey(filter);
+                      return (
+                        <AnswerPicker
+                          key={key}
+                          filter={filter}
+                          fields={schema.fields}
+                          relations={schema.relations}
+                          language={language}
+                          value={draft.answers[key]}
+                          onChange={(answer) => {
+                            const answers = { ...draft.answers };
+                            if (answer) answers[key] = answer;
+                            else delete answers[key];
+                            change({ answers });
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-fg">{t("dashboard.ownFilter")}</span>
+                  {/* Подшапка таблицы рассчитана на всю ширину view — здесь без её полей. */}
+                  <div className="rounded-md border border-border [&>div]:mx-0 [&>div]:border-b-0 [&>div]:px-2">
+                    <FilterBar
+                      columns={schema.fields}
+                      relations={schema.relations}
+                      language={language}
+                      filters={draft.filters}
+                      sorts={[]}
+                      onFilters={(own) => change({ filters: own })}
+                      onSorts={noop}
+                    />
+                  </div>
+                </div>
+              </>
             ) : (
               <p className="text-sm text-fg-subtle">{t("dashboard.pickTableFirst")}</p>
             )}
@@ -134,7 +182,98 @@ export function WidgetEditor({
   );
 }
 
-function TablePicker({ value, onPick }: { value: string; onPick: (slug: string) => void }) {
+/**
+ * Каким полем виджет отвечает на общий фильтр: датой на «Период»,
+ * ссылкой на «Запись таблицы» — прямой или через справочник
+ * («Филиал» для сделок: сотрудник → его филиал).
+ */
+function AnswerPicker({
+  filter,
+  fields,
+  relations,
+  language,
+  value,
+  onChange,
+}: {
+  filter: DashFilter;
+  fields: TableField[];
+  relations: Relation[];
+  language: string;
+  value: Answer | undefined;
+  onChange: (answer: Answer | undefined) => void;
+}) {
+  const { t } = useTranslation();
+  const target = (field: TableField) => relations.find((item) => item.id === field.relationId)?.toSlug ?? "";
+  const options = fields.filter((field) =>
+    filter.kind === "period" ? filterKind(field) === "range" : filterKind(field) === "relation" && target(field),
+  );
+  const chosen = fields.find((field) => field.slug === value?.field);
+  const through = filter.kind === "record" && chosen && target(chosen) !== filter.table ? target(chosen) : "";
+  const label = (field: TableField) => localized(field.labels, language, field.label);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-fg-muted">{filter.label || t("dashboard.period")}</span>
+      <Dropdown
+        value={value?.field ?? ""}
+        size="sm"
+        items={[
+          { value: "", label: t("dashboard.answerNone") },
+          ...options.map((field) => ({ value: field.slug, label: label(field) })),
+        ]}
+        onChange={(field) => onChange(field ? { field } : undefined)}
+      />
+      {through && value && (
+        <ViaPicker
+          table={through}
+          target={filter.kind === "record" ? filter.table : ""}
+          language={language}
+          value={value.via ?? ""}
+          onChange={(via) => onChange(via ? { field: value.field, via } : { field: value.field })}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Поле справочника `table`, которое ссылается на таблицу фильтра. */
+function ViaPicker({
+  table,
+  target,
+  language,
+  value,
+  onChange,
+}: {
+  table: string;
+  target: string;
+  language: string;
+  value: string;
+  onChange: (via: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { schema } = useTableSchema(table);
+  const options = schema.fields.filter(
+    (field) =>
+      filterKind(field) === "relation" &&
+      schema.relations.find((item) => item.id === field.relationId)?.toSlug === target,
+  );
+
+  return (
+    <Dropdown
+      value={value}
+      size="sm"
+      placeholder={options.length ? t("dashboard.via") : t("dashboard.noLinks")}
+      disabled={!options.length}
+      items={options.map((field) => ({
+        value: field.slug,
+        label: `${t("dashboard.via")}: ${localized(field.labels, language, field.label)}`,
+      }))}
+      onChange={onChange}
+    />
+  );
+}
+
+export function TablePicker({ value, onPick }: { value: string; onPick: (slug: string) => void }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const { current: language } = useDataLanguages();

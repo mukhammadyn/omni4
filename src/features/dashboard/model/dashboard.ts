@@ -1,13 +1,19 @@
-import { toCharts, toChartsAttribute, type ChartConfig } from "@/features/item";
+import { parseFilters, toCharts, toChartsAttribute, type ChartConfig, type Filters } from "@/features/item";
+import type { Answer, DashFilter } from "./filters";
 
-/** График CHART плюс своя таблица: на дашборде у каждого виджета она своя. */
-export type Widget = ChartConfig & { tableSlug: string };
+/**
+ * График CHART плюс своя таблица: на дашборде у каждого виджета она своя.
+ * `filters` — свой отбор, `answers` — какими полями он отвечает
+ * на общие фильтры, по ключу фильтра (`filterKey`).
+ */
+export type Widget = ChartConfig & { tableSlug: string; filters: Filters; answers: Record<string, Answer> };
 
 export type Dashboard = {
   id: string;
   title: string;
   emoji: string;
   description: string;
+  filters: DashFilter[];
   widgets: Widget[];
 };
 
@@ -38,11 +44,21 @@ export function toTree(value: unknown): Tree {
         title: text(dashboard["title"]),
         emoji: text(dashboard["emoji"]) || DEFAULT_EMOJI,
         description: text(dashboard["description"]),
+        filters: list(dashboard["filters"]).flatMap(toDashFilter),
         widgets: list(dashboard["widgets"]).flatMap((item) => {
           // По одному: toCharts выбрасывает мусор, и сопоставлять таблицу
           // с графиком по индексу после фильтра было бы мимо.
           const [chart] = toCharts([item]);
-          return chart ? [{ ...chart, tableSlug: text(item["table_slug"]) }] : [];
+          return chart
+            ? [
+                {
+                  ...chart,
+                  tableSlug: text(item["table_slug"]),
+                  filters: parseFilters(item["filters"]) ?? {},
+                  answers: toAnswers(item["answers"]),
+                },
+              ]
+            : [];
         }),
       })),
     }),
@@ -63,9 +79,22 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
         title: dashboard.title,
         emoji: dashboard.emoji,
         description: dashboard.description,
+        filters: dashboard.filters.map((filter) =>
+          filter.kind === "period"
+            ? filter
+            : {
+                kind: filter.kind,
+                label: filter.label,
+                table: filter.table,
+                source_table: filter.sourceTable,
+                source_field: filter.sourceField,
+              },
+        ),
         widgets: dashboard.widgets.map((widget) => ({
           ...toChartsAttribute([widget])[0],
           table_slug: widget.tableSlug,
+          filters: widget.filters,
+          answers: widget.answers,
         })),
       })),
     })),
@@ -82,7 +111,7 @@ export function findDashboard(tree: Tree, id: string): { folder: Folder; dashboa
 }
 
 export function newDashboard(title: string): Dashboard {
-  return { id: crypto.randomUUID(), title, emoji: DEFAULT_EMOJI, description: "", widgets: [] };
+  return { id: crypto.randomUUID(), title, emoji: DEFAULT_EMOJI, description: "", filters: [], widgets: [] };
 }
 
 export function newFolder(moduleId: string, title: string): Folder {
@@ -116,6 +145,28 @@ export function patchDashboard(
       }),
     })),
   };
+}
+
+function toDashFilter(item: Record<string, unknown>): DashFilter[] {
+  const label = text(item["label"]);
+  if (item["kind"] === "period") return [{ kind: "period", label }];
+  const table = text(item["table"]);
+  const sourceTable = text(item["source_table"]);
+  const sourceField = text(item["source_field"]);
+  return item["kind"] === "record" && table && sourceTable && sourceField
+    ? [{ kind: "record", label, table, sourceTable, sourceField }]
+    : [];
+}
+
+function toAnswers(value: unknown): Record<string, Answer> {
+  const answers: Record<string, Answer> = {};
+  if (!isObject(value)) return answers;
+  for (const [key, item] of Object.entries(value)) {
+    if (!isObject(item) || !text(item["field"])) continue;
+    const via = text(item["via"]);
+    answers[key] = via ? { field: text(item["field"]), via } : { field: text(item["field"]) };
+  }
+  return answers;
 }
 
 function list(value: unknown): Record<string, unknown>[] {

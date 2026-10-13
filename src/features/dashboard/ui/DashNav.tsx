@@ -17,6 +17,33 @@ import { Popover, PopoverItem } from "@/shared/ui/popover";
 import type { Folder, Tree } from "../model/dashboard";
 import { NO_MODULE } from "../model/prefs";
 
+/**
+ * Цвет модуля — `MODULES[].color` прототипа. Модуль меню своего цвета
+ * не хранит, поэтому узнаём его по названию.
+ *
+ * ponytail: по названию модуля; переименуют — плашка станет цветом
+ * акцента. Хранить цвет в `attributes` модуля, когда его будут задавать.
+ */
+const MODULE_TINTS: Record<string, string> = {
+  crm: "bg-module-crm",
+  hrms: "bg-module-hrms",
+  склад: "bg-module-wms",
+  финансы: "bg-module-fin",
+  проекты: "bg-module-pm",
+};
+
+/** Плашка модуля — `.dn-mic` прототипа: белый значок на цвете модуля. */
+export function ModuleMark({ module, small = false }: { module: MenuNode; small?: boolean }) {
+  const tint = MODULE_TINTS[module.label.trim().toLowerCase()] ?? "bg-accent";
+  return (
+    <span
+      className={`inline-grid shrink-0 place-items-center rounded-[5px] text-white [&_svg]:size-3 ${tint} ${small ? "size-4.5" : "size-5"}`}
+    >
+      <MenuIcon name={module.icon} type={module.type} />
+    </span>
+  );
+}
+
 const ROW =
   "flex h-7.5 w-full cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-left text-sm whitespace-nowrap transition-colors hover:bg-surface-hover";
 
@@ -75,7 +102,7 @@ export function DashNav({
     ...modules.map((module) => ({
       id: module.id,
       label: module.label,
-      icon: <MenuIcon name={module.icon} type={module.type} />,
+      icon: <ModuleMark module={module} />,
       folders: tree.folders.filter((folder) => folder.moduleId === module.id),
     })),
     ...(orphans.length

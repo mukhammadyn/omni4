@@ -11,6 +11,8 @@ import { DashboardsPage } from "@/features/dashboard";
 const searchSchema = z.object({
   d: z.string().optional().catch(undefined),
   module: z.string().optional().catch(undefined),
+  /** Общие фильтры по ключу фильтра: «period», слаг таблицы. */
+  f: z.record(z.string(), z.array(z.string())).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_authed/_static/dashboards")({
@@ -25,14 +27,18 @@ function useCrumbs() {
 }
 
 function DashboardsRoute() {
-  const { d, module } = Route.useSearch();
+  const { d, module, f } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
   return (
     <DashboardsPage
       dashboardId={d ?? ""}
       moduleId={module ?? ""}
+      values={f ?? {}}
       onOpen={(id) => void navigate({ search: (prev) => ({ ...prev, d: id }) })}
+      onValues={(values) =>
+        void navigate({ search: (prev) => ({ ...prev, f: Object.keys(values).length ? values : undefined }), replace: true })
+      }
     />
   );
 }

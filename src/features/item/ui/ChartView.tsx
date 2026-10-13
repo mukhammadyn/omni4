@@ -497,6 +497,8 @@ export function ChartCard({
   inlineSetup = true,
   headerActions,
   plain = false,
+  previous,
+  exact,
 }: {
   config: ChartConfig;
   columns: Field[];
@@ -521,6 +523,16 @@ export function ChartCard({
   headerActions?: ReactNode;
   /** Без своей рамки и с крупным заголовком — предпросмотр в редакторе. */
   plain?: boolean;
+  /**
+   * Строки прошлого периода — у «Показателя» рядом с числом встаёт
+   * изменение к нему (KPI дашборда, ADR-0013). Нет — сравнения нет.
+   */
+  previous?: Item[] | undefined;
+  /**
+   * Точное количество строк по ответу ручки (`count`) — у «Показателя»
+   * с «Количеством» оно вместо подсчёта по выборке, которая обрезана.
+   */
+  exact?: { value: number; previous?: number | undefined } | undefined;
 }) {
   const { t, i18n } = useTranslation();
 
@@ -739,7 +751,15 @@ export function ChartCard({
         ) : !series.points.length ? (
           <p className="grid flex-1 place-items-center text-sm text-fg-muted">{t("pivot.empty")}</p>
         ) : config.kind === "stat" ? (
-          <Stat series={series} locale={i18n.language} />
+          <Stat
+            value={exact && config.aggregation === "count" ? exact.value : (series.points[0]?.value ?? 0)}
+            previous={
+              exact && config.aggregation === "count"
+                ? exact.previous
+                : previous && chartSeries(previous, config).points[0]?.value
+            }
+            locale={i18n.language}
+          />
         ) : config.kind === "donut" ? (
           <Donut series={series} locale={i18n.language} />
         ) : config.kind === "heatmap" ? (
@@ -1685,12 +1705,32 @@ function Line({ series, locale }: { series: ChartSeries; locale: string }) {
  * каждой цифре ширину нуля, и на крупном кегле число рассыпается.
  * Моноширинные — там, где числа стоят столбиком.
  */
-function Stat({ series, locale }: { series: ChartSeries; locale: string }) {
+function Stat({ value, previous, locale }: { value: number; previous?: number | undefined; locale: string }) {
+  const { t } = useTranslation();
+  const delta = previous === undefined ? null : statDelta(value, previous);
+
   return (
-    <p className="py-4 text-3xl font-semibold text-fg">
-      {show(series.points[0]?.value ?? 0, locale)}
-    </p>
+    <div className="flex flex-col gap-1 py-4">
+      <p className="text-3xl font-semibold text-fg">{show(value, locale)}</p>
+      {delta !== null && (
+        <p className="text-xs text-fg-muted">
+          <span className={delta.sign > 0 ? "text-success" : delta.sign < 0 ? "text-danger" : ""}>
+            {delta.text}
+          </span>{" "}
+          {t("chart.vsPrevious", { value: show(previous ?? 0, locale) })}
+        </p>
+      )}
+    </div>
   );
+}
+
+/** Изменение к прошлому: «+12%», «−3%»; от нуля процента нет — «+5». */
+export function statDelta(value: number, previous: number): { sign: number; text: string } {
+  const diff = value - previous;
+  const sign = Math.sign(diff);
+  const mark = sign > 0 ? "+" : sign < 0 ? "−" : "";
+  if (!previous) return { sign, text: `${mark}${Math.abs(diff).toLocaleString()}` };
+  return { sign, text: `${mark}${Math.round((Math.abs(diff) / Math.abs(previous)) * 100)}%` };
 }
 
 /**

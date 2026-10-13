@@ -66,6 +66,8 @@ body {
   --color-module-crm: #2383e2;
   --color-module-hrms: #448361;
   --color-module-pm: #c14c8a;
+  --color-module-wms: #d9730d;
+  --color-module-fin: #9065b0;
   --color-surface-hover: rgba(55, 53, 47, 0.06);
   --color-surface-active: rgba(55, 53, 47, 0.09);
   --color-overlay: #00000059;    /* затемнение под модалкой */

@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { ChartColumnIcon, CopyIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ChartCard, newChart, useItems } from "@/features/item";
+import { ChartCard, ME, newChart, useItems } from "@/features/item";
+import { session } from "@/shared/api/session";
 import { useTableSchema } from "@/features/table";
 import { useDataLanguages } from "@/features/workspace";
 import { moveBefore } from "@/shared/lib/order";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
+import { useViaGuids, type ViaLookup } from "../api/via";
 import { SAMPLE, type Widget } from "../model/dashboard";
+import { NOBODY, filterKey, unanswered, widgetFilters, type DashFilter, type FilterValues } from "../model/filters";
 import { WidgetEditor } from "./WidgetEditor";
 
 /**
@@ -17,11 +20,15 @@ import { WidgetEditor } from "./WidgetEditor";
  */
 export function WidgetGrid({
   widgets,
+  filters,
+  values,
   editing,
   editable,
   onWidgets,
 }: {
   widgets: Widget[];
+  filters: DashFilter[];
+  values: FilterValues;
   editing: boolean;
   /** Можно ли менять дашборд вообще — тогда пустой экран зовёт добавить. */
   editable: boolean;
@@ -52,7 +59,7 @@ export function WidgetGrid({
     setOver(null);
   };
 
-  const add = () => setEditor({ widget: { ...newChart(), tableSlug: "" }, isNew: true });
+  const add = () => setEditor({ widget: { ...newChart(), tableSlug: "", filters: {}, answers: {} }, isNew: true });
 
   const save = (widget: Widget) => {
     onWidgets(
@@ -68,6 +75,7 @@ export function WidgetGrid({
       key={editor.widget.id}
       initial={editor.widget}
       isNew={editor.isNew}
+      filters={filters}
       onSave={save}
       onClose={() => setEditor(null)}
     />
@@ -103,6 +111,8 @@ export function WidgetGrid({
         <WidgetCard
           key={widget.id}
           widget={widget}
+          filters={filters}
+          values={values}
           editing={editing}
           dragged={dragged === widget.id}
           over={over === widget.id && Boolean(dragged)}
@@ -147,12 +157,16 @@ export function WidgetGrid({
  * у таблиц, поэтому права роли на записи соблюдены. Виджеты одной
  * таблицы делят запрос: ключ кэша — тело запроса.
  *
+ * Отбор — свой виджета и общие фильтры дашборда через «И».
+ *
  * ponytail: связи разворачиваются (без `relations: false`), чтобы
- * подписи ссылок были без догрузки по guid; общих фильтров, прав
- * на поля и валют пока нет — шаги 4–5 ADR-0013.
+ * подписи ссылок были без догрузки по guid; прав на поля и валют
+ * пока нет — шаг 5 ADR-0013.
  */
 function WidgetCard({
   widget,
+  filters,
+  values,
   editing,
   onChange,
   onEdit,
@@ -160,6 +174,8 @@ function WidgetCard({
   ...card
 }: {
   widget: Widget;
+  filters: DashFilter[];
+  values: FilterValues;
   editing: boolean;
   dragged: boolean;
   over: boolean;
@@ -177,8 +193,35 @@ function WidgetCard({
   const { current: language } = useDataLanguages();
   const slug = widget.tableSlug || undefined;
   const { schema } = useTableSchema(slug);
-  const items = useItems(slug, { limit: SAMPLE, page: 1 });
+  const objectIds = session.getObjectIds();
+  const me = (table: string) => objectIds[table] ?? NOBODY;
+
+  // Фильтры через справочник: таблица справочника — куда ведёт поле ответа.
+  const lookups = filters.flatMap((filter): ViaLookup[] => {
+    const key = filterKey(filter);
+    const answer = widget.answers[key];
+    const value = values[key];
+    const field = schema.fields.find((item) => item.slug === answer?.field);
+    const table = schema.relations.find((item) => item.id === field?.relationId)?.toSlug;
+    if (!answer?.via || !value?.length || !table) return [];
+    return [{ key, table, via: answer.via, values: value.map((guid) => (guid === ME ? me(key) : guid)) }];
+  });
+  const viaGuids = useViaGuids(lookups);
+  const waiting = lookups.some((lookup) => !(lookup.key in viaGuids));
+
+  const query = widgetFilters(widget.filters, widget.answers, filters, values, viaGuids, me);
+  const items = useItems(waiting ? undefined : slug, { limit: SAMPLE, page: 1, filters: query });
   const { rows, count } = items.page;
+
+  // KPI со сравнением: тот же отбор, но прошлый период. Только когда
+  // виджет отвечает на заданный «Период».
+  const compares = widget.kind === "stat" && Boolean(widget.answers["period"]?.field && values["period"]?.length);
+  const previous = useItems(compares && !waiting ? slug : undefined, {
+    limit: SAMPLE,
+    page: 1,
+    filters: widgetFilters(widget.filters, widget.answers, filters, values, viaGuids, me, true),
+  });
+  const deaf = unanswered(filters, widget.answers, values);
 
   const action = (label: string, icon: typeof PencilIcon, onClick: () => void) => (
     <button
@@ -199,6 +242,8 @@ function WidgetCard({
       columns={schema.fields}
       relations={schema.relations}
       rows={rows}
+      previous={compares ? previous.page.rows : undefined}
+      exact={{ value: count, previous: compares ? previous.page.count : undefined }}
       language={language}
       editing={editing}
       onChange={onChange}
@@ -216,9 +261,16 @@ function WidgetCard({
         ) : items.error ? (
           <p className="text-2xs text-danger">{items.error}</p>
         ) : (
-          rows.length < count && (
-            <p className="text-2xs text-fg-subtle">{t("dashboard.sampled", { shown: rows.length, total: count })}</p>
-          )
+          <>
+            {deaf.length > 0 && (
+              <p className="text-2xs text-fg-subtle">
+                {t("dashboard.unanswered", { names: deaf.map((filter) => filter.label || t("dashboard.period")).join(", ") })}
+              </p>
+            )}
+            {rows.length < count && (
+              <p className="text-2xs text-fg-subtle">{t("dashboard.sampled", { shown: rows.length, total: count })}</p>
+            )}
+          </>
         )
       }
     />
