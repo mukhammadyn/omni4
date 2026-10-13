@@ -78,8 +78,11 @@ export function DashNav({
   canEdit: boolean;
   onToggle: (key: string) => void;
   onOpen: (id: string) => void;
-  /** Без папки — в папку открытого дашборда или первую папку модуля. */
-  onNewDashboard: (folderId?: string) => void;
+  /**
+   * Без папки — в папку открытого дашборда или первую папку модуля.
+   * С модулем — в первую папку этого модуля, а нет папок — в новую.
+   */
+  onNewDashboard: (folderId?: string, moduleId?: string) => void;
   onNewFolder: () => void;
   onRenameFolder: (id: string, title: string) => void;
   onRemoveFolder: (id: string) => void;
@@ -221,19 +224,29 @@ export function DashNav({
 
           return (
             <div key={group.id}>
-              <button type="button" onClick={() => onToggle(group.id)} className={`${ROW} font-semibold text-fg`}>
-                <Chevron open={groupOpen} />
-                <span className="flex shrink-0">{group.icon}</span>
-                <span className="truncate">{group.label}</span>
-                <span className="ml-auto text-xs font-medium text-fg-subtle">{count}</span>
-              </button>
+              <div className={`${ROW} group/row font-semibold text-fg`}>
+                <button type="button" onClick={() => onToggle(group.id)} className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <Chevron open={groupOpen} />
+                  <span className="flex shrink-0">{group.icon}</span>
+                  <span className="truncate">{group.label}</span>
+                </button>
+                {/* Модуль без папок иначе не заполнить: «+» в шапке кладёт
+                    в модуль открытого дашборда, а у папки «+» есть только
+                    у существующей. */}
+                {canEdit && group.id !== NO_MODULE && (
+                  <HoverButton label={t("dashboard.addToModule")} onClick={() => onNewDashboard(undefined, group.id)}>
+                    <Icon as={PlusIcon} size={14} />
+                  </HoverButton>
+                )}
+                <span className="text-xs font-medium text-fg-subtle">{count}</span>
+              </div>
 
               {groupOpen &&
                 folders.map(({ folder, dashboards }) => {
                   const folderOpen = Boolean(q) || !closed.has(folder.id);
                   return (
                     <div key={folder.id}>
-                      <div className={`${ROW} group/folder pl-6 text-fg-muted`}>
+                      <div className={`${ROW} group/row pl-6 text-fg-muted`}>
                         {renaming === folder.id ? (
                           <input
                             defaultValue={folder.title}
@@ -307,7 +320,7 @@ function HoverButton({ label, onClick, children }: { label: string; onClick: () 
       title={label}
       aria-label={label}
       onClick={onClick}
-      className="grid size-5.5 shrink-0 place-items-center rounded text-fg-subtle opacity-0 group-hover/folder:opacity-100 hover:bg-surface-active hover:text-fg focus-visible:opacity-100"
+      className="grid size-5.5 shrink-0 place-items-center rounded text-fg-subtle opacity-0 group-hover/row:opacity-100 hover:bg-surface-active hover:text-fg focus-visible:opacity-100"
     >
       {children}
     </button>

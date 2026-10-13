@@ -110,6 +110,44 @@ export function findDashboard(tree: Tree, id: string): { folder: Folder; dashboa
   return null;
 }
 
+/**
+ * Какой дашборд открыть. Названный — он. Иначе первый дашборд модуля
+ * `home`; чужой модуль подставляется, только если модуль не назван
+ * (`named`): вход «Дашборды» из CRM без дашбордов CRM должен показать
+ * пустой CRM, а не HRMS — иначе и «+» положит новый дашборд в HRMS.
+ */
+export function openedDashboard(
+  tree: Tree,
+  id: string,
+  home: string,
+  named: boolean,
+): { folder: Folder; dashboard: Dashboard } | null {
+  const found = findDashboard(tree, id);
+  if (found) return found;
+  const folder =
+    tree.folders.find((item) => item.moduleId === home && item.dashboards.length) ??
+    (named ? undefined : tree.folders.find((item) => item.dashboards.length));
+  return folder ? { folder, dashboard: folder.dashboards[0]! } : null;
+}
+
+/**
+ * Папка нового дашборда: заданная → папка открытого → первая папка
+ * модуля. `undefined` — папки нет, её заводят в модуле `module`.
+ * Названный модуль (`+` у строки модуля) перебивает папку открытого
+ * дашборда: тот может быть из другого модуля.
+ */
+export function folderForNew(
+  tree: Tree,
+  { folderId, moduleOf, opened, home }: { folderId?: string | undefined; moduleOf?: string | undefined; opened?: Folder | undefined; home: string },
+): { folder: Folder | undefined; module: string } {
+  const module = moduleOf ?? opened?.moduleId ?? home;
+  const folder =
+    tree.folders.find((item) => item.id === folderId) ??
+    (moduleOf ? undefined : opened) ??
+    tree.folders.find((item) => item.moduleId === module);
+  return { folder, module };
+}
+
 export function newDashboard(title: string): Dashboard {
   return { id: crypto.randomUUID(), title, emoji: DEFAULT_EMOJI, description: "", filters: [], widgets: [] };
 }

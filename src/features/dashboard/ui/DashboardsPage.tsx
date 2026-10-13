@@ -21,8 +21,9 @@ import { Icon } from "@/shared/ui/icon";
 import { Tabs } from "@/shared/ui/tabs";
 import { useDashboardTree } from "../api/tree";
 import {
-  findDashboard,
+  folderForNew,
   newDashboard,
+  openedDashboard,
   newFolder,
   patchDashboard,
   patchFolder,
@@ -80,14 +81,7 @@ export function DashboardsPage({
   const [deleting, setDeleting] = useState(false);
 
   const home = moduleId || modules[0]?.id || "";
-  const current =
-    findDashboard(tree, dashboardId) ??
-    (() => {
-      const folder =
-        tree.folders.find((item) => item.moduleId === home && item.dashboards.length) ??
-        tree.folders.find((item) => item.dashboards.length);
-      return folder ? { folder, dashboard: folder.dashboards[0]! } : null;
-    })();
+  const current = openedDashboard(tree, dashboardId, home, Boolean(moduleId));
 
   /*
    * Путь к дашборду раскрывается ОДИН раз — когда его открыли. Раньше
@@ -112,14 +106,10 @@ export function DashboardsPage({
     if (open) onOpen(open);
   };
 
-  /** Папка нового дашборда: заданная → папка открытого → первая папка модуля → новая. */
-  const addDashboard = (folderId?: string) => {
+  /** Папки нет — заводится в модуле (см. folderForNew). */
+  const addDashboard = (folderId?: string, moduleOf?: string) => {
     const dashboard = newDashboard("");
-    const module = current?.folder.moduleId ?? home;
-    const target =
-      tree.folders.find((folder) => folder.id === folderId) ??
-      current?.folder ??
-      tree.folders.find((folder) => folder.moduleId === module);
+    const { folder: target, module } = folderForNew(tree, { folderId, moduleOf, opened: current?.folder, home });
 
     if (target) {
       apply(patchFolder(tree, target.id, (folder) => ({ ...folder, dashboards: [...folder.dashboards, dashboard] })), dashboard.id);
@@ -160,7 +150,7 @@ export function DashboardsPage({
     return <p className="p-6 text-sm text-fg-muted">{t("dashboard.noAccess")}</p>;
   }
 
-  const module = modules.find((item) => item.id === current?.folder.moduleId);
+  const module = modules.find((item) => item.id === (current?.folder.moduleId ?? home));
   const editing = canEdit && layout !== null && layout.id === current?.dashboard.id;
   const favorite = Boolean(current && prefs.favorites.includes(current.dashboard.id));
 
@@ -177,7 +167,13 @@ export function DashboardsPage({
           <div className="px-6 pt-9 lg:px-24">
             {prefs.hidden && <ShowNav onClick={showNav} />}
             <Empty
-              title={isLoading ? t("common.loading") : t("dashboard.none")}
+              title={
+                isLoading
+                  ? t("common.loading")
+                  : moduleId && module
+                    ? t("dashboard.noneInModule", { module: module.label })
+                    : t("dashboard.none")
+              }
               description={isLoading ? "" : t("dashboard.noneDescription")}
               action={
                 canEdit && !isLoading ? (
