@@ -21,6 +21,7 @@ import { Icon } from "@/shared/ui/icon";
 import { Tabs } from "@/shared/ui/tabs";
 import { useDashboardTree } from "../api/tree";
 import {
+  findDashboard,
   folderForNew,
   newDashboard,
   openedDashboard,
@@ -78,7 +79,8 @@ export function DashboardsPage({
    * Привязан к дашборду: ушли на соседнюю вкладку — правка брошена.
    */
   const [layout, setLayout] = useState<{ id: string; widgets: Widget[]; filters: DashFilter[] } | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  /** Что ждёт подтверждения удаления: дашборд или папка с дашбордами. */
+  const [removing, setRemoving] = useState<{ kind: "dashboard" | "folder"; id: string } | null>(null);
 
   const home = moduleId || modules[0]?.id || "";
   const current = openedDashboard(tree, dashboardId, home, Boolean(moduleId));
@@ -106,6 +108,10 @@ export function DashboardsPage({
     if (open) onOpen(open);
   };
 
+  /** Новое в свёрнутом модуле не должно пропадать из вида: модуль раскрывается. */
+  const reveal = (module: string) =>
+    prefs.closed.includes(module) && updatePrefs({ ...prefs, closed: prefs.closed.filter((key) => key !== module) });
+
   /** Папки нет — заводится в модуле (см. folderForNew). */
   const addDashboard = (folderId?: string, moduleOf?: string) => {
     const dashboard = newDashboard("");
@@ -119,8 +125,21 @@ export function DashboardsPage({
     }
   };
 
-  const addFolder = () =>
-    apply({ folders: [...tree.folders, newFolder(current?.folder.moduleId ?? home, t("dashboard.newFolder"))] });
+  /** Отдаёт id новой папки: сайдбар сразу открывает её на переименование. */
+  const addFolder = (moduleOf?: string) => {
+    const module = moduleOf ?? current?.folder.moduleId ?? home;
+    const folder = newFolder(module, t("dashboard.newFolder"));
+    apply({ folders: [...tree.folders, folder] });
+    reveal(module);
+    return folder.id;
+  };
+
+  /** Пустая папка удаляется сразу, с дашбордами — после подтверждения. */
+  const removeFolder = (id: string) => {
+    const folder = tree.folders.find((item) => item.id === id);
+    if (folder?.dashboards.length) setRemoving({ kind: "folder", id });
+    else apply(patchFolder(tree, id, () => null));
+  };
 
   const patchCurrent = (patch: Partial<Dashboard>) =>
     current && apply(patchDashboard(tree, current.dashboard.id, (dashboard) => ({ ...dashboard, ...patch })));
@@ -140,7 +159,10 @@ export function DashboardsPage({
         onNewDashboard={addDashboard}
         onNewFolder={addFolder}
         onRenameFolder={(id, title) => apply(patchFolder(tree, id, (folder) => ({ ...folder, title })))}
-        onRemoveFolder={(id) => apply(patchFolder(tree, id, () => null))}
+        onRemoveFolder={removeFolder}
+        onRenameDashboard={(id, title) => apply(patchDashboard(tree, id, (dashboard) => ({ ...dashboard, title })))}
+        onRemoveDashboard={(id) => setRemoving({ kind: "dashboard", id })}
+        onFavorite={(id) => updatePrefs({ ...prefs, favorites: toggle(prefs.favorites, id) })}
         onHide={() => updatePrefs({ ...prefs, hidden: true })}
       />
     </div>
@@ -155,6 +177,8 @@ export function DashboardsPage({
   const favorite = Boolean(current && prefs.favorites.includes(current.dashboard.id));
 
   const showNav = () => updatePrefs({ ...prefs, hidden: false });
+  const removingDashboard = removing?.kind === "dashboard" ? findDashboard(tree, removing.id) : null;
+  const removingFolder = removing?.kind === "folder" ? tree.folders.find((folder) => folder.id === removing.id) : undefined;
 
   return (
     <div className="relative flex min-h-0 flex-1">
@@ -264,7 +288,7 @@ export function DashboardsPage({
                 </ViewAction>
                 {canEdit && (
                   <>
-                    <ViewAction label={t("dashboard.remove")} danger onClick={() => setDeleting(true)}>
+                    <ViewAction label={t("dashboard.remove")} danger onClick={() => current && setRemoving({ kind: "dashboard", id: current.dashboard.id })}>
                       <Icon as={Trash2Icon} size={16} />
                     </ViewAction>
                     {editing ? (
@@ -330,19 +354,35 @@ export function DashboardsPage({
         )}
       </div>
 
-      {deleting && current && (
+      {removingDashboard && (
         <ConfirmDialog
           title={t("dashboard.removeTitle")}
           description={t("dashboard.removeDescription", {
-            name: current.dashboard.title || t("dashboard.untitled"),
+            name: removingDashboard.dashboard.title || t("dashboard.untitled"),
           })}
           confirmLabel={t("dashboard.remove")}
           busy={false}
           onConfirm={() => {
-            setDeleting(false);
-            apply(patchDashboard(tree, current.dashboard.id, () => null));
+            setRemoving(null);
+            apply(patchDashboard(tree, removingDashboard.dashboard.id, () => null));
           }}
-          onClose={() => setDeleting(false)}
+          onClose={() => setRemoving(null)}
+        />
+      )}
+      {removingFolder && (
+        <ConfirmDialog
+          title={t("dashboard.removeFolderTitle")}
+          description={t("dashboard.removeFolderDescription", {
+            name: removingFolder.title || t("dashboard.untitled"),
+            count: removingFolder.dashboards.length,
+          })}
+          confirmLabel={t("dashboard.removeFolder")}
+          busy={false}
+          onConfirm={() => {
+            setRemoving(null);
+            apply(patchFolder(tree, removingFolder.id, () => null));
+          }}
+          onClose={() => setRemoving(null)}
         />
       )}
     </div>
