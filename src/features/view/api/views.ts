@@ -6,7 +6,7 @@ import { useSession } from "@/shared/api/use-session";
 import i18n from "@/shared/lib/i18n";
 import { keys } from "@/shared/lib/query-keys";
 import { errorMessage, reportError, toast } from "@/shared/lib/toast";
-import type { View } from "../model/types";
+import { ATTENDANCE_LAYOUTS, type AttendanceLayout, type View } from "../model/types";
 import { toUrlTemplate, type UrlTemplate } from "../model/url-template";
 import { perLanguage } from "@/shared/lib/i18n";
 
@@ -478,10 +478,32 @@ function toViews(data: ViewsResponseDto): View[] {
   return (data.views ?? []).filter((dto) => dto.id).map(toView);
 }
 
+/**
+ * Типы, слитые с соседними (ADR-0016): view, заведённые до слияния,
+ * читаются как новые. `raw` остаётся как пришёл — правка в «Свойствах»
+ * старый тип не перепишет, переводит его только миграция.
+ *
+ * ponytail: снять вместе со старыми ключами, когда живые view переведены
+ * (ADR-0016, шаг 4).
+ */
+const MERGED: Record<string, Pick<View, "type"> & Partial<Pick<View, "card" | "layout">>> = {
+  PEOPLE: { type: "GALLERY", card: "person" },
+  ATTENDANCE_LIST: { type: "ATTENDANCE", layout: "list" },
+  TIMESHEET: { type: "ATTENDANCE", layout: "sheet" },
+};
+
+const toCard = (value: unknown): View["card"] => (value === "person" ? "person" : "");
+
+const toLayout = (value: unknown): AttendanceLayout =>
+  ATTENDANCE_LAYOUTS.find((layout) => layout === value) ?? "calendar";
+
 export function toView(dto: ViewDto): View {
+  const merged = MERGED[dto.type ?? ""];
   return {
     id: dto.id ?? "",
-    type: dto.type ?? "",
+    type: merged?.type ?? dto.type ?? "",
+    card: merged?.card ?? toCard(dto.attributes?.["card"]),
+    layout: merged?.layout ?? toLayout(dto.attributes?.["layout"]),
     tableSlug: dto.table_slug ?? "",
     name: dto.name?.trim() ?? "",
     names: toNames(dto.attributes),

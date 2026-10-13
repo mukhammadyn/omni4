@@ -42,13 +42,13 @@ const ICONS: Record<string, LucideIcon> = {
   TABLE: Table2Icon,
   LIST: ListIcon,
   GALLERY: LayoutGridIcon,
-  PEOPLE: LayoutGridIcon,
+  "GALLERY.person": LayoutGridIcon,
   VACANCIES: LayoutGridIcon,
   VACANCY_PLAN: ClipboardListIcon,
-  ATTENDANCE: CalendarCheckIcon,
-  ATTENDANCE_LIST: ListIcon,
+  "ATTENDANCE.calendar": CalendarCheckIcon,
+  "ATTENDANCE.list": ListIcon,
   ABSENCES: PlaneIcon,
-  TIMESHEET: SheetIcon,
+  "ATTENDANCE.sheet": SheetIcon,
   ORG: NetworkIcon,
   BOARD: SquareKanbanIcon,
   CALENDAR: CalendarDaysIcon,
@@ -77,6 +77,10 @@ export const VIEW_ICON_CHOICES: { name: string; icon: LucideIcon }[] = [
   { name: "network", icon: NetworkIcon },
 ];
 
-export function viewIcon(type: string): LucideIcon {
-  return ICONS[type] ?? Table2Icon;
+/**
+ * Значок по типу или, где на руках сам view, по `viewKind(view)`:
+ * у «Сетки» и раскладок посещаемости он свой (ADR-0016).
+ */
+export function viewIcon(kind: string): LucideIcon {
+  return ICONS[kind] ?? Table2Icon;
 }

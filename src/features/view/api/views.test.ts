@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { toUpdateBody, toView } from "./views";
+import { viewKind } from "../model/types";
 
 test("имя вкладки собирается по языкам данных, пустые не в счёт", () => {
   const view = toView({
@@ -232,4 +233,23 @@ test("последний убранный график — пустой спис
 
   expect((body["attributes"] as Record<string, unknown>)["charts"]).toEqual([]);
   expect(toView(body).charts).toEqual([]);
+});
+
+test("слитые типы читаются как новые, а в теле правки остаются старыми (ADR-0016)", () => {
+  const people = toView({ id: "v", type: "PEOPLE" });
+  expect([people.type, people.card, viewKind(people)]).toEqual(["GALLERY", "person", "GALLERY.person"]);
+  // Правка в «Свойствах» тип не переписывает: переводит только миграция.
+  expect(toUpdateBody({ view: people, name: "Сетка", language: "ru" })["type"]).toBe("PEOPLE");
+
+  const sheet = toView({ id: "v", type: "TIMESHEET" });
+  expect([sheet.type, sheet.layout, viewKind(sheet)]).toEqual(["ATTENDANCE", "sheet", "ATTENDANCE.sheet"]);
+  expect(toView({ id: "v", type: "ATTENDANCE_LIST" }).layout).toBe("list");
+});
+
+test("карточка и раскладка — из attributes; ATTENDANCE без раскладки — календарь", () => {
+  expect(toView({ id: "v", type: "GALLERY", attributes: { card: "person" } }).card).toBe("person");
+  expect(toView({ id: "v", type: "GALLERY", attributes: { card: "чужое" } }).card).toBe("");
+  expect(toView({ id: "v", type: "ATTENDANCE", attributes: { layout: "sheet" } }).layout).toBe("sheet");
+  expect(viewKind(toView({ id: "v", type: "ATTENDANCE" }))).toBe("ATTENDANCE.calendar");
+  expect(viewKind(toView({ id: "v", type: "GALLERY" }))).toBe("GALLERY");
 });
