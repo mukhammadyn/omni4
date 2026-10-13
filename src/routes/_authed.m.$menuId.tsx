@@ -128,6 +128,7 @@ import {
   ExcelImportDialog,
   IMPLEMENTED_VIEW_TYPES,
   TAB_VIEW_TYPES,
+  traitsOf,
   RelationView,
   CalendarSetup,
   ViewCreateButton,
@@ -290,9 +291,6 @@ function parseDay(value: string | undefined): Date {
   const date = new Date(year, month - 1, day);
   return Number.isNaN(date.getTime()) ? nowLocal() : date;
 }
-
-/** Экраны HRMS, которые грузят свои данные сами: общий запрос строк им не нужен. */
-const SELF_LOADING = new Set(["TIMESHEET", "ATTENDANCE", "ATTENDANCE_LIST", "ABSENCES"]);
 
 export const Route = createFileRoute("/_authed/m/$menuId")({
   validateSearch: searchSchema,
@@ -622,8 +620,8 @@ function MenuPage() {
   const listView = supportedView && view?.type === "LIST";
   /** Галерея (`r_gallery` прототипа) — то же самое карточками. */
   const galleryView = supportedView && view?.type === "GALLERY";
-  /** «Сетка» сотрудников — та же галерея, карточка человека. */
-  const peopleView = supportedView && view?.type === "PEOPLE";
+  /** «Сетка» сотрудников — та же галерея, карточка человека (ADR-0016). */
+  const GalleryCards = view?.card === "person" ? PeopleGallery : Gallery;
   /** «Карточки» вакансий (features/hrms) — та же галерея, карточка вакансии. */
   const vacancyCardsView = supportedView && view?.type === "VACANCIES";
   /** «Оргструктура» сотрудников: дереву нужны все люди сразу, без страниц. */
@@ -634,7 +632,7 @@ function MenuPage() {
   const wholeView = orgView || vacancyPlanView;
   /** «Календарь», «Список», «Табель» посещаемости и «Отсутствия»
       (features/hrms): данные за период грузят сами, строки view им не нужны. */
-  const sheetView = supportedView && SELF_LOADING.has(view?.type ?? "");
+  const sheetView = supportedView && Boolean(traitsOf(view?.type ?? "").selfLoading);
   /** Экраны, отбирающие строки по видимому диапазону дат. */
   const dateView = calendarView || timelineView;
   /** Режим: из адреса, иначе из настроек view, иначе месяц. */
@@ -1926,14 +1924,14 @@ function MenuPage() {
           {/* Пока варианты вкладок едут, запрос строк не запущен вовсе —
               и пустая таблица врала бы «записей нет». */}
           {sheetView ? (
-            view.type === "ATTENDANCE" ? (
-              <AttendanceCalendar viewId={view.id} onOpenEmployee={openEmployee} />
-            ) : view.type === "ATTENDANCE_LIST" ? (
-              <AttendanceList viewId={view.id} onOpenEmployee={openEmployee} />
-            ) : view.type === "ABSENCES" ? (
+            view.type === "ABSENCES" ? (
               <Absences viewId={view.id} onOpenRow={openRow} onOpenEmployee={openEmployee} />
-            ) : (
+            ) : view.layout === "list" ? (
+              <AttendanceList viewId={view.id} onOpenEmployee={openEmployee} />
+            ) : view.layout === "sheet" ? (
               <Timesheet viewId={view.id} onOpenEmployee={openEmployee} />
+            ) : (
+              <AttendanceCalendar viewId={view.id} onOpenEmployee={openEmployee} />
             )
           ) : boardNotReady ? (
             /* Доска без поля раскладки — не пустая сетка: рисовать
@@ -1961,7 +1959,7 @@ function MenuPage() {
           ) : rowsLoading || tabGroup.pending ? (
             listView ? (
               <ListSkeleton />
-            ) : wholeView ? null : galleryView || peopleView || vacancyCardsView ? (
+            ) : wholeView ? null : galleryView || vacancyCardsView ? (
               <GallerySkeleton />
             ) : (
               <GridSkeleton columns={columns.length} />
@@ -2188,7 +2186,7 @@ function MenuPage() {
                 : {})}
             />
           ) : galleryView ? (
-            <Gallery
+            <GalleryCards
               tableSlug={view.tableSlug}
               columns={columns}
               rows={rows.rows}
@@ -2223,18 +2221,6 @@ function MenuPage() {
               fields={schema.fields}
               rows={rows.rows}
               relations={schema.relations}
-              language={language}
-              onOpenRow={openRow}
-              {...(can.write ? { onAdd: createRecord } : {})}
-              {...(infinite && hasMore ? { onEndReached: loadMore } : {})}
-            />
-          ) : peopleView ? (
-            <PeopleGallery
-              tableSlug={view.tableSlug}
-              columns={columns}
-              rows={rows.rows}
-              relations={schema.relations}
-              locale={i18n.language}
               language={language}
               onOpenRow={openRow}
               {...(can.write ? { onAdd: createRecord } : {})}

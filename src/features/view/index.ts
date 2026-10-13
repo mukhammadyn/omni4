@@ -16,7 +16,7 @@ export {
 } from "./model/columns";
 export { CalendarSetup } from "./ui/CalendarFields";
 export { RelationView } from "./ui/RelationView";
-export { IMPLEMENTED_VIEW_TYPES, TAB_VIEW_TYPES, VIEW_TYPES, isTabView, viewName } from "./model/types";
+export { IMPLEMENTED_VIEW_TYPES, TAB_VIEW_TYPES, VIEW_TYPES, isTabView, traitsOf, viewKind, viewName } from "./model/types";
 export type { View, ViewType } from "./model/types";
 export {
   EMPTY_URL_TEMPLATE,

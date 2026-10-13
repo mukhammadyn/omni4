@@ -4,7 +4,7 @@ import type { TranslationKey } from "@/shared/lib/i18n";
 import { DynamicIcon } from "@/shared/ui/dynamic-icon";
 import { Icon } from "@/shared/ui/icon";
 import { Tabs } from "@/shared/ui/tabs";
-import { viewName, type View } from "../model/types";
+import { viewKind, viewName, type View } from "../model/types";
 import { viewIcon } from "./view-icon";
 
 /**
@@ -39,15 +39,15 @@ export function ViewTabs({
         id: view.id,
         label:
           viewName(view, language) ||
-          t(`view.type.${view.type}` as TranslationKey, { defaultValue: view.type }),
-        icon: viewIcon(view.type),
+          t(`view.type.${viewKind(view)}` as TranslationKey, { defaultValue: view.type }),
+        icon: viewIcon(viewKind(view)),
         ...(view.icon
           ? {
               iconNode: (
                 <DynamicIcon
                   name={view.icon}
                   size={14}
-                  fallback={<Icon as={viewIcon(view.type)} size={14} />}
+                  fallback={<Icon as={viewIcon(viewKind(view))} size={14} />}
                 />
               ),
             }

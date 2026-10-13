@@ -59,6 +59,8 @@ import {
   IMPLEMENTED_VIEW_TYPES,
   TAB_VIEW_TYPES,
   VIEW_TYPES,
+  traitsOf,
+  viewKind,
   type View,
 } from "../model/types";
 import { CalendarFields, dateFields } from "./CalendarFields";
@@ -241,8 +243,7 @@ export function ViewOptions({
    * отвечают её колонки, у календаря — клетки дней, у списка и галереи
    * нет колонок, а дерево и графики строят порядок сами.
    */
-  const canGroup =
-    !["TREE", "BOARD", "CALENDAR", "CHART", "LIST", "GALLERY", "PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN", "ATTENDANCE", "ATTENDANCE_LIST", "TIMESHEET", "ABSENCES"].includes(view.type);
+  const canGroup = !traitsOf(view.type).noGrouping;
   /** Первое поле группировки — подписью на кнопке, остальные счётом. */
   const grouped = view.groupByIds
     .map((id) => fields.find((field) => field.id === id || field.relationId === id))
@@ -388,7 +389,10 @@ function Panel({
   };
   const back = () => open(null);
   const types = switchableTypes(view);
-  const typeLabel = t(`view.type.${view.type}` as TranslationKey, { defaultValue: view.type });
+  /* Подпись и значок — по виду, а не по типу: «Табель» и «Сетка» — это
+     ATTENDANCE и GALLERY, но читаются, как до слияния (ADR-0016). */
+  const kind = viewKind(view);
+  const typeLabel = t(`view.type.${kind}` as TranslationKey, { defaultValue: view.type });
   /*
    * Доска раскладывает те же строки по колонкам, поэтому настройка
    * `group_fields` у неё называется своими словами: у таблицы это
@@ -409,10 +413,10 @@ function Panel({
           <PopoverItem
             key={type}
             active={type === view.type}
-            icon={<Icon as={viewIcon(type)} size={16} className="shrink-0" />}
+            icon={<Icon as={viewIcon(type === view.type ? kind : type)} size={16} className="shrink-0" />}
             onClick={() => handlers.onType?.(type)}
           >
-            {t(`view.type.${type}` as TranslationKey, { defaultValue: type })}
+            {type === view.type ? typeLabel : t(`view.type.${type}` as TranslationKey, { defaultValue: type })}
           </PopoverItem>
         ))}
       </Subpage>
@@ -1024,7 +1028,7 @@ function Panel({
    * закреплять, ни делить их на группы нечем. Страницы, отбор и
    * раскладка вкладками — как у таблицы.
    */
-  const isList = ["LIST", "GALLERY", "PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN", "ATTENDANCE", "ATTENDANCE_LIST", "TIMESHEET", "ABSENCES"].includes(view.type);
+  const isList = Boolean(traitsOf(view.type).columnless);
   /** Поле начала события — подписью в строке настроек. Здесь это слаг. */
   const dateFrom = fields.find((field) => field.slug === view.dateFromSlug);
   /** Поле раскладки вкладками — подписью в строке настроек. */
@@ -1043,13 +1047,13 @@ function Panel({
               <IconPicker
                 value={view.icon}
                 type={view.type}
-                placeholder={<Icon as={viewIcon(view.type)} size={16} />}
+                placeholder={<Icon as={viewIcon(kind)} size={16} />}
                 preset={{ label: t("view.iconPreset"), icons: VIEW_ICON_CHOICES }}
                 onChange={handlers.onIcon}
               />
             ) : (
               <span className="grid size-8 shrink-0 place-items-center rounded-md border border-border text-fg-muted">
-                <Icon as={viewIcon(view.type)} size={16} />
+                <Icon as={viewIcon(kind)} size={16} />
               </span>
             )}
             {/*

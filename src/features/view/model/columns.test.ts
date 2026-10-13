@@ -46,6 +46,8 @@ const view = (columnIds: string[]): View => ({
   disableDates: null,
   charts: [],
   period: "",
+  card: "",
+  layout: "calendar",
   tabGroupId: "",
   subGroupId: "",
   defaultFilters: {},

@@ -23,14 +23,11 @@ export const VIEW_TYPES = [
   "TABLE",
   "LIST",
   "GALLERY",
-  "PEOPLE",
   "ORG",
   "VACANCIES",
   "VACANCY_PLAN",
   "ATTENDANCE",
-  "ATTENDANCE_LIST",
   "ABSENCES",
-  "TIMESHEET",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -44,100 +41,153 @@ export const VIEW_TYPES = [
 export type ViewType = (typeof VIEW_TYPES)[number];
 
 /**
- * SECTION — не вкладка. Это раскладка формы записи в Drawer: те же
- * columns, но описывают секции карточки, а не колонки таблицы.
- * Показать его вкладкой — значит предложить открыть таблицу, которой нет.
+ * Что тип умеет и где его показывают. Одна запись на тип — и все наборы
+ * ниже выводятся из неё, а не повторяются руками (ADR-0016): новый тип
+ * дописывается одной строкой, и забыть его в одном из мест нельзя.
+ * Согласованность признаков стережёт types.test.ts.
  */
-const NOT_A_TAB = new Set<string>(["SECTION"]);
+export type ViewTraits = {
+  /** Экран действительно есть. Остальные вкладки видны, но пусты. */
+  implemented?: true;
+  /**
+   * Бывает ВКЛАДКОЙ СВЯЗИ в карточке записи.
+   *
+   * ГРАФИКОВ во вкладке нет. Не запрет по существу — сводки по строкам
+   * одной связи бывают осмысленными, — а честный отказ показывать
+   * вкладку, за которой пусто: раскладку графиков рисует экран
+   * (routes/_authed.m.$menuId), и во вкладке её сейчас никто не рисует.
+   *
+   * У КАЛЕНДАРЯ период и видимый день живут в своём состоянии, а не
+   * в адресе: адрес занят основной таблицей — той, из которой открыли
+   * карточку. Цена та же, что у сортировки и страницы вкладки: ссылка
+   * открывает её с текущего месяца.
+   *
+   * ТАЙМЛАЙН — по той же причине, что и календарь: масштаб и видимый
+   * день у вкладки свои, а не в адресе.
+   *
+   * ДЕРЕВО собирается на клиенте. Ручка дерева
+   * (`POST /v2/items/{slug}/tree`) читает из тела ровно ОДНО условие —
+   * родителя (`<slug>_id`), — а всё остальное молча отбрасывает
+   * (object_builder, storage/postgres/ag_grid_tree.go:105 и :203).
+   * Отбор по колонке-ссылке до неё не доезжает, и дерево показало бы ВСЮ
+   * чужую таблицу. Поэтому вкладка строит иерархию на клиенте, из строк,
+   * которые и так загружены с нужным отбором (features/item/model/tree,
+   * groupByParent). Старая админка фильтры в эту ручку шлёт и получает
+   * то самое «всё» — см. docs/backend-notes.md.
+   *
+   * СПИСКА и ГАЛЕРЕИ во вкладке пока нет: новую строку вкладка заводит
+   * черновиком прямо в таблице, а у них черновика нет — «Новая запись»
+   * создала бы пустую строку. Нужна своя карточка создания поверх вкладки.
+   */
+  inTabs?: true;
+  /**
+   * Человек его не заводит и не выбирает сменой типа: экран сделан под
+   * одну таблицу модуля, и на чужой он показал бы чепуху. Запись view
+   * заводится один раз, на свой пункт меню, через API; дальше вкладка
+   * живёт как любая — имя, порядок, «Свойства», права.
+   */
+  fixed?: true;
+  /** Данные грузит сам: общий запрос строк view ему не нужен. */
+  selfLoading?: true;
+  /**
+   * Без колонок: свойства стоят в строке или в карточке подряд, и ни
+   * закреплять, ни делить их на группы нечем. Страницы, отбор
+   * и раскладка вкладками — как у таблицы.
+   */
+  columnless?: true;
+  /**
+   * Строки в группы не собираются. Признак отрицательный нарочно:
+   * у незнакомого типа (бэкенд отдаёт и такие) группировка в «Свойствах»
+   * не прячется. У доски за это отвечают её колонки, у календаря — клетки
+   * дней, а дерево и графики строят порядок сами.
+   */
+  noGrouping?: true;
+  /**
+   * Не вкладка. SECTION — раскладка формы записи в Drawer: те же
+   * columns, но описывают секции карточки, а не колонки таблицы.
+   * Показать его вкладкой — значит предложить открыть таблицу, которой нет.
+   */
+  notATab?: true;
+};
 
-/** Экраны, которые действительно есть. Остальные вкладки видны, но пусты. */
-export const IMPLEMENTED_VIEW_TYPES = new Set<string>([
-  "TABLE",
+/** Экран HRMS под одну таблицу: см. ViewTraits.fixed. */
+const HRMS = { implemented: true, fixed: true, columnless: true, noGrouping: true } as const;
+
+const TRAITS: Record<ViewType, ViewTraits> = {
+  TABLE: { implemented: true, inTabs: true },
   /*
    * Список — `r_list` прототипа. Бэкенд, как и у CHART, про тип не знает
    * и знать ему нечего (см. VIEW_TYPES): строки те же, что у таблицы.
    */
-  "LIST",
+  LIST: { implemented: true, columnless: true, noGrouping: true },
   /*
    * Галерея — `r_gallery` прототипа. Не GRID: GRID у ucode — прежний
    * табличный тип на ag-grid (CONTEXT, ViewType), и такие вкладки
    * в проектах уже есть — галереей им становиться нельзя.
+   *
+   * «Сетка» сотрудников HRMS (`employees.html` прототипа) — та же галерея
+   * с карточкой человека (`View.card`), а не свой тип (ADR-0016).
    */
-  "GALLERY",
-  /* Сетка людей, оргструктура, карточки вакансий — см. FIXED_VIEW_TYPES. */
-  "PEOPLE",
-  "ORG",
-  "VACANCIES",
-  "VACANCY_PLAN",
-  "ATTENDANCE",
-  "ATTENDANCE_LIST",
-  "ABSENCES",
-  "TIMESHEET",
-  "TREE",
-  "BOARD",
-  "CALENDAR",
-  "TIMELINE",
-  "PIVOT",
-  "CHART",
-]);
+  GALLERY: { implemented: true, columnless: true, noGrouping: true },
+  /**
+   * «Оргструктура» там же (features/hrms): читает таблицы HRMS по слагам,
+   * и на любой другой таблице ей нечего показать.
+   */
+  ORG: HRMS,
+  /**
+   * «Карточки» вакансий (`vacancies.html`, features/hrms): поля
+   * `hr_vacancies` по слагам и воронка по кандидатам.
+   */
+  VACANCIES: HRMS,
+  /** «Планирование» найма там же: план и найм по месяцам. */
+  VACANCY_PLAN: HRMS,
+  /**
+   * Посещаемость (`attendance.html`, features/hrms) по
+   * `hr_attendance_days`. Три экрана — раскладки одного типа
+   * (`View.layout`, ADR-0016): «Календарь» — статус дня значком,
+   * «Список» — строка на день сотрудника, «Табель» — сотрудники × дни,
+   * смены и заявки рядом.
+   */
+  ATTENDANCE: { ...HRMS, selfLoading: true },
+  /** «Отсутствия» на `hr_requests`: заявки и их согласование. */
+  ABSENCES: { ...HRMS, selfLoading: true },
+  BOARD: { implemented: true, inTabs: true, noGrouping: true },
+  CALENDAR: { implemented: true, inTabs: true, noGrouping: true },
+  CHART: { implemented: true, noGrouping: true },
+  GRID: {},
+  PIVOT: { implemented: true, inTabs: true },
+  SECTION: { notATab: true },
+  TIMELINE: { implemented: true, inTabs: true },
+  TREE: { implemented: true, inTabs: true, noGrouping: true },
+};
+
+/** Раскладки посещаемости: см. View.layout. */
+export const ATTENDANCE_LAYOUTS = ["calendar", "list", "sheet"] as const;
+export type AttendanceLayout = (typeof ATTENDANCE_LAYOUTS)[number];
 
 /**
- * Типы, которыми бывает ВКЛАДКА СВЯЗИ в карточке записи.
- *
- * Почти IMPLEMENTED_VIEW_TYPES, но список свой не зря: два типа
- * во вкладке устроены иначе, чем на экране, а один в неё не идёт вовсе.
- *
- * ГРАФИКОВ во вкладке нет. Не запрет по существу — сводки по строкам
- * одной связи бывают осмысленными, — а честный отказ показывать
- * вкладку, за которой пусто: раскладку графиков рисует экран
- * (routes/_authed.m.$menuId), и во вкладке её сейчас никто не рисует.
- *
- * У КАЛЕНДАРЯ период и видимый день живут в своём состоянии, а не
- * в адресе: адрес занят основной таблицей — той, из которой открыли
- * карточку. Цена та же, что у сортировки и страницы вкладки: ссылка
- * открывает её с текущего месяца.
- *
- * ТАЙМЛАЙН — по той же причине, что и календарь: масштаб и видимый
- * день у вкладки свои, а не в адресе.
- *
- * ДЕРЕВО собирается на клиенте. Ручка дерева
- * (`POST /v2/items/{slug}/tree`) читает из тела ровно ОДНО условие —
- * родителя (`<slug>_id`), — а всё остальное молча отбрасывает
- * (object_builder, storage/postgres/ag_grid_tree.go:105 и :203).
- * Отбор по колонке-ссылке до неё не доезжает, и дерево показало бы ВСЮ
- * чужую таблицу. Поэтому вкладка строит иерархию на клиенте, из строк,
- * которые и так загружены с нужным отбором (features/item/model/tree,
- * groupByParent). Старая админка фильтры в эту ручку шлёт и получает
- * то самое «всё» — см. docs/backend-notes.md.
- *
- * СПИСКА и ГАЛЕРЕИ во вкладке пока нет: новую строку вкладка заводит
- * черновиком прямо в таблице, а у них черновика нет — «Новая запись»
- * создала бы пустую строку. Нужна своя карточка создания поверх вкладки.
+ * Чем view отличается для подписи и значка: тип, уточнённый карточкой
+ * или раскладкой. «Сетка» и «Табель» — не свои типы (ADR-0016), но
+ * подписываются и рисуются по-своему, как до слияния.
  */
-const NOT_IN_TABS = new Set<string>(["CHART", "LIST", "GALLERY", "PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN", "ATTENDANCE", "ATTENDANCE_LIST", "TIMESHEET", "ABSENCES"]);
+export function viewKind(view: Pick<View, "type" | "card" | "layout">): string {
+  if (view.type === "GALLERY" && view.card) return `GALLERY.${view.card}`;
+  if (view.type === "ATTENDANCE") return `ATTENDANCE.${view.layout}`;
+  return view.type;
+}
 
-/**
- * Типы, которые человек не заводит и не выбирает сменой типа: экран
- * сделан под одну таблицу модуля, и на чужой он показал бы чепуху.
- * Запись view заводится один раз, на свой пункт меню, через API; дальше
- * вкладка живёт как любая — имя, порядок, «Свойства», права.
- *
- * PEOPLE — «Сетка» сотрудников HRMS (`employees.html` прототипа).
- * ORG — «Оргструктура» там же (features/hrms): читает таблицы HRMS
- * по слагам, и на любой другой таблице ей нечего показать.
- * VACANCIES — «Карточки» вакансий (`vacancies.html`, features/hrms):
- * поля `hr_vacancies` по слагам и воронка по кандидатам.
- * VACANCY_PLAN — «Планирование» найма там же: план и найм по месяцам.
- * ATTENDANCE — «Календарь» посещаемости там же: статус дня значком.
- * ATTENDANCE_LIST — «Список» посещаемости: строка — день сотрудника.
- * ABSENCES — «Отсутствия» на `hr_requests`: заявки и их согласование.
- * TIMESHEET — «Табель» посещаемости (`attendance.html`, features/hrms):
- * сотрудники × дни по `hr_attendance_days`, смены и заявки рядом.
- */
-export const FIXED_VIEW_TYPES = new Set<string>(["PEOPLE", "ORG", "VACANCIES", "VACANCY_PLAN", "ATTENDANCE", "ATTENDANCE_LIST", "TIMESHEET", "ABSENCES"]);
-export const TAB_VIEW_TYPES = VIEW_TYPES.filter(
-  (type) => IMPLEMENTED_VIEW_TYPES.has(type) && !NOT_IN_TABS.has(type),
-);
+/** Признаки типа. Незнакомый тип — без единого признака. */
+export const traitsOf = (type: string): ViewTraits =>
+  (TRAITS as Record<string, ViewTraits | undefined>)[type] ?? {};
+
+const typesWith = (trait: keyof ViewTraits) => VIEW_TYPES.filter((type) => TRAITS[type][trait]);
+
+/** Экраны, которые действительно есть. Остальные вкладки видны, но пусты. */
+export const IMPLEMENTED_VIEW_TYPES = new Set<string>(typesWith("implemented"));
+/** Типы, которые не заводят через «+» и не выбирают сменой типа. */
+export const FIXED_VIEW_TYPES = new Set<string>(typesWith("fixed"));
+/** Типы, которыми бывает вкладка связи в карточке записи. */
+export const TAB_VIEW_TYPES = typesWith("inTabs");
 
 export type View = {
   id: string;
@@ -342,6 +392,18 @@ export type View = {
    */
   period: string;
   /**
+   * Карточка галереи (`attributes.card`): `person` — карточка человека
+   * (фото, статус, контакты; PeopleGallery), пусто — обычная. Читается
+   * только у GALLERY.
+   */
+  card: "" | "person";
+  /**
+   * Раскладка посещаемости (`attributes.layout`). Читается только
+   * у ATTENDANCE; пустая и незнакомая — календарь: так view ATTENDANCE,
+   * заведённые до слияния, остались календарём без миграции.
+   */
+  layout: AttendanceLayout;
+  /**
    * View, как его отдал бэкенд. Нужен для записи: PUT перезаписывает
    * строку целиком, причём calendar_from_slug, calendar_to_slug,
    * group_fields и columns он проставляет ВСЕГДА, даже когда их не
@@ -352,7 +414,7 @@ export type View = {
 };
 
 /** Показывается ли view вкладкой на экране таблицы. */
-export const isTabView = (view: View) => !view.isRelationView && !NOT_A_TAB.has(view.type);
+export const isTabView = (view: View) => !view.isRelationView && !traitsOf(view.type).notATab;
 
 /**
  * Имя view, как его задал админ. Пустая строка — имени нет вовсе.
