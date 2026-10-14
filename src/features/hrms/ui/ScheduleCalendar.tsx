@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { BriefcaseIcon, ChevronDownIcon, HouseIcon, MoonIcon, SparkleIcon, SunIcon, UserIcon, UsersIcon, type LucideIcon } from "lucide-react";
+import { BriefcaseIcon, ChevronDownIcon, SparkleIcon, UserIcon, UsersIcon, type LucideIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
 import { CHIP_STYLES, hexToChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
@@ -11,26 +11,8 @@ import { EmployeeName, PeriodBar, useDayHead, usePeriod, type OpenEmployee } fro
 import { ATTENDANCE_TAB } from "./employee-tabs";
 import { useScheduleSettings, type ScheduleGroup } from "./schedule-settings";
 import { NO_TEMPLATE } from "./ScheduleTools";
-
-/** Тип смены: подложка, полоса слева и значок — `KIND` прототипа. */
-export const KIND_STYLE: Record<ShiftKind, { chip: string; stripe: string; icon: LucideIcon }> = {
-  day: { chip: CHIP_STYLES.blue, stripe: "bg-chart-1", icon: SunIcon },
-  night: { chip: CHIP_STYLES.purple, stripe: "bg-chart-7", icon: MoonIcon },
-  remote: { chip: CHIP_STYLES.green, stripe: "bg-chart-3", icon: HouseIcon },
-};
-
-/** «8 ч», «7 ч 30 м». */
-export function useDuration() {
-  const { t } = useTranslation();
-  return (minutes: number) => {
-    const h = Math.floor(minutes / 60);
-    const m = Math.round(minutes % 60);
-    return h && m ? t("timesheet.hm", { h, m }) : m ? t("timesheet.m", { m }) : t("timesheet.h", { h });
-  };
-}
-
-/** Новая смена на клетке или правка существующей — окну смены. */
-export type OpenShift = { shift?: Shift; employeeId?: string; date: string };
+import { KIND_STYLE, useDuration, type OpenShift } from "./schedule-parts";
+import { ShiftDialog } from "./ShiftDialog";
 
 type Row = { id: string; employees: ScheduleEmployee[]; position?: string };
 
@@ -46,11 +28,9 @@ type Row = { id: string; employees: ScheduleEmployee[]; position?: string };
 export function ScheduleCalendar({
   viewId,
   onOpenEmployee,
-  onOpenShift,
 }: {
   viewId: string;
   onOpenEmployee: OpenEmployee;
-  onOpenShift?: (open: OpenShift) => void;
 }) {
   const { t } = useTranslation();
   const period = usePeriod(viewId);
@@ -62,6 +42,8 @@ export function ScheduleCalendar({
   const duration = useDuration();
   const [kinds, setKinds] = useState<Set<ShiftKind>>(() => new Set());
   const [closed, setClosed] = useState<Set<string>>(() => new Set());
+  const [editing, setEditing] = useState<OpenShift | null>(null);
+  const onOpenShift = setEditing;
   const month = scale === "month";
 
   const shiftsOf = useMemo(() => byEmployeeDate(data.shifts), [data.shifts]);
@@ -186,7 +168,7 @@ export function ScheduleCalendar({
   };
 
   const place = (shift: Shift) => (shift.kind === "remote" ? t("schedule.kind.remote") : locationName.get(shift.locationId) ?? "");
-  const open = (shift: Shift) => (onOpenShift ? () => onOpenShift({ shift, date: shift.date }) : undefined);
+  const open = (shift: Shift) => () => onOpenShift({ shift, date: shift.date });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -297,10 +279,8 @@ export function ScheduleCalendar({
                         {dates.map((date) => (
                           <td
                             key={date}
-                            onClick={onOpenShift ? () => onOpenShift({ employeeId: row.employees[0]!.id, date }) : undefined}
-                            className={`${body} group/cell px-1 py-1 align-middle ${month ? "text-center" : ""} ${shade(date)} ${
-                              onOpenShift ? "cursor-copy" : ""
-                            }`}
+                            onClick={() => onOpenShift({ employeeId: row.employees[0]!.id, date })}
+                            className={`${body} group/cell px-1 py-1 align-middle ${month ? "text-center" : ""} ${shade(date)} cursor-copy`}
                           >
                             <div className={month ? "flex flex-col items-center gap-0.5" : "flex flex-col gap-0.5"}>{cell(row, date)}</div>
                           </td>
@@ -313,6 +293,8 @@ export function ScheduleCalendar({
           </tbody>
         </table>
       </div>
+
+      {editing && <ShiftDialog open={editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }
