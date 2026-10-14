@@ -46,9 +46,9 @@ import { TimesheetDay } from "./TimesheetDay";
  * Клик по дню — то же окно дня, что у табеля (TimesheetDay). Данные —
  * те же (api/timesheet). Сделан под `hr_attendance_days` (FIXED_VIEW_TYPES).
  */
-export function AttendanceCalendar({ viewId, onOpenEmployee }: { viewId: string; onOpenEmployee: OpenEmployee }) {
+export function AttendanceCalendar({ viewId, search, onOpenEmployee }: { viewId: string; search: string; onOpenEmployee: OpenEmployee }) {
   const { t } = useTranslation();
-  const view = useAttendance(viewId, undefined, SHEET_PAGE);
+  const view = useAttendance(viewId, undefined, SHEET_PAGE, search);
   const { scale, range, dates, today, sheet, rows } = view;
   const [open, setOpen] = useState<OpenDay | null>(null);
   const head = useDayHead();

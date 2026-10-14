@@ -77,7 +77,7 @@ export { FilterChip } from "./ui/FilterChip";
 export { ItemDrawer } from "./ui/ItemDrawer";
 export { GridFooter, MAX_LIMIT, MIN_LIMIT, PAGE_SIZES } from "./ui/GridFooter";
 export { SortPanel } from "./ui/SortPanel";
-export { TableToolbar } from "./ui/TableToolbar";
+export { SearchBox, TableToolbar } from "./ui/TableToolbar";
 export { MineToggle, type WhoField } from "./ui/MineToggle";
 
 export { chartRoleIssue } from "./model/chart-geometry";

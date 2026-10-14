@@ -7,7 +7,7 @@ import { Icon } from "@/shared/ui/icon";
 import { useSchedule, useScheduleDirectory, type ScheduleEmployee } from "../api/schedule";
 import { byEmployeeDate, SHIFT_KINDS, type Shift, type ShiftKind, type Template } from "../model/schedule";
 import { isWeekend } from "../model/timesheet";
-import { EmployeeName, PeriodBar, useDayHead, usePeriod, type OpenEmployee } from "./attendance-parts";
+import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, useDayHead, usePeriod, type OpenEmployee } from "./attendance-parts";
 import { SCHEDULE_TAB } from "./employee-tabs";
 import { useScheduleSettings, type ScheduleGroup } from "./schedule-settings";
 import { NO_TEMPLATE } from "./ScheduleTools";
@@ -28,16 +28,25 @@ type Row = { id: string; employees: ScheduleEmployee[]; position?: string };
  */
 export function ScheduleCalendar({
   viewId,
+  search,
   onOpenEmployee,
 }: {
   viewId: string;
+  search: string;
   onOpenEmployee: OpenEmployee;
 }) {
   const { t } = useTranslation();
-  const period = usePeriod(viewId);
+  const period = usePeriod(viewId, undefined, search);
   const { scale, range, dates, today, query } = period;
   const settings = useScheduleSettings(viewId);
-  const data = useSchedule(range);
+  // Ось «Должность» сводит всех людей должности в строку — ей нужны все сразу.
+  const data = useSchedule({
+    ...range,
+    search: query,
+    departments: settings.values("dept"),
+    locations: settings.values("location"),
+    ...(settings.axis === "employee" ? { pageSize: SHEET_PAGE } : {}),
+  });
   const { locations } = useScheduleDirectory();
   const head = useDayHead();
   const duration = useDuration();
@@ -60,23 +69,40 @@ export function ScheduleCalendar({
       templateById.get(bySchedule.get(employee.id) ?? employee.templateId);
   }, [data.shifts, templateById]);
 
+  // Поиск — на сервере (api/schedule, useSchedule): второй отбор по имени прятал бы тех,
+  // кого сервер нашёл по другому полю, и итог разошёлся бы со строками.
   const employees = useMemo(() => {
-    const needle = query.toLocaleLowerCase();
     const hit = (values: string[], value: string) => !values.length || values.includes(value);
     return data.employees.filter(
       (employee) =>
-        (!needle || employee.name.toLocaleLowerCase().includes(needle)) &&
         hit(settings.values("dept"), employee.departmentId) &&
         hit(settings.values("location"), employee.locationId) &&
         hit(settings.values("template"), templateOf(employee)?.id ?? NO_TEMPLATE),
     );
-  }, [data.employees, query, settings, templateOf]);
+  }, [data.employees, settings, templateOf]);
 
   const visible = (shift: Shift) => !kinds.size || kinds.has(shift.kind);
 
+  /*
+   * Счётчики — по всей компании, а не по прокрученным строкам: смены
+   * периода и так грузятся на всех (api/schedule), а число сотрудников
+   * приходит в `count`. С поиском или отбором так нельзя — смены не знают
+   * отдела, — и счёт идёт по загруженным, как в «Посещаемости».
+   */
+  const narrowed = Boolean(query) || settings.active > 0;
   const stats = useMemo(() => {
     const counts: Record<ShiftKind | "off", number> = { day: 0, night: 0, remote: 0, off: 0 };
     let minutes = 0;
+    if (data.hasMore && !narrowed) {
+      const worked = new Set<string>();
+      for (const shift of data.shifts) {
+        counts[shift.kind] += 1;
+        minutes += shift.plannedMinutes;
+        worked.add(`${shift.employeeId}|${shift.date}`);
+      }
+      counts.off = Math.max(0, data.total * dates.length - worked.size);
+      return { counts, minutes, people: data.total };
+    }
     for (const employee of employees)
       for (const date of dates) {
         const list = shiftsOf(employee.id, date);
@@ -86,8 +112,8 @@ export function ScheduleCalendar({
           minutes += shift.plannedMinutes;
         }
       }
-    return { counts, minutes };
-  }, [employees, dates, shiftsOf]);
+    return { counts, minutes, people: employees.length };
+  }, [employees, dates, shiftsOf, data.hasMore, data.shifts, data.total, narrowed]);
 
   /* Строки: сотрудники или должности, по группам. */
   const groups = useMemo(() => {
@@ -96,7 +122,8 @@ export function ScheduleCalendar({
       const byPosition = new Map<string, ScheduleEmployee[]>();
       for (const employee of list) byPosition.set(employee.position, [...(byPosition.get(employee.position) ?? []), employee]);
       return [...byPosition]
-        .sort(([a], [b]) => a.localeCompare(b))
+        // «—» (должность не заполнена) — в конце, как у групп.
+        .sort(([a], [b]) => Number(!a) - Number(!b) || a.localeCompare(b))
         .map(([position, members]) => ({ id: `p:${position}`, employees: members, position }));
     };
     const keyOf: Record<Exclude<ScheduleGroup, "none">, (e: ScheduleEmployee) => [string, string]> = {
@@ -107,18 +134,22 @@ export function ScheduleCalendar({
         return [template?.id ?? NO_TEMPLATE, template?.name ?? t("schedule.noTemplate")];
       },
     };
-    if (settings.group === "none") return [{ id: "", label: "", rows: rowsOf(employees) }];
-    const buckets = new Map<string, { label: string; members: ScheduleEmployee[] }>();
-    for (const employee of employees) {
-      const [id, label] = keyOf[settings.group](employee);
-      const bucket = buckets.get(id) ?? { label: label || "—", members: [] };
-      bucket.members.push(employee);
+    // По должности шаблон не группирует: у людей одной должности он разный (`posView` прототипа).
+    if (settings.group === "none" || (settings.axis === "position" && settings.group === "template"))
+      return [{ id: "", label: "", rows: rowsOf(employees) }];
+    const group = keyOf[settings.group];
+    // Строки — целиком, по первому сотруднику: должность не делится между группами, как в прототипе.
+    const buckets = new Map<string, { label: string; rows: Row[] }>();
+    for (const row of settings.axis === "position" ? rowsOf(employees) : employees.map((e) => ({ id: e.id, employees: [e] }))) {
+      const [id, label] = group(row.employees[0]!);
+      const bucket = buckets.get(id) ?? { label: label || "—", rows: [] };
+      bucket.rows.push(row);
       buckets.set(id, bucket);
     }
     return [...buckets]
       // Крупные группы первыми, «—» (поле не заполнено) — в конце.
-      .sort(([idA, a], [idB, b]) => Number(!idA) - Number(!idB) || b.members.length - a.members.length)
-      .map(([id, { label, members }]) => ({ id: `${settings.group}:${id}`, label, rows: rowsOf(members) }));
+      .sort(([idA, a], [idB, b]) => Number(!idA) - Number(!idB) || b.rows.length - a.rows.length)
+      .map(([id, { label, rows }]) => ({ id: `${settings.axis}:${settings.group}:${id}`, label, rows }));
   }, [employees, settings.axis, settings.group, templateOf, t]);
 
   const toggleGroup = (id: string) =>
@@ -201,18 +232,15 @@ export function ScheduleCalendar({
             {t("schedule.dayOff")}
             <b className="font-semibold text-fg tabular-nums">{stats.counts.off}</b>
           </span>
-          <span className="ml-2 text-xs text-fg-subtle">
-            {t("schedule.total", { count: employees.length, hours: duration(stats.minutes) })}
-          </span>
         </div>
       </PeriodBar>
 
-      <div className="relative mx-6 mb-4 min-h-0 flex-1 overflow-auto">
+      <div className="relative mx-6 mb-2 min-h-0 flex-1 overflow-auto">
         {data.fetching && !data.loading && <div className="sticky top-0 z-30 h-0.5 animate-pulse bg-accent" />}
         <table className="min-w-full border-separate border-spacing-0 text-xs">
           <thead>
             <tr>
-              <th className={`${headCell} left-0 z-30 min-w-[250px] px-3 text-left font-normal`}>
+              <th className={`${headCell} left-0 z-30 min-w-[250px] border-r px-3 text-left font-normal`}>
                 <AxisSwitch value={settings.axis} onChange={settings.setAxis} />
               </th>
               {dates.map((date) => (
@@ -249,7 +277,7 @@ export function ScheduleCalendar({
                 <Fragment key={group.id}>
                   {group.label && (
                     <tr className="cursor-pointer" onClick={() => toggleGroup(group.id)}>
-                      <td className={`${body} sticky left-0 z-10 bg-surface-soft px-3 py-1.5`}>
+                      <td className={`${body} sticky left-0 z-10 border-r bg-surface-soft px-3 py-1.5`}>
                         <span className="flex items-center gap-1.5 text-[13px]">
                           <Icon
                             as={ChevronDownIcon}
@@ -266,9 +294,13 @@ export function ScheduleCalendar({
                   {!closed.has(group.id) &&
                     group.rows.map((row) => (
                       <tr key={row.id} className="group">
-                        <td className={`${body} sticky left-0 z-10 bg-surface px-3 py-1.5 group-hover:bg-surface-hover`}>
+                        <td className={`${body} sticky left-0 z-10 border-r bg-surface px-3 py-1.5 group-hover:bg-surface-hover`}>
                           {row.position !== undefined ? (
-                            <PositionName name={row.position || "—"} count={row.employees.length} />
+                            <PositionName
+                              name={row.position || "—"}
+                              count={row.employees.length}
+                              departments={[...new Set(row.employees.map((e) => e.department).filter(Boolean))].join(", ")}
+                            />
                           ) : (
                             <EmployeeHead
                               employee={row.employees[0]!}
@@ -282,7 +314,8 @@ export function ScheduleCalendar({
                         {dates.map((date) => (
                           <td
                             key={date}
-                            onClick={() => onOpenShift({ employeeId: row.employees[0]!.id, date })}
+                            // На строке должности сотрудника не подставляем: в ней их несколько.
+                            onClick={() => onOpenShift(row.position !== undefined ? { date } : { employeeId: row.employees[0]!.id, date })}
                             className={`${body} group/cell px-1 py-1 align-middle ${month ? "text-center" : ""} ${shade(date)} cursor-copy`}
                           >
                             <div className={month ? "flex flex-col items-center gap-0.5" : "flex flex-col gap-0.5"}>{cell(row, date)}</div>
@@ -295,6 +328,11 @@ export function ScheduleCalendar({
             )}
           </tbody>
         </table>
+        {!data.loading && <MoreRows sheet={data} />}
+      </div>
+      {/* Итог — под таблицей, вне её прокрутки: виден всегда. */}
+      <div className="mx-6 mb-3 shrink-0 text-xs text-fg-subtle tabular-nums">
+        {t("schedule.total", { count: stats.people, hours: duration(stats.minutes) })}
       </div>
 
       {editing && <ShiftDialog open={editing} onClose={() => setEditing(null)} />}
@@ -384,7 +422,8 @@ export function TemplateTag({ template, className = "" }: { template: Template; 
   );
 }
 
-function PositionName({ name, count }: { name: string; count: number }) {
+/** Должность — `.sg-pos` прототипа: «2 сотр. · Разработка». */
+function PositionName({ name, count, departments }: { name: string; count: number; departments: string }) {
   const { t } = useTranslation();
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -393,7 +432,9 @@ function PositionName({ name, count }: { name: string; count: number }) {
       </span>
       <div className="min-w-0">
         <div className="truncate text-[13px] font-semibold text-fg">{name}</div>
-        <div className="text-2xs text-fg-subtle">{t("schedule.employees", { count })}</div>
+        <div className="truncate text-2xs text-fg-subtle">
+          {[t("schedule.employees", { count }), departments].filter(Boolean).join(" · ")}
+        </div>
       </div>
     </div>
   );

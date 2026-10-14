@@ -21,6 +21,7 @@ import {
   GridFooter,
   MAX_LIMIT,
   MIN_LIMIT,
+  SearchBox,
   TableToolbar,
   MineToggle,
   PEOPLE,
@@ -1603,6 +1604,16 @@ function MenuPage() {
 
               {/* Группировка и вид строки «Планирования» — личные, свои
                   (features/hrms), а не настройки view из ⋮. */}
+              {/* Экраны HRMS ищут сотрудника сами — та же лупа, что
+                  у таблиц, без меню полей. «Шаблонам» искать нечего. */}
+              {sheetView && view.type !== "WORK_SCHEDULES" && can.searchButton && (
+                <SearchBox
+                  value={searchText}
+                  onChange={(next) => setSearch({ search: next || undefined }, true)}
+                  language={language}
+                  placeholder={t("timesheet.search")}
+                />
+              )}
               {vacancyPlanView && <VacancyPlanTools viewId={view.id} />}
               {sheetView && view.type === "SCHEDULE" && <ScheduleTools viewId={view.id} />}
 
@@ -2021,7 +2032,7 @@ function MenuPage() {
               и пустая таблица врала бы «записей нет». */}
           {sheetView ? (
             view.type === "ABSENCES" ? (
-              <Absences viewId={view.id} onOpenRow={openRow} onOpenEmployee={openEmployee} />
+              <Absences viewId={view.id} search={searchText} onOpenRow={openRow} onOpenEmployee={openEmployee} />
             ) : view.type === "WORK_SCHEDULES" ? (
               <>
                 <WorkSchedules />
@@ -2029,15 +2040,15 @@ function MenuPage() {
               </>
             ) : view.type === "SCHEDULE" ? (
               <>
-                <ScheduleCalendar viewId={view.id} onOpenEmployee={openEmployee} />
+                <ScheduleCalendar viewId={view.id} search={searchText} onOpenEmployee={openEmployee} />
                 {scheduleCreate && <ScheduleCreate viewType={scheduleCreate} onClose={() => setScheduleCreate(null)} />}
               </>
             ) : view.layout === "list" ? (
-              <AttendanceList viewId={view.id} onOpenEmployee={openEmployee} />
+              <AttendanceList viewId={view.id} search={searchText} onOpenEmployee={openEmployee} />
             ) : view.layout === "sheet" ? (
-              <Timesheet viewId={view.id} onOpenEmployee={openEmployee} />
+              <Timesheet viewId={view.id} search={searchText} onOpenEmployee={openEmployee} />
             ) : (
-              <AttendanceCalendar viewId={view.id} onOpenEmployee={openEmployee} />
+              <AttendanceCalendar viewId={view.id} search={searchText} onOpenEmployee={openEmployee} />
             )
           ) : boardNotReady ? (
             /* Доска без поля раскладки — не пустая сетка: рисовать

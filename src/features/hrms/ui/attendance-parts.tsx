@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeftIcon, ChevronRightIcon, SearchIcon, XIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { GAP, pageItems } from "@/shared/ui/pagination";
 import { useUi } from "@/shared/lib/ui-store";
 import { todayInput } from "@/shared/lib/date-value";
@@ -32,23 +32,26 @@ function useSettings(viewId: string, scales: readonly Scale[]) {
   };
 }
 
-/** Период и поиск — без данных: строке периода больше ничего не нужно. */
-export function usePeriod(viewId: string, scales: readonly Scale[] = SCALES) {
+/**
+ * Период и поиск — без данных: строке периода больше ничего не нужно.
+ * Поиск — лупа на панели вида, как у остальных таблиц; живёт в адресе
+ * (`?search=`), сюда приходит пропом экрана.
+ */
+export function usePeriod(viewId: string, scales: readonly Scale[] = SCALES, search = "") {
   const today = todayInput();
   const settings = useSettings(viewId, scales);
   const anchor = settings.anchor ?? today;
   const range = useMemo(() => rangeOf(settings.scale, anchor), [settings.scale, anchor]);
   const dates = useMemo(() => datesOf(range), [range]);
-  const [search, setSearch] = useState("");
   const query = useDeferredValue(search.trim());
-  return { ...settings, scales, anchor, range, dates, today, search, setSearch, query };
+  return { ...settings, scales, anchor, range, dates, today, search, query };
 }
 
 export type Period = ReturnType<typeof usePeriod>;
 
 /** Период, поиск, данные и строки сотрудников за период. */
-export function useAttendance(viewId: string, scales: readonly Scale[] = SCALES, pageSize?: number) {
-  const period = usePeriod(viewId, scales);
+export function useAttendance(viewId: string, scales: readonly Scale[] = SCALES, pageSize?: number, search = "") {
+  const period = usePeriod(viewId, scales, search);
   const { range, dates, today, query } = period;
   const sheet = useTimesheet({ ...range, dates, today, search: query, ...(pageSize ? { pageSize } : {}) });
   const rows = useMemo(
@@ -67,7 +70,7 @@ export const SHEET_PAGE = 30;
  * Маркер под таблицей, внутри её прокрутки: подъехал к низу — следующая
  * порция сотрудников (табель HRMS, Time/Sheet).
  */
-export function MoreRows({ sheet }: { sheet: Timesheet }) {
+export function MoreRows({ sheet }: { sheet: Pick<Timesheet, "hasMore" | "loadMore" | "loadingMore" | "loading"> }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const { hasMore, loadMore } = sheet;
@@ -111,8 +114,9 @@ export function usePeriodLabel({ scale, anchor, range }: Pick<Period, "scale" | 
 }
 
 /**
- * Строка над сеткой — как в HRMS и прототипе: период, «Сегодня»,
- * масштаб, свой блок экрана (обозначения, счётчики), поиск справа.
+ * Строка над сеткой — `renderCal` прототипа: период, «Сегодня», свой
+ * блок экрана (обозначения, счётчики); справа — масштаб. Поиска здесь
+ * нет — он на панели вида.
  */
 export function PeriodBar({ view, children }: { view: Period; children?: ReactNode }) {
   const { t } = useTranslation();
@@ -135,42 +139,27 @@ export function PeriodBar({ view, children }: { view: Period; children?: ReactNo
       >
         {t("timesheet.today")}
       </button>
-      <div className="ml-1 flex rounded-md border border-border p-0.5">
-        {view.scales.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => view.setScale(item)}
-            className={`h-6 rounded-[4px] px-2.5 text-[13px] transition-colors ${
-              item === scale ? "bg-surface-active font-medium text-fg" : "text-fg-muted hover:text-fg"
-            }`}
-          >
-            {t(`timesheet.scale.${item}`)}
-          </button>
-        ))}
-      </div>
       {children && <span className="mx-2 h-4 w-px bg-border" />}
-      {children}
+      {/* Не хватает места — переносятся счётчики внутри своего блока,
+          а масштаб остаётся в строке справа. */}
+      <div className="min-w-0 flex-1">{children}</div>
 
-      <label className="ml-auto flex h-7 max-w-52 min-w-28 flex-1 items-center gap-1.5 rounded-md border border-border px-2 text-[13px]">
-        <Icon as={SearchIcon} size={14} className="shrink-0 text-fg-subtle" />
-        <input
-          value={view.search}
-          onChange={(event) => view.setSearch(event.target.value)}
-          placeholder={t("timesheet.search")}
-          className="min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-subtle"
-        />
-        {view.search && (
-          <button
-            type="button"
-            onClick={() => view.setSearch("")}
-            aria-label={t("table.clearSearch")}
-            className="text-fg-subtle hover:text-fg"
-          >
-            <Icon as={XIcon} size={14} />
-          </button>
-        )}
-      </label>
+      <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+        <div className="flex rounded-md border border-border p-0.5">
+          {view.scales.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => view.setScale(item)}
+              className={`h-6 rounded-[4px] px-2.5 text-[13px] transition-colors ${
+                item === scale ? "bg-surface-active font-medium text-fg" : "text-fg-muted hover:text-fg"
+              }`}
+            >
+              {t(`timesheet.scale.${item}`)}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

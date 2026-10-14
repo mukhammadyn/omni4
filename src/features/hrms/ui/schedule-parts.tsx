@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ClockIcon, HouseIcon, MoonIcon, SunIcon, type LucideIcon } from "lucide-react";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
+import { Modal } from "@/shared/ui/modal";
 import { CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { isClock, type Shift, type ShiftKind, type Template } from "../model/schedule";
 
@@ -106,6 +107,21 @@ export function TemplatePreview({ template }: { template: Pick<Template, "type" 
 /* ---------- поля окон ---------- */
 
 /**
+ * Окно, пока грузится то, без чего форму не заполнить: щелчок не должен
+ * выглядеть как «ничего не произошло». Отказ — причиной, а не вечной загрузкой.
+ */
+export function DialogLoading({ onClose, error }: { onClose: () => void; error?: string | null }) {
+  const { t } = useTranslation();
+  return (
+    <Modal onClose={onClose}>
+      <div className={`max-w-sm rounded-xl border border-border bg-surface px-8 py-6 text-sm shadow-xl ${error ? "text-danger" : "text-fg-subtle"}`}>
+        {error ?? t("common.loading")}
+      </div>
+    </Modal>
+  );
+}
+
+/**
  * Время «ЧЧ:ММ» текстом, как `.tin` прототипа: системное поле времени
  * пишет его по часам ОС — «06:00 PM» рядом с «09:00–17:00» в сетке.
  */
@@ -139,20 +155,23 @@ export function Row({ label, hint, children }: { label: string; hint?: string | 
 export function Segments<T extends string>({
   value,
   items,
+  full = false,
   onChange,
 }: {
   value: T;
   items: { value: T; label: ReactNode }[];
+  /** На всю ширину колонки, кнопки поровну — вровень с полями формы. */
+  full?: boolean;
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="inline-flex self-start rounded-md border border-border p-0.5">
+    <div className={`${full ? "flex w-full" : "inline-flex self-start"} rounded-md border border-border p-0.5`}>
       {items.map((item) => (
         <button
           key={item.value}
           type="button"
           onClick={() => onChange(item.value)}
-          className={`inline-flex h-7 items-center gap-1.5 rounded-[4px] px-3 text-[13px] transition-colors ${
+          className={`inline-flex h-7 items-center gap-1.5 rounded-[4px] px-3 text-[13px] transition-colors ${full ? "flex-1 justify-center" : ""} ${
             value === item.value ? "bg-surface-active font-medium text-fg" : "text-fg-muted hover:text-fg"
           }`}
         >
