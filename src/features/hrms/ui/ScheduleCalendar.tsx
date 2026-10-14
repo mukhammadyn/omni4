@@ -8,7 +8,7 @@ import { useSchedule, useScheduleDirectory, type ScheduleEmployee } from "../api
 import { byEmployeeDate, SHIFT_KINDS, type Shift, type ShiftKind, type Template } from "../model/schedule";
 import { isWeekend } from "../model/timesheet";
 import { EmployeeName, PeriodBar, useDayHead, usePeriod, type OpenEmployee } from "./attendance-parts";
-import { ATTENDANCE_TAB } from "./employee-tabs";
+import { SCHEDULE_TAB } from "./employee-tabs";
 import { useScheduleSettings, type ScheduleGroup } from "./schedule-settings";
 import { NO_TEMPLATE } from "./ScheduleTools";
 import { KIND_STYLE, useDuration, type OpenShift } from "./schedule-parts";
@@ -274,7 +274,7 @@ export function ScheduleCalendar({
                               employee={row.employees[0]!}
                               until={range.to}
                               template={month ? undefined : templateOf(row.employees[0]!)}
-                              onOpen={() => onOpenEmployee(row.employees[0]!.id, ATTENDANCE_TAB)}
+                              onOpen={() => onOpenEmployee(row.employees[0]!.id, SCHEDULE_TAB)}
                               onApply={() => setApplyFor(row.employees[0]!.id)}
                             />
                           )}

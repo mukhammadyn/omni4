@@ -1,6 +1,6 @@
 export { EMPLOYEES } from "./api/employee";
 export { EmployeePage } from "./ui/EmployeePage";
-export { ABSENCES_TAB, ATTENDANCE_TAB, type EmployeeTab } from "./ui/employee-tabs";
+export { ABSENCES_TAB, ATTENDANCE_TAB, SCHEDULE_TAB, type EmployeeTab } from "./ui/employee-tabs";
 export { OrgStructure } from "./ui/OrgStructure";
 export { VACANCIES } from "./api/vacancy";
 export { useVacancyColumns } from "./ui/vacancy-columns";

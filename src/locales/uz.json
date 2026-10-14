@@ -2025,6 +2025,8 @@
   "employeeAttendance.filter.absent": "Kelmaganlar",
   "employeeAttendance.filter.leave": "Ta’tillar",
   "employeeAttendance.filter.over": "Ortiqcha ish",
+  "employeeSchedule.title": "Ish grafigi",
+  "employeeSchedule.total": "Smenalar: {{count}} · {{hours}}",
   "employeeAbsences.title": "Ta’tillar",
   "employeeAbsences.subtitle": "Ta’til, kasallik va safarlar balansi, arizalari va tarixi",
   "employeeAbsences.sub.balance": "Balans",

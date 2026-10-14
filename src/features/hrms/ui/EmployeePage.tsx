@@ -40,18 +40,29 @@ import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
 import { toProfile, useEmployee, useNeighbours, useReports } from "../api/employee";
 import { JOB_HISTORY } from "../api/job-history";
+import { SHIFTS } from "../api/schedule";
 import { toPerson } from "../api/org";
 import { monthsBetween, toDay } from "../model/job-history";
 import { Card, Meta, Row, SideProp } from "./page-parts";
-import { ABSENCES_TAB, ATTENDANCE_TAB } from "./employee-tabs";
+import { ABSENCES_TAB, ATTENDANCE_TAB, SCHEDULE_TAB } from "./employee-tabs";
 import { EmployeeAbsences } from "./EmployeeAbsences";
 import { EmployeeAttendance } from "./EmployeeAttendance";
+import { EmployeeSchedule } from "./EmployeeSchedule";
 import { WorkHistory, spanText } from "./WorkHistory";
 
 /** Свои вкладки — «Личное» и employee-tabs; остальные — вкладки связей пункта меню. */
 const PERSONAL = "personal";
 /** Своя вкладка → таблица вкладки связи, место которой она занимает. */
-const OWN_TABLES: Record<string, string> = { [ABSENCES_TAB]: "hr_requests", [ATTENDANCE_TAB]: "hr_attendance_days" };
+const OWN_TABLES: Record<string, string> = {
+  [ABSENCES_TAB]: "hr_requests",
+  [ATTENDANCE_TAB]: "hr_attendance_days",
+  [SCHEDULE_TAB]: SHIFTS,
+};
+const OWN_TITLES: Record<string, TranslationKey> = {
+  [ABSENCES_TAB]: "employeeAbsences.title",
+  [ATTENDANCE_TAB]: "employeeAttendance.title",
+  [SCHEDULE_TAB]: "employeeSchedule.title",
+};
 const OWN_TABS = new Set(Object.keys(OWN_TABLES));
 
 /*
@@ -229,7 +240,7 @@ export function EmployeePage({
   });
   const missing = Object.keys(OWN_TABLES)
     .filter((id) => !relationTabs.some((item) => item.id === id))
-    .map((id) => ({ id, label: t(id === ABSENCES_TAB ? "employeeAbsences.title" : "employeeAttendance.title") }));
+    .map((id) => ({ id, label: t(OWN_TITLES[id]!) }));
   const work = employee.tabs.findIndex((item) => item.tableSlug === JOB_HISTORY);
   const allTabs = [
     { id: PERSONAL, label: t("employee.tab.personal") },
@@ -384,6 +395,8 @@ export function EmployeePage({
 
         {own === ATTENDANCE_TAB ? (
           <EmployeeAttendance employeeId={guid} />
+        ) : own === SCHEDULE_TAB ? (
+          <EmployeeSchedule employeeId={guid} />
         ) : own === ABSENCES_TAB ? (
           <EmployeeAbsences employeeId={guid} />
         ) : tab?.tableSlug === JOB_HISTORY && tab.direction === "incoming" ? (
