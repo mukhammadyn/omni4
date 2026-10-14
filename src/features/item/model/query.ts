@@ -60,7 +60,7 @@ export type FilterOperator = (typeof FILTER_OPERATORS)[number];
  *   between             [0] — с, [1] — по
  *   after, before       [0] — граница
  */
-export type Filter = { op: FilterOperator; values: string[] };
+export type Filter = { op: FilterOperator; values: string[]; bounds?: Partial<Record<"$gt" | "$gte" | "$lt" | "$lte", string | undefined>> | undefined };
 
 /**
  * Фильтры по слагу поля.
@@ -137,7 +137,7 @@ export function resolveMe(filters: Filters, objectIds: Record<string, string>): 
  */
 export const filtersSchema = z.record(
   z.string(),
-  z.object({ op: z.enum(FILTER_OPERATORS), values: z.array(z.string()) }),
+  z.object({ op: z.enum(FILTER_OPERATORS), values: z.array(z.string()), bounds: z.object({ $gt: z.string().optional(), $gte: z.string().optional(), $lt: z.string().optional(), $lte: z.string().optional() }).optional() }),
 );
 
 /** Непонятное значение — просто «фильтров нет», а не сломанный экран. */
@@ -288,6 +288,9 @@ function toFilter(value: unknown, kind: FilterKind | null | undefined): Filter |
 
 /** undefined — фильтр добавлен, но не заполнен: на сервер он не уходит. */
 function toCondition(filter: Filter): unknown {
+  // Combined dashboard ranges use only the comparison operators documented
+  // by get-list; no new backend conjunction syntax is introduced.
+  if (filter.bounds && Object.keys(filter.bounds).length) return filter.bounds;
   const values = filter.values.map((value) => value.trim());
   const first = values[0] ?? "";
 

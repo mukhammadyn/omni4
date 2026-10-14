@@ -38,6 +38,12 @@ test("null из правки удаляет дашборд", () => {
   expect(findDashboard(patchDashboard(toTree(raw), "d", () => null), "d")).toBeNull();
 });
 
+test("records widget columns, widths, sorting and pagination survive save/reopen", () => {
+  const tree = toTree(raw), widget = findDashboard(tree, "d")!.dashboard.widgets[0]!;
+  Object.assign(widget, { type: "records", columns: ["created_at", "status", "owner", "amount"], columnWidths: { amount: 120 }, sorts: [{ field: "amount", direction: "desc" }], pageSize: 50, currencySlug: "currency" });
+  expect(toTree(toTreeAttribute(tree))).toEqual(tree);
+});
+
 /* CRM без дашбордов, у HRMS — папка с одним (как в проекте omni4 на 2026-10-13). */
 const hrmsFolder = { ...newFolder("hrms", "Люди"), dashboards: [newDashboard("Штат")] };
 const twoModules = { folders: [hrmsFolder] };

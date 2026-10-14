@@ -30,7 +30,7 @@ export type ItemsPage = {
 
 const EMPTY_PAGE: ItemsPage = { rows: [], count: 0 };
 
-export function useItems(tableSlug: string | undefined, query: ItemsQuery) {
+export function useItems(tableSlug: string | undefined, query: ItemsQuery, cacheScope?: string) {
   const slug = tableSlug ?? "";
   const infinite = query.infinite === true;
 
@@ -51,7 +51,7 @@ export function useItems(tableSlug: string | undefined, query: ItemsQuery) {
   const first = Math.max(query.page, 1) - 1;
 
   const result = useInfiniteQuery({
-    queryKey: keys.items.list(slug, infinite ? body : { ...body, page: first }),
+    queryKey: keys.items.list(slug, { ...(infinite ? body : { ...body, page: first }), ...(cacheScope ? { cacheScope } : {}) }),
     queryFn: ({ pageParam }) =>
       api.post<ItemsResponseDto>(`/v2/object/get-list/${slug}`, {
         data: { ...body, offset: pageParam * query.limit },
@@ -88,6 +88,8 @@ export function useItems(tableSlug: string | undefined, query: ItemsQuery) {
     isLoading: result.isLoading,
     /** Обновление поверх уже показанных строк — для индикатора, не для скелетона. */
     isFetching: result.isFetching,
+    updatedAt: result.dataUpdatedAt,
+    isPlaceholderData: result.isPlaceholderData,
     /** Есть ли что грузить дальше и не грузится ли уже. */
     hasMore: result.hasNextPage && !result.isFetchingNextPage,
     loadingMore: result.isFetchingNextPage,

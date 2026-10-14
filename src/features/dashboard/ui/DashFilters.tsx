@@ -2,7 +2,8 @@ import { useState } from "react";
 import { CalendarIcon, ChevronDownIcon, PlusIcon, XIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { FilterChip, filterKind } from "@/features/item";
-import { localized, useTableSchema } from "@/features/table";
+import { localized } from "@/features/table";
+import { useDashboardSchema } from "../api/schema";
 import { useDataLanguages } from "@/features/workspace";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
@@ -19,12 +20,14 @@ export function DashFilters({
   filters,
   values,
   editing,
+  menuId,
   onValues,
   onFilters,
 }: {
   filters: DashFilter[];
   values: FilterValues;
   editing: boolean;
+  menuId: string;
   onValues: (values: FilterValues) => void;
   onFilters: (filters: DashFilter[]) => void;
 }) {
@@ -47,7 +50,7 @@ export function DashFilters({
             {filter.kind === "period" ? (
               <PeriodChip label={filter.label || t("dashboard.period")} value={values[key] ?? []} onChange={(value) => put(key, value)} />
             ) : (
-              <RecordChip filter={filter} value={values[key] ?? []} onChange={(value) => put(key, value)} />
+              <RecordChip menuId={menuId} filter={filter} value={values[key] ?? []} onChange={(value) => put(key, value)} />
             )}
             {editing && (
               <button
@@ -80,6 +83,7 @@ export function DashFilters({
         >
           {(close) => (
             <AddFilter
+              menuId={menuId}
               hasPeriod={filters.some((filter) => filter.kind === "period")}
               taken={new Set(filters.map(filterKey))}
               onAdd={(filter) => {
@@ -167,12 +171,14 @@ function PeriodChip({ label, value, onChange }: { label: string; value: string[]
  * «Запись таблицы» — тот же чип, что у фильтра таблицы, по полю,
  * которым фильтр объявлен: выбор строк, подписи, «Я» у сотрудников.
  */
-function RecordChip({ filter, value, onChange }: { filter: Extract<DashFilter, { kind: "record" }>; value: string[]; onChange: (value: string[]) => void }) {
+function RecordChip({ menuId, filter, value, onChange }: { menuId: string; filter: Extract<DashFilter, { kind: "record" }>; value: string[]; onChange: (value: string[]) => void }) {
+  const { t } = useTranslation();
   const { current: language } = useDataLanguages();
-  const { schema } = useTableSchema(filter.sourceTable);
+  const access = useDashboardSchema(filter.sourceTable, menuId);
+  const { schema } = access;
   const field = schema.fields.find((item) => item.slug === filter.sourceField);
   const relation = schema.relations.find((item) => item.id === field?.relationId);
-  if (!field) return null;
+  if (!access.ready || !field) return <span className="flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs text-fg-muted">{filter.label || t("dashboard.recordFilterHint")}: {access.loading ? t("common.loading") : t("dashboard.filterUnavailable")}{value.length > 0 && <button type="button" onClick={() => onChange([])} className="underline">{t("dashboard.clearFilter")}</button>}</span>;
 
   return (
     <FilterChip
@@ -187,11 +193,11 @@ function RecordChip({ filter, value, onChange }: { filter: Extract<DashFilter, {
 }
 
 /** Новый фильтр: «Период» или запись таблицы — через поле-ссылку на неё. */
-function AddFilter({ hasPeriod, taken, onAdd }: { hasPeriod: boolean; taken: Set<string>; onAdd: (filter: DashFilter) => void }) {
+function AddFilter({ menuId, hasPeriod, taken, onAdd }: { menuId: string; hasPeriod: boolean; taken: Set<string>; onAdd: (filter: DashFilter) => void }) {
   const { t } = useTranslation();
   const { current: language } = useDataLanguages();
   const [table, setTable] = useState("");
-  const { schema } = useTableSchema(table || undefined);
+  const { schema, ready } = useDashboardSchema(table || undefined, menuId);
 
   const links = schema.fields.flatMap((field) => {
     const relation = schema.relations.find((item) => item.id === field.relationId);
@@ -215,7 +221,7 @@ function AddFilter({ hasPeriod, taken, onAdd }: { hasPeriod: boolean; taken: Set
             value=""
             size="sm"
             placeholder={links.length ? t("dashboard.pickLink") : t("dashboard.noLinks")}
-            disabled={!links.length}
+            disabled={!ready || !links.length}
             items={links.map(({ field }) => ({ value: field.slug, label: localized(field.labels, language, field.label) }))}
             onChange={(slug) => {
               const link = links.find(({ field }) => field.slug === slug);

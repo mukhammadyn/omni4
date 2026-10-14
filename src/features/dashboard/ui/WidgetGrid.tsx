@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChartColumnIcon, CopyIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ChartCard, ME, newChart, useItems } from "@/features/item";
-import { session } from "@/shared/api/session";
-import { useTableSchema } from "@/features/table";
+import { ChartCard, FilterBar, newChart, type Filters, type Sort } from "@/features/item";
+import { localized } from "@/features/table";
 import { useDataLanguages } from "@/features/workspace";
 import { moveBefore } from "@/shared/lib/order";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
-import { useViaGuids, type ViaLookup } from "../api/via";
-import { SAMPLE, type Widget } from "../model/dashboard";
-import { NOBODY, filterKey, unanswered, widgetFilters, type DashFilter, type FilterValues } from "../model/filters";
+import { useWidgetData } from "../api/widget-data";
+import { Popover } from "@/shared/ui/popover";
+import { WidgetContents, WidgetStatus } from "./WidgetContents";
+import type { Dataset } from "../model/datasets";
+import type { Widget } from "../model/dashboard";
+import { type DashFilter, type FilterValues } from "../model/filters";
 import { WidgetEditor } from "./WidgetEditor";
 
 /**
@@ -20,21 +22,28 @@ import { WidgetEditor } from "./WidgetEditor";
  */
 export function WidgetGrid({
   widgets,
+  datasets,
+  menuId,
   filters,
   values,
   editing,
   editable,
   onWidgets,
+  onBeginEditing,
 }: {
   widgets: Widget[];
+  datasets: Dataset[];
+  menuId: string;
   filters: DashFilter[];
   values: FilterValues;
   editing: boolean;
   /** Можно ли менять дашборд вообще — тогда пустой экран зовёт добавить. */
   editable: boolean;
   onWidgets: (next: Widget[]) => void;
+  onBeginEditing: () => void;
 }) {
   const { t } = useTranslation();
+  const [cross, setCross] = useState<Record<string, Filters>>({});
   const [dragged, setDragged] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   /** Открытый редактор: виджет и новый ли он. */
@@ -59,7 +68,7 @@ export function WidgetGrid({
     setOver(null);
   };
 
-  const add = () => setEditor({ widget: { ...newChart(), tableSlug: "", filters: {}, answers: {} }, isNew: true });
+  const add = () => { if (!editing) onBeginEditing(); setEditor({ widget: { ...newChart(), tableSlug: "", filters: {}, answers: {} }, isNew: true }); };
 
   const save = (widget: Widget) => {
     onWidgets(
@@ -73,9 +82,12 @@ export function WidgetGrid({
   const dialog = editor && (
     <WidgetEditor
       key={editor.widget.id}
+      datasets={datasets}
       initial={editor.widget}
       isNew={editor.isNew}
       filters={filters}
+      values={values}
+      menuId={menuId}
       onSave={save}
       onClose={() => setEditor(null)}
     />
@@ -106,11 +118,15 @@ export function WidgetGrid({
   }
 
   return (
-    <div className="grid gap-3 lg:grid-cols-12">
+    <>{Object.keys(cross).length > 0 && <div className="mb-2 flex items-center gap-2 text-xs text-fg-muted"><span>{t("dashboard.crossFilterActive")}</span><Button type="button" size="sm" variant="secondary" onClick={() => setCross({})}>{t("dashboard.clearCrossFilters")}</Button></div>}<div className="mb-3 flex items-center justify-between gap-2">{editing ? <p role="status" className="text-xs text-fg-muted">{t("dashboard.draftHint")}</p> : <span />}{editable && <Button type="button" size="sm" variant="secondary" onClick={add}><Icon as={PlusIcon} size={14} />{t("dashboard.addWidget")}</Button>}</div><div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
       {widgets.map((widget) => (
         <WidgetCard
           key={widget.id}
           widget={widget}
+          datasets={datasets}
+          selection={cross[widget.datasetId ? datasets.find((d) => d.id === widget.datasetId)?.source.kind === "table" ? (datasets.find((d) => d.id === widget.datasetId)!.source as { tableSlug: string }).tableSlug : widget.tableSlug : widget.tableSlug] ?? {}}
+          onSelect={(table, filter) => setCross((current) => ({ ...current, [table]: filter }))}
+          menuId={menuId}
           filters={filters}
           values={values}
           editing={editing}
@@ -148,131 +164,37 @@ export function WidgetGrid({
         </button>
       )}
       {dialog}
-    </div>
+    </div></>
   );
 }
 
-/**
- * Карточка CHART со своей таблицей. Строки — тем же get-list, что
- * у таблиц, поэтому права роли на записи соблюдены. Виджеты одной
- * таблицы делят запрос: ключ кэша — тело запроса.
- *
- * Отбор — свой виджета и общие фильтры дашборда через «И».
- *
- * ponytail: связи разворачиваются (без `relations: false`), чтобы
- * подписи ссылок были без догрузки по guid; прав на поля и валют
- * пока нет — шаг 5 ADR-0013.
- */
-function WidgetCard({
-  widget,
-  filters,
-  values,
-  editing,
-  onChange,
-  onEdit,
-  onDuplicate,
-  ...card
-}: {
-  widget: Widget;
-  filters: DashFilter[];
-  values: FilterValues;
-  editing: boolean;
-  dragged: boolean;
-  over: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  onDragOver: () => void;
-  onDrop: () => void;
-  onMove: (delta: number) => void;
-  onChange: (patch: Partial<Widget>) => void;
-  onRemove: () => void;
-  onEdit: () => void;
-  onDuplicate: () => void;
+/** Card defaults are persisted; viewer constraints belong only to this card. */
+function WidgetCard({ widget, datasets, menuId, selection, onSelect, filters, values, editing, onChange, onEdit, onDuplicate, ...card }: {
+  widget: Widget; datasets: Dataset[]; selection: Filters; onSelect: (table: string, filter: Filters) => void; menuId: string; filters: DashFilter[]; values: FilterValues; editing: boolean;
+  dragged: boolean; over: boolean; onDragStart: () => void; onDragEnd: () => void; onDragOver: () => void; onDrop: () => void;
+  onMove: (delta: number) => void; onChange: (patch: Partial<Widget>) => void; onRemove: () => void; onEdit: () => void; onDuplicate: () => void;
 }) {
   const { t } = useTranslation();
   const { current: language } = useDataLanguages();
-  const slug = widget.tableSlug || undefined;
-  const { schema } = useTableSchema(slug);
-  const objectIds = session.getObjectIds();
-  const me = (table: string) => objectIds[table] ?? NOBODY;
-
-  // Фильтры через справочник: таблица справочника — куда ведёт поле ответа.
-  const lookups = filters.flatMap((filter): ViaLookup[] => {
-    const key = filterKey(filter);
-    const answer = widget.answers[key];
-    const value = values[key];
-    const field = schema.fields.find((item) => item.slug === answer?.field);
-    const table = schema.relations.find((item) => item.id === field?.relationId)?.toSlug;
-    if (!answer?.via || !value?.length || !table) return [];
-    return [{ key, table, via: answer.via, values: value.map((guid) => (guid === ME ? me(key) : guid)) }];
-  });
-  const viaGuids = useViaGuids(lookups);
-  const waiting = lookups.some((lookup) => !(lookup.key in viaGuids));
-
-  const query = widgetFilters(widget.filters, widget.answers, filters, values, viaGuids, me);
-  const items = useItems(waiting ? undefined : slug, { limit: SAMPLE, page: 1, filters: query });
-  const { rows, count } = items.page;
-
-  // KPI со сравнением: тот же отбор, но прошлый период. Только когда
-  // виджет отвечает на заданный «Период».
-  const compares = widget.kind === "stat" && Boolean(widget.answers["period"]?.field && values["period"]?.length);
-  const previous = useItems(compares && !waiting ? slug : undefined, {
-    limit: SAMPLE,
-    page: 1,
-    filters: widgetFilters(widget.filters, widget.answers, filters, values, viaGuids, me, true),
-  });
-  const deaf = unanswered(filters, widget.answers, values);
-
-  const action = (label: string, icon: typeof PencilIcon, onClick: () => void) => (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
-    >
-      <Icon as={icon} size={14} />
-    </button>
-  );
-
-  return (
-    <ChartCard
-      {...card}
-      config={widget}
-      columns={schema.fields}
-      relations={schema.relations}
-      rows={rows}
-      previous={compares ? previous.page.rows : undefined}
-      exact={{ value: count, previous: compares ? previous.page.count : undefined }}
-      language={language}
-      editing={editing}
-      onChange={onChange}
-      inlineSetup={false}
-      headerActions={
-        <>
-          {action(t("dashboard.duplicate"), CopyIcon, onDuplicate)}
-          {action(t("dashboard.editWidget"), PencilIcon, onEdit)}
-        </>
-      }
-      aside={
-        !slug ? (
-          /* Виджет без таблицы — недонастроенный: говорим, что делать. */
-          <p className="text-2xs text-fg-subtle">{t("dashboard.unconfigured")}</p>
-        ) : items.error ? (
-          <p className="text-2xs text-danger">{items.error}</p>
-        ) : (
-          <>
-            {deaf.length > 0 && (
-              <p className="text-2xs text-fg-subtle">
-                {t("dashboard.unanswered", { names: deaf.map((filter) => filter.label || t("dashboard.period")).join(", ") })}
-              </p>
-            )}
-            {rows.length < count && (
-              <p className="text-2xs text-fg-subtle">{t("dashboard.sampled", { shown: rows.length, total: count })}</p>
-            )}
-          </>
-        )
-      }
-    />
-  );
+  const [picked, setPicked] = useState<Filters>({});
+  const [viewer, setViewer] = useState<Filters>({});
+  const [page, setPage] = useState(1);
+  const [sorts, setSorts] = useState<Sort[] | undefined>(undefined);
+  const savedSorts = JSON.stringify(widget.sorts ?? []);
+  useEffect(() => { setSorts(undefined); setViewer({}); setPicked({}); setPage(1); }, [widget.tableSlug, savedSorts]);
+  const fingerprint = JSON.stringify([widget.filters, viewer, picked, selection, values, sorts, widget.tableSlug, widget.pageSize]);
+  useEffect(() => { setPage(1); }, [fingerprint]);
+  const data = useWidgetData(widget, filters, values, menuId, viewer, page, sorts, datasets, selection, picked);
+  if (widget.type !== "heading" && (data.denied || data.forbidden) && !data.error && !editing) return null;
+  const action = (label: string, icon: typeof PencilIcon, onClick: () => void) => <button type="button" aria-label={label} title={label} onClick={onClick} className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-fg-subtle hover:bg-surface-hover hover:text-fg"><Icon as={icon} size={14} /></button>;
+  return <ChartCard {...card} config={widget} columns={data.schema.fields} relations={data.schema.relations} rows={[]} language={language} editing={editing} onChange={onChange} inlineSetup={false} showRowCount={false}
+    headerActions={<>{action(t("dashboard.duplicate"), CopyIcon, onDuplicate)}{action(t("dashboard.editWidget"), PencilIcon, onEdit)}</>}
+    viewerActions={widget.type === "heading" ? undefined : <Popover trigger={({ open, toggle }) => <button type="button" aria-expanded={open} onClick={toggle} className="rounded-md border border-border px-2 py-1 text-xs text-fg-muted hover:bg-surface-hover">{t("dashboard.cardFilters")}{Object.keys(viewer).length ? ` (${Object.keys(viewer).length})` : ""}</button>}>{() => <div className="w-[360px] max-w-[85vw] p-2"><p className="mb-1 text-xs text-fg-muted">{t("dashboard.viewerScope")}</p><FilterBar columns={data.schema.fields} relations={data.schema.relations} language={language} filters={viewer} sorts={[]} onFilters={setViewer} onSorts={() => {}} /><Button type="button" size="sm" variant="secondary" onClick={() => { setViewer({}); setPicked({}); }}>{t("dashboard.resetViewer")}</Button></div>}</Popover>}
+    aside={<><WidgetStatus widget={widget} data={data} /><div aria-label={t("dashboard.effectiveFilters")} className="flex flex-wrap gap-1">{Object.entries(data.query).filter(([slug]) => slug !== "guid").map(([slug, filter]) => { const field = data.schema.fields.find((f) => f.slug === slug); return field ? <span key={slug} className="max-w-64 truncate rounded-full bg-surface-soft px-2 py-0.5 text-2xs text-fg-muted">{localized(field.labels, language, field.label)}: {field.relationId ? t("dashboard.selectedCount", { count: filter.values.length }) : filter.values.join(" — ")}</span> : null; })}</div></>}
+    content={<WidgetContents widget={widget} data={data} language={language} editing={editing} page={page} sorts={data.effectiveSorts} onPage={setPage} onSorts={setSorts} onChange={onChange} onSelect={(filter) => {
+      const table = data.dataset?.source.kind === "table" ? data.dataset.source.tableSlug : widget.tableSlug;
+      if (widget.interaction?.scope === "dashboard") onSelect(table, filter);
+      else setPicked((current) => JSON.stringify(current) === JSON.stringify(filter) ? {} : filter);
+    }} />}
+  />;
 }

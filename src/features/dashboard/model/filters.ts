@@ -1,4 +1,5 @@
-import { ME, type Filters } from "@/features/item";
+import { ME, isFilterSet, type Filter, type Filters } from "@/features/item";
+import { nowLocal, zonedToInstant } from "@/shared/lib/date-value";
 
 /**
  * Общий фильтр дашборда (ADR-0013, «Фильтры»). Объявлен на дашборде,
@@ -48,7 +49,7 @@ export type Range = { from: Date; to: Date };
  * ponytail: границы — в поясе браузера, как у фильтра таблицы; пояс
  * проекта — когда его начнут читать из настроек.
  */
-export function periodRange(value: string[] | undefined, today = new Date()): { range: Range; previous: Range } | null {
+export function periodRange(value: string[] | undefined, today = nowLocal()): { range: Range; previous: Range } | null {
   const [head, from, to] = value ?? [];
 
   if (head === CUSTOM) {
@@ -70,7 +71,11 @@ export function periodRange(value: string[] | undefined, today = new Date()): { 
 }
 
 /** Отрезок → условие `between` в том виде, в каком его шлёт фильтр таблицы. */
-export function rangeValues(range: Range): string[] {
+export function rangeValues(range: Range, timestamp = false): string[] {
+  if (timestamp) {
+    const instant = (date: Date) => zonedToInstant({ year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hour: 0, minute: 0 });
+    return [instant(range.from).toISOString(), new Date(+instant(addDays(range.to, 1)) - 1).toISOString()];
+  }
   return [dayKey(range.from), `${dayKey(range.to)}T23:59:59.999`];
 }
 
@@ -81,8 +86,8 @@ export function rangeValues(range: Range): string[] {
  * (`useViaGuids`). `me` — своя строка по таблице фильтра; нет её — «Я»
  * не находит ничего, а не всё.
  *
- * ponytail: общий фильтр по полю, на котором есть и свой отбор,
- * заменяет свой — пересечь два списка guid можно, когда понадобится.
+ * Same-field conditions are intersected; unsupported combinations are
+ * reported rather than silently widening the scope.
  */
 export function widgetFilters(
   own: Filters,
@@ -93,8 +98,9 @@ export function widgetFilters(
   me: (table: string) => string,
   /** Отбор прошлого периода — для сравнения у KPI. */
   previous = false,
+  timestampFields: ReadonlySet<string> = new Set(),
 ): Filters {
-  const result: Filters = { ...own };
+  let result: Filters = { ...own };
   /** Списки guid, уже поставленные общими фильтрами, по полю. */
   const shared = new Map<string, string[]>();
 
@@ -107,7 +113,7 @@ export function widgetFilters(
     if (filter.kind === "period") {
       const period = periodRange(value);
       if (period) {
-        result[answer.field] = { op: "between", values: rangeValues(previous ? period.previous : period.range) };
+        result = mergeFilters(result, { [answer.field]: { op: "between", values: rangeValues(previous ? period.previous : period.range, timestampFields.has(answer.field)) } });
       }
       continue;
     }
@@ -119,7 +125,7 @@ export function widgetFilters(
     if (earlier) guids = guids.filter((guid) => earlier.includes(guid));
     shared.set(answer.field, guids);
     // Пустой список — ничего не нашлось, а не «все».
-    result[answer.field] = { op: "is", values: guids.length ? guids : [NOBODY] };
+    result = mergeFilters(result, { [answer.field]: { op: "is", values: guids.length ? guids : [NOBODY] } });
   }
 
   return result;
@@ -127,6 +133,69 @@ export function widgetFilters(
 
 /** Строки с таким guid нет: отбор по нему находит ничего. */
 export const NOBODY = "00000000-0000-0000-0000-000000000000";
+
+/** AND without relying on an unsupported `$and`/`$in` server contract. */
+export function mergeFilters(...sources: Filters[]): Filters {
+  const result: Filters = {};
+  for (const source of sources) {
+    for (const [field, next] of Object.entries(source)) {
+      if (!isFilterSet(next)) continue;
+      const current = result[field];
+      if (!current) { result[field] = next; continue; }
+      const combined = intersectFilter(current, next);
+      if (combined === null) return { guid: { op: "is", values: [NOBODY] } };
+      result[field] = combined;
+    }
+  }
+  return result;
+}
+
+function compare(a: string, b: string): number {
+  return a.trim() && b.trim() && Number.isFinite(Number(a)) && Number.isFinite(Number(b))
+    ? Number(a) - Number(b) : a.localeCompare(b);
+}
+
+type Bound = { value: string; strict: boolean };
+function bounds(filter: Filter): { lower?: Bound; upper?: Bound } | null {
+  if (filter.bounds) {
+    const b = filter.bounds;
+    return { ...(b.$gt || b.$gte ? { lower: { value: b.$gt ?? b.$gte!, strict: Boolean(b.$gt) } } : {}), ...(b.$lt || b.$lte ? { upper: { value: b.$lt ?? b.$lte!, strict: Boolean(b.$lt) } } : {}) };
+  }
+  if (filter.op === "between") return {
+    ...(filter.values[0] ? { lower: { value: filter.values[0], strict: false } } : {}),
+    ...(filter.values[1] ? { upper: { value: filter.values[1], strict: false } } : {}),
+  };
+  if (filter.op === "after") return { lower: { value: filter.values[0]!, strict: true } };
+  if (filter.op === "before") return { upper: { value: filter.values[0]!, strict: true } };
+  return null;
+}
+
+export function intersectFilter(a: Filter, b: Filter): Filter | null {
+  if (JSON.stringify(a) === JSON.stringify(b)) return a;
+  if (a.op === "is" && b.op === "is") {
+    const values = a.values.filter((v) => b.values.includes(v));
+    return values.length ? { op: "is", values } : null;
+  }
+  if (a.op === "equals" && b.op === "equals") return null;
+  const left = bounds(a), right = bounds(b);
+  if (left && right) {
+    const choose = (x: Bound | undefined, y: Bound | undefined, lower: boolean) => {
+      if (!x) return y; if (!y) return x;
+      const c = compare(x.value, y.value);
+      if (!c) return { value: x.value, strict: x.strict || y.strict };
+      return (lower ? c > 0 : c < 0) ? x : y;
+    };
+    const lower = choose(left.lower, right.lower, true), upper = choose(left.upper, right.upper, false);
+    if (lower && upper && (compare(lower.value, upper.value) > 0 || (!compare(lower.value, upper.value) && (lower.strict || upper.strict)))) return null;
+    return { op: "between", values: [lower?.value ?? "", upper?.value ?? ""], bounds: {
+      ...(lower ? { [lower.strict ? "$gt" : "$gte"]: lower.value } : {}),
+      ...(upper ? { [upper.strict ? "$lt" : "$lte"]: upper.value } : {}),
+    } };
+  }
+  // Distinct regex/set conditions cannot be expressed faithfully by get-list.
+  // Blocking is preferable to silently dropping a saved or viewer constraint.
+  throw new Error("dashboard.filterConflict");
+}
 
 /** Фильтр задан, а виджет на него не отвечает — карточка говорит об этом. */
 export function unanswered(filters: DashFilter[], answers: Record<string, Answer>, values: FilterValues): DashFilter[] {

@@ -336,6 +336,8 @@ export const keys = {
     all: ["layouts"] as const,
     byMenu: (envId: string, tableSlug: string, menuId: string) =>
       [...keys.layouts.all, envId, tableSlug, menuId] as const,
+    dashboard: (envId: string, tableSlug: string, menuId: string, account: string) =>
+      [...keys.layouts.byMenu(envId, tableSlug, menuId), "dashboard", account] as const,
   },
   items: {
     all: ["items"] as const,

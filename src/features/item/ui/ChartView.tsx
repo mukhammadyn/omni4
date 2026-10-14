@@ -1,4 +1,5 @@
-import { Fragment, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { startPointerDrag } from "@/shared/lib/pointer-drag";
 import {
   AudioWaveformIcon,
   BinaryIcon,
@@ -27,6 +28,8 @@ import { Tooltip } from "@/shared/ui/tooltip";
 import type { DateKind } from "@/shared/lib/date-value";
 import {
   CHART_BUCKETS,
+  RAW_CHART_KINDS,
+  MULTI_MEASURE_KINDS,
   CHART_KINDS,
   OTHER_KEY,
   MAX_ROWS,
@@ -48,6 +51,9 @@ import {
   type ChartSeries,
   type ChartSplit,
 } from "../model/chart";
+import { CartesianChart, PieChart, TreemapChart, XYChart } from "./ChartExtra";
+import { ChartRoles } from "./ChartRoles";
+import { chartRoleIssue, partValuesValid } from "../model/chart-geometry";
 import { cellKind } from "../model/cell-kind";
 import { AGGREGATIONS, NUMERIC_FIELDS, type Aggregation } from "../model/pivot";
 import { valueLabelOf } from "../model/relation";
@@ -210,7 +216,7 @@ export function ChartView({
           /* Двенадцать колонок, а не две: размер карточки задаётся
              ручкой на её краю, и шаг в четверть экрана — это шаг,
              а не выбор из двух вариантов. */
-          <div className="grid gap-3 lg:grid-cols-12">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
             {charts.map((chart) => (
               <ChartCard
                 key={chart.id}
@@ -292,6 +298,7 @@ function SizeHandle({
   label,
   onPreview,
   onCommit,
+  onCancel,
 }: {
   edge: "right" | "bottom";
   card: RefObject<HTMLElement | null>;
@@ -301,49 +308,42 @@ function SizeHandle({
   label: string;
   onPreview: (value: number) => void;
   onCommit: (value: number) => void;
+  onCancel: () => void;
 }) {
   const clamp = (next: number) => Math.round(Math.min(max, Math.max(min, next)));
+  const drag = useRef<ReturnType<typeof startPointerDrag> | null>(null);
+  useEffect(() => () => drag.current?.dispose(), []);
 
   const start = (event: PointerEvent<HTMLDivElement>) => {
     const element = card.current;
     const grid = element?.parentElement;
-    if (!element || !grid || event.button !== 0) return;
+    if (!element || !grid || event.button !== 0 || !event.isPrimary) return;
 
     // Ручка живёт внутри карточки, которую тащат мышью, — без этого
     // нажатие на неё начинает перетаскивание всей карточки.
     event.preventDefault();
     event.stopPropagation();
+    drag.current?.cancel();
 
-    const box = element.getBoundingClientRect();
     const step =
       edge === "right"
         ? (grid.getBoundingClientRect().width + GRID_GAP) / MAX_SPAN
-        : ROW_HEIGHT + GRID_GAP;
+        : ROW_HEIGHT;
 
     const sizeAt = (point: globalThis.PointerEvent) =>
       clamp(
         edge === "right"
-          ? (point.clientX - box.left + GRID_GAP) / step
-          : (point.clientY - box.top + GRID_GAP) / step,
+          ? value + (point.clientX - event.clientX) / step
+          : value + (point.clientY - event.clientY) / step,
       );
 
     let last = value;
-    const onMove = (move: globalThis.PointerEvent) => {
-      const next = sizeAt(move);
-      if (next === last) return;
-      last = next;
-      onPreview(next);
-    };
-
-    const onUp = (up: globalThis.PointerEvent) => {
-      document.removeEventListener("pointermove", onMove);
-      document.body.style.cursor = "";
-      onCommit(sizeAt(up));
-    };
-
-    document.body.style.cursor = edge === "right" ? "col-resize" : "row-resize";
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp, { once: true });
+    drag.current = startPointerDrag(event.currentTarget, event, {
+      cursor: edge === "right" ? "col-resize" : "row-resize",
+      preview: (move) => { const next = sizeAt(move as globalThis.PointerEvent); if (next !== last) { last = next; onPreview(next); } },
+      commit: (up) => onCommit(sizeAt(up as globalThis.PointerEvent)),
+      cancel: onCancel,
+    });
   };
 
   // Стрелками — тоже: попасть мышью в полосу шириной 6px может не каждый.
@@ -367,7 +367,7 @@ function SizeHandle({
       tabIndex={0}
       onPointerDown={start}
       onKeyDown={onKeyDown}
-      className={`absolute z-10 hidden items-center justify-center lg:flex ${
+      className={`absolute z-10 hidden touch-none items-center justify-center lg:flex ${
         edge === "right"
           ? "top-0 right-0 h-full w-2 cursor-col-resize"
           : "bottom-0 left-0 h-2 w-full cursor-row-resize"
@@ -499,6 +499,10 @@ export function ChartCard({
   plain = false,
   previous,
   exact,
+  content,
+  viewerActions,
+  showRowCount = true,
+  hideHeader = false,
 }: {
   config: ChartConfig;
   columns: Field[];
@@ -533,6 +537,10 @@ export function ChartCard({
    * с «Количеством» оно вместо подсчёта по выборке, которая обрезана.
    */
   exact?: { value: number; previous?: number | undefined } | undefined;
+  content?: ReactNode;
+  viewerActions?: ReactNode;
+  showRowCount?: boolean;
+  hideHeader?: boolean;
 }) {
   const { t, i18n } = useTranslation();
 
@@ -563,6 +571,7 @@ export function ChartCard({
   };
 
   const series = chartSeries(rows, config, {
+    measureLabel: (measure) => [t(`pivot.aggregation.${measure.aggregation}` as const), columns.find((field) => field.slug === measure.field) ? localized(columns.find((field) => field.slug === measure.field)!.labels, language, columns.find((field) => field.slug === measure.field)!.label) : "", measure.unit].filter(Boolean).join(" "),
     group: axis(groupField, config.groupBucket),
     split: axis(splitField, config.splitBucket),
     /* Порядок стадий воронки — порядок вариантов поля, как их завёл
@@ -577,6 +586,8 @@ export function ChartCard({
    * amount · по status». Пустая карточка без подписи — это число,
    * о котором нельзя сказать, что оно считает.
    */
+  const roleIssue = chartRoleIssue(config, columns);
+  const invalidParts = ["donut", "pie", "treemap", "stack", "column100", "area100", "funnel", "stream"].includes(config.kind) && !partValuesValid(series);
   const derived = chartTitle(config, columns, language, t);
 
   /*
@@ -644,6 +655,7 @@ export function ChartCard({
             max={MAX_SPAN}
             label={t("chart.resizeWidth")}
             onPreview={(next) => setSizing({ width: next, height })}
+            onCancel={() => setSizing(null)}
             onCommit={(next) => {
               setSizing(null);
               if (next !== config.width) onChange({ width: next });
@@ -658,6 +670,7 @@ export function ChartCard({
             max={MAX_ROWS}
             label={t("chart.resizeHeight")}
             onPreview={(next) => setSizing({ width, height: next })}
+            onCancel={() => setSizing(null)}
             onCommit={(next) => {
               setSizing(null);
               if (next !== config.height) onChange({ height: next });
@@ -665,7 +678,7 @@ export function ChartCard({
           />
         </>
       )}
-      <header className="flex min-w-0 items-center gap-1.5">
+      {!hideHeader && <header className="flex min-w-0 items-center gap-1.5">
         {editing && (
           <button
             type="button"
@@ -707,13 +720,14 @@ export function ChartCard({
          * У ненастроенного графика счётчика нет: он сообщал бы «ноль
          * строк», то есть отвечал на вопрос, которого не задавали.
          */}
-        {chartReady(config) && (
+        {showRowCount && chartReady(config) && (
           <span className="shrink-0 text-2xs text-fg-subtle">
             {t("chart.rows", { count: series.count })}
           </span>
         )}
 
         {editing && headerActions}
+        {viewerActions}
 
         {editing && (
           <button
@@ -726,7 +740,7 @@ export function ChartCard({
             <Icon as={Trash2Icon} size={14} />
           </button>
         )}
-      </header>
+      </header>}
 
       {aside}
 
@@ -741,13 +755,17 @@ export function ChartCard({
        * не поместились.
        */}
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-        {!chartReady(config) ? (
+        {content !== undefined ? content : !chartReady(config) ? (
           <p className="grid flex-1 place-items-center text-sm text-fg-muted">
             {/* Стопке и тепловой карте не хватает именно ВТОРОГО поля —
                 сказать «выберите поле», когда первое уже выбрано, значит
                 отправить человека искать несуществующую ошибку. */}
-            {config.groupSlug && !config.splitSlug ? t("chart.needSplit") : t("pivot.pick")}
+            {RAW_CHART_KINDS.has(config.kind) ? t("chart.pickNumericRoles") : config.groupSlug && !config.splitSlug ? t("chart.needSplit") : t("pivot.pick")}
           </p>
+        ) : roleIssue || invalidParts ? (
+          <p role="alert" className="text-sm text-fg-muted">{t(invalidParts ? "chart.issue.negative" : `chart.issue.${roleIssue}` as "chart.issue.numeric")}</p>
+        ) : RAW_CHART_KINDS.has(config.kind) ? (
+          <XYChart rows={rows} config={config} locale={i18n.language} />
         ) : !series.points.length ? (
           <p className="grid flex-1 place-items-center text-sm text-fg-muted">{t("pivot.empty")}</p>
         ) : config.kind === "stat" ? (
@@ -762,6 +780,12 @@ export function ChartCard({
           />
         ) : config.kind === "donut" ? (
           <Donut series={series} locale={i18n.language} />
+        ) : config.kind === "pie" ? (
+          <PieChart series={series} locale={i18n.language} />
+        ) : config.kind === "treemap" ? (
+          <TreemapChart series={series} locale={i18n.language} />
+        ) : ["column", "column100", "area", "area100", "combo"].includes(config.kind) ? (
+          <CartesianChart config={config} series={series} locale={i18n.language} />
         ) : config.kind === "heatmap" ? (
           <Heatmap series={series} locale={i18n.language} />
         ) : config.kind === "funnel" ? (
@@ -780,11 +804,11 @@ export function ChartCard({
       {/* Легенда обязательна, как только серий больше одной: опознавать
           их цветом и только цветом нельзя. У кольца она своя — там доли
           и есть серии. */}
-      {series.splits.length > 1 && config.kind !== "heatmap" && <Legend splits={series.splits} />}
+      {content === undefined && series.splits.length > 1 && config.kind !== "heatmap" && <Legend splits={series.splits} />}
 
       {/* Сколько значений осталось за кадром. Молча обрезанный рейтинг
           выглядит как весь список. */}
-      {(series.hidden > 0 || series.hiddenSplits > 0) && config.kind !== "donut" && (
+      {content === undefined && (series.hidden > 0 || series.hiddenSplits > 0) && !["donut", "pie"].includes(config.kind) && (
         <p className="text-2xs text-fg-subtle">
           {[
             series.hidden > 0 ? t("chart.hidden", { count: series.hidden }) : "",
@@ -815,6 +839,8 @@ export function chartTitle(
     const field = bySlug.get(slug);
     return field ? localized(field.labels, language, field.label) : "";
   };
+  if (RAW_CHART_KINDS.has(config.kind)) return [t(`chart.kind.${config.kind}` as "chart.kind.scatter"), label(config.kind === "map" ? config.latitudeSlug ?? "" : config.xSlug ?? ""), label(config.kind === "map" ? config.longitudeSlug ?? "" : config.ySlug ?? "")].filter(Boolean).join(" · ");
+  if (config.measures?.length) return [label(config.groupSlug), ...config.measures.map((m) => m.label || [t(`pivot.aggregation.${m.aggregation}` as const), label(m.field)].filter(Boolean).join(" "))].filter(Boolean).join(" · ");
   const value = config.aggregation !== "count" ? label(config.valueSlug) : "";
   const calculation = [t(`pivot.aggregation.${config.aggregation}` as const), value].filter(Boolean).join(" ");
   const group = config.kind !== "stat" ? label(config.groupSlug) : "";
@@ -889,6 +915,7 @@ export function ChartSetup({
   const pickKind = (kind: ChartKind) =>
     onChange({
       kind,
+      ...(!MULTI_MEASURE_KINDS.has(kind) ? { measures: [] } : config.measures?.length ? { measures: config.measures.map((m) => ({ ...m, aggregation: aggregationAllowed(kind, m.aggregation) ? m.aggregation : "count" as Aggregation })) } : {}),
       // Смена формы не должна оставлять кольцо со средним.
       ...(aggregationAllowed(kind, config.aggregation) ? {} : { aggregation: "count" as Aggregation }),
       // Кольцу и числу второе поле не нужно; уносим его с собой,
@@ -980,7 +1007,7 @@ export function ChartSetup({
       {/* Второе поле: им категория делится на серии. Стопке и тепловой
           карте оно обязательно, полосам и линии — по желанию, поэтому
           в списке есть «без разбивки». */}
-      {splittable(config.kind) && (
+      {splittable(config.kind) && !config.measures?.length && (
         <>
           <Slot stacked={stacked} label={t("chart.split")} order="order-4">
             <Dropdown
@@ -1024,7 +1051,7 @@ export function ChartSetup({
         </>
       )}
 
-      <Slot stacked={stacked} label={t("chart.calculation")} order="order-2">
+      {!RAW_CHART_KINDS.has(config.kind) && !config.measures?.length && <Slot stacked={stacked} label={t("chart.calculation")} order="order-2">
         <Dropdown
           value={config.aggregation}
           ariaLabel={t("pivot.value")}
@@ -1035,10 +1062,10 @@ export function ChartSetup({
           }))}
           onChange={(value) => onChange({ aggregation: value as Aggregation })}
         />
-      </Slot>
+      </Slot>}
 
       {/* Поле значения нужно всем, кроме количества. */}
-      {config.aggregation !== "count" && (
+      {!RAW_CHART_KINDS.has(config.kind) && !config.measures?.length && config.aggregation !== "count" && (
         <Slot stacked={stacked} label={t("pivot.value")} order="order-2">
           <Dropdown
             value={config.valueSlug}
@@ -1050,6 +1077,8 @@ export function ChartSetup({
           />
         </Slot>
       )}
+
+      <ChartRoles config={config} columns={columns} language={language} onChange={onChange} />
 
       {/* Размер карточки — ручками на её краях, а не кнопкой здесь:
           «во всю ширину» было выбором из двух, а сетка даёт десять. */}
@@ -1563,7 +1592,7 @@ function Legend({ splits }: { splits: ChartSplit[] }) {
         <li key={split.key} className="flex min-w-0 items-center gap-1.5 text-2xs">
           <span className={`size-2 shrink-0 rounded-full ${seriesDot(split.key, index)}`} />
           <span className="truncate text-fg-muted">
-            {split.key === OTHER_KEY ? t("chart.other") : split.label}
+            {split.key === OTHER_KEY ? t("chart.other") : split.label}{splits.some((split) => split.axis === "right") ? ` · ${t(split.axis === "right" ? "chart.axisRight" : "chart.axisLeft")}` : ""}{split.unit ? ` · ${split.unit}` : ""}
           </span>
         </li>
       ))}
@@ -1705,13 +1734,13 @@ function Line({ series, locale }: { series: ChartSeries; locale: string }) {
  * каждой цифре ширину нуля, и на крупном кегле число рассыпается.
  * Моноширинные — там, где числа стоят столбиком.
  */
-function Stat({ value, previous, locale }: { value: number; previous?: number | undefined; locale: string }) {
+export function Stat({ value, previous, locale, compact = false }: { value: number; previous?: number | undefined; locale: string; compact?: boolean }) {
   const { t } = useTranslation();
   const delta = previous === undefined ? null : statDelta(value, previous);
 
   return (
-    <div className="flex flex-col gap-1 py-4">
-      <p className="text-3xl font-semibold text-fg">{show(value, locale)}</p>
+    <div className={`flex flex-col gap-1 ${compact ? "py-1" : "py-4"}`}>
+      <p className={`${compact ? "text-xl" : "text-3xl"} font-semibold text-fg`}>{show(value, locale)}</p>
       {delta !== null && (
         <p className="text-xs text-fg-muted">
           <span className={delta.sign > 0 ? "text-success" : delta.sign < 0 ? "text-danger" : ""}>
@@ -1758,6 +1787,7 @@ const KIND_ICONS: Record<ChartKind, LucideIcon> = {
   stream: AudioWaveformIcon,
   donut: ChartPieIcon,
   stat: BinaryIcon,
+  column: ChartColumnIcon, column100: Columns3Icon, area: ChartLineIcon, area100: ChartLineIcon, pie: ChartPieIcon, scatter: GripIcon, bubble: GripIcon, treemap: GripIcon, combo: ChartColumnIcon, map: GripIcon,
 };
 
 /**

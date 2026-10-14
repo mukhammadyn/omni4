@@ -36,7 +36,7 @@ type FieldsQueries = [
 
 type RelationQueries = UseQueryResult<RelationDto, Error>[];
 
-export function useTableSchema(tableSlug: string | undefined, columnIds?: string[]) {
+export function useTableSchema(tableSlug: string | undefined, columnIds?: string[], visibility?: { field?: (field: Field) => boolean; table?: (slug: string) => boolean }) {
   const slug = tableSlug ?? "";
 
   const base = useQueries({
@@ -92,11 +92,11 @@ export function useTableSchema(tableSlug: string | undefined, columnIds?: string
    */
   const fieldRelations = new Set<string>();
   for (const field of base.schema.fields) {
-    if (field.relationId && (!columnIds || columnIds.includes(field.id) || columnIds.includes(field.relationId))) {
+    if (field.relationId && visibility?.field?.(field) !== false && (!columnIds || columnIds.includes(field.id) || columnIds.includes(field.relationId))) {
       fieldRelations.add(field.relationId);
     }
   }
-  const needed = base.schema.relations.filter((relation) => fieldRelations.has(relation.id));
+  const needed = base.schema.relations.filter((relation) => fieldRelations.has(relation.id) && visibility?.table?.(relation.toSlug) !== false);
 
   const details = useQueries({
     queries: needed.map((relation) => ({

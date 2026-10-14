@@ -1,4 +1,5 @@
-import { parseFilters, toCharts, toChartsAttribute, type ChartConfig, type Filters } from "@/features/item";
+import { parseFilters, toCharts, toChartsAttribute, toAggregation, type ChartConfig, type ChartMeasure, type Filters, type Sort } from "@/features/item";
+import { toDatasets, type Dataset } from "./datasets";
 import type { Answer, DashFilter } from "./filters";
 
 /**
@@ -6,7 +7,23 @@ import type { Answer, DashFilter } from "./filters";
  * `filters` — свой отбор, `answers` — какими полями он отвечает
  * на общие фильтры, по ключу фильтра (`filterKey`).
  */
-export type Widget = ChartConfig & { tableSlug: string; filters: Filters; answers: Record<string, Answer> };
+export const WIDGET_TYPES = ["chart", "records", "pivot", "ratio", "goal", "heading", "breakdown", "transitions"] as const;
+export type WidgetType = typeof WIDGET_TYPES[number];
+export type Widget = ChartConfig & {
+  tableSlug: string; filters: Filters; answers: Record<string, Answer>;
+  type?: WidgetType;
+  datasetId?: string;
+  body?: string;
+  pivotRows?: string[];
+  pivotSkipEmpty?: boolean;
+  ratio?: { numerator: ChartMeasure; denominator: ChartMeasure; percent: boolean };
+  goal?: number;
+  columns?: string[];
+  columnWidths?: Record<string, number>;
+  sorts?: Sort[];
+  pageSize?: number;
+  currencySlug?: string;
+};
 
 export type Dashboard = {
   id: string;
@@ -20,7 +37,7 @@ export type Dashboard = {
 /** Папка дашбордов. Модуль — id папки меню с `is_tab` (ADR-0010). */
 export type Folder = { id: string; moduleId: string; title: string; dashboards: Dashboard[] };
 
-export type Tree = { folders: Folder[] };
+export type Tree = { folders: Folder[]; datasets?: Dataset[] };
 
 export const DEFAULT_EMOJI = "📊";
 
@@ -56,6 +73,18 @@ export function toTree(value: unknown): Tree {
                   tableSlug: text(item["table_slug"]),
                   filters: parseFilters(item["filters"]) ?? {},
                   answers: toAnswers(item["answers"]),
+                  ...(typeof item["body"] === "string" ? { body: item["body"] } : {}),
+                  ...(Array.isArray(item["pivot_rows"]) ? { pivotRows: item["pivot_rows"].filter((slug): slug is string => typeof slug === "string") } : {}),
+                  ...(typeof item["pivot_skip_empty"] === "boolean" ? { pivotSkipEmpty: item["pivot_skip_empty"] } : {}),
+                  ...(typeof item["goal"] === "number" && Number.isFinite(item["goal"]) ? { goal: item["goal"] } : {}),
+                  ...(toRatio(item["ratio"]) ? { ratio: toRatio(item["ratio"])! } : {}),
+                  ...(typeof item["dataset_id"] === "string" ? { datasetId: item["dataset_id"] } : {}),
+                  ...(WIDGET_TYPES.includes(item["widget_type"] as WidgetType) ? { type: item["widget_type"] as WidgetType } : {}),
+                  ...(Array.isArray(item["columns"]) ? { columns: item["columns"].filter((v): v is string => typeof v === "string") } : {}),
+                  ...(isObject(item["column_widths"]) ? { columnWidths: Object.fromEntries(Object.entries(item["column_widths"]).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])).map(([slug, width]) => [slug, Math.max(80, Math.min(600, width))])) } : {}),
+                  ...(Array.isArray(item["sorts"]) ? { sorts: list(item["sorts"]).flatMap((s): Sort[] => typeof s["field"] === "string" ? [{ field: s["field"], direction: s["direction"] === "desc" ? "desc" : "asc" }] : []) } : {}),
+                  ...(typeof item["page_size"] === "number" ? { pageSize: Math.max(10, Math.min(100, Math.round(item["page_size"]))) } : {}),
+                  ...(typeof item["currency_slug"] === "string" ? { currencySlug: item["currency_slug"] } : {}),
                 },
               ]
             : [];
@@ -64,12 +93,14 @@ export function toTree(value: unknown): Tree {
     }),
   );
 
-  return { folders };
+  return { folders, ...(isObject(value) && Array.isArray(value["datasets"]) ? { datasets: toDatasets(value["datasets"]) } : {}) };
 }
 
 /** Обратно в attributes. Ключи змейкой — как у `charts`. */
 export function toTreeAttribute(tree: Tree): Record<string, unknown> {
   return {
+    ...tree,
+    ...(tree.datasets ? { datasets: tree.datasets } : {}),
     folders: tree.folders.map((folder) => ({
       id: folder.id,
       module_id: folder.moduleId,
@@ -95,6 +126,18 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           table_slug: widget.tableSlug,
           filters: widget.filters,
           answers: widget.answers,
+          ...(widget.body !== undefined ? { body: widget.body } : {}),
+          ...(widget.pivotRows ? { pivot_rows: widget.pivotRows } : {}),
+          ...(widget.pivotSkipEmpty !== undefined ? { pivot_skip_empty: widget.pivotSkipEmpty } : {}),
+          ...(widget.ratio ? { ratio: widget.ratio } : {}),
+          ...(widget.goal !== undefined ? { goal: widget.goal } : {}),
+          ...(widget.datasetId ? { dataset_id: widget.datasetId } : {}),
+          ...(widget.type ? { widget_type: widget.type } : {}),
+          ...(widget.columns ? { columns: widget.columns } : {}),
+          ...(widget.columnWidths ? { column_widths: widget.columnWidths } : {}),
+          ...(widget.sorts ? { sorts: widget.sorts } : {}),
+          ...(widget.pageSize ? { page_size: widget.pageSize } : {}),
+          ...(widget.currencySlug ? { currency_slug: widget.currencySlug } : {}),
         })),
       })),
     })),
@@ -159,6 +202,7 @@ export function newFolder(moduleId: string, title: string): Folder {
 /** Правка одной папки. */
 export function patchFolder(tree: Tree, id: string, patch: (folder: Folder) => Folder | null): Tree {
   return {
+    ...tree,
     folders: tree.folders.flatMap((folder) => {
       if (folder.id !== id) return [folder];
       const next = patch(folder);
@@ -174,6 +218,8 @@ export function patchDashboard(
   patch: (dashboard: Dashboard) => Dashboard | null,
 ): Tree {
   return {
+    ...tree,
+    ...(tree.datasets ? { datasets: tree.datasets } : {}),
     folders: tree.folders.map((folder) => ({
       ...folder,
       dashboards: folder.dashboards.flatMap((dashboard) => {
@@ -217,4 +263,10 @@ function text(value: unknown): string {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function toRatio(value: unknown): Widget["ratio"] | null {
+  if (!isObject(value) || !isObject(value["numerator"]) || !isObject(value["denominator"])) return null;
+  const measure = (item: Record<string, unknown>, id: string): ChartMeasure => ({ id, field: text(item["field"]), aggregation: toAggregation(text(item["aggregation"])) });
+  return { numerator: measure(value["numerator"], "numerator"), denominator: measure(value["denominator"], "denominator"), percent: value["percent"] === true };
 }

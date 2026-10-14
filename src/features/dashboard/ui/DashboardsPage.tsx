@@ -36,6 +36,7 @@ import type { DashFilter, FilterValues } from "../model/filters";
 import { readPrefs, toggle, writePrefs, type Prefs } from "../model/prefs";
 import { DashFilters } from "./DashFilters";
 import { DashNav, ModuleMark } from "./DashNav";
+import { DatasetEditor } from "./DatasetEditor";
 import { WidgetGrid } from "./WidgetGrid";
 
 /**
@@ -64,7 +65,7 @@ export function DashboardsPage({
   const session = useSession();
   const root = useMenuChildren(ROOT_MENU_ID);
   const modules = root.items.filter((node) => node.isModule);
-  const { tree, isLoading, canRead, canEdit, save } = useDashboardTree();
+  const { tree, menuId, isLoading, isSaving, saveError, retrySave, canRead, canEdit, save } = useDashboardTree();
 
   const prefsKey = `omni4.dashboards.${session.getProjectId() ?? ""}.${session.getUserId()}`;
   const [prefs, setPrefs] = useState<Prefs>(() => readPrefs(prefsKey));
@@ -80,6 +81,7 @@ export function DashboardsPage({
    */
   const [layout, setLayout] = useState<{ id: string; widgets: Widget[]; filters: DashFilter[] } | null>(null);
   /** Что ждёт подтверждения удаления: дашборд или папка с дашбордами. */
+  const [datasetsOpen, setDatasetsOpen] = useState(false);
   const [removing, setRemoving] = useState<{ kind: "dashboard" | "folder"; id: string } | null>(null);
 
   const home = moduleId || modules[0]?.id || "";
@@ -104,8 +106,9 @@ export function DashboardsPage({
   const closed = new Set(prefs.closed);
 
   const apply = (next: Tree, open?: string) => {
-    save(next);
+    const saved = save(next);
     if (open) onOpen(open);
+    return saved;
   };
 
   /** Новое в свёрнутом модуле не должно пропадать из вида: модуль раскрывается. */
@@ -121,7 +124,7 @@ export function DashboardsPage({
       apply(patchFolder(tree, target.id, (folder) => ({ ...folder, dashboards: [...folder.dashboards, dashboard] })), dashboard.id);
     } else {
       const folder = { ...newFolder(module, t("dashboard.defaultFolder")), dashboards: [dashboard] };
-      apply({ folders: [...tree.folders, folder] }, dashboard.id);
+      apply({ ...tree, folders: [...tree.folders, folder] }, dashboard.id);
     }
   };
 
@@ -129,7 +132,7 @@ export function DashboardsPage({
   const addFolder = (moduleOf?: string) => {
     const module = moduleOf ?? current?.folder.moduleId ?? home;
     const folder = newFolder(module, t("dashboard.newFolder"));
-    apply({ folders: [...tree.folders, folder] });
+    apply({ ...tree, folders: [...tree.folders, folder] });
     reveal(module);
     return folder.id;
   };
@@ -183,6 +186,7 @@ export function DashboardsPage({
   return (
     <div className="relative flex min-h-0 flex-1">
       {nav}
+      {datasetsOpen && <DatasetEditor datasets={tree.datasets ?? []} menuId={menuId} onSave={(datasets) => apply({ ...tree, datasets })} onClose={() => setDatasetsOpen(false)} />}
 
       {/* Страница прокручивается целиком, полоса вкладок липнет к верху —
           как `.scroller` и `.viewbar` прототипа. */}
@@ -252,9 +256,9 @@ export function DashboardsPage({
             </div>
 
             {/* Полоса вкладок — `.viewbar`: вкладки папки слева, действия справа. */}
-            <div className="sticky top-0 z-10 flex min-h-10 items-center gap-1 border-b border-border bg-surface">
+            <div className="sticky top-0 z-10 flex min-h-10 flex-wrap items-center gap-1 border-b border-border bg-surface">
               {prefs.hidden && <ShowNav onClick={showNav} />}
-              <div className="flex min-w-0 flex-1 items-center gap-1">
+              <div className="flex min-w-0 flex-1 items-center gap-1 max-sm:basis-full">
                 <Tabs
                   tabs={current.folder.dashboards.map((dashboard) => ({
                     id: dashboard.id,
@@ -270,7 +274,7 @@ export function DashboardsPage({
                 )}
               </div>
 
-              <div className="flex shrink-0 items-center gap-0.5">
+              <div className="flex shrink-0 flex-wrap items-center gap-0.5 max-sm:w-full max-sm:min-w-0 max-sm:pb-1">
                 <ViewAction
                   label={t(favorite ? "dashboard.unfavorite" : "dashboard.favorite")}
                   pressed={favorite}
@@ -288,24 +292,25 @@ export function DashboardsPage({
                 </ViewAction>
                 {canEdit && (
                   <>
+                    <ViewAction label={t("dashboard.datasets")} text onClick={() => setDatasetsOpen(true)}><Icon as={Settings2Icon} size={16} /></ViewAction>
                     <ViewAction label={t("dashboard.remove")} danger onClick={() => current && setRemoving({ kind: "dashboard", id: current.dashboard.id })}>
                       <Icon as={Trash2Icon} size={16} />
                     </ViewAction>
                     {editing ? (
                       <>
-                        <Button type="button" size="sm" variant="secondary" className="ml-1" onClick={() => setLayout(null)}>
+                        <Button type="button" size="sm" variant="secondary" className="ml-1" disabled={isSaving} onClick={() => setLayout(null)}>
                           {t("action.cancel")}
                         </Button>
                         <Button
                           type="button"
                           size="sm"
-                          onClick={() => {
-                            patchCurrent({ widgets: layout.widgets, filters: layout.filters });
-                            setLayout(null);
+                          disabled={isSaving}
+                          onClick={async () => {
+                            if (await patchCurrent({ widgets: layout.widgets, filters: layout.filters })) setLayout(null);
                           }}
                         >
                           <Icon as={CheckIcon} size={14} />
-                          {t("action.save")}
+                          {t(isSaving ? "dashboard.saving" : "dashboard.saveDashboard")}
                         </Button>
                       </>
                     ) : (
@@ -329,7 +334,10 @@ export function DashboardsPage({
             </div>
 
             <div className="flex flex-col gap-3 pt-4">
+              {saveError && <div role="alert" className="flex items-center gap-2 text-sm text-danger"><span>{saveError}</span><Button type="button" size="sm" variant="secondary" disabled={isSaving} onClick={() => { void retrySave(); }}>{t("dashboard.refresh")}</Button></div>}
+              {isSaving && <p role="status" className="text-xs text-fg-muted">{t("dashboard.saving")}</p>}
               <DashFilters
+                menuId={menuId}
                 filters={editing ? layout.filters : current.dashboard.filters}
                 values={values}
                 editing={editing}
@@ -338,11 +346,14 @@ export function DashboardsPage({
               />
               <WidgetGrid
                 key={current.dashboard.id}
+                menuId={menuId}
+                datasets={tree.datasets ?? []}
                 widgets={editing ? layout.widgets : current.dashboard.widgets}
                 filters={editing ? layout.filters : current.dashboard.filters}
                 values={values}
                 editing={editing}
                 editable={canEdit}
+                onBeginEditing={() => setLayout({ id: current.dashboard.id, widgets: current.dashboard.widgets, filters: current.dashboard.filters })}
                 /* Вне правки меняет только диалог «Добавить первый виджет» —
                    он сам и есть подтверждение, пишем сразу. */
                 onWidgets={(widgets) =>

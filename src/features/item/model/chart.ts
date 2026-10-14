@@ -52,6 +52,16 @@ export const CHART_KINDS = [
   "stream",
   "donut",
   "stat",
+  "column",
+  "column100",
+  "area",
+  "area100",
+  "pie",
+  "scatter",
+  "bubble",
+  "treemap",
+  "combo",
+  "map",
 ] as const;
 
 export type ChartKind = (typeof CHART_KINDS)[number];
@@ -71,6 +81,10 @@ export type ChartKind = (typeof CHART_KINDS)[number];
 export const CHART_BUCKETS = ["hour", "weekday", "day", "month"] as const;
 
 export type ChartBucket = (typeof CHART_BUCKETS)[number] | "";
+export type ChartMeasure = {
+  id: string; field: string; aggregation: Aggregation; label?: string;
+  axis?: "left" | "right"; display?: "line" | "column"; unit?: string;
+};
 
 export type ChartConfig = {
   /** Ключ для порядка и перетаскивания. Не идентификатор в базе. */
@@ -108,6 +122,14 @@ export type ChartConfig = {
    * читается форма.
    */
   height: number;
+  /** Multiple measures use one category axis; categorical split remains a separate mode. */
+  measures?: ChartMeasure[];
+  xSlug?: string;
+  ySlug?: string;
+  sizeSlug?: string;
+  latitudeSlug?: string;
+  longitudeSlug?: string;
+  interaction?: { scope: "card" | "dashboard"; filterKey?: string };
 };
 
 /** Границы размера карточки. Ширина — колонки, высота — ряды. */
@@ -132,10 +154,13 @@ export const clampRows = (value: number) =>
  * Поэтому у этих форм выбор способа сведения короче, а не «нарисуем,
  * а человек разберётся».
  */
-const PART_KINDS = new Set<string>(["donut", "stack", "funnel", "stream"]);
+const PART_KINDS = new Set<string>(["donut", "pie", "treemap", "stack", "column100", "area100", "funnel", "stream"]);
 
 /** Формы, которым второе поле обязательно: без него рисовать нечего. */
-const NEEDS_SPLIT = new Set<string>(["stack", "heatmap"]);
+const NEEDS_SPLIT = new Set<string>(["stack", "heatmap", "column100", "area100"]);
+export const MULTI_MEASURE_KINDS = new Set<string>(["bar", "stack", "column", "column100", "line", "area", "area100", "combo"]);
+export const RAW_CHART_KINDS = new Set<string>(["scatter", "bubble", "map"]);
+const TIME_KINDS = new Set<string>(["line", "area", "area100", "combo"]);
 
 /** Формы, у которых порядок задаёт список значений, а не их величина. */
 const STAGE_KINDS = new Set<string>(["funnel", "stream"]);
@@ -152,7 +177,7 @@ export function aggregationAllowed(kind: ChartKind, aggregation: Aggregation): b
  * то есть в тепловую карту.
  */
 export function splittable(kind: ChartKind): boolean {
-  return kind === "stack" || !PART_KINDS.has(kind);
+  return !RAW_CHART_KINDS.has(kind) && (kind === "stack" || kind === "column100" || kind === "area100" || !PART_KINDS.has(kind));
 }
 
 /**
@@ -221,7 +246,7 @@ export type ChartPoint = {
 };
 
 /** Серия: значение второго поля. */
-export type ChartSplit = { key: string; label: string };
+export type ChartSplit = { key: string; label: string; axis?: "left" | "right"; display?: "line" | "column"; unit?: string };
 
 export type ChartSeries = {
   points: ChartPoint[];
@@ -248,11 +273,15 @@ const EMPTY: ChartSeries = {
 
 /** Готов ли график к показу: без поля рисовать нечего. */
 export function chartReady(config: ChartConfig): boolean {
-  if (config.aggregation !== "count" && !config.valueSlug) return false;
+  if (config.kind === "map") return Boolean(config.latitudeSlug && config.longitudeSlug);
+  if (config.kind === "scatter" || config.kind === "bubble") return Boolean(config.xSlug && config.ySlug && (config.kind !== "bubble" || config.sizeSlug));
+  if (config.measures?.length && MULTI_MEASURE_KINDS.has(config.kind)) {
+    if (config.measures.some((measure) => !aggregationAllowed(config.kind, measure.aggregation) || (measure.aggregation !== "count" && !measure.field))) return false;
+  } else if (config.aggregation !== "count" && !config.valueSlug) return false;
   if (config.kind === "stat") return true;
   if (!config.groupSlug) return false;
 
-  return !NEEDS_SPLIT.has(config.kind) || Boolean(config.splitSlug);
+  return !NEEDS_SPLIT.has(config.kind) || Boolean(config.splitSlug) || (config.kind !== "heatmap" && (config.measures?.length ?? 0) > 1);
 }
 
 /**
@@ -269,6 +298,7 @@ export type ChartAxis = {
 };
 
 export type ChartContext = {
+  measureLabel?: ((measure: ChartMeasure) => string) | undefined;
   group?: ChartAxis | undefined;
   split?: ChartAxis | undefined;
   /**
@@ -308,6 +338,8 @@ export function chartSeries(
   context: ChartContext = {},
 ): ChartSeries {
   if (!chartReady(config)) return EMPTY;
+  if (RAW_CHART_KINDS.has(config.kind)) return EMPTY;
+  if (config.measures?.length && MULTI_MEASURE_KINDS.has(config.kind)) return measureSeries(rows, config, context);
 
   if (config.kind === "stat") {
     const values =
@@ -347,7 +379,7 @@ export function chartSeries(
      * про подпись и итог, а порядок стадий приходит извне.
      */
     sort:
-      config.kind === "line" || staged(config.kind) || config.groupBucket
+      TIME_KINDS.has(config.kind) || staged(config.kind) || config.groupBucket
         ? { by: { kind: "label" }, desc: false }
         : { by: { kind: "total" }, desc: true },
     /*
@@ -436,7 +468,7 @@ export function chartSeries(
     );
   }
 
-  if (config.kind === "donut") {
+  if (["donut", "pie", "treemap"].includes(config.kind)) {
     const slices = foldTail(
       all.map(({ key, label, value }) => ({ key, label, value })),
       SERIES_LIMIT,
@@ -494,11 +526,32 @@ export function chartSeries(
  * это не сутки.
  */
 function rowCap(kind: ChartKind, bucket: ChartBucket, splits: number): number | null {
-  if (kind === "line" || staged(kind)) return null;
+  if (TIME_KINDS.has(kind) || staged(kind)) return null;
   if (bucket === "hour" || bucket === "weekday") return null;
   if (kind === "heatmap") return HEATMAP_ROWS;
 
   return splits > 1 ? GROUPED_ROWS : BAR_ROWS;
+}
+
+/** Each measure reduces source rows independently, so averages are never averages of averages. */
+function measureSeries(rows: Item[], config: ChartConfig, context: ChartContext): ChartSeries {
+  const measures = config.measures!.slice(0, SERIES_LIMIT);
+  const results = measures.map((measure) => chartSeries(rows, { ...config, measures: [], kind: "line", splitSlug: "", aggregation: measure.aggregation, valueSlug: measure.field }, context));
+  const labels = new Map(results.flatMap((result) => result.points.map((point) => [point.key, point.label] as const)));
+  const keys = [...labels.keys()];
+  const byKey = results.map((result) => new Map(result.points.map((point) => [point.key, point.value])));
+  if (TIME_KINDS.has(config.kind) || config.groupBucket) keys.sort();
+  else keys.sort((a, b) => (byKey[0]?.get(b) ?? 0) - (byKey[0]?.get(a) ?? 0) || a.localeCompare(b));
+  const splits: ChartSplit[] = measures.map((measure) => ({ key: measure.id, label: measure.label || context.measureLabel?.(measure) || measure.field || measure.aggregation, ...(measure.axis ? { axis: measure.axis } : {}), ...(measure.display ? { display: measure.display } : {}), ...(measure.unit ? { unit: measure.unit } : {}) }));
+  const limit = rowCap(config.kind, config.groupBucket, splits.length);
+  const shown = limit === null ? keys : config.groupBucket ? keys.slice(-limit) : keys.slice(0, limit);
+  return { points: shown.map((key) => ({ key, label: labels.get(key)!, value: byKey[0]?.get(key) ?? 0, cells: new Map(measures.map((measure, index) => [measure.id, byKey[index]?.get(key) ?? 0])) })), splits, total: results[0]?.total ?? 0, count: results[0]?.count ?? 0, hidden: keys.length - shown.length, hiddenSplits: Math.max(0, config.measures!.length - measures.length) };
+}
+
+/** Fields whose visibility must be checked before requesting rows. */
+export function chartFieldSlugs(config: ChartConfig): string[] {
+  if (RAW_CHART_KINDS.has(config.kind)) return [config.groupSlug, config.kind === "map" ? config.latitudeSlug ?? "" : config.xSlug ?? "", config.kind === "map" ? config.longitudeSlug ?? "" : config.ySlug ?? "", config.sizeSlug ?? ""].filter(Boolean);
+  return [config.kind === "stat" ? "" : config.groupSlug, config.measures?.length ? "" : config.splitSlug, ...(config.measures?.length && MULTI_MEASURE_KINDS.has(config.kind) ? config.measures.filter((measure) => measure.aggregation !== "count").map((measure) => measure.field) : config.aggregation === "count" ? [] : [config.valueSlug])].filter(Boolean);
 }
 
 /**
@@ -808,6 +861,13 @@ export function toCharts(value: unknown): ChartConfig[] {
         valueSlug: typeof raw["value_slug"] === "string" ? raw["value_slug"] : "",
         width: toSpan(raw["width"]),
         height: clampRows(typeof raw["height"] === "number" ? raw["height"] : MIN_ROWS),
+        ...(Array.isArray(raw["measures"]) ? { measures: raw["measures"].slice(0, SERIES_LIMIT).flatMap((value, index): ChartMeasure[] => {
+          if (typeof value !== "object" || value === null) return [];
+          const item = value as Record<string, unknown>, aggregation = toAggregation(typeof item["aggregation"] === "string" ? item["aggregation"] : undefined);
+          return [{ id: typeof item["id"] === "string" && item["id"] ? item["id"] : `measure-${index}`, field: typeof item["field"] === "string" ? item["field"] : "", aggregation, ...(typeof item["label"] === "string" ? { label: item["label"] } : {}), ...(item["axis"] === "right" ? { axis: "right" as const } : {}), ...(item["display"] === "line" || item["display"] === "column" ? { display: item["display"] } : {}), ...(typeof item["unit"] === "string" ? { unit: item["unit"] } : {}) }];
+        }) } : {}),
+        ...Object.fromEntries(["x", "y", "size", "latitude", "longitude"].flatMap((key) => typeof raw[`${key}_slug`] === "string" ? [[`${key}Slug`, raw[`${key}_slug`]]] : [])),
+        ...(typeof raw["interaction"] === "object" && raw["interaction"] !== null && ["card", "dashboard"].includes((raw["interaction"] as Record<string, unknown>)["scope"] as string) ? { interaction: raw["interaction"] as NonNullable<ChartConfig["interaction"]> } : {}),
       };
     })
     .filter((chart): chart is ChartConfig => chart !== null);
@@ -842,5 +902,12 @@ export function toChartsAttribute(charts: ChartConfig[]): Record<string, unknown
     value_slug: chart.valueSlug,
     width: chart.width,
     height: chart.height,
+    ...(chart.measures ? { measures: chart.measures } : {}),
+    ...(chart.xSlug ? { x_slug: chart.xSlug } : {}),
+    ...(chart.ySlug ? { y_slug: chart.ySlug } : {}),
+    ...(chart.sizeSlug ? { size_slug: chart.sizeSlug } : {}),
+    ...(chart.latitudeSlug ? { latitude_slug: chart.latitudeSlug } : {}),
+    ...(chart.longitudeSlug ? { longitude_slug: chart.longitudeSlug } : {}),
+    ...(chart.interaction ? { interaction: chart.interaction } : {}),
   }));
 }

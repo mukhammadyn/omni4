@@ -375,7 +375,7 @@ test("мусор в attributes выбрасывается, а не роняет 
   expect(toCharts(undefined)).toEqual([]);
   expect(toCharts("charts")).toEqual([]);
   // Форма — единственное обязательное поле: без неё рисовать нечем.
-  expect(toCharts([null, 7, {}, { kind: "pie" }])).toEqual([]);
+  expect(toCharts([null, 7, {}, { kind: "unknown-shape" }])).toEqual([]);
 });
 
 test("кольцо от среднего приводится к количеству при чтении", () => {

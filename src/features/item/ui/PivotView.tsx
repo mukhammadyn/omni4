@@ -43,6 +43,7 @@ export function PivotView({
   loaded,
   total,
   onSetup,
+  editable = true,
 }: {
   /** Колонки view: из них выбирают поля сводной. */
   columns: Field[];
@@ -59,6 +60,7 @@ export function PivotView({
    * оно приходит в каждом ответе get-list.
    */
   total: number;
+  editable?: boolean;
   onSetup: (next: Partial<PivotSetup>) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -135,8 +137,9 @@ export function PivotView({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <button
             type="button"
-            aria-expanded={settingsOpen}
-            onClick={() => setSettingsOpen((open) => !open)}
+            disabled={!editable}
+            aria-expanded={editable && settingsOpen}
+            onClick={() => editable && setSettingsOpen((open) => !open)}
             className="flex min-w-0 items-center gap-1.5 rounded-md text-left text-xs text-fg-muted transition-colors hover:text-fg"
           >
             <Icon
@@ -163,7 +166,7 @@ export function PivotView({
           </span>
         </div>
 
-        {settingsOpen && (
+        {editable && settingsOpen && (
           <>
             <div className="mt-2 grid gap-2 md:grid-cols-3">
               <Zone title={t("pivot.rows")} hint={t("pivot.rowsHint")}>

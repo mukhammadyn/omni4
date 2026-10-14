@@ -4,9 +4,9 @@ export { Board } from "./ui/Board";
 export { useDisabledDays } from "./api/calendar";
 export { CalendarView } from "./ui/Calendar";
 export { PivotView } from "./ui/PivotView";
-export { AddTile, ChartCard, ChartSetup, ChartView, chartTitle } from "./ui/ChartView";
-export { newChart, toCharts, toChartsAttribute } from "./model/chart";
-export type { ChartConfig } from "./model/chart";
+export { AddTile, ChartCard, ChartSetup, ChartView, Stat, chartTitle } from "./ui/ChartView";
+export { chartReady, chartFieldSlugs, chartSeries, newChart, toCharts, toChartsAttribute } from "./model/chart";
+export type { ChartConfig, ChartMeasure } from "./model/chart";
 export {
   AGGREGATIONS,
   DEFAULT_SORT,
@@ -24,6 +24,8 @@ export { toScale } from "./model/timeline";
 export type { TimelineScale } from "./model/timeline";
 export { useDrawerLayout } from "./api/layout";
 export { applyRights, itemTitle, orderColumns } from "./model/layout";
+export { fieldRights } from "./model/layout";
+export type { Layout } from "./model/layout";
 export { useCreateItem } from "./api/relations";
 export { fileUrl, uploadFolder, useFileMeta, useUploadFiles } from "./api/files";
 export type { ItemsPage, ItemsResponseDto, RowEdit } from "./api/items";
@@ -51,7 +53,7 @@ export {
   withMine,
 } from "./model/query";
 export type { Filter, FilterOperator, Filters, ItemsQuery, Sort, SortDirection } from "./model/query";
-export { selfDefaults } from "./model/relation";
+export { selfDefaults, valueLabelOf } from "./model/relation";
 export { relationDataKey } from "./model/types";
 export type { Item } from "./model/types";
 export { rowErrors } from "./model/validate";
@@ -74,3 +76,5 @@ export { GridFooter, MAX_LIMIT, MIN_LIMIT, PAGE_SIZES } from "./ui/GridFooter";
 export { SortPanel } from "./ui/SortPanel";
 export { TableToolbar } from "./ui/TableToolbar";
 export { MineToggle, type WhoField } from "./ui/MineToggle";
+
+export { chartRoleIssue } from "./model/chart-geometry";

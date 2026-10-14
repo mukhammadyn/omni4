@@ -17,7 +17,7 @@ export type ViaLookup = { key: string; table: string; via: string; values: strin
  *
  * Результат по ключу фильтра; ключа нет — ещё грузится.
  */
-export function useViaGuids(lookups: ViaLookup[]): Record<string, string[]> {
+export function useViaGuids(lookups: ViaLookup[], cacheScope?: string) {
   return useQueries({
     queries: lookups.map((lookup) => {
       const body = toRequestBody({
@@ -27,7 +27,7 @@ export function useViaGuids(lookups: ViaLookup[]): Record<string, string[]> {
         relations: false,
       });
       return {
-        queryKey: keys.items.list(lookup.table, body),
+        queryKey: keys.items.list(lookup.table, { ...body, ...(cacheScope ? { cacheScope } : {}) }),
         queryFn: () => api.post<ItemsResponseDto>(`/v2/object/get-list/${lookup.table}`, { data: body }),
         staleTime: 60_000,
       };
@@ -39,7 +39,7 @@ export function useViaGuids(lookups: ViaLookup[]): Record<string, string[]> {
         if (!lookup || !result.data) return;
         guids[lookup.key] = (result.data.data?.response ?? []).map((row) => String(row["guid"] ?? "")).filter(Boolean);
       });
-      return guids;
+      return { guids, loading: results.some((result) => result.isLoading), error: results.find((result) => result.error)?.error ?? null, truncated: results.some((result) => (result.data?.data?.count ?? 0) > SAMPLE), refetches: results.map((result) => result.refetch) };
     },
   });
 }
