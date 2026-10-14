@@ -11,25 +11,22 @@ import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { SHIFTS, useDeleteTemplate, useSaveTemplate, useScheduleEmployees, useTemplates } from "../api/schedule";
 import { weekMinutesOf, type Template } from "../model/schedule";
 import { plusDays } from "../model/timesheet";
+import { ApplyTemplateDialog } from "./ApplyTemplateDialog";
 import { TemplatePreview, templateDot, useDuration, useTemplateSummary } from "./schedule-parts";
+import { TemplateDialog } from "./TemplateDialog";
 
 /**
  * «Шаблоны» графика работы (`tplView` прототипа, schedule.html): карточка
  * на шаблон — неделя или цикл клетками, часы в неделю, перерыв, кто на
  * нём (шаблон в карточке сотрудника), «Изменить» и «Применить».
  *
+ * Окна шаблона и «Применить» открывает сам.
+ *
  * Удалить шаблон нельзя, пока по нему есть смены впереди: они остались бы
  * сиротами, а применить другой — дело одного окна. Сделан под
  * `hr_work_schedules` (FIXED_VIEW_TYPES).
  */
-export function WorkSchedules({
-  onEdit,
-  onApply,
-}: {
-  /** Окно шаблона; без шаблона — новый. */
-  onEdit?: (template?: Template) => void;
-  onApply?: (template: Template) => void;
-}) {
+export function WorkSchedules() {
   const { t } = useTranslation();
   const { templates, loading } = useTemplates();
   const { employees } = useScheduleEmployees();
@@ -38,6 +35,11 @@ export function WorkSchedules({
   const save = useSaveTemplate();
   const remove = useDeleteTemplate();
   const [deleting, setDeleting] = useState<Template | null>(null);
+  /** Окно шаблона: шаблон на правку, `null` — новый. */
+  const [editing, setEditing] = useState<Template | null | undefined>(undefined);
+  const [applying, setApplying] = useState<Template | null>(null);
+  const onEdit = (template?: Template) => setEditing(template ?? null);
+  const onApply = setApplying;
 
   const today = todayInput();
   const future = useItemCounts(
@@ -97,33 +99,42 @@ export function WorkSchedules({
                   >
                     {(close) => (
                       <>
-                        {onApply && (
-                          <PopoverItem icon={<Icon as={UsersIcon} size={15} />} onClick={() => {
+                        <PopoverItem
+                          icon={<Icon as={UsersIcon} size={15} />}
+                          onClick={() => {
                             close();
                             onApply(template);
-                          }}>
-                            {t("template.applyTo")}
-                          </PopoverItem>
-                        )}
-                        {onEdit && (
-                          <PopoverItem icon={<Icon as={PencilIcon} size={15} />} onClick={() => {
+                          }}
+                        >
+                          {t("template.applyTo")}
+                        </PopoverItem>
+                        <PopoverItem
+                          icon={<Icon as={PencilIcon} size={15} />}
+                          onClick={() => {
                             close();
                             onEdit(template);
-                          }}>
-                            {t("action.edit")}
-                          </PopoverItem>
-                        )}
-                        <PopoverItem icon={<Icon as={CopyIcon} size={15} />} onClick={() => {
+                          }}
+                        >
+                          {t("action.edit")}
+                        </PopoverItem>
+                        <PopoverItem
+                          icon={<Icon as={CopyIcon} size={15} />}
+                          onClick={() => {
                             close();
                             duplicate(template);
-                          }}>
+                          }}
+                        >
                           {t("template.duplicate")}
                         </PopoverItem>
                         <PopoverSeparator />
-                        <PopoverItem danger icon={<Icon as={Trash2Icon} size={15} />} onClick={() => {
+                        <PopoverItem
+                          danger
+                          icon={<Icon as={Trash2Icon} size={15} />}
+                          onClick={() => {
                             close();
                             askDelete(template, index);
-                          }}>
+                          }}
+                        >
                           {t("action.delete")}
                         </PopoverItem>
                       </>
@@ -157,36 +168,32 @@ export function WorkSchedules({
                     {used.length ? t("schedule.employees", { count: used.length }) : t("template.unused")}
                   </span>
                   <span className="flex-1" />
-                  {onEdit && (
-                    <Button size="sm" variant="secondary" onClick={() => onEdit(template)}>
-                      <Icon as={PencilIcon} size={13} />
-                      {t("action.edit")}
-                    </Button>
-                  )}
-                  {onApply && (
-                    <Button size="sm" onClick={() => onApply(template)}>
-                      {t("template.apply")}
-                    </Button>
-                  )}
+                  <Button size="sm" variant="secondary" onClick={() => onEdit(template)}>
+                    <Icon as={PencilIcon} size={13} />
+                    {t("action.edit")}
+                  </Button>
+                  <Button size="sm" onClick={() => onApply(template)}>
+                    {t("template.apply")}
+                  </Button>
                 </div>
               </div>
             );
           })}
 
-          {onEdit && (
-            <button
-              type="button"
-              onClick={() => onEdit()}
-              className="flex min-h-[220px] flex-col items-center justify-center gap-1 rounded-xl border-[1.5px] border-dashed border-border-strong text-fg-muted transition-colors hover:border-accent hover:bg-accent-subtle hover:text-accent-text"
-            >
-              <Icon as={PlusIcon} size={22} />
-              <b className="text-sm font-semibold">{t("template.new")}</b>
-              <small className="text-xs text-fg-subtle">{t("template.newHint")}</small>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => onEdit()}
+            className="flex min-h-[220px] flex-col items-center justify-center gap-1 rounded-xl border-[1.5px] border-dashed border-border-strong text-fg-muted transition-colors hover:border-accent hover:bg-accent-subtle hover:text-accent-text"
+          >
+            <Icon as={PlusIcon} size={22} />
+            <b className="text-sm font-semibold">{t("template.new")}</b>
+            <small className="text-xs text-fg-subtle">{t("template.newHint")}</small>
+          </button>
         </div>
       )}
 
+      {editing !== undefined && <TemplateDialog {...(editing ? { template: editing } : {})} onClose={() => setEditing(undefined)} />}
+      {applying && <ApplyTemplateDialog templateId={applying.id} onClose={() => setApplying(null)} />}
       {deleting && (
         <ConfirmDialog
           title={t("template.deleteTitle", { name: deleting.name })}

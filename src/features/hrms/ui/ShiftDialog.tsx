@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CalendarXIcon, CheckIcon, ChevronDownIcon, ClockIcon, LayoutTemplateIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
+import { CalendarXIcon, CheckIcon, ChevronDownIcon, LayoutTemplateIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
 import { todayInput } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
@@ -31,7 +31,7 @@ import {
   type Shift,
   type ShiftForm,
 } from "../model/schedule";
-import { KIND_STYLE, type OpenShift } from "./schedule-parts";
+import { ClockInput, KIND_STYLE, Row, Segments, type OpenShift } from "./schedule-parts";
 
 /**
  * Окно смены — `shiftModal` прототипа. Новая смена — на одного или
@@ -282,64 +282,6 @@ function ShiftForm({
         </div>
       </div>
     </Modal>
-  );
-}
-
-/**
- * Время «ЧЧ:ММ» текстом, как `.tin` прототипа: системное поле времени
- * пишет его по часам ОС — «06:00 PM» рядом с «09:00–17:00» в сетке.
- */
-export function ClockInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="relative">
-      <Input
-        value={value}
-        inputMode="numeric"
-        maxLength={5}
-        placeholder="09:00"
-        aria-invalid={!isClock(value)}
-        onChange={(event) => onChange(event.target.value)}
-        className={`pr-8 tabular-nums ${isClock(value) ? "" : "border-danger"}`}
-      />
-      <Icon as={ClockIcon} size={15} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-fg-subtle" />
-    </div>
-  );
-}
-
-function Row({ label, hint, children }: { label: string; hint?: string | undefined; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[13px] text-fg-muted">{label}</span>
-      {children}
-      {hint && <span className="text-xs text-fg-subtle">{hint}</span>}
-    </div>
-  );
-}
-
-function Segments<T extends string>({
-  value,
-  items,
-  onChange,
-}: {
-  value: T;
-  items: { value: T; label: ReactNode }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-border p-0.5">
-      {items.map((item) => (
-        <button
-          key={item.value}
-          type="button"
-          onClick={() => onChange(item.value)}
-          className={`inline-flex h-7 items-center gap-1.5 rounded-[4px] px-3 text-[13px] transition-colors ${
-            value === item.value ? "bg-surface-active font-medium text-fg" : "text-fg-muted hover:text-fg"
-          }`}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
   );
 }
 

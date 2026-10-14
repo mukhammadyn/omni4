@@ -1,7 +1,10 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { HouseIcon, MoonIcon, SunIcon, type LucideIcon } from "lucide-react";
+import { ClockIcon, HouseIcon, MoonIcon, SunIcon, type LucideIcon } from "lucide-react";
+import { Icon } from "@/shared/ui/icon";
+import { Input } from "@/shared/ui/input";
 import { CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
-import type { Shift, ShiftKind, Template } from "../model/schedule";
+import { isClock, type Shift, type ShiftKind, type Template } from "../model/schedule";
 
 /* Общее у экранов графика: календаря, окна смены, вкладки сотрудника. */
 
@@ -61,7 +64,7 @@ export function useTemplateSummary() {
 
 /** Неделя или цикл клетками — `tplPreview` прототипа. */
 export function TemplatePreview({ template }: { template: Pick<Template, "type" | "days" | "cycle"> }) {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const weekday = (index: number) =>
     new Intl.DateTimeFormat(i18n.language, { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 9, 12 + index)));
   const cells =
@@ -72,7 +75,7 @@ export function TemplatePreview({ template }: { template: Pick<Template, "type" 
           const length = Math.max(1, work + off);
           // Два цикла, если влезают в 8 клеток, — видно, что он повторяется.
           return Array.from({ length: length * 2 <= 8 ? length * 2 : length }, (_, index) => ({
-            label: t("template.dayN", { n: index + 1 }),
+            label: String(index + 1),
             day: index % length < work ? { start, end, kind } : null,
           }));
         })();
@@ -95,6 +98,66 @@ export function TemplatePreview({ template }: { template: Pick<Template, "type" 
             <span className="py-1 text-[11px]">—</span>
           )}
         </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- поля окон ---------- */
+
+/**
+ * Время «ЧЧ:ММ» текстом, как `.tin` прототипа: системное поле времени
+ * пишет его по часам ОС — «06:00 PM» рядом с «09:00–17:00» в сетке.
+ */
+export function ClockInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="relative">
+      <Input
+        value={value}
+        inputMode="numeric"
+        maxLength={5}
+        placeholder="09:00"
+        aria-invalid={!isClock(value)}
+        onChange={(event) => onChange(event.target.value)}
+        className={`pr-8 tabular-nums ${isClock(value) ? "" : "border-danger"}`}
+      />
+      <Icon as={ClockIcon} size={15} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-fg-subtle" />
+    </div>
+  );
+}
+
+export function Row({ label, hint, children }: { label: string; hint?: string | undefined; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[13px] text-fg-muted">{label}</span>
+      {children}
+      {hint && <span className="text-xs text-fg-subtle">{hint}</span>}
+    </div>
+  );
+}
+
+export function Segments<T extends string>({
+  value,
+  items,
+  onChange,
+}: {
+  value: T;
+  items: { value: T; label: ReactNode }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="inline-flex self-start rounded-md border border-border p-0.5">
+      {items.map((item) => (
+        <button
+          key={item.value}
+          type="button"
+          onClick={() => onChange(item.value)}
+          className={`inline-flex h-7 items-center gap-1.5 rounded-[4px] px-3 text-[13px] transition-colors ${
+            value === item.value ? "bg-surface-active font-medium text-fg" : "text-fg-muted hover:text-fg"
+          }`}
+        >
+          {item.label}
+        </button>
       ))}
     </div>
   );

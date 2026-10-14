@@ -1648,3 +1648,21 @@ DATE_TIME_WITHOUT_TIME_ZONE (ADR-0014).
 и отклоняют чужой: «unsupported menu type». Свой экран поэтому заводится
 пунктом `LINK` с `attributes.screen` (`settings`, `dashboards`, `dashboards-entry`);
 различает их `toMenuNode` (features/sidebar).
+
+## PATCH строк под токеном пользователя — «Session has been expired»
+
+Проверено 2026-10-14 на «Применить шаблон» графика (features/hrms,
+`api/schedule`). `PATCH /v2/items/{slug}` (правка многих строк)
+с токеном пользователя отвечает 403 «Session has been expired», хотя
+сессия жива: соседние POST и DELETE в том же действии проходят.
+
+Причина — проверка доступа в auth: `V2HasAccessUser` переводит метод
+в право (`ucode_go_auth_service/grpc/service/session_service_v2.go:2113`),
+а в `switch` есть GET, POST, PUT, DELETE — и нет PATCH. Право остаётся
+пустым, `GetTablePermission` с пустым методом отказывает, а шлюз
+любую такую ошибку подписывает как истёкшую сессию
+(`ucode_go_admin_api_gateway/api/handlers/v2/handler.go:114`). Под
+API-ключом проверки нет, поэтому через ключ PATCH работает.
+
+Нужно: `case http.MethodPatch: methodField = config.UPDATE`. Фронт
+обходит: правит строки по одной через `PUT /v2/items/{slug}`.

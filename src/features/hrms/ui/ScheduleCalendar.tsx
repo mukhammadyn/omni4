@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { BriefcaseIcon, ChevronDownIcon, SparkleIcon, UserIcon, UsersIcon, type LucideIcon } from "lucide-react";
+import { BriefcaseIcon, ChevronDownIcon, RefreshCwIcon, SparkleIcon, UserIcon, UsersIcon, type LucideIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
 import { CHIP_STYLES, hexToChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
@@ -12,6 +12,7 @@ import { ATTENDANCE_TAB } from "./employee-tabs";
 import { useScheduleSettings, type ScheduleGroup } from "./schedule-settings";
 import { NO_TEMPLATE } from "./ScheduleTools";
 import { KIND_STYLE, useDuration, type OpenShift } from "./schedule-parts";
+import { ApplyTemplateDialog } from "./ApplyTemplateDialog";
 import { ShiftDialog } from "./ShiftDialog";
 
 type Row = { id: string; employees: ScheduleEmployee[]; position?: string };
@@ -43,6 +44,7 @@ export function ScheduleCalendar({
   const [kinds, setKinds] = useState<Set<ShiftKind>>(() => new Set());
   const [closed, setClosed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<OpenShift | null>(null);
+  const [applyFor, setApplyFor] = useState<string | null>(null);
   const onOpenShift = setEditing;
   const month = scale === "month";
 
@@ -273,6 +275,7 @@ export function ScheduleCalendar({
                               until={range.to}
                               template={month ? undefined : templateOf(row.employees[0]!)}
                               onOpen={() => onOpenEmployee(row.employees[0]!.id, ATTENDANCE_TAB)}
+                              onApply={() => setApplyFor(row.employees[0]!.id)}
                             />
                           )}
                         </td>
@@ -295,6 +298,7 @@ export function ScheduleCalendar({
       </div>
 
       {editing && <ShiftDialog open={editing} onClose={() => setEditing(null)} />}
+      {applyFor && <ApplyTemplateDialog employeeIds={[applyFor]} onClose={() => setApplyFor(null)} />}
     </div>
   );
 }
@@ -343,15 +347,29 @@ function EmployeeHead({
   until,
   template,
   onOpen,
+  onApply,
 }: {
   employee: ScheduleEmployee;
   until: string;
   template: Template | undefined;
   onOpen: () => void;
+  onApply: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div>
-      <EmployeeName employee={employee} until={until} avatar={<Avatar name={employee.name} photo={employee.photo || undefined} size="lg" />} onOpen={onOpen} />
+      <div className="flex items-center gap-1.5">
+        <EmployeeName employee={employee} until={until} avatar={<Avatar name={employee.name} photo={employee.photo || undefined} size="lg" />} onOpen={onOpen} />
+        {/* `.sg-tp` прототипа: применить шаблон этому сотруднику. */}
+        <button
+          type="button"
+          onClick={onApply}
+          title={t("apply.title")}
+          className="grid size-7 shrink-0 place-items-center rounded-md border border-border text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent-subtle hover:text-accent-text focus-visible:opacity-100"
+        >
+          <Icon as={RefreshCwIcon} size={14} />
+        </button>
+      </div>
       {template && <TemplateTag template={template} className="mt-1 ml-[38px]" />}
     </div>
   );
