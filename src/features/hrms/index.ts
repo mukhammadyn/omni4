@@ -5,6 +5,8 @@ export { OrgStructure } from "./ui/OrgStructure";
 export { VACANCIES } from "./api/vacancy";
 export { useVacancyColumns } from "./ui/vacancy-columns";
 export { VacancyCards } from "./ui/VacancyCards";
+export { CandidatesTable } from "./ui/CandidatesTable";
+export { CandidatePage } from "./ui/CandidatePage";
 export { VacancyPlan } from "./ui/VacancyPlan";
 export { VacancyPlanTools } from "./ui/VacancyPlanTools";
 export { VacancyPage, type VacancyTab } from "./ui/VacancyPage";

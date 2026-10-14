@@ -45,6 +45,7 @@ const ICONS: Record<string, LucideIcon> = {
   "GALLERY.person": LayoutGridIcon,
   VACANCIES: LayoutGridIcon,
   VACANCY_PLAN: ClipboardListIcon,
+  CANDIDATES: Table2Icon,
   "ATTENDANCE.calendar": CalendarCheckIcon,
   "ATTENDANCE.list": ListIcon,
   ABSENCES: PlaneIcon,

@@ -40,6 +40,8 @@ import {
   useDisabledDays,
   useDrawerLayout,
   useItem,
+  useItemCounts,
+  ValueChips,
   useItems,
   useUpdateItem,
   dayKey,
@@ -79,6 +81,7 @@ import {
   Absences,
   AttendanceCalendar,
   AttendanceList,
+  CandidatesTable,
   OrgStructure,
   Timesheet,
   VACANCIES,
@@ -149,6 +152,7 @@ import {
   useExportExcel,
   useMenuViews,
   subGroupField,
+  chipsField,
   tabGroupField,
   useTabGroup,
   useUpdateView,
@@ -624,6 +628,8 @@ function MenuPage() {
   const GalleryCards = view?.card === "person" ? PeopleGallery : Gallery;
   /** «Карточки» вакансий (features/hrms) — та же галерея, карточка вакансии. */
   const vacancyCardsView = supportedView && view?.type === "VACANCIES";
+  /** Таблица кандидатов (features/hrms): колонки по вкладке-статусу. */
+  const candidatesView = supportedView && view?.type === "CANDIDATES";
   /** «Оргструктура» сотрудников: дереву нужны все люди сразу, без страниц. */
   const orgView = supportedView && view?.type === "ORG";
   /** «Планирование» вакансий (features/hrms): итогам нужны все вакансии. */
@@ -864,6 +870,8 @@ function MenuPage() {
   /* Поле дорожек ищется теми же двумя ключами, что и поле колонок:
      у поля-связи в настройках лежит id связи, а не поля. */
   const boardLaneField = boardView ? subGroupField(view, tableFields) : undefined;
+  /** Поле полосы значений. У доски его нет: значения там и так колонками. */
+  const chipsBy = boardView ? undefined : chipsField(view, tableFields);
   /** Доску не по чему раскладывать: поле не выбрано в настройках view. */
   const boardNotReady = boardView && !boardField;
 
@@ -902,6 +910,38 @@ function MenuPage() {
   const scopeFilters: Filters = useMemo(
     () => ({ ...filters, ...defaultFilters, ...tabFilters }),
     [filters, defaultFilters, tabFilters],
+  );
+
+  /*
+   * Счётчики вкладок — тем же отбором, что и список, только с условием
+   * своей вкладки: число на вкладке совпадает с тем, что она покажет.
+   * Доске вкладки не рисуются — и считать нечего.
+   */
+  /* Полоса считается без своего же условия: иначе после первого
+     нажатия остальные чипы пропали бы, и выбрать второй было бы не из чего. */
+  const chipFilters = useMemo(() => {
+    if (!chipsBy) return scopeFilters;
+    const rest = { ...scopeFilters };
+    delete rest[chipsBy.slug];
+    return rest;
+  }, [scopeFilters, chipsBy]);
+
+  const tabCountFilters = useMemo(
+    () =>
+      boardView
+        ? []
+        : tabGroup.tabs.map((tab) => ({ ...filters, ...defaultFilters, ...tab.filters })),
+    [boardView, tabGroup.tabs, filters, defaultFilters],
+  );
+  const tabCounts = useItemCounts(
+    can.read ? view?.tableSlug : undefined,
+    tabCountFilters,
+    searchText,
+  );
+  const tabsInBar = tabs.length === 1 && tabGroup.tabs.length > 0 && !boardView;
+  const tabItems = useMemo(
+    () => tabGroup.tabs.map((tab, i) => ({ id: tab.id, label: tab.label, count: tabCounts[i] })),
+    [tabGroup.tabs, tabCounts],
   );
 
   /** То, что действительно уходит в запрос. Область видимости — сверху. */
@@ -1024,6 +1064,12 @@ function MenuPage() {
        в drawer не помещается (features/hrms, VacancyPage). */
     if (view?.tableSlug === VACANCIES) {
       void navigate({ to: "/vacancies/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
+    /* Кандидата — тоже: воронка, оценки по этапам и история
+       (features/hrms, CandidatePage). */
+    if (view?.tableSlug === CANDIDATES) {
+      void navigate({ to: "/candidates/$itemId", params: { itemId: guid }, search: { menu: menuId } });
       return;
     }
 
@@ -1453,12 +1499,26 @@ function MenuPage() {
            справа тулбар (`.view-actions`) с зазором 2px между кнопками.
            Поля 24px — `.page.full`: линия начинается там же, где таблица. */
         <div className="mx-6 flex h-11.5 shrink-0 items-center gap-1 border-b border-border transition-opacity duration-200 ease-out starting:opacity-0">
-          <ViewTabs
-            views={tabs}
-            activeId={view?.id ?? ""}
-            language={language}
-            onSelect={(next) => openView(next.id)}
-          />
+          {/* View один, а у него вкладки — они и встают на место его имени,
+              как в прототипе (candidates.html: Активные · Нанятые · …):
+              вторая строка под единственной вкладкой view была бы полосой
+              ради полосы. View несколько — вкладки остаются строкой ниже. */}
+          {tabsInBar ? (
+            <div className="flex min-w-0 self-stretch">
+              <Tabs
+                tabs={tabItems}
+                activeId={tabGroup.activeId}
+                onSelect={(id) => setSearch({ group: id, page: 1 }, true)}
+              />
+            </div>
+          ) : (
+            <ViewTabs
+              views={tabs}
+              activeId={view?.id ?? ""}
+              language={language}
+              onSelect={(next) => openView(next.id)}
+            />
+          )}
 
           {can.viewCreate && tableSlug && (
             <ViewCreateButton
@@ -1671,6 +1731,7 @@ function MenuPage() {
                   onGroupBy: (groupBy) => updateView.mutate({ view, groupBy }),
                   /* Дорожки доски: второй уровень той же раскладки. */
                   onSubGroup: (subGroup) => updateView.mutate({ view, subGroup }),
+                  onChips: (chips) => updateView.mutate({ view, chips }),
                   // Поля дат календаря. Смена поля начала сбрасывает
                   // видимый день: диапазон считался по прежнему полю,
                   // и оставлять его — показывать чужой отбор.
@@ -1889,14 +1950,36 @@ function MenuPage() {
 
               У доски та же настройка рисует колонки, а не вкладки:
               полоса поверх доски дублировала бы её же шапки. */}
-          {tabGroup.tabs.length > 0 && !boardView && (
+          {tabGroup.tabs.length > 0 && !boardView && !tabsInBar && (
             <div className="mx-6 flex h-11 shrink-0 items-center border-b border-border">
               <Tabs
-                tabs={tabGroup.tabs}
+                tabs={tabItems}
                 activeId={tabGroup.activeId}
                 onSelect={(id) => setSearch({ group: id, page: 1 }, true)}
               />
             </div>
+          )}
+
+          {chipsBy && view && can.read && !sheetView && (
+            <ValueChips
+              className="mx-6 shrink-0 border-b border-border py-2"
+              tableSlug={view.tableSlug}
+              field={chipsBy}
+              relations={schema.relations}
+              language={language}
+              filters={chipFilters}
+              search={searchText}
+              selected={filters[chipsBy.slug]?.values ?? []}
+              onChange={(values) => {
+                const next = { ...filters };
+                if (values.length) {
+                  next[chipsBy.slug] = { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values };
+                } else {
+                  delete next[chipsBy.slug];
+                }
+                applyFilters(next);
+              }}
+            />
           )}
 
           {/* Полоса отбора проявляется, а не возникает. Высоту ей не
@@ -2213,6 +2296,16 @@ function MenuPage() {
               fields={schema.fields}
               language={language}
               pending={(hasMore || loadingMore) && rows.rows.length < ORG_CAP}
+              onOpenRow={openRow}
+            />
+          ) : candidatesView ? (
+            <CandidatesTable
+              rows={rows.rows}
+              status={tabGroup.activeId}
+              fields={schema.fields}
+              relations={schema.relations}
+              language={language}
+              canUpdate={can.update}
               onOpenRow={openRow}
             />
           ) : vacancyCardsView ? (

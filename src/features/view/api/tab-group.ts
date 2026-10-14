@@ -38,7 +38,12 @@ export const TAB_GROUP_TYPES = new Set([
  */
 const TAB_LIMIT = 50;
 
-export type TabGroupTab = { id: string; label: string };
+export type TabGroupTab = {
+  id: string;
+  label: string;
+  /** Условие этой вкладки — для счётчика: открытая уходит в `filters`. */
+  filters: Filters;
+};
 
 export type TabGroup = {
   /** Поле раскладки. undefined — вкладок нет, всё остальное пусто. */
@@ -69,6 +74,11 @@ export function tabGroupField(view: View | undefined, fields: Field[]): Field | 
  */
 export function subGroupField(view: View | undefined, fields: Field[]): Field | undefined {
   return fieldById(view?.subGroupId, fields);
+}
+
+/** Поле полосы значений (`attributes.chips_by_id`) — теми же двумя ключами. */
+export function chipsField(view: View | undefined, fields: Field[]): Field | undefined {
+  return fieldById(view?.chipsId, fields);
 }
 
 function fieldById(id: string | undefined, fields: Field[]): Field | undefined {
@@ -119,10 +129,15 @@ export function useTabGroup({
     if (!field) return NO_TAB_GROUP;
 
     const tabs: TabGroupTab[] = relation
-      ? rows.map((row) => ({ id: row.guid, label: row.label || row.guid }))
+      ? rows.map((row) => ({
+          id: row.guid,
+          label: row.label || row.guid,
+          filters: { [field.slug]: tabFilter(field, row.guid) },
+        }))
       : [...field.options.values()].map((option) => ({
           id: option.value,
           label: localized(option.labels, language, option.label || option.value),
+          filters: { [field.slug]: tabFilter(field, option.value) },
         }));
 
     /*
@@ -130,13 +145,13 @@ export function useTabGroup({
      * не бывает — раскладка на то и раскладка, что показывает часть.
      * Так же ведёт себя и старая админка (Grid.jsx, setGroupTab).
      */
-    const activeId = tabs.find((tab) => tab.id === selected)?.id ?? tabs[0]?.id ?? "";
+    const active = tabs.find((tab) => tab.id === selected) ?? tabs[0];
 
     return {
       field,
       tabs,
-      activeId,
-      filters: activeId ? { [field.slug]: tabFilter(field, activeId) } : {},
+      activeId: active?.id ?? "",
+      filters: active?.filters ?? {},
       pending: Boolean(relation) && isLoading,
     };
   }, [field, relation, rows, language, selected, isLoading]);

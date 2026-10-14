@@ -1,12 +1,12 @@
 import { useCallback } from "react";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTableSettings } from "@/features/table";
+import { useInfiniteQuery, useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { fetchTableSettings } from "@/features/table";
 import { api } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { keys } from "@/shared/lib/query-keys";
 import { errorMessage, reportError } from "@/shared/lib/toast";
 import { relationDataKey, type Item } from "../model/types";
-import { type ItemsQuery, resolveMe, toRequestBody } from "../model/query";
+import { type Filters, type ItemsQuery, resolveMe, toRequestBody } from "../model/query";
 
 /**
  * Строки таблицы.
@@ -104,6 +104,52 @@ export function useItems(tableSlug: string | undefined, query: ItemsQuery) {
     /** Повторить запрос: у отказа на экране есть кнопка. */
     refetch: () => void result.refetch(),
   };
+}
+
+/**
+ * Сколько строк под каждым отбором — для счётчиков на вкладках.
+ *
+ * По запросу на отбор: ручки «посчитай по значениям поля» с фильтрами
+ * у бэкенда нет — серверная группировка фильтры игнорирует
+ * (docs/backend-notes.md, «Группировка»). Строка спрашивается одна
+ * и без связей: нужен только `count`.
+ *
+ * ponytail: N запросов на N вкладок; вкладок в раскладке бывает
+ * немного (потолок — TAB_LIMIT в features/view). Станет дорого —
+ * просить у бэкенда count с GROUP BY и WHERE.
+ *
+ * Ключ лежит под `keys.items.table`, поэтому правка, создание
+ * и удаление строк освежают и счётчики. Пометка `count` в ключе
+ * не даёт ему совпасть с ключом страниц useItems: там кэш бесконечный,
+ * здесь обычный, и общий ключ они не делят.
+ */
+export function useItemCounts(
+  tableSlug: string | undefined,
+  filters: Filters[],
+  search: string,
+): (number | undefined)[] {
+  const slug = tableSlug ?? "";
+
+  return useQueries({
+    queries: filters.map((one) => {
+      const body = toRequestBody({
+        limit: 1,
+        page: 1,
+        filters: resolveMe(one, session.getObjectIds()),
+        search,
+        relations: false,
+      });
+
+      return {
+        queryKey: keys.items.list(slug, { ...body, count: true }),
+        queryFn: () => api.post<ItemsResponseDto>(`/v2/object/get-list/${slug}`, { data: body }),
+        enabled: Boolean(slug),
+        staleTime: 60_000,
+        select: (data: ItemsResponseDto) => data.data?.count ?? 0,
+      };
+    }),
+    combine: (results) => results.map((result) => result.data),
+  });
 }
 
 /**
@@ -250,11 +296,18 @@ export function authBypass(
 export function useUpdateItem(tableSlug: string | undefined) {
   const queryClient = useQueryClient();
   const slug = tableSlug ?? "";
-  const { table } = useTableSettings(tableSlug);
 
   return useMutation({
-    mutationFn: ({ guid, values }: RowEdit) =>
-      api.put<unknown>(`/v2/items/${slug}`, { data: { guid, ...values, ...authBypass(values, table) } }),
+    /*
+     * Настройки таблицы — только ради authBypass, и читаются в момент
+     * правки, а не при монтировании: хук правки стоит и там, где таблицу
+     * не показывают (оценки на странице кандидата), и запрос настроек
+     * при открытии страницы был бы впустую. Обычно они уже в кэше.
+     */
+    mutationFn: async ({ guid, values }: RowEdit) => {
+      const table = await fetchTableSettings(queryClient, slug);
+      return api.put<unknown>(`/v2/items/${slug}`, { data: { guid, ...values, ...authBypass(values, table) } });
+    },
 
     onMutate: async (edit) => {
       // Летящий запрос списка перезапишет наш патч своим старым ответом.

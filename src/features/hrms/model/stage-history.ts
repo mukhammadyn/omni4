@@ -7,7 +7,8 @@
  *   hr_recruiting_stages_id_2 — «С этапа» (пусто — вход в воронку);
  *   hr_recruiting_stages_id   — «На этап» (пусто — выход: нанят, отказ);
  *   status                    — статус кандидата после перехода;
- *   employees_id              — кто перевёл, если своя строка известна.
+ *   employees_id              — кто перевёл, если своя строка известна;
+ *   comment                   — пояснение: причина отказа, откуда перенесён.
  */
 export function stageHistoryRow({
   candidate,
@@ -17,6 +18,7 @@ export function stageHistoryRow({
   status,
   by,
   at,
+  comment,
 }: {
   candidate: string;
   vacancy: string;
@@ -25,6 +27,7 @@ export function stageHistoryRow({
   status: string;
   by: string | undefined;
   at: string;
+  comment?: string | undefined;
 }) {
   return {
     hr_candidates_id: candidate,
@@ -34,5 +37,6 @@ export function stageHistoryRow({
     status,
     moved_at: at,
     ...(by ? { employees_id: by } : {}),
+    ...(comment ? { comment } : {}),
   };
 }

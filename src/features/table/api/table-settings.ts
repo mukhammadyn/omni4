@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
 import i18n from "@/shared/lib/i18n";
 import { keys } from "@/shared/lib/query-keys";
@@ -91,15 +91,39 @@ export function useTableSettings(tableSlug: string | undefined, enabled = true) 
   const slug = tableSlug ?? "";
 
   const query = useQuery({
-    queryKey: keys.tables.detail(slug),
-    queryFn: () => api.get<TableDto>(`/v1/table/${slug}`),
+    ...tableQuery(slug),
     enabled: Boolean(slug) && enabled,
-    // Настройки таблицы правит админ, и правит редко.
-    staleTime: 5 * 60_000,
     select: toTableSettings,
   });
 
   return { table: query.data, isLoading: query.isLoading, error: query.error };
+}
+
+/** Запрос настроек — один на хук и на чтение по требованию (fetchTableSettings). */
+function tableQuery(slug: string) {
+  return {
+    queryKey: keys.tables.detail(slug),
+    queryFn: () => api.get<TableDto>(`/v1/table/${slug}`),
+    // Настройки таблицы правит админ, и правит редко.
+    staleTime: 5 * 60_000,
+  };
+}
+
+/**
+ * Настройки таблицы тогда, когда они понадобились, а не при монтировании:
+ * из кэша, нет его — запросом. Для тех, кому они нужны только в момент
+ * действия (правка строки, features/item). Не пришли — undefined.
+ */
+export async function fetchTableSettings(
+  queryClient: QueryClient,
+  tableSlug: string,
+): Promise<TableSettings | undefined> {
+  if (!tableSlug) return undefined;
+  try {
+    return toTableSettings(await queryClient.ensureQueryData(tableQuery(tableSlug)));
+  } catch {
+    return undefined;
+  }
 }
 
 /**

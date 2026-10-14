@@ -60,6 +60,7 @@ function VacancyRoute() {
       language={language}
       onTab={(next) => void navigate({ to: ".", search: { menu, tab: next }, replace: true })}
       onAddCandidate={() => void navigate({ to: "/candidates/new", search: { vac: itemId, menu } })}
+      onOpenCandidate={(guid) => void navigate({ to: "/candidates/$itemId", params: { itemId: guid }, search: { menu: "" } })}
     />
   );
 }

@@ -374,7 +374,7 @@ export function Pills({
  * и строка ввода, Enter добавляет, Backspace в пустой строке снимает
  * последнюю.
  */
-function Tags({ value, placeholder, onChange }: { value: string[]; placeholder: string; onChange: (next: string[]) => void }) {
+export function Tags({ value, placeholder, onChange }: { value: string[]; placeholder: string; onChange: (next: string[]) => void }) {
   const { t } = useTranslation();
   const [input, setInput] = useState("");
   return (

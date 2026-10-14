@@ -84,6 +84,7 @@ export function VacancyPage({
   language,
   onTab,
   onAddCandidate,
+  onOpenCandidate,
 }: {
   guid: string;
   tab: VacancyTab;
@@ -92,6 +93,7 @@ export function VacancyPage({
   onTab: (tab: VacancyTab) => void;
   /** «+ Кандидат» — страница нового кандидата с этой вакансией. */
   onAddCandidate: () => void;
+  onOpenCandidate: (guid: string) => void;
 }) {
   const { t } = useTranslation();
   const vacancy = useVacancy(guid);
@@ -290,6 +292,7 @@ export function VacancyPage({
             today={today}
             onMove={vacancy.moveCandidate}
             onRestore={vacancy.restoreCandidate}
+            onOpen={onOpenCandidate}
           />
         ) : tab === "cands" ? (
           <Candidates
@@ -300,6 +303,7 @@ export function VacancyPage({
             candidateFields={vacancy.candidateFields}
             locale={locale}
             language={language}
+            onOpen={onOpenCandidate}
           />
         ) : (
           /* `.vi-grid`: тексты слева, свойства справа; узко — столбиком. */
@@ -400,6 +404,7 @@ function Funnel({
   today,
   onMove,
   onRestore,
+  onOpen,
 }: {
   scores: Map<string, number>;
   columns: StageColumn[];
@@ -412,6 +417,7 @@ function Funnel({
   today: string;
   onMove: (candidate: Item, stage: string) => void;
   onRestore: (candidate: Item) => void;
+  onOpen: (guid: string) => void;
 }) {
   const { t } = useTranslation();
   const [over, setOver] = useState<string | null>(null);
@@ -473,9 +479,10 @@ function Funnel({
                       setDragging(text(c.guid));
                     }}
                     onDragEnd={() => setDragging(null)}
+                    onClick={() => onOpen(text(c.guid))}
                     /* `.fn-card`: лёгкая тень и рамка; при наведении — тень карточки. */
-                    className={`flex gap-2.5 rounded-[9px] bg-surface px-[11px] py-2.5 ring-1 ring-border ring-inset transition-shadow hover:shadow-card hover:ring-border-strong ${
-                      canMove ? "cursor-grab active:cursor-grabbing" : ""
+                    className={`flex cursor-pointer gap-2.5 rounded-[9px] bg-surface px-[11px] py-2.5 ring-1 ring-border ring-inset transition-shadow hover:shadow-card hover:ring-border-strong ${
+                      canMove ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                     } ${dragging === text(c.guid) ? "opacity-40" : ""}`}
                   >
                     <Avatar name={text(c.full_name)} photo={firstText(c.photo) || undefined} size="lg" />
@@ -528,7 +535,8 @@ function Funnel({
               finished.map((c) => (
                 <div
                   key={text(c.guid)}
-                  className="flex items-center gap-2.5 rounded-[9px] px-3 py-2.5 ring-1 ring-border ring-inset transition-colors hover:bg-surface-hover"
+                  onClick={() => onOpen(text(c.guid))}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-[9px] px-3 py-2.5 ring-1 ring-border ring-inset transition-colors hover:bg-surface-hover"
                 >
                   <Avatar name={text(c.full_name)} photo={firstText(c.photo) || undefined} size="lg" />
                   <div className="min-w-0 flex-1">
@@ -549,7 +557,10 @@ function Funnel({
                   {c.status !== "hired" && canMove && (
                     <button
                       type="button"
-                      onClick={() => onRestore(c)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRestore(c);
+                      }}
                       title={t("vacancy.page.restore")}
                       aria-label={t("vacancy.page.restore")}
                       className="grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle transition-colors hover:bg-surface-hover hover:text-fg"
@@ -623,6 +634,7 @@ function Candidates({
   candidateFields,
   locale,
   language,
+  onOpen,
 }: {
   query: string;
   scores: Map<string, number>;
@@ -631,6 +643,7 @@ function Candidates({
   candidateFields: Field[];
   locale: string;
   language: string;
+  onOpen: (guid: string) => void;
 }) {
   const { t } = useTranslation();
   const shown = candidates.filter((c) => text(c.full_name).toLowerCase().includes(query.trim().toLowerCase()));
@@ -657,7 +670,7 @@ function Candidates({
             const stage = stageOf(c);
             const salary = num(c.salary_expectation);
             return (
-              <tr key={text(c.guid)} className="hover:[&>td]:bg-surface-hover">
+              <tr key={text(c.guid)} onClick={() => onOpen(text(c.guid))} className="cursor-pointer hover:[&>td]:bg-surface-hover">
                 <td className={td}>
                   <span className="flex items-center gap-2.5">
                     <Avatar name={text(c.full_name)} photo={firstText(c.photo) || undefined} />

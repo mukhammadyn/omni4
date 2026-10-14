@@ -26,6 +26,7 @@ export const VIEW_TYPES = [
   "ORG",
   "VACANCIES",
   "VACANCY_PLAN",
+  "CANDIDATES",
   "ATTENDANCE",
   "ABSENCES",
   "BOARD",
@@ -141,6 +142,11 @@ const TRAITS: Record<ViewType, ViewTraits> = {
   VACANCIES: HRMS,
   /** «Планирование» найма там же: план и найм по месяцам. */
   VACANCY_PLAN: HRMS,
+  /**
+   * «Кандидаты» (`candidates.html`, features/hrms): таблица по слагам
+   * `hr_candidates`, колонки зависят от вкладки-статуса.
+   */
+  CANDIDATES: HRMS,
   /**
    * Посещаемость (`attendance.html`, features/hrms) по
    * `hr_attendance_days`. Три экрана — раскладки одного типа
@@ -346,6 +352,13 @@ export type View = {
    * (HeaderFilter/components/ViewOptions.jsx:296).
    */
   subGroupId: string;
+  /**
+   * Поле полосы значений над списком (`attributes.chips_by_id`, наш
+   * ключ — в старой админке такой настройки нет): чип на значение
+   * со счётчиком, нажатие — отбор. Ключ тот же, что и у `tabGroupId`.
+   * Пусто — полосы нет. Образец — этапы над кандидатами в прототипе.
+   */
+  chipsId: string;
   /**
    * Слаг поля, с которого начинается событие календаря и полоса
    * таймлайна (колонка `calendar_from_slug`). Пусто — рисовать нечего.

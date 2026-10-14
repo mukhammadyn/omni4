@@ -18,3 +18,9 @@ test("переход: «с этапа» — второе поле, «на эта
     stageHistoryRow({ candidate: "c", vacancy: "v", from: null, to: "s1", status: "active", by: undefined, at: "T" }),
   ).not.toHaveProperty("employees_id");
 });
+
+test("пояснение — только если есть", () => {
+  const base = { candidate: "c", vacancy: "v", from: "s1", to: null, status: "rejected", by: undefined, at: "T" };
+  expect(stageHistoryRow({ ...base, comment: "Не прошёл" })).toMatchObject({ comment: "Не прошёл" });
+  expect(stageHistoryRow(base)).not.toHaveProperty("comment");
+});

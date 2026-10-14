@@ -295,6 +295,8 @@ export type ViewEdit = {
   tabGroup?: string;
   /** Поле дорожек доски. Пустая строка — убрать дорожки. */
   subGroup?: string;
+  /** Поле полосы значений. Пустая строка — убрать полосу. */
+  chips?: string;
   /** Слаг поля начала события. Пустая строка — календарю нечего рисовать. */
   dateFrom?: string;
   /** Слаг поля конца события. Пустая строка — событие точкой в дне. */
@@ -336,6 +338,7 @@ export function toUpdateBody({
   groupBy,
   tabGroup,
   subGroup,
+  chips,
   dateFrom,
   dateTo,
   charts,
@@ -385,6 +388,7 @@ export function toUpdateBody({
      * от «поля с пустым id», а null отличается.
      */
     ...(subGroup === undefined ? {} : { sub_group_by_id: subGroup || null }),
+    ...(chips === undefined ? {} : { chips_by_id: chips || null }),
     /*
      * Графики. Список целиком, включая пустой: убрать последний график
      * — такая же правка, как добавить первый, и «не трогали» здесь
@@ -517,6 +521,8 @@ export function toView(dto: ViewDto): View {
       typeof dto.attributes?.["sub_group_by_id"] === "string"
         ? dto.attributes["sub_group_by_id"]
         : "",
+    chipsId:
+      typeof dto.attributes?.["chips_by_id"] === "string" ? dto.attributes["chips_by_id"] : "",
     dateFromSlug: toDateSlug(dto.calendar_from_slug, dto.attributes, "calendar_from_slug"),
     dateToSlug: toDateSlug(dto.calendar_to_slug, dto.attributes, "calendar_to_slug"),
     statusFieldSlug: dto.status_field_slug?.trim() ?? "",

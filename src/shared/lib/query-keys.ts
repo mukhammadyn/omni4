@@ -236,6 +236,8 @@ export const keys = {
     all: ["files"] as const,
     folder: (folder: string) => [...keys.files.all, folder] as const,
     list: (folder: string, search: string) => [...keys.files.folder(folder), search] as const,
+    /** Размер и дата файла по адресу — заголовки ответа CDN. */
+    meta: (url: string) => [...keys.files.all, "meta", url] as const,
   },
   /** Шаблоны ДОКУМЕНТОВ: печатные формы записи, свои у каждой таблицы. */
   docs: {

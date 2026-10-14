@@ -75,7 +75,16 @@ export function useCreateItem(tableSlug: string | undefined) {
         ),
       }),
     onError: (error) => reportError(error, "common.createFailed"),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.items.all }),
+    /*
+     * Только своя таблица: на новую строку ещё никто не ссылается, и в
+     * чужих списках (`<слаг>_data`) её нет. Сброс всего `items` грузил
+     * заново всё на экране — на странице кандидата пять списков на
+     * каждую запись истории. Счётчики и деревья этой таблицы лежат под
+     * тем же ключом и освежаются. Не освежится чужое, что бэкенд
+     * пересчитал бы сам (событие после создания, формула-счётчик) —
+     * у проекта таких нет (docs/backend-notes.md, «Поле FORMULA»).
+     */
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.items.table(slug) }),
   });
 }
 

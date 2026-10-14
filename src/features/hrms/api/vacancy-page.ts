@@ -10,9 +10,9 @@ import { text } from "./org";
 import { VACANCIES } from "./vacancy";
 
 export const CANDIDATES = "hr_candidates";
-const STAGES = "hr_recruiting_stages";
-const HISTORY = "hr_candidate_stage_history";
-const EVALUATIONS = "hr_candidate_evaluations";
+export const STAGES = "hr_recruiting_stages";
+export const HISTORY = "hr_candidate_stage_history";
+export const EVALUATIONS = "hr_candidate_evaluations";
 export const ALL = { limit: MAX_LIMIT, page: 1 };
 
 /** Статус кандидата «в работе» — он и стоит в колонках воронки. */
@@ -39,7 +39,14 @@ export function usePipelineStages(pipeline: string) {
  */
 function useStageLog() {
   const createHistory = useCreateItem(HISTORY);
-  return (candidate: string, vacancy: string, from: string | null, to: string | null, status: string) =>
+  return (
+    candidate: string,
+    vacancy: string,
+    from: string | null,
+    to: string | null,
+    status: string,
+    comment?: string,
+  ) =>
     createHistory.mutate(
       stageHistoryRow({
         candidate,
@@ -49,6 +56,7 @@ function useStageLog() {
         status,
         by: session.getObjectIds()[EMPLOYEES],
         at: new Date().toISOString(),
+        comment,
       }),
     );
 }
@@ -86,6 +94,115 @@ export function useCreateCandidate() {
 }
 
 /**
+ * Средняя оценка кандидатов из 10; нет оценок — нет ключа.
+ *
+ * По `hr_candidate_evaluations`, а не из поля `score`: оно FORMULA без
+ * настроек (`table_from` пуст) и не считается вовсе, а настроенное
+ * не досчитывало бы (docs/backend-notes.md, «Поле FORMULA»).
+ */
+export function useCandidateScores(ids: string[]) {
+  const evaluations = useItems(ids.length ? EVALUATIONS : undefined, {
+    ...ALL,
+    relations: false,
+    filters: { hr_candidates_id: { op: "is", values: ids } },
+  });
+  return useMemo(() => {
+    const sums = new Map<string, { sum: number; n: number }>();
+    for (const e of evaluations.page.rows) {
+      if (typeof e.score !== "number") continue;
+      const id = text(e.hr_candidates_id);
+      const acc = sums.get(id) ?? { sum: 0, n: 0 };
+      sums.set(id, { sum: acc.sum + e.score, n: acc.n + 1 });
+    }
+    return new Map([...sums].map(([id, { sum, n }]) => [id, Math.round((sum / n) * 10) / 10]));
+  }, [evaluations.page.rows]);
+}
+
+/**
+ * Переходы кандидата — смена этапа и возврат в работу — с записью
+ * в историю этапов. Запись — только после ответа: отказ сервера
+ * не должен оставить в истории переход, которого не было.
+ */
+export function useCandidateMoves() {
+  const updateCandidate = useUpdateItem(CANDIDATES);
+  const log = useStageLog();
+  const transition = (
+    candidate: Item,
+    values: Item,
+    from: string | null,
+    to: string | null,
+    status: string,
+    comment?: string,
+  ) =>
+    updateCandidate.mutate(
+      { guid: text(candidate.guid), values },
+      {
+        /* Вакансия — после перехода: перенос пишется уже на новую. */
+        onSuccess: () =>
+          log(
+            text(candidate.guid),
+            text(values.hr_vacancies_id) || text(candidate.hr_vacancies_id),
+            from,
+            to,
+            status,
+            comment,
+          ),
+      },
+    );
+
+  return {
+    /** Кандидата — на другой этап; с этого момента «на этапе 0 дн.». */
+    move: (candidate: Item, stage: string) =>
+      transition(
+        candidate,
+        { hr_recruiting_stages_id: stage, stage_changed_at: new Date().toISOString() },
+        text(candidate.hr_recruiting_stages_id) || null,
+        stage,
+        ACTIVE,
+      ),
+    /**
+     * Вернуть в воронку из отказа или резерва — `data-rs` прототипа: вход
+     * на его этап. Причина стирается: в работе её нет (`#cdBack`).
+     */
+    restore: (candidate: Item) =>
+      transition(
+        candidate,
+        { status: ACTIVE, hr_rejection_reasons_id: null },
+        null,
+        text(candidate.hr_recruiting_stages_id) || null,
+        ACTIVE,
+      ),
+    /**
+     * Выход из воронки — нанят, отказ, резерв (`#cdHire`, `#cdRej`,
+     * `#cdRes`): «на этап» пусто, этап кандидата остаётся последним
+     * пройденным. `values` — что пишется вместе со статусом.
+     */
+    finish: (candidate: Item, status: string, values: Item = {}, comment?: string) =>
+      transition(
+        candidate,
+        { ...values, status },
+        text(candidate.hr_recruiting_stages_id) || null,
+        null,
+        status,
+        comment,
+      ),
+    /**
+     * Перенос на другую вакансию — на первый этап её воронки, с отсчётом
+     * «на этапе» заново. Статус не меняется; в истории — откуда перенесён.
+     */
+    transfer: (candidate: Item, vacancy: string, stage: string | null, comment: string) =>
+      transition(
+        candidate,
+        { hr_vacancies_id: vacancy, hr_recruiting_stages_id: stage, stage_changed_at: new Date().toISOString() },
+        text(candidate.hr_recruiting_stages_id) || null,
+        stage,
+        text(candidate.status),
+        comment,
+      ),
+  };
+}
+
+/**
  * Всё, что нужно странице вакансии (vacancy.html прототипа): запись,
  * схемы вакансии и кандидата, этапы её воронки, кандидаты, права и правка.
  *
@@ -98,21 +215,7 @@ export function useVacancy(guid: string) {
   const { schema: candidateSchema } = useTableSchema(CANDIDATES);
   const permissionOf = useTablePermissions();
   const update = useUpdateItem(VACANCIES);
-  const updateCandidate = useUpdateItem(CANDIDATES);
-  const stageLog = useStageLog();
-  const log = (candidate: string, from: string | null, to: string | null, status: string) =>
-    stageLog(candidate, guid, from, to, status);
-
-  /**
-   * Смена этапа или статуса кандидата — и запись о ней в истории.
-   * Запись — только после ответа: отказ сервера не должен оставить
-   * в истории переход, которого не было.
-   */
-  const transition = (candidate: Item, values: Item, from: string | null, to: string | null, status: string) =>
-    updateCandidate.mutate(
-      { guid: text(candidate.guid), values },
-      { onSuccess: () => log(text(candidate.guid), from, to, status) },
-    );
+  const moves = useCandidateMoves();
 
   const candidates = useItems(CANDIDATES, {
     ...ALL,
@@ -122,27 +225,8 @@ export function useVacancy(guid: string) {
 
   const all = candidates.page.rows;
 
-  /*
-   * Средняя оценка — по `hr_candidate_evaluations`, а не из поля `score`:
-   * оно FORMULA без настроек (`table_from` пуст) и не считается вовсе,
-   * а настроенное не досчитывало бы (docs/backend-notes.md, «Поле FORMULA»).
-   */
   const ids = useMemo(() => all.map((c) => text(c.guid)).filter(Boolean), [all]);
-  const evaluations = useItems(ids.length ? EVALUATIONS : undefined, {
-    ...ALL,
-    relations: false,
-    filters: { hr_candidates_id: { op: "is", values: ids } },
-  });
-  const scores = useMemo(() => {
-    const sums = new Map<string, { sum: number; n: number }>();
-    for (const e of evaluations.page.rows) {
-      if (typeof e.score !== "number") continue;
-      const id = text(e.hr_candidates_id);
-      const acc = sums.get(id) ?? { sum: 0, n: 0 };
-      sums.set(id, { sum: acc.sum + e.score, n: acc.n + 1 });
-    }
-    return new Map([...sums].map(([id, { sum, n }]) => [id, Math.round((sum / n) * 10) / 10]));
-  }, [evaluations.page.rows]);
+  const scores = useCandidateScores(ids);
   const columns = useMemo<StageColumn[]>(
     () =>
       stages.map((stage) => ({
@@ -175,24 +259,8 @@ export function useVacancy(guid: string) {
     edit: (slug: string, value: unknown) => update.mutate({ guid, values: { [slug]: value } }),
     /** Форма «Редактировать»: все правки — одним запросом. */
     save: (values: Item) => update.mutate({ guid, values }),
-    /** Кандидата — на другой этап; с этого момента «на этапе 0 дн.». */
-    moveCandidate: (candidate: Item, stage: string) =>
-      transition(
-        candidate,
-        { hr_recruiting_stages_id: stage, stage_changed_at: new Date().toISOString() },
-        text(candidate.hr_recruiting_stages_id) || null,
-        stage,
-        ACTIVE,
-      ),
+    moveCandidate: moves.move,
     canAdd: permissionOf(CANDIDATES).write,
-    /** Вернуть в воронку из отказа или резерва — `data-rs` прототипа: вход на его этап. */
-    restoreCandidate: (candidate: Item) =>
-      transition(
-        candidate,
-        { status: ACTIVE },
-        null,
-        text(candidate.hr_recruiting_stages_id) || null,
-        ACTIVE,
-      ),
+    restoreCandidate: moves.restore,
   };
 }

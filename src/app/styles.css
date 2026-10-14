@@ -557,6 +557,30 @@ body {
 }
 
 /*
+ * Печать страницы записи (страница кандидата, «Ещё → Печать»).
+ *
+ * Страница помечена `data-print-page` и живёт внутри каркаса на всю
+ * высоту окна с прокруткой внутри. На бумагу должна уйти она одна
+ * и целиком: всё, что не она, не её предок и не её потомок, прячется
+ * (сайдбар, шапка, тосты), а предкам снимаются высота и обрезка —
+ * иначе печатался бы только видимый экран. Кнопки страница прячет
+ * сама (`print:hidden`).
+ */
+@media print {
+  body:has([data-print-page]) *:not(:has([data-print-page]), [data-print-page], [data-print-page] *) {
+    display: none !important;
+  }
+
+  *:has([data-print-page]),
+  [data-print-page] {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+}
+
+/*
  * Микрофронтенд во всю область содержимого.
  *
  * Обычный экран живёт в карточке: отступ от края, скругление, тень

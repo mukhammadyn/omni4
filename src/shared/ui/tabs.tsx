@@ -29,6 +29,8 @@ export type TabItem = {
   iconNode?: ReactNode;
   /** Подсказка под курсором. Нужна там, где подпись сокращена до кода. */
   title?: string;
+  /** Сколько записей за вкладкой. undefined — не считали или ещё едет. */
+  count?: number | undefined;
 };
 
 /*
@@ -102,6 +104,9 @@ export function Tabs({
             >
               {item.iconNode ?? (item.icon && <Icon as={item.icon} size={14} />)}
               {item.label}
+              {item.count !== undefined && (
+                <span className="font-normal text-fg-subtle tabular-nums">{item.count}</span>
+              )}
             </span>
           </button>
         );

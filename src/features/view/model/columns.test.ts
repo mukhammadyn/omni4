@@ -50,6 +50,7 @@ const view = (columnIds: string[]): View => ({
   layout: "calendar",
   tabGroupId: "",
   subGroupId: "",
+  chipsId: "",
   defaultFilters: {},
   navigate: EMPTY_URL_TEMPLATE,
   objectUrl: EMPTY_URL_TEMPLATE,

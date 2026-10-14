@@ -71,12 +71,10 @@ function NewCandidateRoute() {
           vacancy={vac}
           locale={i18n.language}
           language={language}
-          /* Страницы кандидата нет: пришли из меню — обратно к списку,
-             с вакансии — в её воронку, где новый уже стоит. */
-          onCreated={(vacancy) =>
-            void (!vac && menu
-              ? navigate({ to: "/m/$menuId", params: { menuId: menu } })
-              : navigate({ to: "/vacancies/$itemId", params: { itemId: vacancy }, search: { menu, tab: "funnel" } }))
+          /* Как в прототипе: новый кандидат открывается своей страницей,
+             и «назад» с неё ведёт туда же, откуда пришли в форму. */
+          onCreated={(guid) =>
+            void navigate({ to: "/candidates/$itemId", params: { itemId: guid }, search: { menu }, replace: true })
           }
           onCancel={() => router.history.back()}
         />

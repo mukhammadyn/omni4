@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import {
   CalendarClockIcon,
+  ChartNoAxesColumnIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   DownloadIcon,
@@ -51,7 +52,7 @@ import { LanguageInput } from "@/shared/ui/language-input";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { ToolButton } from "@/shared/ui/tool-button";
 import { moveBefore } from "@/shared/lib/order";
-import { TAB_GROUP_TYPES, subGroupField, tabGroupField } from "../api/tab-group";
+import { TAB_GROUP_TYPES, chipsField, subGroupField, tabGroupField } from "../api/tab-group";
 import { columnGroup, columnKey, toggleColumn } from "../model/columns";
 import { type UrlTemplate } from "../model/url-template";
 import {
@@ -139,6 +140,8 @@ export type ViewOptionsHandlers = {
   onTabGroup?: (fieldId: string) => void;
   /** Поле дорожек доски. Пустая строка — доска в одну дорожку. */
   onSubGroup?: (fieldId: string) => void;
+  /** Поле полосы значений. Пустая строка — без полосы. */
+  onChips?: (fieldId: string) => void;
   /**
    * Поля дат календаря. Слаги, а не id: так эту настройку хранит база
    * (колонки `calendar_from_slug` и `calendar_to_slug`).
@@ -331,6 +334,7 @@ type PanelPage =
   | "group"
   | "tabGroup"
   | "subGroup"
+  | "chips"
   | "calendar"
   | "table"
   | "docs"
@@ -830,15 +834,20 @@ function Panel({
     );
   }
 
-  if (page === "subGroup") {
+  if (page === "subGroup" || page === "chips") {
     /*
-     * Дорожки доски — второй уровень раскладки: колонки те же, но
-     * повторяются для каждого значения выбранного поля. Годятся те же
-     * пять типов, что и у колонок: по строке дорожек не сделать.
+     * Два выбора одного поля с конечным набором значений — те же пять
+     * типов, что и у раскладки: по строке не сделать ни дорожек, ни чипов.
      *
-     * Поле колонок из списка убрано: доска, разрезанная сама по себе,
-     * даёт одну карточку на клетку и ни одной в остальных.
+     * Дорожки доски — второй уровень раскладки: колонки те же, но
+     * повторяются для каждого значения выбранного поля. Поле колонок из
+     * списка убрано: доска, разрезанная сама по себе, даёт одну карточку
+     * на клетку и ни одной в остальных. У полосы значений убрано поле
+     * вкладок по той же причине: на вкладке у него одно значение.
      */
+    const lanes = page === "subGroup";
+    const activeId = lanes ? view.subGroupId : view.chipsId;
+    const pick = lanes ? handlers.onSubGroup : handlers.onChips;
     const groupable = matching(
       fields.filter(
         (field) =>
@@ -851,28 +860,28 @@ function Panel({
 
     return (
       <Subpage
-        title={t("view.subGroup")}
+        title={t(lanes ? "view.subGroup" : "view.chips")}
         busy={busy}
         onBack={back}
-        hint={t("view.subGroupHint")}
+        hint={t(lanes ? "view.subGroupHint" : "view.chipsHint")}
       >
         <FieldSearch value={query} onChange={setQuery} />
 
         <List>
           <PopoverItem
-            active={!view.subGroupId}
+            active={!activeId}
             icon={<Icon as={XIcon} size={16} className="shrink-0 text-fg-subtle" />}
-            onClick={() => handlers.onSubGroup?.("")}
+            onClick={() => pick?.("")}
           >
-            {t("view.subGroupNone")}
+            {t(lanes ? "view.subGroupNone" : "view.chipsNone")}
           </PopoverItem>
 
           {groupable.map((field) => (
             <PopoverItem
               key={field.id}
-              active={view.subGroupId === field.id || view.subGroupId === field.relationId}
+              active={activeId === field.id || activeId === field.relationId}
               icon={<Icon as={fieldIcon(field.type)} size={16} className="shrink-0" />}
-              onClick={() => handlers.onSubGroup?.(columnKey(field))}
+              onClick={() => pick?.(columnKey(field))}
             >
               {localized(field.labels, language, field.label)}
             </PopoverItem>
@@ -1035,6 +1044,8 @@ function Panel({
   const tabGrouped = tabGroupField(view, fields);
   /** Поле дорожек доски — там же. */
   const subGrouped = subGroupField(view, fields);
+  /** Поле полосы значений — там же. */
+  const chipped = chipsField(view, fields);
 
   return (
     <div className="w-80">
@@ -1127,6 +1138,17 @@ function Panel({
           label={t("view.subGroup")}
           value={subGrouped ? localized(subGrouped.labels, language, subGrouped.label) : ""}
           onClick={() => open("subGroup")}
+        />
+      )}
+
+      {/* Полоса значений — над списком, поэтому не у доски: там значения
+          и так стоят колонками, и у календаря с графиком ей не над чем стоять. */}
+      {can.settings && handlers.onChips && isGrid && (
+        <Row
+          icon={ChartNoAxesColumnIcon}
+          label={t("view.chips")}
+          value={chipped ? localized(chipped.labels, language, chipped.label) : ""}
+          onClick={() => open("chips")}
         />
       )}
 

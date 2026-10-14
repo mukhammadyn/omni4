@@ -1,4 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { keys } from "@/shared/lib/query-keys";
 import { api } from "@/shared/api/client";
 import { reportError } from "@/shared/lib/toast";
 
@@ -91,4 +92,30 @@ export function useUploadFiles() {
 
     onError: (error) => reportError(error, "cell.uploadFailed"),
   });
+}
+
+export type FileMeta = { size: number | null; modified: string | null };
+
+/**
+ * Размер и дата файла — из заголовков ответа CDN на HEAD: в ячейке
+ * лежит только адрес. CDN отдаёт оба заголовка в CORS
+ * (`access-control-expose-headers`). Файл по адресу не меняется,
+ * поэтому ответ не устаревает.
+ */
+export function useFileMeta(url: string) {
+  return useQuery({
+    queryKey: keys.files.meta(url),
+    queryFn: async (): Promise<FileMeta> => {
+      const response = await fetch(url, { method: "HEAD" });
+      const size = Number(response.headers.get("content-length"));
+      const modified = response.headers.get("last-modified");
+      return {
+        size: Number.isFinite(size) && size > 0 ? size : null,
+        modified: modified ? new Date(modified).toISOString() : null,
+      };
+    },
+    enabled: Boolean(url),
+    staleTime: Infinity,
+    retry: false,
+  }).data;
 }

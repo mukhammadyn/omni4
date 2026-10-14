@@ -78,7 +78,8 @@ export function NewCandidate({
   vacancy: string;
   locale: string;
   language: string;
-  onCreated: (vacancy: string) => void;
+  /** Создан — guid нового кандидата. */
+  onCreated: (guid: string) => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
@@ -145,10 +146,10 @@ export function NewCandidate({
         ...(stage ? { hr_recruiting_stages_id: stage } : {}),
         ...(source ? { hr_candidate_sources_id: source } : {}),
       },
-      () => {
+      (guid) => {
         toast.success(t("candidate.new.added"));
         if (more) setDraft({ ...fresh(vacancyId), [relationDataKey("hr_vacancies_id")]: row[relationDataKey("hr_vacancies_id")] });
-        else onCreated(vacancyId);
+        else onCreated(guid);
       },
     );
   };
