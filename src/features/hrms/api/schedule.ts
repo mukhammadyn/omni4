@@ -79,6 +79,7 @@ export const toTemplate = (row: Item, days: Item[]): Template => {
         kind: kindOf(day?.shift_kind),
       };
     }),
+    dayIds: own.map((day) => text(day.guid)),
     cycle: {
       work: num(row.cycle_work_days) || 2,
       off: num(row.cycle_off_days) || 2,
@@ -204,5 +205,78 @@ export function useWriteShifts() {
     },
     onError: (error) => reportError(error, "common.saveFailed"),
     onSettled: () => queryClient.invalidateQueries({ queryKey: keys.items.table(SHIFTS) }),
+  });
+}
+
+const upsert = (slug: string, objects: Record<string, unknown>[]) =>
+  objects.length
+    ? api.post<unknown>(`/v2/items/${slug}/upsert-many`, { data: { field_slug: "guid", fields: Object.keys(objects[0]!), objects } })
+    : Promise.resolve();
+
+/**
+ * Запись шаблона: строка `hr_work_schedules` и семь дней заново — старые
+ * дни удаляются, а не сверяются по дню недели: их всего семь. Новому
+ * шаблону guid даём сами. Возвращает guid шаблона.
+ */
+export function useSaveTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (template: Template) => {
+      const guid = template.id || crypto.randomUUID();
+      await upsert(WORK_SCHEDULES, [
+        {
+          guid,
+          name: template.name.trim(),
+          color: template.color,
+          type: template.type,
+          break_minutes: template.breakMinutes,
+          grace_minutes: template.graceMinutes,
+          description: template.description,
+          is_active: template.active,
+          cycle_work_days: template.cycle.work,
+          cycle_off_days: template.cycle.off,
+          cycle_start_time: template.cycle.start,
+          cycle_end_time: template.cycle.end,
+          cycle_shift_kind: template.cycle.kind,
+        },
+      ]);
+      if (template.dayIds.length) await api.delete<unknown>(`/v1/object/${WORK_SCHEDULE_DAYS}`, { data: { ids: template.dayIds } });
+      await upsert(
+        WORK_SCHEDULE_DAYS,
+        template.days.map((day, index) => ({
+          guid: crypto.randomUUID(),
+          hr_work_schedules_id: guid,
+          weekday: WEEKDAYS[index],
+          is_working: day.working,
+          start_time: day.working ? day.start : null,
+          end_time: day.working ? day.end : null,
+          shift_kind: day.kind,
+        })),
+      );
+      return guid;
+    },
+    onError: (error) => reportError(error, "common.saveFailed"),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.items.table(WORK_SCHEDULES) }),
+        queryClient.invalidateQueries({ queryKey: keys.items.table(WORK_SCHEDULE_DAYS) }),
+      ]),
+  });
+}
+
+/** Удаление шаблона с его днями. Смены, уже созданные по нему, остаются. */
+export function useDeleteTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (template: Template) => {
+      if (template.dayIds.length) await api.delete<unknown>(`/v1/object/${WORK_SCHEDULE_DAYS}`, { data: { ids: template.dayIds } });
+      await api.delete<unknown>(`/v1/object/${WORK_SCHEDULES}`, { data: { ids: [template.id] } });
+    },
+    onError: (error) => reportError(error, "common.deleteFailed"),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.items.table(WORK_SCHEDULES) }),
+        queryClient.invalidateQueries({ queryKey: keys.items.table(WORK_SCHEDULE_DAYS) }),
+      ]),
   });
 }

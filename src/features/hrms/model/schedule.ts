@@ -46,6 +46,8 @@ export type Template = {
   active: boolean;
   /** Семь дней с понедельника — у недельного. */
   days: TemplateDay[];
+  /** guid строк `hr_work_schedule_days` — их переписывает сохранение. */
+  dayIds: string[];
   /** N рабочих через M выходных — у сменного цикла. */
   cycle: { work: number; off: number; start: string; end: string; kind: ShiftKind };
 };
@@ -83,7 +85,8 @@ export const weekdayOf = (date: string) => (new Date(`${date}T00:00:00Z`).getUTC
 
 const DEFAULT_BREAK = 60;
 
-export const blankTemplate = (): Omit<Template, "id"> => ({
+export const blankTemplate = (): Template => ({
+  id: "",
   name: "",
   color: "#3B82F6",
   type: "weekly",
@@ -92,6 +95,7 @@ export const blankTemplate = (): Omit<Template, "id"> => ({
   description: "",
   active: true,
   days: WEEKDAYS.map((_, index) => ({ working: index < 5, start: "09:00", end: "18:00", kind: "day" })),
+  dayIds: [],
   cycle: { work: 2, off: 2, start: "08:00", end: "20:00", kind: "day" },
 });
 

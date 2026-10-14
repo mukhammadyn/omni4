@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { HouseIcon, MoonIcon, SunIcon, type LucideIcon } from "lucide-react";
-import { CHIP_STYLES } from "@/shared/ui/chip";
-import type { Shift, ShiftKind } from "../model/schedule";
+import { CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
+import type { Shift, ShiftKind, Template } from "../model/schedule";
 
 /* Общее у экранов графика: календаря, окна смены, вкладки сотрудника. */
 
@@ -24,3 +24,78 @@ export function useDuration() {
 
 /** Новая смена на клетке или правка существующей — окну смены. */
 export type OpenShift = { shift?: Shift; employeeId?: string; date: string };
+
+/**
+ * Насыщенная точка цвета шаблона — `.tp-dot` прототипа. HEX из данных
+ * читается как намерение (CONTEXT, FieldOption) и рисуется токеном.
+ */
+export const TEMPLATE_DOT: Record<ChipColor, string> = {
+  blue: "bg-chart-1",
+  orange: "bg-chart-2",
+  green: "bg-chart-3",
+  yellow: "bg-chart-4",
+  pink: "bg-chart-5",
+  purple: "bg-chart-7",
+  red: "bg-chart-8",
+  brown: "bg-chip-brown-fg",
+  gray: "bg-fg-subtle",
+};
+
+export const templateDot = (template: Pick<Template, "color">) => TEMPLATE_DOT[hexToChipColor(template.color)];
+
+/** «Пн–Пт · 09:00–18:00», «2 через 2 · 08:00–20:00» — `tplDesc` прототипа. */
+export function useTemplateSummary() {
+  const { t, i18n } = useTranslation();
+  const weekday = (index: number) =>
+    new Intl.DateTimeFormat(i18n.language, { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 9, 12 + index)));
+  return (template: Pick<Template, "type" | "days" | "cycle">) => {
+    if (template.type === "cycle")
+      return t("template.cycleSummary", { work: template.cycle.work, off: template.cycle.off, start: template.cycle.start, end: template.cycle.end });
+    const working = template.days.flatMap((day, index) => (day.working ? [index] : []));
+    const first = template.days[working[0] ?? -1];
+    if (!first) return t("template.noDays");
+    const days = working.length > 1 ? `${weekday(working[0]!)}–${weekday(working[working.length - 1]!)}` : weekday(working[0]!);
+    return `${days} · ${first.start}–${first.end}`;
+  };
+}
+
+/** Неделя или цикл клетками — `tplPreview` прототипа. */
+export function TemplatePreview({ template }: { template: Pick<Template, "type" | "days" | "cycle"> }) {
+  const { t, i18n } = useTranslation();
+  const weekday = (index: number) =>
+    new Intl.DateTimeFormat(i18n.language, { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 9, 12 + index)));
+  const cells =
+    template.type === "weekly"
+      ? template.days.map((day, index) => ({ label: weekday(index), day: day.working ? day : null }))
+      : (() => {
+          const { work, off, start, end, kind } = template.cycle;
+          const length = Math.max(1, work + off);
+          // Два цикла, если влезают в 8 клеток, — видно, что он повторяется.
+          return Array.from({ length: length * 2 <= 8 ? length * 2 : length }, (_, index) => ({
+            label: t("template.dayN", { n: index + 1 }),
+            day: index % length < work ? { start, end, kind } : null,
+          }));
+        })();
+  return (
+    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))` }}>
+      {cells.map((cell, index) => (
+        <div
+          key={index}
+          className={`flex flex-col items-center gap-px rounded-md px-0.5 py-1.5 text-center tabular-nums ${
+            cell.day ? KIND_STYLE[cell.day.kind].chip : "border border-border text-fg-subtle [background:repeating-linear-gradient(135deg,transparent_0_5px,var(--color-surface-hover)_5px_6px)]"
+          }`}
+        >
+          <small className="text-[10.5px] capitalize opacity-80">{cell.label}</small>
+          {cell.day ? (
+            <>
+              <b className="text-[11px] font-semibold">{cell.day.start}</b>
+              <b className="text-[11px] font-semibold">{cell.day.end}</b>
+            </>
+          ) : (
+            <span className="py-1 text-[11px]">—</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
