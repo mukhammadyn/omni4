@@ -102,14 +102,49 @@ export function useTemplates() {
 
 export type ScheduleEmployee = Person & { positionId: string; templateId: string; hireDate: string; dismissalDate: string };
 
-/** Отделы и филиалы — отбор календаря и подпись филиала у смены. */
-export function useScheduleDirectory() {
+/**
+ * Справочники графика: отделы и филиалы — отбор календаря и подпись
+ * смены, должности и проекты — окну смены. Проекты грузятся, только
+ * когда окно открыто.
+ */
+export function useScheduleDirectory({ forms = false }: { forms?: boolean } = {}) {
   const departments = useAll("departments", {}, false);
   const locations = useAll("locations", {}, false);
+  const positions = useAll(forms ? "positions" : undefined, {}, false);
+  const projects = useAll(forms ? "pm_projects" : undefined, {}, false);
   return useMemo(() => {
     const names = (rows: Item[]) => rows.map((row) => ({ id: text(row.guid), name: text(row.name) })).sort((a, b) => a.name.localeCompare(b.name));
-    return { departments: names(departments.rows), locations: names(locations.rows) };
-  }, [departments.rows, locations.rows]);
+    return {
+      departments: names(departments.rows),
+      locations: names(locations.rows),
+      positions: names(positions.rows),
+      projects: names(projects.rows),
+    };
+  }, [departments.rows, locations.rows, positions.rows, projects.rows]);
+}
+
+/** Праздники за период — даты, которые серия пропускает. */
+export function useHolidays(from: string, to: string) {
+  const query = useAll(from && to ? "hr_holidays" : undefined, { date: { op: "between", values: [from, to] } }, false);
+  return useMemo(
+    () => new Set(query.rows.filter((row) => text(row.type) !== "working_weekend").map((row) => text(row.date).slice(0, 10))),
+    [query.rows],
+  );
+}
+
+const toEmployee = (row: Item): ScheduleEmployee => ({
+  ...toPerson(row),
+  positionId: text(row.positions_id),
+  templateId: text(row.hr_work_schedules_id),
+  hireDate: text(row.hire_date).slice(0, 10),
+  dismissalDate: text(row.dismissal_date).slice(0, 10),
+});
+
+/** Сотрудники по алфавиту — сетке и выбору в окне смены. */
+export function useScheduleEmployees(employeeId?: string) {
+  const people = useAll(EMPLOYEES, employeeId ? { guid: { op: "any", values: [employeeId] } } : {});
+  const employees = useMemo(() => people.rows.map(toEmployee).sort((a, b) => a.name.localeCompare(b.name)), [people.rows]);
+  return { employees, loading: people.loading };
 }
 
 /**
@@ -118,24 +153,15 @@ export function useScheduleDirectory() {
  */
 export function useSchedule({ from, to, employeeId }: { from: string; to: string; employeeId?: string }) {
   const one = employeeId ? { employees_id: { op: "any" as const, values: [employeeId] } } : {};
-  const people = useAll(EMPLOYEES, employeeId ? { guid: { op: "any", values: [employeeId] } } : {});
+  const people = useScheduleEmployees(employeeId);
   const shifts = useAll(SHIFTS, { ...one, date: { op: "between", values: [from, to] } }, false);
   const holidays = useAll("hr_holidays", { date: { op: "between", values: [from, to] } }, false);
   const { templates, loading: templatesLoading } = useTemplates();
 
   return useMemo(
     () => ({
-      employees: people.rows
-        .map((row): ScheduleEmployee => ({
-          ...toPerson(row),
-          positionId: text(row.positions_id),
-          templateId: text(row.hr_work_schedules_id),
-          hireDate: text(row.hire_date).slice(0, 10),
-          dismissalDate: text(row.dismissal_date).slice(0, 10),
-        }))
-        // Принятые после периода и уволенные до него в графике не нужны.
-        .filter((e) => (!e.hireDate || e.hireDate <= to) && (!e.dismissalDate || e.dismissalDate >= from))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+      // Принятые после периода и уволенные до него в графике не нужны.
+      employees: people.employees.filter((e) => (!e.hireDate || e.hireDate <= to) && (!e.dismissalDate || e.dismissalDate >= from)),
       shifts: shifts.rows.map(toShift),
       templates,
       // ponytail: праздник общий на всех, как в табеле (api/timesheet).
@@ -147,7 +173,7 @@ export function useSchedule({ from, to, employeeId }: { from: string; to: string
       loading: people.loading || shifts.loading || holidays.loading || templatesLoading,
       fetching: shifts.fetching,
     }),
-    [people.rows, shifts.rows, holidays.rows, templates, from, to, people.loading, shifts.loading, holidays.loading, templatesLoading, shifts.fetching],
+    [people.employees, people.loading, shifts.rows, holidays.rows, templates, from, to, shifts.loading, holidays.loading, templatesLoading, shifts.fetching],
   );
 }
 
