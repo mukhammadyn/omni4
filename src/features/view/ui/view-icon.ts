@@ -1,6 +1,7 @@
 import {
   CalendarCheckIcon,
   CalendarDaysIcon,
+  CalendarRangeIcon,
   ChartNoAxesGanttIcon,
   ChartPieIcon,
   ClipboardListIcon,
@@ -49,6 +50,7 @@ const ICONS: Record<string, LucideIcon> = {
   "ATTENDANCE.calendar": CalendarCheckIcon,
   "ATTENDANCE.list": ListIcon,
   ABSENCES: PlaneIcon,
+  SCHEDULE: CalendarRangeIcon,
   "ATTENDANCE.sheet": SheetIcon,
   ORG: NetworkIcon,
   BOARD: SquareKanbanIcon,
