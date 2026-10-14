@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type Item } from "@/features/item";
+import { MAX_LIMIT, toRequestBody, type Filters, type Item, type ItemsResponseDto } from "@/features/item";
 import { api } from "@/shared/api/client";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError } from "@/shared/lib/toast";
@@ -188,30 +188,83 @@ export function useSeries(seriesId: string) {
 const CHUNK = 1000;
 const chunks = <T,>(list: T[]) => Array.from({ length: Math.ceil(list.length / CHUNK) }, (_, i) => list.slice(i * CHUNK, (i + 1) * CHUNK));
 
+const upsert = (slug: string, objects: Record<string, unknown>[]) =>
+  objects.length
+    ? api.post<unknown>(`/v2/items/${slug}/upsert-many`, { data: { field_slug: "guid", fields: Object.keys(objects[0]!), objects } })
+    : Promise.resolve();
+
+/** Смены сотрудников в периоде — все, порциями: их снимает «Заменить существующие». */
+async function shiftIdsOf(employeeIds: string[], from: string, to: string) {
+  const filters: Filters = { employees_id: { op: "any", values: employeeIds }, date: { op: "between", values: [from, to] } };
+  const body = toRequestBody({ limit: MAX_LIMIT, page: 1, filters, relations: false });
+  const ids: string[] = [];
+  for (let offset = 0; ; offset += MAX_LIMIT) {
+    const page = await api.post<ItemsResponseDto>(`/v2/object/get-list/${SHIFTS}`, { data: { ...body, offset } });
+    const rows = page.data?.response ?? [];
+    ids.push(...rows.map((row) => text(row.guid)));
+    if (rows.length < MAX_LIMIT) return ids;
+  }
+}
+
 /**
- * Запись графика: сначала удаляются снятые смены, потом пишутся новые
- * одним upsert-many на порцию (справочник API, §4.3) — а не POST на
- * каждый день. guid новым строкам даём сами: ответ upsert-many пуст.
+ * Сначала удаляются снятые смены, потом пишутся новые одним upsert-many
+ * на порцию (справочник API, §4.3) — а не POST на каждый день. guid
+ * новым строкам даём сами: ответ upsert-many пуст.
  */
+async function writeShifts(remove: string[], add: ShiftDraft[]) {
+  for (const ids of chunks(remove)) await api.delete<unknown>(`/v1/object/${SHIFTS}`, { data: { ids } });
+  for (const objects of chunks(add.map((draft) => toRow(draft, crypto.randomUUID())))) await upsert(SHIFTS, objects);
+}
+
 export function useWriteShifts() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ remove, add }: { remove: string[]; add: ShiftDraft[] }) => {
-      for (const ids of chunks(remove)) await api.delete<unknown>(`/v1/object/${SHIFTS}`, { data: { ids } });
-      const rows = add.map((draft) => toRow(draft, crypto.randomUUID()));
-      const fields = Object.keys(rows[0] ?? {});
-      for (const objects of chunks(rows))
-        await api.post<unknown>(`/v2/items/${SHIFTS}/upsert-many`, { data: { field_slug: "guid", fields, objects } });
-    },
+    mutationFn: ({ remove, add }: { remove: string[]; add: ShiftDraft[] }) => writeShifts(remove, add),
     onError: (error) => reportError(error, "common.saveFailed"),
     onSettled: () => queryClient.invalidateQueries({ queryKey: keys.items.table(SHIFTS) }),
   });
 }
 
-const upsert = (slug: string, objects: Record<string, unknown>[]) =>
-  objects.length
-    ? api.post<unknown>(`/v2/items/${slug}/upsert-many`, { data: { field_slug: "guid", fields: Object.keys(objects[0]!), objects } })
-    : Promise.resolve();
+/**
+ * «Применить шаблон»: смены по шаблону на период и шаблон в карточку
+ * каждого сотрудника (`employees.hr_work_schedules_id` — им «Шаблоны»
+ * считают, кто на шаблоне). С `replace` прежние смены сотрудников
+ * в периоде снимаются — разовые тоже, как в прототипе.
+ */
+export function useApplyTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      templateId,
+      employeeIds,
+      from,
+      to,
+      replace,
+      add,
+    }: {
+      templateId: string;
+      employeeIds: string[];
+      from: string;
+      to: string;
+      replace: boolean;
+      add: ShiftDraft[];
+    }) => {
+      await writeShifts(replace ? await shiftIdsOf(employeeIds, from, to) : [], add);
+      /* По одной, PUT, а не одним PATCH: PATCH под токеном пользователя
+         auth отклоняет — права для метода нет (docs/backend-notes.md,
+         «PATCH строк под токеном пользователя», session_service_v2.go:2113). */
+      await Promise.all(
+        employeeIds.map((guid) => api.put<unknown>(`/v2/items/${EMPLOYEES}`, { data: { guid, hr_work_schedules_id: templateId } })),
+      );
+    },
+    onError: (error) => reportError(error, "common.saveFailed"),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.items.table(SHIFTS) }),
+        queryClient.invalidateQueries({ queryKey: keys.items.table(EMPLOYEES) }),
+      ]),
+  });
+}
 
 /**
  * Запись шаблона: строка `hr_work_schedules` и семь дней заново — старые

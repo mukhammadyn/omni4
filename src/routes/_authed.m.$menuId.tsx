@@ -84,6 +84,8 @@ import {
   CandidatesTable,
   ScheduleCalendar,
   ScheduleTools,
+  SCHEDULE_VIEWS,
+  ScheduleCreate,
   WorkSchedules,
   OrgStructure,
   Timesheet,
@@ -1256,6 +1258,8 @@ function MenuPage() {
    */
   const [pendingRow, setPendingRow] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  /** Открытое окно «Создать» графика — тип его view. */
+  const [scheduleCreate, setScheduleCreate] = useState<string | null>(null);
 
   /**
    * Завести черновик. Одно место на все три способа (кнопка в шапке,
@@ -1266,6 +1270,11 @@ function MenuPage() {
      проекта, если админ её задал (`attributes.url_object`). */
   const createRecord = () => {
     if (view && openCreateUrl(view)) return;
+    /* У графика «Создать» — своё окно: смена или шаблон (features/hrms). */
+    if (view && SCHEDULE_VIEWS.has(view.type)) {
+      setScheduleCreate(view.type);
+      return;
+    }
     /* Вакансию заводят страницей, как правят: форма по секциям
        (vacancy.html?new=1 прототипа), а не карточкой сбоку. */
     if (view?.tableSlug === VACANCIES) {
@@ -2014,9 +2023,15 @@ function MenuPage() {
             view.type === "ABSENCES" ? (
               <Absences viewId={view.id} onOpenRow={openRow} onOpenEmployee={openEmployee} />
             ) : view.type === "WORK_SCHEDULES" ? (
-              <WorkSchedules />
+              <>
+                <WorkSchedules />
+                {scheduleCreate && <ScheduleCreate viewType={scheduleCreate} onClose={() => setScheduleCreate(null)} />}
+              </>
             ) : view.type === "SCHEDULE" ? (
-              <ScheduleCalendar viewId={view.id} onOpenEmployee={openEmployee} />
+              <>
+                <ScheduleCalendar viewId={view.id} onOpenEmployee={openEmployee} />
+                {scheduleCreate && <ScheduleCreate viewType={scheduleCreate} onClose={() => setScheduleCreate(null)} />}
+              </>
             ) : view.layout === "list" ? (
               <AttendanceList viewId={view.id} onOpenEmployee={openEmployee} />
             ) : view.layout === "sheet" ? (
