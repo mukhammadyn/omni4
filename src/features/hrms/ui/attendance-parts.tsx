@@ -94,7 +94,7 @@ export type OpenDay = { employee: SheetEmployee; date: string };
 const utc = (key: string) => new Date(`${key}T00:00:00Z`);
 
 /** Подпись периода: «Сентябрь 2026 г.», «5–11 окт. 2026 г.», «пт, 9 окт. 2026 г.». */
-function usePeriodLabel({ scale, anchor, range }: Period) {
+export function usePeriodLabel({ scale, anchor, range }: Pick<Period, "scale" | "anchor" | "range">) {
   const { i18n } = useTranslation();
   const locale = i18n.language;
   if (scale === "month") {
@@ -231,7 +231,7 @@ export function EmployeeName({
   );
 }
 
-function NavButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+export function NavButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"

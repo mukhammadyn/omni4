@@ -2025,6 +2025,8 @@
   "employeeAttendance.filter.absent": "Absent",
   "employeeAttendance.filter.leave": "Leave",
   "employeeAttendance.filter.over": "Overtime",
+  "employeeSchedule.title": "Work schedule",
+  "employeeSchedule.total": "Shifts: {{count}} · {{hours}}",
   "employeeAbsences.title": "Absences",
   "employeeAbsences.subtitle": "Balance, requests and history of vacations, sick leaves and trips",
   "employeeAbsences.sub.balance": "Balance",

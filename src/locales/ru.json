@@ -2025,6 +2025,8 @@
   "employeeAttendance.filter.absent": "Прогулы",
   "employeeAttendance.filter.leave": "Отсутствия",
   "employeeAttendance.filter.over": "Переработка",
+  "employeeSchedule.title": "График работы",
+  "employeeSchedule.total": "Смен: {{count}} · {{hours}}",
   "employeeAbsences.title": "Отсутствия",
   "employeeAbsences.subtitle": "Баланс, заявки и история отпусков, больничных и командировок",
   "employeeAbsences.sub.balance": "Баланс",

@@ -25,8 +25,8 @@ export function useDuration() {
   };
 }
 
-/** Новая смена на клетке или правка существующей — окну смены. */
-export type OpenShift = { shift?: Shift; employeeId?: string; date: string };
+/** Новая смена на клетке или правка существующей — окну смены; `start` — щелчок по часу недели. */
+export type OpenShift = { shift?: Shift; employeeId?: string; date: string; start?: string };
 
 /**
  * Насыщенная точка цвета шаблона — `.tp-dot` прототипа. HEX из данных
