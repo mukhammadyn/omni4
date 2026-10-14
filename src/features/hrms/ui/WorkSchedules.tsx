@@ -62,6 +62,8 @@ export function WorkSchedules() {
       { onSuccess: () => toast.success(t("template.copied")) },
     );
   const askDelete = (template: Template, index: number) => {
+    // Пока счёт не пришёл (или запрос упал) — не знаем, есть ли смены впереди.
+    if (future[index] === undefined) return toast.error(t("template.counting"));
     if (future[index]) return toast.error(t("template.inUse", { count: future[index] }));
     setDeleting(template);
   };
@@ -201,7 +203,7 @@ export function WorkSchedules() {
           confirmLabel={t("action.delete")}
           busy={remove.isPending}
           onConfirm={() =>
-            remove.mutate(deleting, {
+            remove.mutate({ template: deleting, employeeIds: (usedBy.get(deleting.id) ?? []).map((employee) => employee.id) }, {
               onSuccess: () => {
                 toast.success(t("template.deleted"));
                 setDeleting(null);

@@ -137,16 +137,19 @@ export function TableToolbar({
  * Значение уходит с задержкой — иначе каждая буква становится запросом
  * к серверу и новой страницей в кэше.
  */
-function SearchBox({
+export function SearchBox({
   value,
   onChange,
   tableSlug,
   language,
+  placeholder,
 }: {
   value: string;
   onChange: (value: string) => void;
-  tableSlug: string;
+  /** Без таблицы — без меню «по каким полям искать»: экран ищет сам (HRMS). */
+  tableSlug?: string;
   language: string;
+  placeholder?: string;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(Boolean(value));
@@ -229,7 +232,7 @@ function SearchBox({
           value={text}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={(event) => event.key === "Escape" && close()}
-          placeholder={t("table.searchPlaceholder")}
+          placeholder={placeholder ?? t("table.searchPlaceholder")}
           tabIndex={open ? 0 : -1}
           className="min-w-0 flex-1 bg-transparent px-1.5 text-fg outline-none placeholder:text-fg-subtle"
         />
@@ -245,7 +248,7 @@ function SearchBox({
         )}
       </label>
 
-      {open && <SearchFieldsMenu tableSlug={tableSlug} language={language} />}
+      {open && tableSlug && <SearchFieldsMenu tableSlug={tableSlug} language={language} />}
     </div>
   );
 }

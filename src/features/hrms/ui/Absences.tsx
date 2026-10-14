@@ -34,15 +34,17 @@ const STATUS_DOT: Record<Status, string> = { pending: "bg-warning", approved: "b
  */
 export function Absences({
   viewId,
+  search,
   onOpenRow,
   onOpenEmployee,
 }: {
   viewId: string;
+  search: string;
   onOpenRow: (guid: string) => void;
   onOpenEmployee: OpenEmployee;
 }) {
   const { t, i18n } = useTranslation();
-  const view = usePeriod(viewId, ABSENCE_SCALES);
+  const view = usePeriod(viewId, ABSENCE_SCALES, search);
   const { range, query } = view;
   const requests = useAbsenceRequests(range.from, range.to, query);
   const routes = useRoutes();

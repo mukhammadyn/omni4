@@ -31,9 +31,9 @@ const SOURCE_CHIP: Record<string, ChipColor> = { hikvision: "blue", mobile: "pur
  * (`employee.html#att` прототипа), «глаз» — то же окно дня.
  * Сделан под `hr_attendance_days` (FIXED_VIEW_TYPES).
  */
-export function AttendanceList({ viewId, onOpenEmployee }: { viewId: string; onOpenEmployee: OpenEmployee }) {
+export function AttendanceList({ viewId, search, onOpenEmployee }: { viewId: string; search: string; onOpenEmployee: OpenEmployee }) {
   const { t, i18n } = useTranslation();
-  const view = useAttendance(viewId, LIST_SCALES);
+  const view = useAttendance(viewId, LIST_SCALES, undefined, search);
   const { range, dates, today, sheet, rows } = view;
   const filter = useStatusFilter();
   const [page, setPage] = useScopedPage(`${range.from}|${view.search}|${[...filter.only].join()}`);

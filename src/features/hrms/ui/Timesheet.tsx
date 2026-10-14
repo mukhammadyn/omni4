@@ -22,9 +22,9 @@ const SHEET_SCALES: readonly Scale[] = ["month", "week"];
  * Сделан под `hr_attendance_days` (FIXED_VIEW_TYPES): данные грузит
  * сам (api/timesheet), строки view ему не нужны.
  */
-export function Timesheet({ viewId, onOpenEmployee }: { viewId: string; onOpenEmployee: OpenEmployee }) {
+export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; search: string; onOpenEmployee: OpenEmployee }) {
   const { t, i18n } = useTranslation();
-  const view = useAttendance(viewId, SHEET_SCALES, SHEET_PAGE);
+  const view = useAttendance(viewId, SHEET_SCALES, SHEET_PAGE, search);
   const { scale, range, dates, today, sheet, rows } = view;
   const [open, setOpen] = useState<OpenDay | null>(null);
   const head = useDayHead();

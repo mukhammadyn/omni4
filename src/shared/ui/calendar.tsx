@@ -60,6 +60,9 @@ export function Calendar({
       // прошлогодней даты начинается с прокрутки на двенадцать месяцев.
       {...(value ? { defaultMonth: value } : {})}
       captionLayout="dropdown"
+      /* Стрелки по бокам подписи, в одной строке с ней: прежние, поверх
+         подписи справа, налезали на список года. */
+      navLayout="around"
       startMonth={new Date(Math.min(now - YEARS_BACK, year), 0)}
       endMonth={new Date(Math.max(now + YEARS_AHEAD, year), 11)}
       onSelect={(date) => date && onSelect(date)}
@@ -102,19 +105,19 @@ export function Calendar({
       classNames={{
         root: "relative w-fit select-none",
         months: "flex flex-col",
-        month: "space-y-1",
-        month_caption: "flex h-8 items-center px-1 text-sm font-medium",
+        /* «‹ [месяц] [год] ›» строкой, сетка дней — под ней на всю ширину. */
+        month: "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-1 gap-y-1",
+        month_caption: "flex h-8 min-w-0 items-center justify-center text-sm font-medium",
         caption_label: "flex items-center gap-0.5 capitalize",
-        dropdowns: "flex items-center gap-1",
-        /* Ширины фиксированные: подпись месяца меняется от «май»
-           до «сентябрь», и без них соседний список ездил бы вбок
-           при каждом перелистывании. */
-        months_dropdown: "w-32",
-        years_dropdown: "w-20",
-        nav: "absolute right-0 top-0 flex items-center gap-0.5",
+        dropdowns: "flex min-w-0 flex-1 items-center gap-1",
+        /* Месяц — остаток строки, год — фиксированный: подпись месяца
+           меняется от «май» до «сентябрь», и без фиксированной ширины
+           год ездил бы вбок при каждом перелистывании. */
+        months_dropdown: "min-w-0 flex-1",
+        years_dropdown: "w-[72px] shrink-0",
         button_previous: navButton,
         button_next: navButton,
-        month_grid: "w-full border-collapse",
+        month_grid: "col-span-3 w-full border-collapse",
         weekdays: "flex",
         weekday: "grid size-8 place-items-center text-2xs font-normal text-fg-muted capitalize",
         week: "flex",

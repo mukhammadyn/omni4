@@ -9,10 +9,10 @@ import { DatePicker } from "@/shared/ui/date-picker";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Modal } from "@/shared/ui/modal";
-import { useApplyTemplate, useHolidays, useScheduleDirectory, useScheduleEmployees, useTemplates } from "../api/schedule";
+import { useApplyTemplate, useHolidays, useEmployeesById, useScheduleDirectory, useTemplates, type ScheduleEmployee } from "../api/schedule";
 import { draftsOfTemplate, expandTemplate, weekMinutesOf } from "../model/schedule";
 import { plusDays } from "../model/timesheet";
-import { Row, TemplatePreview, templateDot, useDuration, useTemplateSummary } from "./schedule-parts";
+import { DialogLoading, Row, TemplatePreview, templateDot, useDuration, useTemplateSummary } from "./schedule-parts";
 import { EmployeePicker } from "./ShiftDialog";
 
 /**
@@ -22,24 +22,23 @@ import { EmployeePicker } from "./ShiftDialog";
  * смены сотрудников в периоде; «Сдвигать цикл» — у сменного цикла
  * на нескольких, чтобы смены перекрывали друг друга.
  */
-export function ApplyTemplateDialog({
-  templateId,
-  employeeIds = [],
-  onClose,
-}: {
-  templateId?: string;
-  employeeIds?: string[];
-  onClose: () => void;
-}) {
+type Props = { templateId?: string; employeeIds?: string[]; onClose: () => void };
+
+/** Шаблон и филиал по умолчанию берутся из карточки первого сотрудника — ждём её. */
+export function ApplyTemplateDialog(props: Props) {
+  const first = useEmployeesById(props.employeeIds?.slice(0, 1) ?? []);
+  if (first.loading) return <DialogLoading onClose={props.onClose} />;
+  return <ApplyForm {...props} first={first.employees[0]} />;
+}
+
+function ApplyForm({ templateId, employeeIds = [], first, onClose }: Props & { first: ScheduleEmployee | undefined }) {
   const { t, i18n } = useTranslation();
   const duration = useDuration();
   const summary = useTemplateSummary();
   const { templates } = useTemplates();
-  const { employees } = useScheduleEmployees();
   const { locations } = useScheduleDirectory();
   const apply = useApplyTemplate();
   const today = todayInput();
-  const first = employees.find((item) => item.id === employeeIds[0]);
   const [form, setForm] = useState({
     templateId: templateId ?? first?.templateId ?? "",
     employeeIds,
@@ -51,7 +50,9 @@ export function ApplyTemplateDialog({
   });
   const set = (patch: Partial<typeof form>) => setForm((prev) => ({ ...prev, ...patch }));
   const template = templates.find((item) => item.id === form.templateId) ?? templates[0];
-  const holidays = useHolidays(form.from, form.to);
+  const { dates: holidays, loading: holidaysLoading } = useHolidays(form.from, form.to);
+  // Должность каждого — в его смены; только выбранные, а не вся компания.
+  const chosen = useEmployeesById(form.employeeIds);
   const weeks = Math.max(1, Math.round((Date.parse(form.to) - Date.parse(form.from)) / 864e5 / 7));
   const cycle = template?.type === "cycle" && form.employeeIds.length > 1;
 
@@ -67,7 +68,9 @@ export function ApplyTemplateDialog({
     if (!template) return;
     if (!form.employeeIds.length) return toast.error(t("shift.needEmployees"));
     if (form.to < form.from) return toast.error(t("apply.badPeriod"));
-    const positions = new Map(employees.map((item) => [item.id, item.positionId]));
+    // Прошлое — норма табеля: «Заменить» сняло бы прошлые смены, а новые легли бы задним числом.
+    if (form.from < today) return toast.error(t("apply.pastFrom"));
+    const positions = new Map(chosen.employees.map((item) => [item.id, item.positionId]));
     const add = draftsOfTemplate(template, days, {
       seriesId: crypto.randomUUID(),
       locationId: form.locationId,
@@ -120,7 +123,7 @@ export function ApplyTemplateDialog({
           {template && <TemplatePreview template={template} />}
 
           <Row label={t("shift.employees")}>
-            <EmployeePicker employees={employees} value={form.employeeIds} onChange={(ids) => set({ employeeIds: ids })} />
+            <EmployeePicker value={form.employeeIds} onChange={(ids) => set({ employeeIds: ids })} />
           </Row>
           <div className="grid grid-cols-2 gap-3">
             <Row label={t("apply.from")}>
@@ -166,7 +169,7 @@ export function ApplyTemplateDialog({
           <Button variant="ghost" onClick={onClose}>
             {t("action.cancel")}
           </Button>
-          <Button onClick={submit} disabled={apply.isPending || !template}>
+          <Button onClick={submit} disabled={apply.isPending || holidaysLoading || chosen.loading || !template}>
             <Icon as={CheckIcon} size={14} />
             {apply.isPending ? t("common.saving") : t("template.apply")}
           </Button>
