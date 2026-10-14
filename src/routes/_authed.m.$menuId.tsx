@@ -82,6 +82,8 @@ import {
   AttendanceCalendar,
   AttendanceList,
   CandidatesTable,
+  ScheduleCalendar,
+  ScheduleTools,
   OrgStructure,
   Timesheet,
   VACANCIES,
@@ -1592,6 +1594,7 @@ function MenuPage() {
               {/* Группировка и вид строки «Планирования» — личные, свои
                   (features/hrms), а не настройки view из ⋮. */}
               {vacancyPlanView && <VacancyPlanTools viewId={view.id} />}
+              {sheetView && view.type === "SCHEDULE" && <ScheduleTools viewId={view.id} />}
 
               {/* Действия таблицы: функции проекта над отмеченными
                   строками. Рядом с настройками, а не среди поиска
@@ -2009,6 +2012,8 @@ function MenuPage() {
           {sheetView ? (
             view.type === "ABSENCES" ? (
               <Absences viewId={view.id} onOpenRow={openRow} onOpenEmployee={openEmployee} />
+            ) : view.type === "SCHEDULE" ? (
+              <ScheduleCalendar viewId={view.id} onOpenEmployee={openEmployee} />
             ) : view.layout === "list" ? (
               <AttendanceList viewId={view.id} onOpenEmployee={openEmployee} />
             ) : view.layout === "sheet" ? (

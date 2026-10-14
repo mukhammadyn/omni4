@@ -18,3 +18,5 @@ export { AttendanceCalendar } from "./ui/AttendanceCalendar";
 export { AttendanceList } from "./ui/AttendanceList";
 export { Absences } from "./ui/Absences";
 export { useEmployeesMenuId } from "./api/employee";
+export { ScheduleCalendar } from "./ui/ScheduleCalendar";
+export { ScheduleTools } from "./ui/ScheduleTools";

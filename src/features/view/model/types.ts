@@ -29,6 +29,7 @@ export const VIEW_TYPES = [
   "CANDIDATES",
   "ATTENDANCE",
   "ABSENCES",
+  "SCHEDULE",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -157,6 +158,11 @@ const TRAITS: Record<ViewType, ViewTraits> = {
   ATTENDANCE: { ...HRMS, selfLoading: true },
   /** «Отсутствия» на `hr_requests`: заявки и их согласование. */
   ABSENCES: { ...HRMS, selfLoading: true },
+  /**
+   * «Календарь» графика работы (`schedule.html`, features/hrms) по
+   * `hr_shifts`: сотрудники или должности × дни, смены и шаблоны рядом.
+   */
+  SCHEDULE: { ...HRMS, selfLoading: true },
   BOARD: { implemented: true, inTabs: true, noGrouping: true },
   CALENDAR: { implemented: true, inTabs: true, noGrouping: true },
   CHART: { implemented: true, noGrouping: true },

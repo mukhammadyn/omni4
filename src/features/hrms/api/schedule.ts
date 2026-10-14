@@ -100,7 +100,17 @@ export function useTemplates() {
   return { templates: list, loading: templates.loading || days.loading };
 }
 
-export type ScheduleEmployee = Person & { positionId: string; templateId: string };
+export type ScheduleEmployee = Person & { positionId: string; templateId: string; hireDate: string; dismissalDate: string };
+
+/** Отделы и филиалы — отбор календаря и подпись филиала у смены. */
+export function useScheduleDirectory() {
+  const departments = useAll("departments", {}, false);
+  const locations = useAll("locations", {}, false);
+  return useMemo(() => {
+    const names = (rows: Item[]) => rows.map((row) => ({ id: text(row.guid), name: text(row.name) })).sort((a, b) => a.name.localeCompare(b.name));
+    return { departments: names(departments.rows), locations: names(locations.rows) };
+  }, [departments.rows, locations.rows]);
+}
 
 /**
  * Всё, из чего рисуется график за период: сотрудники, их смены, шаблоны
@@ -120,7 +130,11 @@ export function useSchedule({ from, to, employeeId }: { from: string; to: string
           ...toPerson(row),
           positionId: text(row.positions_id),
           templateId: text(row.hr_work_schedules_id),
+          hireDate: text(row.hire_date).slice(0, 10),
+          dismissalDate: text(row.dismissal_date).slice(0, 10),
         }))
+        // Принятые после периода и уволенные до него в графике не нужны.
+        .filter((e) => (!e.hireDate || e.hireDate <= to) && (!e.dismissalDate || e.dismissalDate >= from))
         .sort((a, b) => a.name.localeCompare(b.name)),
       shifts: shifts.rows.map(toShift),
       templates,
@@ -133,7 +147,7 @@ export function useSchedule({ from, to, employeeId }: { from: string; to: string
       loading: people.loading || shifts.loading || holidays.loading || templatesLoading,
       fetching: shifts.fetching,
     }),
-    [people.rows, shifts.rows, holidays.rows, templates, people.loading, shifts.loading, holidays.loading, templatesLoading, shifts.fetching],
+    [people.rows, shifts.rows, holidays.rows, templates, from, to, people.loading, shifts.loading, holidays.loading, templatesLoading, shifts.fetching],
   );
 }
 
