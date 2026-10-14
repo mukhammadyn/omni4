@@ -39,7 +39,7 @@ const num = (value: unknown): number | null => (typeof value === "number" && Num
  * Все строки по отбору, порциями по MAX_LIMIT. Месяц табеля — это
  * сотрудники × дни, и в июне их уже было больше одной порции.
  */
-function useAll(tableSlug: string | undefined, filters: Filters, relations?: false) {
+export function useAll(tableSlug: string | undefined, filters: Filters, relations?: false) {
   const query = useItems(tableSlug, { limit: MAX_LIMIT, page: 1, infinite: true, filters, relations });
   const { hasMore, loadMore } = query;
   useEffect(() => {
