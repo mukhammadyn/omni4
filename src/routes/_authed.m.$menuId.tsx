@@ -84,6 +84,7 @@ import {
   CandidatesTable,
   ScheduleCalendar,
   ScheduleTools,
+  WorkSchedules,
   OrgStructure,
   Timesheet,
   VACANCIES,
@@ -2012,6 +2013,8 @@ function MenuPage() {
           {sheetView ? (
             view.type === "ABSENCES" ? (
               <Absences viewId={view.id} onOpenRow={openRow} onOpenEmployee={openEmployee} />
+            ) : view.type === "WORK_SCHEDULES" ? (
+              <WorkSchedules />
             ) : view.type === "SCHEDULE" ? (
               <ScheduleCalendar viewId={view.id} onOpenEmployee={openEmployee} />
             ) : view.layout === "list" ? (

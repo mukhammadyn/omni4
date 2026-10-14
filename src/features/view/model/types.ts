@@ -30,6 +30,7 @@ export const VIEW_TYPES = [
   "ATTENDANCE",
   "ABSENCES",
   "SCHEDULE",
+  "WORK_SCHEDULES",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -163,6 +164,8 @@ const TRAITS: Record<ViewType, ViewTraits> = {
    * `hr_shifts`: сотрудники или должности × дни, смены и шаблоны рядом.
    */
   SCHEDULE: { ...HRMS, selfLoading: true },
+  /** «Шаблоны» графика там же — карточки `hr_work_schedules` с днями. */
+  WORK_SCHEDULES: { ...HRMS, selfLoading: true },
   BOARD: { implemented: true, inTabs: true, noGrouping: true },
   CALENDAR: { implemented: true, inTabs: true, noGrouping: true },
   CHART: { implemented: true, noGrouping: true },
