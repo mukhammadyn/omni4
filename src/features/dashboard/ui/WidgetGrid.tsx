@@ -68,7 +68,7 @@ export function WidgetGrid({
     setOver(null);
   };
 
-  const add = () => { if (!editing) onBeginEditing(); setEditor({ widget: { ...newChart(), tableSlug: "", filters: {}, answers: {} }, isNew: true }); };
+  const add = () => { if (!editing) onBeginEditing(); setEditor({ widget: { ...newChart(), kind: "stat", tableSlug: "", filters: {}, answers: {} }, isNew: true }); };
 
   const save = (widget: Widget) => {
     onWidgets(
@@ -187,7 +187,7 @@ function WidgetCard({ widget, datasets, menuId, selection, onSelect, filters, va
   const data = useWidgetData(widget, filters, values, menuId, viewer, page, sorts, datasets, selection, picked);
   if (widget.type !== "heading" && (data.denied || data.forbidden) && !data.error && !editing) return null;
   const action = (label: string, icon: typeof PencilIcon, onClick: () => void) => <button type="button" aria-label={label} title={label} onClick={onClick} className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-fg-subtle hover:bg-surface-hover hover:text-fg"><Icon as={icon} size={14} /></button>;
-  return <ChartCard {...card} config={widget} columns={data.schema.fields} relations={data.schema.relations} rows={[]} language={language} editing={editing} onChange={onChange} inlineSetup={false} showRowCount={false}
+  return <ChartCard {...card} config={widget} columns={data.schema.fields} relations={data.schema.relations} rows={[]} language={language} editing={editing} onChange={onChange} inlineSetup={false} showRowCount={false} scrollContent={widget.type !== "records"}
     headerActions={<>{action(t("dashboard.duplicate"), CopyIcon, onDuplicate)}{action(t("dashboard.editWidget"), PencilIcon, onEdit)}</>}
     viewerActions={widget.type === "heading" ? undefined : <Popover trigger={({ open, toggle }) => <button type="button" aria-expanded={open} onClick={toggle} className="rounded-md border border-border px-2 py-1 text-xs text-fg-muted hover:bg-surface-hover">{t("dashboard.cardFilters")}{Object.keys(viewer).length ? ` (${Object.keys(viewer).length})` : ""}</button>}>{() => <div className="w-[360px] max-w-[85vw] p-2"><p className="mb-1 text-xs text-fg-muted">{t("dashboard.viewerScope")}</p><FilterBar columns={data.schema.fields} relations={data.schema.relations} language={language} filters={viewer} sorts={[]} onFilters={setViewer} onSorts={() => {}} /><Button type="button" size="sm" variant="secondary" onClick={() => { setViewer({}); setPicked({}); }}>{t("dashboard.resetViewer")}</Button></div>}</Popover>}
     aside={<><WidgetStatus widget={widget} data={data} /><div aria-label={t("dashboard.effectiveFilters")} className="flex flex-wrap gap-1">{Object.entries(data.query).filter(([slug]) => slug !== "guid").map(([slug, filter]) => { const field = data.schema.fields.find((f) => f.slug === slug); return field ? <span key={slug} className="max-w-64 truncate rounded-full bg-surface-soft px-2 py-0.5 text-2xs text-fg-muted">{localized(field.labels, language, field.label)}: {field.relationId ? t("dashboard.selectedCount", { count: filter.values.length }) : filter.values.join(" — ")}</span> : null; })}</div></>}

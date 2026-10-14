@@ -323,6 +323,7 @@ function SizeHandle({
     // нажатие на неё начинает перетаскивание всей карточки.
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.focus({ preventScroll: true });
     drag.current?.cancel();
 
     const step =
@@ -503,6 +504,7 @@ export function ChartCard({
   viewerActions,
   showRowCount = true,
   hideHeader = false,
+  scrollContent = true,
 }: {
   config: ChartConfig;
   columns: Field[];
@@ -541,6 +543,8 @@ export function ChartCard({
   viewerActions?: ReactNode;
   showRowCount?: boolean;
   hideHeader?: boolean;
+  /** Tables own their only scroll container; keep the card body constrained. */
+  scrollContent?: boolean;
 }) {
   const { t, i18n } = useTranslation();
 
@@ -559,14 +563,15 @@ export function ChartCard({
     const kind = cellKind(field.type);
     const dateKind = DATE_KINDS.has(kind) ? (kind as DateKind) : null;
     if (!dateKind || !bucket) {
-      return { label: valueLabelOf(field, relations, language) };
+      const label = valueLabelOf(field, relations, language);
+      return { label: (row: Item, key: string) => key ? label(row, key) : t("chart.emptyValue") };
     }
 
     return {
       bucket: (value: unknown) => bucketKey(value, dateKind, bucket),
       // Подпись бакета собирается из ключа, а не из строки: «08» — это
       // час, а не значение, которое где-то лежит.
-      label: (_row: Item, key: string) => bucketLabel(key, bucket, i18n.language),
+      label: (_row: Item, key: string) => key ? bucketLabel(key, bucket, i18n.language) : t("chart.emptyValue"),
     };
   };
 
@@ -754,7 +759,7 @@ export function ChartCard({
        * него; списки полос остаются сверху и прокручиваются, если
        * не поместились.
        */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+      <div data-chart-body className={`flex min-h-0 flex-1 flex-col ${scrollContent ? "overflow-auto" : "overflow-hidden"}`}>
         {content !== undefined ? content : !chartReady(config) ? (
           <p className="grid flex-1 place-items-center text-sm text-fg-muted">
             {/* Стопке и тепловой карте не хватает именно ВТОРОГО поля —
@@ -1531,7 +1536,7 @@ function Donut({ series, locale }: { series: ChartSeries; locale: string }) {
   let offset = 0;
 
   return (
-    <div className="flex items-center gap-4">
+    <div data-chart-donut className="flex items-center gap-4">
       <svg viewBox="0 0 42 42" className="size-32 shrink-0" role="presentation">
         {series.points.map((point, index) => {
           const share = series.total > 0 ? (point.value / series.total) * 100 : 0;

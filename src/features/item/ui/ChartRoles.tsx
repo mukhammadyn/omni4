@@ -11,7 +11,8 @@ export function ChartRoles({ config, columns, language, onChange }: { config: Ch
   const numeric = columns.filter((field) => NUMERIC_FIELDS.has(field.type)).map((field) => ({ value: field.slug, label: localized(field.labels, language, field.label) }));
   const measures = config.measures ?? [];
   const update = (id: string, patch: Partial<ChartMeasure>) => onChange({ measures: measures.map((measure) => measure.id === id ? { ...measure, ...patch } : measure) });
-  const add = () => onChange({ splitSlug: "", measures: [...(measures.length ? measures : [{ id: crypto.randomUUID(), field: config.valueSlug, aggregation: config.aggregation }]), { id: crypto.randomUUID(), field: "", aggregation: "count" }] });
+  // A second identical COUNT adds no information. Ask for a numeric measure instead.
+  const add = () => onChange({ splitSlug: "", measures: [...(measures.length ? measures : [{ id: crypto.randomUUID(), field: config.valueSlug, aggregation: config.aggregation }]), { id: crypto.randomUUID(), field: numeric.length === 1 ? numeric[0]!.value : "", aggregation: "sum" }] });
   if (RAW_CHART_KINDS.has(config.kind)) {
     const roles: ("xSlug" | "ySlug" | "latitudeSlug" | "longitudeSlug" | "sizeSlug")[] = config.kind === "map" ? ["latitudeSlug", "longitudeSlug", "sizeSlug"] : config.kind === "bubble" ? ["xSlug", "ySlug", "sizeSlug"] : ["xSlug", "ySlug"];
     return <div className="order-2 flex flex-col gap-3">{roles.map((role) => <LabeledField key={role} label={t(`chart.role.${role}` as "chart.role.xSlug")}><Dropdown ariaLabel={t(`chart.role.${role}` as "chart.role.xSlug")} value={config[role] ?? ""} items={[{ value: "", label: t("pivot.pick") }, ...numeric]} onChange={(value) => onChange({ [role]: value })} /></LabeledField>)}</div>;
@@ -26,6 +27,6 @@ export function ChartRoles({ config, columns, language, onChange }: { config: Ch
       {config.kind === "combo" && <><Dropdown ariaLabel={t("chart.axis")} value={measure.axis ?? "left"} items={[{ value: "left", label: t("chart.axisLeft") }, { value: "right", label: t("chart.axisRight") }]} onChange={(axis) => update(measure.id, { axis: axis as "left" | "right" })} /><Dropdown ariaLabel={t("chart.kind")} value={measure.display ?? "column"} items={[{ value: "column", label: t("chart.kind.column") }, { value: "line", label: t("chart.kind.line") }]} onChange={(display) => update(measure.id, { display: display as "column" | "line" })} /></>}
       <Button type="button" size="sm" variant="secondary" onClick={() => onChange({ measures: measures.filter((m) => m.id !== measure.id) })}>{t("chart.removeMeasure")}</Button>
     </fieldset>)}
-    <Button type="button" size="sm" variant="secondary" disabled={measures.length >= 7} onClick={add}>{t("chart.addMeasure")}</Button>
+    <Button type="button" size="sm" variant="secondary" disabled={measures.length >= 7 || !numeric.length} onClick={add}>{t("chart.addMeasure")}</Button>
   </div>;
 }

@@ -754,3 +754,61 @@ main:has(> [data-fullbleed]) {
 .org-tree.h > li::after {
   display: none !important;
 }
+
+
+/* Widget chooser uses the real charts with the same canvas, ink palette and padding.
+   Labels/axes are omitted only in decorative thumbnails; the full preview retains them. */
+.dashboard-chart-thumbnail {
+  --color-chart-1: var(--color-accent);
+  --color-chart-2: color-mix(in srgb, var(--color-accent) 68%, var(--color-surface));
+  --color-chart-3: color-mix(in srgb, var(--color-accent) 44%, var(--color-surface));
+  --color-chart-4: color-mix(in srgb, var(--color-accent) 82%, var(--color-surface));
+}
+.dashboard-chart-thumbnail span,
+.dashboard-chart-thumbnail ul,
+.dashboard-chart-thumbnail p,
+.dashboard-chart-thumbnail svg text,
+.dashboard-chart-thumbnail .w-14 {
+  display: none;
+}
+.dashboard-chart-thumbnail [data-chart-body] > div {
+  min-height: 0;
+  flex: 1;
+  justify-content: center;
+}
+.dashboard-chart-thumbnail svg polyline {
+  stroke-width: 8px;
+}
+.dashboard-chart-thumbnail [data-chart-donut] > svg {
+  width: 140px;
+  height: 140px;
+}
+.dashboard-chart-thumbnail [data-chart-pie] {
+  justify-content: center;
+}
+.dashboard-metric-thumbnail p {
+  color: var(--color-chart-1);
+  font-size: 20px;
+  font-weight: 500;
+}
+/* Only the editor enlarges the preview; saved dashboard card geometry is unchanged. */
+.dashboard-widget-preview [data-chart-donut],
+.dashboard-widget-preview [data-chart-pie] {
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+}
+.dashboard-widget-preview [data-chart-donut] > svg,
+.dashboard-widget-preview [data-chart-pie] > svg {
+  width: clamp(160px, 22vw, 260px);
+  height: clamp(160px, 22vw, 260px);
+}
+.dashboard-widget-preview [data-chart-donut] > ul {
+  flex-basis: 180px;
+}
+
+.dashboard-chart-thumbnail[data-kind="scatter"] svg circle {
+  r: 9px;
+  stroke-width: 5px;
+}

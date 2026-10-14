@@ -45,6 +45,7 @@ export function ResizeHandle({
     if (!el || event.button !== 0 || !event.isPrimary) return;
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget.focus({ preventScroll: true });
     drag.current?.cancel();
 
     const box = el.getBoundingClientRect();

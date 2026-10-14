@@ -29,7 +29,7 @@ export function WidgetContents({ widget, data, language, editing = false, page =
   </div>)}{widget.interaction && onSelect && <ChartSelectionControls widget={widget} data={data} language={language} onSelect={onSelect} />}</div>;
 }
 
-export function WidgetStatus({ widget, data }: { widget: Widget; data: ReturnType<typeof useWidgetData> }) {
+export function WidgetStatus({ widget, data, compact = false }: { widget: Widget; data: ReturnType<typeof useWidgetData>; compact?: boolean }) {
   const { t, i18n } = useTranslation();
   if ((!widget.tableSlug && !widget.datasetId) || data.loading || data.error || data.denied || data.forbidden || !data.ready) return null;
   if (widget.type === "heading") return null;
@@ -37,7 +37,7 @@ export function WidgetStatus({ widget, data }: { widget: Widget; data: ReturnTyp
   return <div className="flex flex-wrap gap-x-2 gap-y-1 text-2xs text-fg-muted" role="status">
     {data.dataset && <span>{data.dataset.name}</span>}
     <span>{exactCount ? t("dashboard.exactCount") : widget.type === "records" ? t("dashboard.recordCount", { count: data.count }) : data.rows.length < data.count ? t("dashboard.sampled", { shown: data.rows.length, total: data.count }) : t("dashboard.complete", { count: data.rows.length })}</span>
-    {data.refreshing ? <span>{t("dashboard.refreshing")}</span> : data.updatedAt > 0 && <span>{t("dashboard.updatedAt", { time: new Date(data.updatedAt).toLocaleTimeString(i18n.language) })}</span>}
+    {!compact && (data.refreshing ? <span>{t("dashboard.refreshing")}</span> : data.updatedAt > 0 && <span>{t("dashboard.updatedAt", { time: new Date(data.updatedAt).toLocaleTimeString(i18n.language) })}</span>)}
     {data.unanswered.length > 0 && <span>{t("dashboard.unanswered", { names: data.unanswered.map((filter) => filter.label || t("dashboard.period")).join(", ") })}</span>}
   </div>;
 }

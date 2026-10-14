@@ -42,7 +42,7 @@ export function CartesianChart({ config, series, locale }: { config: ChartConfig
 
 export function PieChart({ series, locale }: { series: ChartSeries; locale: string }) {
   let start = -Math.PI / 2;
-  return <div className="flex flex-wrap items-center gap-4"><svg viewBox="0 0 100 100" className="size-36 shrink-0" role="img" aria-label="Pie chart">{series.points.filter((point) => point.value > 0).map((point, index) => {
+  return <div data-chart-pie className="flex flex-wrap items-center gap-4"><svg viewBox="0 0 100 100" className="size-36 shrink-0" role="img" aria-label="Pie chart">{series.points.filter((point) => point.value > 0).map((point, index) => {
     const angle = point.value / series.total * Math.PI * 2, end = start + angle;
     const path = `M50,50 L${50 + 48 * Math.cos(start)},${50 + 48 * Math.sin(start)} A48,48 0 ${angle > Math.PI ? 1 : 0},1 ${50 + 48 * Math.cos(end)},${50 + 48 * Math.sin(end)} Z`; start = end;
     const title = `${point.label}: ${show(point.value, locale)} (${show(point.value / series.total * 100, locale)}%)`;
@@ -58,7 +58,7 @@ export function TreemapChart({ series, locale }: { series: ChartSeries; locale: 
 export function XYChart({ rows, config, locale }: { rows: Item[]; config: ChartConfig; locale: string }) {
   const { t } = useTranslation();
   const { points, excluded } = xyPoints(rows, config);
-  const map = config.kind === "map", bubble = config.kind === "bubble" || Boolean(config.sizeSlug);
+  const map = config.kind === "map", bubble = config.kind === "bubble" || (map && Boolean(config.sizeSlug));
   const xd = map ? { min: -180, max: 180 } : linearDomain(points.map((point) => point.x), false);
   const yd = map ? { min: -90, max: 90 } : linearDomain(points.map((point) => point.y), false);
   const maxSize = Math.max(...points.map((point) => point.size), 1);

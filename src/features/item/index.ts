@@ -7,6 +7,9 @@ export { PivotView } from "./ui/PivotView";
 export { AddTile, ChartCard, ChartSetup, ChartView, Stat, chartTitle } from "./ui/ChartView";
 export { chartReady, chartFieldSlugs, chartSeries, newChart, toCharts, toChartsAttribute } from "./model/chart";
 export type { ChartConfig, ChartMeasure } from "./model/chart";
+export { CHART_BUCKETS, MULTI_MEASURE_KINDS, RAW_CHART_KINDS, aggregationAllowed, needsSplit, splittable } from "./model/chart";
+export type { ChartKind, ChartBucket } from "./model/chart";
+export { ChartRoles } from "./ui/ChartRoles";
 export {
   AGGREGATIONS,
   DEFAULT_SORT,

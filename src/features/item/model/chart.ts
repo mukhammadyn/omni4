@@ -123,6 +123,7 @@ export type ChartConfig = {
    */
   height: number;
   /** Multiple measures use one category axis; categorical split remains a separate mode. */
+  showEmpty?: boolean;
   measures?: ChartMeasure[];
   xSlug?: string;
   ySlug?: string;
@@ -383,11 +384,10 @@ export function chartSeries(
         ? { by: { kind: "label" }, desc: false }
         : { by: { kind: "total" }, desc: true },
     /*
-     * Строки без значения поля в график не идут. У сводной это выбор
-     * человека, здесь — правило: «пусто» отдельной полосой съедает
-     * место и цвет, а на кольце превращается в долю ничего.
+     * Existing charts omit empty categories. The dashboard editor can
+     * explicitly include them as a separate labelled group.
      */
-    skipEmpty: true,
+    skipEmpty: !config.showEmpty,
   });
 
   const summable = config.aggregation === "count" || config.aggregation === "sum";
@@ -412,6 +412,7 @@ export function chartSeries(
    * как и полная.
    */
   const splitDomain = bucketDomain(config.splitBucket, table.columns);
+  if (splitDomain && config.showEmpty && table.columns.includes("")) splitDomain.push("");
   const splitKeys = splitDomain ?? table.columns;
 
   const ranked = splitKeys
@@ -437,6 +438,7 @@ export function chartSeries(
   const shown = new Set(splits.map((item) => item.key));
 
   const groupDomain = bucketDomain(config.groupBucket, table.rows.map((row) => row.key));
+  if (groupDomain && config.showEmpty && table.rows.some((row) => row.key === "")) groupDomain.push("");
   const byKey = new Map(table.rows.map((row) => [row.key, row]));
 
   const all = (groupDomain ?? table.rows.map((row) => row.key)).map((key) => {
@@ -570,7 +572,8 @@ function bucketDomain(bucket: ChartBucket, keys: string[]): string[] | null {
   if (bucket !== "day" && bucket !== "month") return null;
   if (!keys.length) return [];
 
-  const sorted = [...keys].sort();
+  const sorted = keys.filter(Boolean).sort();
+  if (!sorted.length) return [];
   const first = sorted[0] ?? "";
   const last = sorted[sorted.length - 1] ?? "";
 
@@ -861,6 +864,7 @@ export function toCharts(value: unknown): ChartConfig[] {
         valueSlug: typeof raw["value_slug"] === "string" ? raw["value_slug"] : "",
         width: toSpan(raw["width"]),
         height: clampRows(typeof raw["height"] === "number" ? raw["height"] : MIN_ROWS),
+        ...(typeof raw["show_empty"] === "boolean" ? { showEmpty: raw["show_empty"] } : {}),
         ...(Array.isArray(raw["measures"]) ? { measures: raw["measures"].slice(0, SERIES_LIMIT).flatMap((value, index): ChartMeasure[] => {
           if (typeof value !== "object" || value === null) return [];
           const item = value as Record<string, unknown>, aggregation = toAggregation(typeof item["aggregation"] === "string" ? item["aggregation"] : undefined);
@@ -902,6 +906,7 @@ export function toChartsAttribute(charts: ChartConfig[]): Record<string, unknown
     value_slug: chart.valueSlug,
     width: chart.width,
     height: chart.height,
+    ...(chart.showEmpty !== undefined ? { show_empty: chart.showEmpty } : {}),
     ...(chart.measures ? { measures: chart.measures } : {}),
     ...(chart.xSlug ? { x_slug: chart.xSlug } : {}),
     ...(chart.ySlug ? { y_slug: chart.ySlug } : {}),
