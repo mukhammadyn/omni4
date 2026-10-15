@@ -22,3 +22,5 @@ export { ScheduleCalendar } from "./ui/ScheduleCalendar";
 export { ScheduleTools } from "./ui/ScheduleTools";
 export { WorkSchedules } from "./ui/WorkSchedules";
 export { SCHEDULE_VIEWS, ScheduleCreate } from "./ui/ScheduleCreate";
+export { TRAININGS } from "./api/training";
+export { useTrainingColumns } from "./ui/training-columns";

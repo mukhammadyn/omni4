@@ -2197,5 +2197,9 @@
   "shift.busyFailed": "Band kunlarni tekshirib bo‘lmadi. Qayta urinib ko‘ring",
   "shift.occupied": "{{name}}da {{day}} kuni smena bor — boshqa kunga o‘tkazing",
   "apply.pastFrom": "Boshlanish sanasi o‘tgan kun bo‘lishi mumkin emas — o‘tgan kunlar tabelda hisoblangan",
-  "template.counting": "Shablon bo‘yicha smenalar hisoblanmoqda — bir soniyadan keyin urinib ko‘ring"
+  "template.counting": "Shablon bo‘yicha smenalar hisoblanmoqda — bir soniyadan keyin urinib ko‘ring",
+  "training.participants": "Ishtirokchilar",
+  "training.homework": "Uy vazifasi",
+  "training.noHomework": "Talab qilinmaydi",
+  "training.accepted": "{{done}}/{{total}} qabul qilindi"
 }
