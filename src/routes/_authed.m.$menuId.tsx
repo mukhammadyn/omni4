@@ -1294,6 +1294,12 @@ function MenuPage() {
       void navigate({ to: "/vacancies/new", search: { menu: menuId } });
       return;
     }
+    /* Тренинг — тоже страницей (training.html?new=1): участники
+       и материалы в карточку сбоку не помещаются. */
+    if (view?.tableSlug === TRAININGS) {
+      void navigate({ to: "/trainings/new", search: { menu: menuId } });
+      return;
+    }
     /* Кандидата — тоже страницей (candidate.html?new=1): вакансию
        и этап выбирают в форме. */
     if (view?.tableSlug === CANDIDATES) {

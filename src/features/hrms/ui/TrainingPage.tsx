@@ -49,7 +49,7 @@ export function trainingPeriod(row: Item, locale: string) {
 }
 
 /** Имя файла из адреса CDN — без каталога и uuid, который CDN ставит впереди. */
-const fileName = (url: string) =>
+export const fileName = (url: string) =>
   decodeURIComponent(url.split("/").pop() ?? url).replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/i, "");
 
 /**

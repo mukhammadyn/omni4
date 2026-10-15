@@ -25,3 +25,4 @@ export { SCHEDULE_VIEWS, ScheduleCreate } from "./ui/ScheduleCreate";
 export { TRAININGS } from "./api/training";
 export { useTrainingColumns } from "./ui/training-columns";
 export { TrainingPage } from "./ui/TrainingPage";
+export { TrainingForm } from "./ui/TrainingForm";

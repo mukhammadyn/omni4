@@ -2232,5 +2232,18 @@
   "training.optional": "Необязательно",
   "training.rework": "Что доработать",
   "training.reworkDefault": "Требуется доработка",
-  "training.rejectHint": "{{name}} сможет пересдать задание."
+  "training.rejectHint": "{{name}} сможет пересдать задание.",
+  "training.form.new": "Новый тренинг",
+  "training.form.title": "Редактирование тренинга",
+  "training.form.subtitle": "Заполните данные, добавьте материалы и назначьте сотрудников",
+  "training.form.base": "Основное",
+  "training.form.baseHint": "Что, когда и где",
+  "training.form.homeworkHint": "Сотрудники сдают файл, тренер или HR проверяет",
+  "training.form.participants": "Сотрудники, проходящие тренинг",
+  "training.form.participantsHint": "Назначьте участников",
+  "training.form.materialsHint": "Презентации, документы, архивы или ссылки",
+  "training.form.drop": "Нажмите, чтобы выбрать файлы",
+  "training.form.linkTitle": "Название материала",
+  "training.form.addLink": "Добавить ссылку",
+  "training.form.linkRequired": "Укажите ссылку"
 }

@@ -2232,5 +2232,18 @@
   "training.optional": "Optional",
   "training.rework": "What to improve",
   "training.reworkDefault": "Needs rework",
-  "training.rejectHint": "{{name}} will be able to resubmit."
+  "training.rejectHint": "{{name}} will be able to resubmit.",
+  "training.form.new": "New training",
+  "training.form.title": "Edit training",
+  "training.form.subtitle": "Fill in the details, add materials and assign employees",
+  "training.form.base": "Basics",
+  "training.form.baseHint": "What, when and where",
+  "training.form.homeworkHint": "Employees submit a file, the trainer or HR reviews it",
+  "training.form.participants": "Employees taking the training",
+  "training.form.participantsHint": "Assign participants",
+  "training.form.materialsHint": "Slides, documents, archives or links",
+  "training.form.drop": "Click to choose files",
+  "training.form.linkTitle": "Material name",
+  "training.form.addLink": "Add link",
+  "training.form.linkRequired": "Enter a link"
 }
