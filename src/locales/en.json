@@ -2197,5 +2197,9 @@
   "shift.busyFailed": "Couldn't check occupied days. Try again",
   "shift.occupied": "{{name}} already has a shift on {{day}} — move to another day",
   "apply.pastFrom": "The start date can't be in the past — past days are already in the timesheet",
-  "template.counting": "Counting shifts on this template — try again in a second"
+  "template.counting": "Counting shifts on this template — try again in a second",
+  "training.participants": "Participants",
+  "training.homework": "Homework",
+  "training.noHomework": "Not required",
+  "training.accepted": "{{done}}/{{total}} accepted"
 }

@@ -96,6 +96,8 @@ import {
   VacancyPlanTools,
   useEmployeesMenuId,
   useVacancyColumns,
+  TRAININGS,
+  useTrainingColumns,
   type EmployeeTab,
 } from "@/features/hrms";
 import { MicrofrontendPage } from "@/features/microfrontend";
@@ -1148,6 +1150,10 @@ function MenuPage() {
   /* Воронка и счётчики кандидатов — у таблицы вакансий (features/hrms). */
   const vacancyColumns = useVacancyColumns(
     view?.tableSlug === VACANCIES && view.type === "TABLE" ? rows.rows : undefined,
+  );
+  /* Участники и прогресс ДЗ — у таблицы тренингов (features/hrms). */
+  const trainingColumns = useTrainingColumns(
+    view?.tableSlug === TRAININGS && view.type === "TABLE" ? rows.rows : undefined,
   );
 
   /*
@@ -2371,7 +2377,7 @@ function MenuPage() {
             <DataGrid
               tableSlug={view.tableSlug}
               columns={columns}
-              extra={vacancyColumns}
+              extra={view.tableSlug === TRAININGS ? trainingColumns : vacancyColumns}
               /* Та же подстановка, что и в карточке: настройка, которая
                  работает в одном из двух мест, хуже отсутствующей. */
               newRowDefaults={newRowDefaults}
