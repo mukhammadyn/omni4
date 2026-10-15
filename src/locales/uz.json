@@ -2245,5 +2245,15 @@
   "training.form.drop": "Fayllarni tanlash uchun bosing",
   "training.form.linkTitle": "Material nomi",
   "training.form.addLink": "Havola qo'shish",
-  "training.form.linkRequired": "Havolani kiriting"
+  "training.form.linkRequired": "Havolani kiriting",
+  "view.type.KNOWLEDGE": "Bilimlar bazasi",
+  "kb.untitled": "Nomsiz",
+  "kb.addSub": "Ichki sahifa qo'shish",
+  "kb.search": "Bazadan qidirish",
+  "kb.notFound": "Hech narsa topilmadi",
+  "kb.empty": "Hozircha sahifalar yo'q",
+  "kb.newPage": "Yangi sahifa",
+  "kb.icon": "Belgi",
+  "kb.updated": "Yangilangan: {{date}}",
+  "kb.placeholder": "Yozishni boshlang yoki buyruqlar uchun «/» ni bosing…"
 }
