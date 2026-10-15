@@ -2267,5 +2267,18 @@
   "kb.slash.callout": "Callout",
   "kb.slash.hr": "Divider",
   "kb.slash.table": "Table",
-  "kb.slash.image": "Image"
+  "kb.slash.image": "Image",
+  "kb.actions": "Actions",
+  "kb.duplicate": "Duplicate",
+  "kb.copySuffix": "(copy)",
+  "kb.move": "Move to…",
+  "kb.copyLink": "Copy link",
+  "kb.linkCopied": "Link copied",
+  "kb.deleteTitle": "Delete “{{title}}”?",
+  "kb.deleteOne": "The page will be deleted.",
+  "kb.deleteWithKids": "Nested pages will be deleted too: {{count}}.",
+  "kb.moveTitle": "Move “{{title}}”",
+  "kb.parent": "Parent page",
+  "kb.topLevel": "— Top level —",
+  "kb.moveAction": "Move"
 }

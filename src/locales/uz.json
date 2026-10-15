@@ -2267,5 +2267,18 @@
   "kb.slash.callout": "Eslatma",
   "kb.slash.hr": "Ajratgich",
   "kb.slash.table": "Jadval",
-  "kb.slash.image": "Rasm"
+  "kb.slash.image": "Rasm",
+  "kb.actions": "Amallar",
+  "kb.duplicate": "Nusxalash",
+  "kb.copySuffix": "(nusxa)",
+  "kb.move": "Ko'chirish…",
+  "kb.copyLink": "Havolani nusxalash",
+  "kb.linkCopied": "Havola nusxalandi",
+  "kb.deleteTitle": "«{{title}}» o'chirilsinmi?",
+  "kb.deleteOne": "Sahifa o'chiriladi.",
+  "kb.deleteWithKids": "Ichki sahifalar ham o'chiriladi: {{count}}.",
+  "kb.moveTitle": "«{{title}}»ni ko'chirish",
+  "kb.parent": "Ota sahifa",
+  "kb.topLevel": "— Yuqori daraja —",
+  "kb.moveAction": "Ko'chirish"
 }

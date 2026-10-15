@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { MAX_LIMIT, PEOPLE, patchRow, useCreateItem, useDeleteItems, useItems, type Item } from "@/features/item";
+import { MAX_LIMIT, PEOPLE, patchRow, useItems, type Item, type ItemsResponseDto } from "@/features/item";
 import { api } from "@/shared/api/client";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError } from "@/shared/lib/toast";
 import { session } from "@/shared/api/session";
-import { EMPTY_DOC, type KbDoc, type KbPage } from "../model/kb";
+import { EMPTY_DOC, toDoc, type KbDoc, type KbPage } from "../model/kb";
 import { text } from "./org";
 import { useAll } from "./timesheet";
 
@@ -76,14 +76,60 @@ function useSaveKb() {
 const by = () => ({ core_users_id: session.getObjectIds()[PEOPLE] ?? null });
 
 /**
+ * Строки базы в кэше через `fix`. База грузится бесконечным запросом
+ * (`useAll`): в кэше куски `{pages}`, строки — в `data.response`.
+ */
+function editRows(page: unknown, fix: (rows: Item[], at: number) => Item[]): unknown {
+  const chunks = (page as { pages?: ItemsResponseDto[] } | undefined)?.pages;
+  if (!Array.isArray(chunks)) return page;
+  return {
+    ...(page as object),
+    pages: chunks.map((chunk, at) => ({ ...chunk, data: { ...chunk.data, response: fix(chunk.data?.response ?? [], at) } })),
+  };
+}
+
+/**
+ * Создание и удаление — сразу в кэше, до ответа. Иначе новая страница
+ * появлялась бы через секунду: адрес уже на ней, а её нет, и экран
+ * показывал первую страницу — по кнопке жали ещё раз и заводили
+ * пустые страницы пачкой. Отказ — сообщение и перечитывание.
+ */
+function useKbWrites() {
+  const queryClient = useQueryClient();
+  const cache = (fix: (rows: Item[], at: number) => Item[]) =>
+    queryClient.setQueriesData({ queryKey: keys.items.table(KB) }, (page: unknown) => editRows(page, fix));
+  const reload = () => void queryClient.invalidateQueries({ queryKey: keys.items.table(KB) });
+
+  const create = useMutation({
+    mutationFn: (row: Item) => api.post<unknown>(`/v2/items/${KB}`, { data: row }),
+    onMutate: (row) => {
+      const now = new Date().toISOString();
+      cache((rows, at) => (at === 0 ? [...rows, { ...row, created_at: now, updated_at: now }] : rows));
+    },
+    onError: (error) => {
+      reportError(error, "common.createFailed");
+      reload();
+    },
+  });
+  const remove = useMutation({
+    mutationFn: (ids: string[]) => api.delete<unknown>(`/v1/object/${KB}`, { data: { ids } }),
+    onMutate: (ids) => cache((rows) => rows.filter((row) => !ids.includes(text(row.guid)))),
+    onError: (error) => {
+      reportError(error, "common.deleteFailed");
+      reload();
+    },
+  });
+  return { create, remove };
+}
+
+/**
  * Правки базы. Создание и копия — со своим guid: страницу открывают
  * сразу, не дожидаясь ответа. Удаление — вместе с вложенными (их ids
  * собирает вызывающий, `descendantsOf`): бэкенд каскада не делает.
  */
 export function useKbActions() {
-  const create = useCreateItem(KB);
+  const { create, remove } = useKbWrites();
   const update = useSaveKb();
-  const remove = useDeleteItems(KB);
   const add = (values: Item) => {
     const guid = crypto.randomUUID();
     create.mutate({ guid, icon: "📄", title: "", content: JSON.stringify(EMPTY_DOC), ...values, ...by() });
@@ -93,12 +139,12 @@ export function useKbActions() {
     /** Новая страница; `parentId` пуст — верхний уровень. Возвращает guid. */
     create: (parentId: string) => add({ hr_kb_articles_id: parentId || null }),
     /** Копия рядом с оригиналом, без вложенных — как `dup` прототипа. */
-    duplicate: (page: KbPage, content: KbDoc, suffix: string) =>
+    duplicate: (page: KbPage, suffix: string) =>
       add({
         hr_kb_articles_id: page.parentId || null,
         icon: page.icon,
         title: `${page.title} ${suffix}`.trim(),
-        content: JSON.stringify(content),
+        content: JSON.stringify(toDoc(page.content)),
       }),
     /** Заголовок, эмодзи, содержимое (документом tiptap) или родитель. */
     save: (id: string, values: { title?: string; icon?: string; content?: KbDoc; parentId?: string }) =>
@@ -113,6 +159,7 @@ export function useKbActions() {
         },
       }),
     remove: (ids: string[]) => remove.mutate(ids),
-    saving: update.isPending || create.isPending,
+    /** Создание в пути — кнопки создания неактивны: второй клик не заведёт вторую. */
+    creating: create.isPending,
   };
 }
