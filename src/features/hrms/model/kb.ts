@@ -224,3 +224,26 @@ export function docText(doc: KbDoc | KbNode): string {
   if ("text" in doc && doc.text) return doc.text;
   return (doc.content ?? []).map((n) => docText(n)).join(" ");
 }
+
+export type DropWhere = "before" | "after" | "in";
+
+/**
+ * Перетаскивание в дереве: куда встаёт страница и какой порядок
+ * у её новых соседей. `sort_order` пишется всем соседям по порядку:
+ * у страниц из hrms он пуст, и номер у одной поставил бы её первой.
+ * Пусто — бросить нельзя (на себя или в свою ветку: был бы цикл).
+ */
+export function dropPlan(pages: KbPage[], dragId: string, targetId: string, where: DropWhere) {
+  const drag = pages.find((p) => p.id === dragId);
+  const target = pages.find((p) => p.id === targetId);
+  if (!drag || !target || dragId === targetId || descendantsOf(pages, dragId).includes(targetId)) return [];
+  const parentId = where === "in" ? target.id : target.parentId;
+  const siblings = childrenOf(pages, parentId).filter((p) => p.id !== dragId);
+  const at = where === "in" ? siblings.length : siblings.findIndex((p) => p.id === targetId) + (where === "after" ? 1 : 0);
+  return [...siblings.slice(0, at), drag, ...siblings.slice(at)]
+    .map((p, sortOrder) => ({ id: p.id, sortOrder, ...(p.id === dragId && p.parentId !== parentId ? { parentId } : {}) }))
+    .filter((step, i, all) => {
+      const page = pages.find((p) => p.id === all[i]!.id)!;
+      return page.sortOrder !== step.sortOrder || "parentId" in step;
+    });
+}

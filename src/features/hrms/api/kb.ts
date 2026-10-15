@@ -146,8 +146,12 @@ export function useKbActions() {
         title: `${page.title} ${suffix}`.trim(),
         content: JSON.stringify(toDoc(page.content)),
       }),
-    /** Заголовок, эмодзи, содержимое (документом tiptap) или родитель. */
-    save: (id: string, values: { title?: string; icon?: string; content?: KbDoc; parentId?: string }) =>
+    /**
+     * Заголовок, эмодзи, содержимое (документом tiptap), родитель или
+     * место среди соседей. Автор — только у правки самой страницы:
+     * перестановка в дереве чужую страницу своей не делает.
+     */
+    save: (id: string, values: { title?: string; icon?: string; content?: KbDoc; parentId?: string; sortOrder?: number }) =>
       update.mutate({
         guid: id,
         values: {
@@ -155,7 +159,8 @@ export function useKbActions() {
           ...(values.icon === undefined ? {} : { icon: values.icon }),
           ...(values.content === undefined ? {} : { content: JSON.stringify(values.content) }),
           ...(values.parentId === undefined ? {} : { hr_kb_articles_id: values.parentId || null }),
-          ...by(),
+          ...(values.sortOrder === undefined ? {} : { sort_order: values.sortOrder }),
+          ...(values.title !== undefined || values.icon !== undefined || values.content !== undefined ? by() : {}),
         },
       }),
     remove: (ids: string[]) => remove.mutate(ids),
