@@ -50,12 +50,12 @@ export type VacancyTab = "funnel" | "cands" | "info" | "edit";
  * схемы ERP; чего в схеме нет или роли не видно, того и в карточке нет.
  */
 const SIDE: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
-  { icon: BriefcaseIcon, title: "vacancy.page.card.position", slugs: ["title", "positions_id", "level", "headcount"] },
-  { icon: UsersIcon, title: "vacancy.page.card.team", slugs: ["employees_id", "employees_id_2"] },
+  { icon: BriefcaseIcon, title: "vacancy.page.card.position", slugs: ["title", "hr_positions_id", "level", "headcount"] },
+  { icon: UsersIcon, title: "vacancy.page.card.team", slugs: ["core_users_id", "core_users_id_2"] },
   {
     icon: WalletIcon,
     title: "vacancy.page.card.terms",
-    slugs: ["locations_id", "work_format", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
+    slugs: ["hr_locations_id", "work_format", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
   },
   {
     icon: CalendarIcon,
@@ -131,8 +131,8 @@ export function VacancyPage({
   const headcount = num(row.headcount) ?? 0;
   const opened = daysOpen(text(row.opened_at), text(row.closed_at), today);
   const team = [
-    { slug: "employees_id", role: t("vacancy.page.recruiter") },
-    { slug: "employees_id_2", role: t("vacancy.page.manager") },
+    { slug: "core_users_id", role: t("vacancy.page.recruiter") },
+    { slug: "core_users_id_2", role: t("vacancy.page.manager") },
   ]
     .map(({ slug, role }) => ({ role, person: related(row, slug) }))
     .filter(({ person }) => text(person.full_name));
@@ -175,8 +175,8 @@ export function VacancyPage({
               {priority && text(row.priority) && <span className="flex text-sm font-normal">{cell(priority)}</span>}
             </h1>
             <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-fg-muted">
-              <Meta icon={NetworkIcon} text={text(related(row, "departments_id").name)} />
-              <Meta icon={MapPinIcon} text={text(related(row, "locations_id").name)} />
+              <Meta icon={NetworkIcon} text={text(related(row, "hr_departments_id").name)} />
+              <Meta icon={MapPinIcon} text={text(related(row, "hr_locations_id").name)} />
               <Meta icon={HouseIcon} text={option("work_format")} />
               <Meta icon={CalendarIcon} text={opened === null ? "" : t("vacancy.openFor", { count: opened })} />
               <Meta icon={WalletIcon} text={salaryText(row, locale, t) ?? t("vacancy.salaryNegotiable")} />

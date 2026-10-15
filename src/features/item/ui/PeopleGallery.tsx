@@ -209,7 +209,7 @@ export function PeopleGallery({
 
 /**
  * Чем связаться по значению поля. Telegram — по слагу: своего типа
- * у него нет, это SINGLE_LINE (`employees.telegram_username`).
+ * у него нет, это SINGLE_LINE (`hr_employees.telegram_username`).
  */
 function contactOf(field: Field): { icon: LucideIcon; href: (value: string) => string } | null {
   if (field.type === "EMAIL") return { icon: MailIcon, href: (value) => `mailto:${value}` };

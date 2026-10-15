@@ -7,8 +7,12 @@ import { relationTabs, useMenuViews } from "@/features/view";
 import { todayInput } from "@/shared/lib/date-value";
 import { firstText, related, text, toPerson } from "./org";
 
-/** Таблица сотрудников ERP (`ucode/erp/erp.dbml`, «Сотрудник = пользователь»). */
-export const EMPLOYEES = PEOPLE;
+/**
+ * Сотрудники — кадры, «о ком запись» (схема v2, `omni4-v2/erp.dbml`).
+ * Не таблица входа: вход, бот и последний визит — у пользователя
+ * (PEOPLE, `core_users`), он ссылается сюда `hr_employees_id`.
+ */
+export const EMPLOYEES = "hr_employees";
 
 /**
  * Всё, что нужно странице сотрудника: запись, схема, вкладки и права.
@@ -26,24 +30,52 @@ export function useEmployee(menuId: string, guid: string, language: string) {
   const permissionOf = useTablePermissions();
   const update = useUpdateItem(EMPLOYEES);
   /* Регион — PICK_LIST локации: в записи ключ варианта, подпись — в схеме. */
-  const { schema: locations } = useTableSchema("locations");
+  const { schema: locations } = useTableSchema("hr_locations");
+  /* Пользователь этого сотрудника: бот и последний вход — его. Может не быть. */
+  const user = useItems(PEOPLE, {
+    limit: 1,
+    page: 1,
+    filters: { hr_employees_id: { op: "contains", values: [guid] } },
+    relations: false,
+  });
 
-  /* Вкладки — по тем же правилам, что в карточке: право на чужую
-     таблицу и на сам view (routes/_authed.m.$menuId, relationTabs). */
-  const tabs = useMemo(
-    () =>
-      relationTabs(views, schema.relations, language).filter(
+  const { schema: users } = useTableSchema(PEOPLE);
+
+  /*
+   * Вкладки — по тем же правилам, что в карточке: право на чужую
+   * таблицу и на сам view (routes/_authed.m.$menuId, relationTabs).
+   *
+   * Связь вкладки ищется сначала у сотрудника, потом у его пользователя:
+   * в схеме v2 поля «кто» смотрят на `core_users`, и задачи сотрудника —
+   * это `hr_tasks.core_users_id` его пользователя, а не связь с ним самим.
+   * Такая вкладка (`viaUser`) отбирает строки по guid пользователя.
+   */
+  const tabs = useMemo(() => {
+    const own = relationTabs(views, schema.relations, language);
+    const taken = new Set(own.map((tab) => tab.id));
+    const incoming = users.relations.filter((relation) => relation.direction === "incoming");
+    const viaUser = relationTabs(
+      views.filter((view) => !taken.has(view.id)),
+      incoming,
+      language,
+    );
+    return [
+      ...own.map((tab) => ({ ...tab, viaUser: false })),
+      ...viaUser.map((tab) => ({ ...tab, viaUser: true })),
+    ]
+      .sort((a, b) => a.view.order - b.view.order)
+      .filter(
         (tab) =>
           permissionOf(tab.tableSlug).read && (viewRights.get(tab.id) ?? ALL_VIEW_RIGHTS).view,
-      ),
-    [views, schema.relations, language, permissionOf, viewRights],
-  );
+      );
+  }, [views, schema.relations, users.relations, language, permissionOf, viewRights]);
 
-  const regionKey = record.item ? firstText(related(record.item, "locations_id").region) : "";
+  const regionKey = record.item ? firstText(related(record.item, "hr_locations_id").region) : "";
   const region = locations.fields.find((field) => field.slug === "region")?.options.get(regionKey);
 
   return {
     row: record.item,
+    user: user.page.rows[0],
     region: region ? localized(region.labels, language, region.label || regionKey) : regionKey,
     isLoading: record.isLoading || schemaLoading,
     error: record.error,
@@ -75,33 +107,30 @@ export function useEmployeesMenuId(): string | undefined {
   return useTableMenuId(table?.id ?? "");
 }
 
-/** Подчинённые: у кого руководитель — этот сотрудник (`employees_id`). */
+/** Подчинённые: у кого руководитель — этот сотрудник (`hr_employees_id`). */
 export function useReports(guid: string) {
   const { page } = useItems(EMPLOYEES, {
     limit: 200,
     page: 1,
     // `contains` — голое значение рядом со слагом, то есть равенство (см. toCondition).
-    filters: { employees_id: { op: "contains", values: [guid] } },
+    filters: { hr_employees_id: { op: "contains", values: [guid] } },
   });
   return page.rows;
 }
 
 /**
- * Шапка страницы — `#empMeta` прототипа: должность, работодатель,
- * локация, отдел, бот и последний вход. Регион — в useEmployee: ему
- * нужна схема локаций.
+ * Шапка страницы — `#empMeta` прототипа: должность, локация, отдел,
+ * бот и последний вход. Регион — в useEmployee: ему нужна схема локаций.
  *
- * Бизнес-юнита у сотрудника нет: он висит на локации, а связанная
- * запись приезжает без своих связей. Его место — работодатель
- * (`legal_entities_id`).
+ * Работодателя нет: в схеме v2 юрлица только в CRM. Бот и вход —
+ * у пользователя (`user`), а не у сотрудника; нет пользователя — нет и их.
  */
-export function toProfile(row: Item) {
+export function toProfile(row: Item, user: Item | undefined) {
   return {
     ...toPerson(row),
-    employer: text(related(row, "legal_entities_id").name),
     /** Чат с ботом есть — бот подключён (`telegram_chat_id`, пишет функция бота). */
-    bot: Boolean(text(row.telegram_chat_id)),
-    lastActivity: text(row.last_activity),
+    bot: Boolean(text(user?.telegram_chat_id)),
+    lastActivity: text(user?.last_activity),
   };
 }
 

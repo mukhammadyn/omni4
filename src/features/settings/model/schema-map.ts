@@ -13,23 +13,21 @@ export type SchemaField = { slug: string; type: string; required: boolean; uniqu
 /**
  * Группа таблицы на диаграмме — вкладка над холстом.
  *
- * Модуль omni4 узнаётся по префиксу слага (`crm_`, `hr_`, `pm_`, `int_`),
- * остальные его таблицы — «Ядро». Не по меню: справочники модулей лежат
- * в папке «Настройки модулей», а «Проекты» временно не модуль
- * (docs/STATUS.md), и папка-предок назвала бы группу неверно.
+ * Модуль omni4 узнаётся по префиксу слага (схема v2: `core_`, `crm_`,
+ * `hr_`; Проекты — часть HRMS, `hr_projects`), остальные его таблицы —
+ * «Ядро». Не по меню: справочники модулей лежат в папке «Настройки
+ * модулей», и папка-предок назвала бы группу неверно.
  *
  * Таблица, которую завёл пользователь, — «other»: её отличает то, что
  * она не [[Protected]]. Модуль у неё не угадывается и по префиксу:
  * `crm_notes` пользователя — всё равно его таблица, а не CRM.
  */
-export const SCHEMA_GROUPS = ["platform", "core", "crm", "pm", "hr", "integrations", "other"] as const;
+export const SCHEMA_GROUPS = ["platform", "core", "crm", "hr", "other"] as const;
 export type SchemaGroup = (typeof SCHEMA_GROUPS)[number];
 
 const PREFIX_GROUPS: [string, SchemaGroup][] = [
   ["crm_", "crm"],
-  ["pm_", "pm"],
   ["hr_", "hr"],
-  ["int_", "integrations"],
 ];
 
 export function groupOf(slug: string, isSystem: boolean, isProtected: boolean): SchemaGroup {
@@ -121,8 +119,8 @@ export function toSchemaMap(
  * получить её на этом же проходе — поэтому до неподвижной точки:
  * участник маршрута → маршрут → … наследует по цепочке.
  *
- * Голосуют только таблицы той же группы: `hr_job_history` ссылается
- * и на `employees`, но «Люди» в Ядре — не подгруппа HR. Поровну —
+ * Голосуют только таблицы той же группы: `hr_documents` ссылается
+ * и на `core_users`, но «Пользователи» в Ядре — не подгруппа HR. Поровну —
  * по алфавиту, чтобы раскладка не зависела от порядка связей.
  *
  * Не на кого сослаться — остаётся null: таблицу никто не трогает

@@ -1,10 +1,9 @@
 import { useMemo } from "react";
-import { MAX_LIMIT, useCreateItem, useItems, useUpdateItem, type Item } from "@/features/item";
+import { MAX_LIMIT, PEOPLE, useCreateItem, useItems, useUpdateItem, type Item } from "@/features/item";
 import { session } from "@/shared/api/session";
 import type { AbsenceType } from "../model/absence-balance";
 import { decisionWrites, type Decision, type Progress, type Route } from "../model/approval";
 import { plusDays } from "../model/timesheet";
-import { EMPLOYEES } from "./employee";
 import { related, text } from "./org";
 import { REQUESTS } from "./timesheet";
 
@@ -37,17 +36,17 @@ export type AbsenceRequest = {
 };
 
 const toRequest = (row: Item): AbsenceRequest => {
-  const person = related(row, "employees_id");
+  const person = related(row, "hr_employees_id");
   const kind = related(row, "hr_absence_types_id");
   const from = text(row.date_from).slice(0, 10);
   return {
     id: text(row.guid),
-    employeeId: text(row.employees_id),
+    employeeId: text(row.hr_employees_id),
     employeeName: text(person.full_name) || "—",
     employeePhoto: text(person.photo),
     // Отдел — заявки, а не сотрудника: по нему выбирается маршрут.
-    departmentId: text(row.departments_id) || text(person.departments_id),
-    departmentName: text(related(row, "departments_id").name),
+    departmentId: text(row.hr_departments_id) || text(person.hr_departments_id),
+    departmentName: text(related(row, "hr_departments_id").name),
     typeId: text(row.hr_absence_types_id),
     typeTitle: text(kind.name),
     typeIcon: text(kind.icon),
@@ -87,7 +86,7 @@ export function useAbsenceRequests(from: string, to: string, search: string) {
 export function useEmployeeRequests(employeeId: string) {
   const query = useItems(employeeId ? REQUESTS : undefined, {
     ...ALL,
-    filters: { type: { op: "is", values: ["absence"] }, employees_id: { op: "any", values: [employeeId] } },
+    filters: { type: { op: "is", values: ["absence"] }, hr_employees_id: { op: "any", values: [employeeId] } },
     sorts: [{ field: "date_from", direction: "desc" }],
   });
   const rows = useMemo(() => query.page.rows.map(toRequest), [query.page.rows]);
@@ -140,7 +139,7 @@ export function useRoutes(): Route[] {
         id: text(row.guid),
         name: text(row.name),
         requestType: text(row.request_type),
-        departmentId: text(row.departments_id),
+        departmentId: text(row.hr_departments_id),
         absenceTypeId: text(row.hr_absence_types_id),
         active: row.is_active !== false,
         steps: steps.page.rows
@@ -156,7 +155,7 @@ export function useRoutes(): Route[] {
  * Решение по заявке: пройденный шаг — в историю, итог — в статус заявки
  * (model/approval). Шаг пишется первым: если статус потом не запишется,
  * заявка останется ждущей с пройденным шагом, а не одобренной без следа.
- * Кто решил — своя строка `employees` из токена; у ADMIN её нет.
+ * Кто решил — своя строка `core_users` из токена; у ADMIN её нет.
  */
 export function useDecideRequest() {
   const createStep = useCreateItem(APPROVALS);
@@ -172,7 +171,7 @@ export function useDecideRequest() {
           step_order: writes.step,
           decision,
           decided_at: at,
-          employees_id: session.getObjectIds()[EMPLOYEES] ?? null,
+          core_users_id: session.getObjectIds()[PEOPLE] ?? null,
         });
       }
       if (writes.status) {

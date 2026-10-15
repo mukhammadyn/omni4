@@ -22,9 +22,10 @@ import {
 } from "./parts";
 
 /**
- * Журналы из таблиц папки «Интеграции» проекта: входящие вебхуки
- * (`int_webhook_events`) и вызовы инструментов AI-ассистента
- * (`int_ai_audit`). Это не настройки, а то, что случилось, — поэтому
+ * Журналы проекта: входящие вебхуки CRM (`crm_webhook_events`) и вызовы
+ * инструментов HRMS Copilot (`hr_ai_audit`). Аудита помощника CRM
+ * (`crm_ai_audit`) здесь нет — ponytail: добавить конфиг, когда его
+ * поля станут известны. Это не настройки, а то, что случилось, — поэтому
  * они в «Логах» рядом с изменениями и функциями, а не своим разделом.
  *
  * Пишут их функции и сервисы, не люди: здесь только чтение. Строка —
@@ -61,7 +62,7 @@ const WEBHOOK_TONES: Record<string, ChipColor> = {
 };
 
 export const WEBHOOK_LOG: TableLogConfig = {
-  table: "int_webhook_events",
+  table: "crm_webhook_events",
   hintKey: "logs.webhooksHint",
   badge: "source",
   title: (row) => text(row.dedup_key),
@@ -80,7 +81,7 @@ export const WEBHOOK_LOG: TableLogConfig = {
 };
 
 export const AI_LOG: TableLogConfig = {
-  table: "int_ai_audit",
+  table: "hr_ai_audit",
   hintKey: "logs.aiHint",
   title: (row) => [text(row.tool_name), text(row.summary)].filter(Boolean).join(" · "),
   /* Исход — по трём флажкам: ошибка, выполнено, только предложено.
@@ -94,8 +95,8 @@ export const AI_LOG: TableLogConfig = {
           ? { ok: true, tone: "gray", label: t("logs.ai.proposed") }
           : null,
   facts: [
-    "employees_id",
-    "int_ai_conversations_id",
+    "core_users_id",
+    "hr_ai_conversations_id",
     "risk",
     "proposed",
     "executed",

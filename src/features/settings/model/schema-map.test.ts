@@ -32,8 +32,8 @@ describe("groupOf", () => {
     expect(groupOf("role", true, false)).toBe("platform");
     expect(groupOf("crm_deals", false, true)).toBe("crm");
     expect(groupOf("hr_shifts", false, true)).toBe("hr");
-    expect(groupOf("int_ai_audit", false, true)).toBe("integrations");
-    expect(groupOf("employees", false, true)).toBe("core");
+    expect(groupOf("hr_ai_audit", false, true)).toBe("hr");
+    expect(groupOf("core_users", false, true)).toBe("core");
     // Префикс модуля у своей таблицы её модульной не делает.
     expect(groupOf("crm_notes", false, false)).toBe("other");
   });
@@ -62,15 +62,15 @@ describe("подгруппы", () => {
         row("hr_training_participants"),
         row("hr_participant_notes"),
         row("hr_absence_types"),
-        row("employees", "Люди"),
-        row("hr_job_history"),
+        row("core_users", "Пользователи"),
+        row("hr_documents"),
       ],
       [
         link("hr_participant_notes", "hr_training_participants"),
         link("hr_training_participants", "hr_trainings"),
         link("hr_training_participants", "hr_absence_types"),
-        // «Люди» — подгруппа Ядра, а не HR: из другой группы не наследуется.
-        link("hr_job_history", "employees"),
+        // «Пользователи» — подгруппа Ядра, а не HR: из другой группы не наследуется.
+        link("hr_documents", "core_users"),
       ],
     );
     const section = (slug: string) => map.tables.find((table) => table.slug === slug)?.section;
@@ -78,7 +78,7 @@ describe("подгруппы", () => {
     expect(section("hr_training_participants")).toBe("Обучение");
     expect(section("hr_participant_notes")).toBe("Обучение");
     expect(section("hr_absence_types")).toBeNull();
-    expect(section("hr_job_history")).toBeNull();
+    expect(section("hr_documents")).toBeNull();
   });
 });
 

@@ -74,7 +74,7 @@ const PROPS: [slug: string, icon: LucideIcon][] = [
   ["currency", CoinsIcon],
   ["city", MapPinIcon],
   ["experience", AwardIcon],
-  ["employees_id", UserRoundSearchIcon],
+  ["core_users_id", UserRoundSearchIcon],
   ["tags", TagIcon],
   ["hr_rejection_reasons_id", InfoIcon],
 ];
@@ -573,7 +573,7 @@ export function CandidatePage({
                     (e) =>
                       text(e.hr_recruiting_stages_id) === step.id &&
                       typeof e.score === "number" &&
-                      text(e.employees_id) === (candidate.me ?? ""),
+                      text(e.core_users_id) === (candidate.me ?? ""),
                   )?.score as number | undefined;
                   const isOpen = opened === step.id;
                   return (
@@ -642,10 +642,10 @@ export function CandidatePage({
                           )}
                           <label className="mt-3 mb-2 block text-[13px] text-fg-muted">{t("candidate.page.comments")}</label>
                           {notes.map((note) => {
-                            const author = text(related(note, "employees_id").full_name);
+                            const author = text(related(note, "core_users_id").full_name);
                             return (
                               <div key={text(note.guid)} className="flex gap-2.5 py-2">
-                                <Avatar name={author || "?"} photo={firstText(related(note, "employees_id").photo) || undefined} />
+                                <Avatar name={author || "?"} photo={firstText(related(note, "core_users_id").photo) || undefined} />
                                 <div className="min-w-0 flex-1">
                                   <b className="text-[13px] font-semibold">{author || "—"}</b>
                                   <small className="ml-1.5 text-xs text-fg-subtle">
@@ -691,7 +691,7 @@ export function CandidatePage({
                     <HistoryEntry
                       key={text(entry.guid)}
                       icon={entryIcon(entry)}
-                      who={text(related(entry, "employees_id").full_name)}
+                      who={text(related(entry, "core_users_id").full_name)}
                       when={formatDate(text(entry.moved_at), "date", locale) ?? ""}
                     >
                       {entryText(entry, t)}

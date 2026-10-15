@@ -89,14 +89,14 @@ export type RecordSection = {
 };
 
 /**
- * «Налоги и нормы» — константы `org_settings`, которые читают функции
+ * «Налоги и нормы» — константы `core_settings`, которые читают функции
  * расчёта зарплаты и посещаемости (dbml: settings). Вкладка HRMS:
  * в прототипе налоги и нормы живут в модульных настройках, а не в
  * «Общих». Пояс, формат даты, валюта и НДС той же строки — в «Локализации».
  */
 const NORMS: RecordSection = {
   id: "hr-norms",
-  table: "org_settings",
+  table: "core_settings",
   titleKey: "core.norms",
   hintKey: "core.normsHint",
   icon: PercentIcon,
@@ -116,7 +116,7 @@ const NORMS: RecordSection = {
  */
 export const CURRENCY_RATES: Directory = {
   id: "rates",
-  table: "currency_rates",
+  table: "core_currency_rates",
   titleKey: "core.rates",
   hintKey: "core.ratesHint",
   icon: CoinsIcon,
@@ -148,24 +148,16 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
         titleKey: "dir.groupOrg",
         items: [
           {
-            id: "org-bu",
-            table: "business_units",
-            titleKey: "dir.bu",
-            hintKey: "dir.buHint",
-            icon: BriefcaseIcon,
-            columns: ["employees_id", "legal_entities_id", "is_active"],
-          },
-          {
             id: "org-locations",
-            table: "locations",
+            table: "hr_locations",
             titleKey: "dir.locations",
             hintKey: "dir.locationsHint",
             icon: MapPinIcon,
-            columns: ["type", "region", "address", "business_units_id", "is_active"],
+            columns: ["type", "region", "address", "is_active"],
           },
           {
             id: "org-legal",
-            table: "legal_entities",
+            table: "crm_legal_entities",
             titleKey: "dir.legal",
             hintKey: "dir.legalHint",
             icon: ScaleIcon,
@@ -178,24 +170,24 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
         items: [
           {
             id: "org-cats",
-            table: "product_categories",
+            table: "crm_product_categories",
             titleKey: "dir.categories",
             hintKey: "dir.categoriesHint",
             icon: LayersIcon,
-            parent: "product_categories_id",
+            parent: "crm_product_categories_id",
             columns: ["code", "is_active"],
           },
           {
             id: "org-products",
-            table: "products",
+            table: "crm_products",
             titleKey: "dir.products",
             hintKey: "dir.productsHint",
             icon: PackageIcon,
-            columns: ["sku", "product_categories_id", "units_id", "price", "currency", "is_active"],
+            columns: ["sku", "crm_product_categories_id", "crm_units_id", "price", "currency", "is_active"],
           },
           {
             id: "org-units",
-            table: "units",
+            table: "crm_units",
             titleKey: "dir.units",
             hintKey: "dir.unitsHint",
             icon: RulerIcon,
@@ -220,7 +212,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             titleKey: "dir.pipelines",
             hintKey: "dir.pipelinesHint",
             icon: GitBranchIcon,
-            columns: ["business_units_id", "is_default", "is_active"],
+            columns: ["is_default", "is_active"],
             sort: ["sort_order"],
           },
           {
@@ -287,22 +279,22 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
         items: [
           {
             id: "hr-deps",
-            table: "departments",
+            table: "hr_departments",
             titleKey: "dir.departments",
             hintKey: "dir.departmentsHint",
             icon: NetworkIcon,
-            parent: "departments_id",
-            columns: ["employees_id", "business_units_id", "is_active"],
+            parent: "hr_departments_id",
+            columns: ["core_users_id", "is_active"],
             sort: ["sort_order"],
           },
           {
             id: "hr-positions",
-            table: "positions",
+            table: "hr_positions",
             titleKey: "dir.positions",
             hintKey: "dir.positionsHint",
             icon: IdCardIcon,
-            parent: "positions_id",
-            columns: ["departments_id", "level", "is_active"],
+            parent: "hr_positions_id",
+            columns: ["hr_departments_id", "level", "is_active"],
           },
         ],
       },
@@ -311,7 +303,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
         items: [
           {
             id: "hr-grades",
-            table: "grades",
+            table: "hr_grades",
             titleKey: "dir.grades",
             hintKey: "dir.gradesHint",
             icon: SignalIcon,
@@ -373,8 +365,8 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             hintKey: "dir.salaryBandsHint",
             icon: ChartColumnIcon,
             /* Названия у вилки нет: строка — это должность × грейд. */
-            title: "positions_id",
-            columns: ["grades_id", "salary_min", "salary_max", "currency", "effective_from", "is_active"],
+            title: "hr_positions_id",
+            columns: ["hr_grades_id", "salary_min", "salary_max", "currency", "effective_from", "is_active"],
           },
         ],
       },
@@ -387,7 +379,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             titleKey: "dir.holidays",
             hintKey: "dir.holidaysHint",
             icon: CalendarHeartIcon,
-            columns: ["date", "type", "locations_id"],
+            columns: ["date", "type", "hr_locations_id"],
             sort: ["date"],
           },
           {
@@ -460,7 +452,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
         items: [
           {
             id: "pm-lists",
-            table: "task_lists",
+            table: "hr_task_lists",
             titleKey: "dir.taskLists",
             hintKey: "dir.taskListsHint",
             icon: ListTodoIcon,
@@ -469,12 +461,12 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
           },
           {
             id: "pm-statuses",
-            table: "task_statuses",
+            table: "hr_task_statuses",
             titleKey: "dir.taskStatuses",
             hintKey: "dir.taskStatusesHint",
             icon: CircleDotIcon,
-            columns: ["task_lists_id", "status_group"],
-            sort: ["task_lists_id", "sort_order"],
+            columns: ["hr_task_lists_id", "status_group"],
+            sort: ["hr_task_lists_id", "sort_order"],
           },
         ],
       },

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useItems } from "@/features/item";
+import { PEOPLE, useItems } from "@/features/item";
 import { authApi } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { useSession } from "@/shared/api/use-session";
@@ -122,14 +122,18 @@ export function useUpdateProfile() {
   });
 }
 
-/** Учётные записи — таблица входа типа «Сотрудник» (ADR-0014). */
-const USERS = "users";
+/**
+ * Учётные записи — таблица входа типа «Сотрудник» (ADR-0014): в схеме v2
+ * это `core_users` (PEOPLE). В списке полей v2 (FRONTEND_RU.md, §2) нет `timezone_id` — пока её
+ * не заведут, пояс читается пустым и не сохраняется.
+ */
+const USERS = PEOPLE;
 
 /**
- * Пояс пользователя — [[User Timezone]], `users.timezone_id` своей строки.
+ * Пояс пользователя — [[User Timezone]], `core_users.timezone_id` своей строки.
  *
  * Строка ищется по `user_id_auth`, а не по `user_id` токена: так она
- * одна и та же при любом входе. У ADMIN строки в `users` нет —
+ * одна и та же при любом входе. У ADMIN строки в `core_users` нет —
  * `hasAccount: false`, и личного пояса у него нет (ADR-0014).
  *
  * `GET /v2/user/{id}` пояс не отдаёт: из строки входа он берёт только

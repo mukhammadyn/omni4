@@ -11,12 +11,12 @@ test("переход: «с этапа» — второе поле, «на эта
     hr_recruiting_stages_id: "s2",
     status: "active",
     moved_at: "T",
-    employees_id: "me",
+    core_users_id: "me",
   });
 
   expect(
     stageHistoryRow({ candidate: "c", vacancy: "v", from: null, to: "s1", status: "active", by: undefined, at: "T" }),
-  ).not.toHaveProperty("employees_id");
+  ).not.toHaveProperty("core_users_id");
 });
 
 test("пояснение — только если есть", () => {

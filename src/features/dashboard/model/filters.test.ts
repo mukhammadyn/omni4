@@ -23,21 +23,21 @@ test("готовый период — от начала единицы, срав
 test("отбор: прямой, через справочник, «Я», без ответа", () => {
   const filters: DashFilter[] = [
     { kind: "period", label: "" },
-    { kind: "record", label: "Менеджер", table: "employees", sourceTable: "crm_deals", sourceField: "employees_id" },
-    { kind: "record", label: "Филиал", table: "locations", sourceTable: "employees", sourceField: "locations_id" },
+    { kind: "record", label: "Менеджер", table: "core_users", sourceTable: "crm_deals", sourceField: "core_users_id" },
+    { kind: "record", label: "Отдел", table: "hr_departments", sourceTable: "core_users", sourceField: "hr_departments_id" },
   ];
   const result = widgetFilters(
     { title: { op: "contains", values: ["x"] } },
-    { period: { field: "created_at" }, employees: { field: "employees_id" }, locations: { field: "employees_id", via: "locations_id" } },
+    { period: { field: "created_at" }, core_users: { field: "core_users_id" }, hr_departments: { field: "core_users_id", via: "hr_departments_id" } },
     filters,
-    { period: ["custom", "2026-10-01", "2026-10-02"], employees: [ME], locations: ["l1"] },
-    { locations: ["me-guid", "other"] },
-    (table) => (table === "employees" ? "me-guid" : NOBODY),
+    { period: ["custom", "2026-10-01", "2026-10-02"], core_users: [ME], hr_departments: ["d1"] },
+    { hr_departments: ["me-guid", "other"] },
+    (table) => (table === "core_users" ? "me-guid" : NOBODY),
   );
-  // Менеджер «Я» и филиал по одному полю — пересечение.
+  // Менеджер «Я» и отдел по одному полю — пересечение.
   expect(result).toEqual({
     title: { op: "contains", values: ["x"] },
     created_at: { op: "between", values: ["2026-10-01", "2026-10-02T23:59:59.999"] },
-    employees_id: { op: "is", values: ["me-guid"] },
+    core_users_id: { op: "is", values: ["me-guid"] },
   });
 });

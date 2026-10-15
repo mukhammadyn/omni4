@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   AwardIcon,
-  BriefcaseBusinessIcon,
   BriefcaseIcon,
   Building2Icon,
   CheckIcon,
@@ -11,7 +10,6 @@ import {
   ClockIcon,
   HeartIcon,
   IdCardIcon,
-  KeyRoundIcon,
   LanguagesIcon,
   MapIcon,
   NetworkIcon,
@@ -38,7 +36,7 @@ import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
-import { toProfile, useEmployee, useNeighbours, useReports } from "../api/employee";
+import { EMPLOYEES, toProfile, useEmployee, useNeighbours, useReports } from "../api/employee";
 import { JOB_HISTORY } from "../api/job-history";
 import { SHIFTS } from "../api/schedule";
 import { toPerson } from "../api/org";
@@ -116,14 +114,12 @@ const WORK = [
   "hire_date",
   "employment_type",
   "work_format",
-  "positions_id",
-  "grades_id",
-  "departments_id",
-  "locations_id",
-  "legal_entities_id",
+  "hr_positions_id",
+  "hr_grades_id",
+  "hr_departments_id",
+  "hr_locations_id",
   "hr_work_schedules_id",
   "probation_end_date",
-  "role_id",
 ];
 
 /**
@@ -193,7 +189,7 @@ export function EmployeePage({
     );
   }
 
-  const person = toProfile(row);
+  const person = toProfile(row, employee.user);
   const tab = employee.tabs.find((item) => item.id === tabId);
   const status = bySlug.get("status");
   const activeField = active ? bySlug.get(active.slug) : undefined;
@@ -202,7 +198,7 @@ export function EmployeePage({
     <Cell
       field={field}
       row={row}
-      tableSlug="employees"
+      tableSlug={EMPLOYEES}
       relations={relations}
       locale={locale}
       language={language}
@@ -251,7 +247,6 @@ export function EmployeePage({
   const own = tabId && OWN_TABS.has(tabId) ? tabId : undefined;
   const activeTab = own ?? tab?.id ?? PERSONAL;
   const lastSeen = formatDate(person.lastActivity, "datetime", locale);
-  const password = employee.can.write ? bySlug.get("password") : undefined;
   const tabActions = TAB_ACTIONS.flatMap((action) => {
     const target = employee.tabs.find((item) => item.tableSlug === action.table);
     return target ? [{ ...action, id: target.id }] : [];
@@ -277,7 +272,6 @@ export function EmployeePage({
             </h1>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13.5px] text-fg-muted">
               <Meta icon={BriefcaseIcon} text={person.position} />
-              <Meta icon={BriefcaseBusinessIcon} text={person.employer} />
               <Meta icon={MapIcon} text={employee.region} />
               <Meta icon={NetworkIcon} text={person.department} />
               <Meta icon={Building2Icon} text={person.location} />
@@ -318,7 +312,7 @@ export function EmployeePage({
                 {t(editing ? "employee.done" : "employee.edit")}
               </Button>
             )}
-            {(password || tabActions.length > 0 || canDismiss) && (
+            {(tabActions.length > 0 || canDismiss) && (
               <Popover
                 align="end"
                 trigger={({ open, toggle }) => (
@@ -331,22 +325,6 @@ export function EmployeePage({
                 {(close) => (
                   /* Ширину меню задаёт содержимое: 270px — `#empActPop`. */
                   <div className="w-67.5">
-                    {password && (
-                      <PopoverItem
-                        icon={<Icon as={KeyRoundIcon} size={15} />}
-                        onClick={(event) => {
-                          /* Пароль — поле таблицы входа: ucode сам
-                             переносит его в auth. Редактор — тот же. */
-                          setActive({
-                            slug: password.slug,
-                            anchor: event.currentTarget.getBoundingClientRect(),
-                          });
-                          close();
-                        }}
-                      >
-                        {t("employee.action.password")}
-                      </PopoverItem>
-                    )}
                     {tabActions.map((action) => (
                       <PopoverItem
                         key={action.id}
@@ -359,7 +337,7 @@ export function EmployeePage({
                         {t(action.label)}
                       </PopoverItem>
                     ))}
-                    {canDismiss && (password || tabActions.length > 0) && <PopoverSeparator />}
+                    {canDismiss && tabActions.length > 0 && <PopoverSeparator />}
                     {canDismiss && (
                       <PopoverItem
                         danger
@@ -410,12 +388,14 @@ export function EmployeePage({
             languages={languages}
             onLanguage={onLanguage}
           />
+        ) : tab?.viaUser && !employee.user ? (
+          <p className="p-8 text-center text-sm text-fg-subtle">{t("employee.noUser")}</p>
         ) : tab ? (
           <div className="flex h-[70vh] min-h-105 flex-col">
             <RelationView
               key={tab.id}
               tab={tab}
-              parentGuid={guid}
+              parentGuid={tab.viaUser ? String(employee.user?.guid ?? "") : guid}
               {...(tab.direction === "outgoing"
                 ? { parentValue: String(row[tab.fieldSlug] ?? "") }
                 : {})}
@@ -539,7 +519,7 @@ export function EmployeePage({
           field={activeField}
           row={row}
           guid={guid}
-          tableSlug="employees"
+          tableSlug={EMPLOYEES}
           anchor={active.anchor}
           relations={relations}
           locale={locale}

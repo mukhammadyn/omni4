@@ -61,7 +61,7 @@ const toEmployee = (row: Item): SheetEmployee => ({
   id: text(row.guid),
   name: text(row.full_name) || [text(row.last_name), text(row.first_name)].filter(Boolean).join(" ") || "—",
   photo: text(row.photo),
-  position: text(related(row, "positions_id").name),
+  position: text(related(row, "hr_positions_id").name),
   hireDate: text(row.hire_date).slice(0, 10),
   dismissalDate: text(row.dismissal_date).slice(0, 10),
 });
@@ -158,7 +158,7 @@ export function useTimesheet({
    * загруженным сотрудникам перезапрашивал бы их на каждой прокрутке
    * (так в HRMS) — замер 2026-10-12: 5–7 с на порцию против 0,6 с.
    */
-  const one: Filters = employeeId ? { employees_id: { op: "any", values: [employeeId] } } : {};
+  const one: Filters = employeeId ? { hr_employees_id: { op: "any", values: [employeeId] } } : {};
   const range: Filters = { ...one, date: { op: "between", values: [from, to] } };
   // Связи дням и сменам не нужны, а без них ответ в пять раз легче.
   const days = useAll(ATTENDANCE_DAYS, range, false);
@@ -187,7 +187,7 @@ export function useTimesheet({
     const dayIndex = new Map<string, Map<string, AttendanceDay>>();
     for (const row of days.rows) {
       const day = toAttendanceDay(row);
-      const employee = text(row.employees_id);
+      const employee = text(row.hr_employees_id);
       const byDate = dayIndex.get(employee) ?? new Map<string, AttendanceDay>();
       byDate.set(day.date, day);
       dayIndex.set(employee, byDate);
@@ -195,7 +195,7 @@ export function useTimesheet({
 
     const planIndex = new Map<string, Map<string, number>>();
     for (const row of shifts.rows) {
-      const employee = text(row.employees_id);
+      const employee = text(row.hr_employees_id);
       const date = text(row.date).slice(0, 10);
       const byDate = planIndex.get(employee) ?? new Map<string, number>();
       byDate.set(date, (byDate.get(date) ?? 0) + (num(row.planned_minutes) ?? 0));
@@ -206,11 +206,11 @@ export function useTimesheet({
     for (const row of requests.rows) {
       const leave = toLeave(row);
       if (!leave) continue;
-      const employee = text(row.employees_id);
+      const employee = text(row.hr_employees_id);
       leaveIndex.set(employee, [...(leaveIndex.get(employee) ?? []), leave]);
     }
 
-    // ponytail: праздник общий на всех; у `hr_holidays` есть `locations_id`,
+    // ponytail: праздник общий на всех; у `hr_holidays` есть `hr_locations_id`,
     // делить по филиалам — когда праздники филиалов разойдутся.
     const holidayIndex = new Map(
       holidays.rows
@@ -248,7 +248,7 @@ export function useDayEvents(employeeId: string, date: string) {
   const query = useItems(ATTENDANCE_EVENTS, {
     limit: 100,
     page: 1,
-    filters: { employees_id: { op: "any", values: [employeeId] }, date: { op: "between", values: [date, date] } },
+    filters: { hr_employees_id: { op: "any", values: [employeeId] }, date: { op: "between", values: [date, date] } },
     sorts: [{ field: "occurred_at", direction: "asc" }],
   });
   return { rows: query.page.rows, loading: query.isLoading };
@@ -272,13 +272,13 @@ export function useDayMarks(employeeIds: string[], from: string, to: string): Ma
   const query = useItems(employeeIds.length ? ATTENDANCE_EVENTS : undefined, {
     limit: MAX_LIMIT,
     page: 1,
-    filters: { employees_id: { op: "any", values: employeeIds }, date: { op: "between", values: [from, to] } },
+    filters: { hr_employees_id: { op: "any", values: employeeIds }, date: { op: "between", values: [from, to] } },
     sorts: [{ field: "occurred_at", direction: "asc" }],
   });
   return useMemo(() => {
     const marks = new Map<string, DayMarks>();
     for (const row of query.page.rows) {
-      const key = `${text(row.employees_id)}|${text(row.date).slice(0, 10)}`;
+      const key = `${text(row.hr_employees_id)}|${text(row.date).slice(0, 10)}`;
       const day = marks.get(key) ?? { source: text(row.source), photos: [], distance: null };
       const photo = text(row.photo);
       if (photo) day.photos.push({ url: photo, in: text(row.direction) === "in", at: text(row.occurred_at) });

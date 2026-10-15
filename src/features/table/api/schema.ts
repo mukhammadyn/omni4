@@ -52,8 +52,8 @@ export function useTableSchema(tableSlug: string | undefined, columnIds?: string
         /*
          * `limit=0` — без предела. Без параметра шлюз подставляет 60
          * (gateway, config/config.go:263, DefaultLimit), а в список идут
-         * и связи, ведущие В таблицу: на `employees` ссылаются почти все
-         * таблицы ERP, и её собственные связи (должность, отдел) в первые
+         * и связи, ведущие В таблицу: на `core_users` ссылаются почти все
+         * таблицы ERP, и её собственные связи (сотрудник, отдел) в первые
          * 60 не попадали — колонки-ссылки оставались пустыми. Ноль
          * object_builder понимает как «всё» (storage/postgres/relation.go,
          * GetList: `if data.Limit > 0`).
@@ -88,7 +88,7 @@ export function useTableSchema(tableSlug: string | undefined, columnIds?: string
    * Без списка колонок — связи, у которых есть поле в ЭТОЙ таблице.
    * Поля показа читаются только через него (`field.relationId`), а
    * связи, ведущие сюда из чужих таблиц, колонок здесь не дают: на
-   * `employees` их шесть десятков, и запрос на каждую был бы впустую.
+   * `core_users` их шесть десятков, и запрос на каждую был бы впустую.
    */
   const fieldRelations = new Set<string>();
   for (const field of base.schema.fields) {

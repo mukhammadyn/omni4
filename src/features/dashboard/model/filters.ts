@@ -6,7 +6,7 @@ import { nowLocal, zonedToInstant } from "@/shared/lib/date-value";
  * а каким полем на него отвечать — решает каждый виджет (`Answer`).
  *
  * «Запись таблицы» объявляется полем-связью какой-нибудь таблицы
- * (`crm_deals.employees_id` → «Менеджер»): из этого поля чип берёт
+ * (`crm_deals.core_users_id` → «Менеджер»): из этого поля чип берёт
  * подпись записей и выбор строк, как у фильтра таблицы. Сам фильтр —
  * про записи `table`, а не про это поле.
  */
@@ -16,7 +16,7 @@ export type DashFilter =
 
 /**
  * Каким полем виджет отвечает на фильтр. `via` — поле справочника:
- * «Филиал» для сделок — `employees_id` → `employees.locations_id`.
+ * «Отдел» для сделок — `core_users_id` → `core_users.hr_departments_id`.
  */
 export type Answer = { field: string; via?: string };
 
@@ -120,7 +120,7 @@ export function widgetFilters(
 
     let guids = answer.via ? viaGuids[key] : value.map((guid) => (guid === ME ? me(filter.table) : guid));
     if (!guids) continue;
-    // «Менеджер» и «Филиал» у сделок отвечают одним `employees_id` — через «И».
+    // «Менеджер» и «Отдел» у сделок отвечают одним `core_users_id` — через «И».
     const earlier = shared.get(answer.field);
     if (earlier) guids = guids.filter((guid) => earlier.includes(guid));
     shared.set(answer.field, guids);

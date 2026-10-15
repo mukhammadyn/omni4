@@ -1,10 +1,9 @@
 import { useMemo } from "react";
-import { useCreateItem, useItems, type Item } from "@/features/item";
+import { PEOPLE, useCreateItem, useItems, type Item } from "@/features/item";
 import { useTableSchema } from "@/features/table";
 import { session } from "@/shared/api/session";
 import { todayInput } from "@/shared/lib/date-value";
 import { plusDays } from "../model/vacancy-dates";
-import { EMPLOYEES } from "./employee";
 import { text } from "./org";
 import { VACANCIES } from "./vacancy";
 import { ALL } from "./vacancy-page";
@@ -28,7 +27,7 @@ export function useNewVacancy() {
 
   const draft = useMemo<Item>(() => {
     const today = todayInput();
-    const recruiter = session.getObjectIds()[EMPLOYEES];
+    const recruiter = session.getObjectIds()[PEOPLE];
     return {
       guid: crypto.randomUUID(),
       status: "draft",
@@ -43,7 +42,7 @@ export function useNewVacancy() {
       opened_at: today,
       deadline: plusDays(today, 30),
       desired_start_date: plusDays(today, 45),
-      ...(recruiter ? { employees_id: recruiter } : {}),
+      ...(recruiter ? { core_users_id: recruiter } : {}),
       ...(pipeline ? { hr_recruiting_pipelines_id: text(pipeline.guid), hr_recruiting_pipelines_id_data: pipeline } : {}),
     };
   }, [pipeline]);

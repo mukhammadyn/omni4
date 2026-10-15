@@ -73,10 +73,11 @@ export type Filters = Record<string, Filter>;
 
 /**
  * Таблица людей: на неё ссылаются все поля «кто» — ответственный,
- * исполнитель, автор (CONTEXT.md, PRD D3).
+ * исполнитель, автор (CONTEXT.md, PRD D3). В схеме v2 это пользователи,
+ * таблица входа; сотрудники («о ком запись») — `hr_employees`.
  * В фильтре по связи с ней первым пунктом стоит «Я».
  */
-export const PEOPLE = "employees";
+export const PEOPLE = "core_users";
 
 /**
  * «Я» — значение фильтра по связи, как «Me» в Notion: «Ответственный — я».

@@ -154,7 +154,7 @@ export function ProfileSettings() {
  * Часовой пояс — [[User Timezone]]. Уезжает сразу, без кнопки: это одна
  * настройка, а не форма, как язык интерфейса.
  *
- * У ADMIN учётной записи в `users` нет — и пояса тоже (ADR-0014).
+ * У ADMIN учётной записи в `core_users` нет — и пояса тоже (ADR-0014).
  */
 function TimezoneSection() {
   const { t } = useTranslation();
