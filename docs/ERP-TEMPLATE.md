@@ -264,6 +264,7 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | `ABSENCES` | `hr_requests` | — | «Отсутствия» и согласование |
 | `SCHEDULE` | `hr_shifts` | — | «Календарь» графика |
 | `WORK_SCHEDULES` | `hr_work_schedules` | — | «Шаблоны» графика |
+| `KNOWLEDGE` | `hr_kb_articles` | — | «База знаний»: дерево и страница |
 | `LIST` | любая | — | список |
 
 Общий атрибут `chips_by_id` — полоса значений над таблицей (TABLE,
@@ -357,6 +358,13 @@ LIST, GALLERY); значение — поле или колонка-связь (
 |---|---|---|---|
 | 1 | TABLE | Список | колонки: `title`, `category`, `starts_at`, `ends_at`, `core_users_id`, `location`, `status` |
 | 2 | CALENDAR | Календарь | `calendar_from_slug: "starts_at"`, `calendar_to_slug: "ends_at"`; колонки: `title` |
+
+**HRMS / База знаний** (`hr_kb_articles`)
+
+| # | Тип | Имя |
+|---|---|---|
+| 1 | KNOWLEDGE | База знаний |
+| 2 | TABLE | — |
 
 **CRM / Сделки** (`crm_deals`)
 
