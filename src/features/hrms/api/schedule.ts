@@ -341,7 +341,7 @@ export function useSeries(seriesId: string, from: string) {
 const CHUNK = 1000;
 const chunks = <T,>(list: T[]) => Array.from({ length: Math.ceil(list.length / CHUNK) }, (_, i) => list.slice(i * CHUNK, (i + 1) * CHUNK));
 
-const upsert = (slug: string, objects: Record<string, unknown>[]) =>
+export const upsert = (slug: string, objects: Record<string, unknown>[]) =>
   objects.length
     ? api.post<unknown>(`/v2/items/${slug}/upsert-many`, { data: { field_slug: "guid", fields: Object.keys(objects[0]!), objects } })
     : Promise.resolve();
