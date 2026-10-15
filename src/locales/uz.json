@@ -2255,5 +2255,17 @@
   "kb.newPage": "Yangi sahifa",
   "kb.icon": "Belgi",
   "kb.updated": "Yangilangan: {{date}}",
-  "kb.placeholder": "Yozishni boshlang yoki buyruqlar uchun «/» ni bosing…"
+  "kb.placeholder": "Yozishni boshlang yoki buyruqlar uchun «/» ni bosing…",
+  "kb.saved": "Saqlandi",
+  "kb.slash.title": "Bloklar",
+  "kb.slash.h2": "Sarlavha",
+  "kb.slash.h3": "Kichik sarlavha",
+  "kb.slash.ul": "Belgili ro'yxat",
+  "kb.slash.ol": "Raqamli ro'yxat",
+  "kb.slash.todo": "Nazorat ro'yxati",
+  "kb.slash.quote": "Iqtibos",
+  "kb.slash.callout": "Eslatma",
+  "kb.slash.hr": "Ajratgich",
+  "kb.slash.table": "Jadval",
+  "kb.slash.image": "Rasm"
 }

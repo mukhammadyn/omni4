@@ -1,11 +1,12 @@
-import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRightIcon, FilePlusIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { useTablePermissions } from "@/features/auth";
 import { formatDate } from "@/shared/lib/date-value";
 import { Icon } from "@/shared/ui/icon";
 import { Popover } from "@/shared/ui/popover";
-import { useKbActions, useKbPages } from "../api/kb";
-import { childrenOf, docText, pathTo, toDoc, type KbPage } from "../model/kb";
+import { KB, useKbActions, useKbPages } from "../api/kb";
+import { childrenOf, docText, pathTo, toDoc, type KbDoc, type KbPage } from "../model/kb";
 
 /* Редактор — отдельным чанком, как MULTI_LINE (ADR-0015). */
 const KbEditor = lazy(() => import("./KbEditor"));
@@ -31,6 +32,7 @@ export function KnowledgeBase({ pageId, onOpen }: { pageId: string; onOpen: (id:
   const { t } = useTranslation();
   const { pages, loading } = useKbPages();
   const actions = useKbActions();
+  const can = useTablePermissions()(KB);
   const [query, setQuery] = useState("");
   /* Раскрытые и свёрнутые руками. Ветка к открытой странице раскрыта
      сама, пока её не свернули. */
@@ -101,7 +103,7 @@ export function KnowledgeBase({ pageId, onOpen }: { pageId: string; onOpen: (id:
           )}
           <span className="w-5 shrink-0 text-center">{page.icon || DEFAULT_ICON}</span>
           <span className="min-w-0 flex-1 truncate">{page.title || t("kb.untitled")}</span>
-          <button
+          {can.write && <button
             type="button"
             title={t("kb.addSub")}
             aria-label={t("kb.addSub")}
@@ -112,7 +114,7 @@ export function KnowledgeBase({ pageId, onOpen }: { pageId: string; onOpen: (id:
             className="grid size-5.5 shrink-0 place-items-center rounded text-fg-subtle opacity-0 group-hover:opacity-100 hover:bg-border focus-visible:opacity-100"
           >
             <Icon as={PlusIcon} size={13} />
-          </button>
+          </button>}
         </div>
         {kids.length > 0 && expanded && kids.map((kid) => row(kid, depth + 1))}
       </div>
@@ -143,19 +145,19 @@ export function KnowledgeBase({ pageId, onOpen }: { pageId: string; onOpen: (id:
             <p className="p-3 text-sm text-fg-subtle">{t(found ? "kb.notFound" : "kb.empty")}</p>
           )}
         </div>
-        <button
+        {can.write && <button
           type="button"
           onClick={() => create("")}
           className="flex h-10 items-center gap-2 border-t border-border px-4 text-sm text-fg-muted hover:bg-surface-hover hover:text-fg"
         >
           <Icon as={FilePlusIcon} size={15} />
           {t("kb.newPage")}
-        </button>
+        </button>}
       </aside>
 
       <div className="min-h-0 min-w-0 flex-1 overflow-auto">
         {current ? (
-          <Page key={current.id} page={current} path={path} pages={pages} onOpen={go} onCreate={create} />
+          <Page key={current.id} page={current} path={path} pages={pages} editable={can.update} onOpen={go} onCreate={create} />
         ) : (
           !loading && <p className="p-8 text-center text-sm text-fg-subtle">{t("kb.empty")}</p>
         )}
@@ -169,12 +171,14 @@ function Page({
   page,
   path,
   pages,
+  editable,
   onOpen,
   onCreate,
 }: {
   page: KbPage;
   path: KbPage[];
   pages: KbPage[];
+  editable: boolean;
   onOpen: (id: string) => void;
   onCreate: (parentId: string) => void;
 }) {
@@ -185,10 +189,36 @@ function Page({
   const doc = useMemo(() => toDoc(page.content), [page.content]);
   const updated = formatDate(page.updatedAt, "date", i18n.language);
 
+  /*
+   * Автосохранение, как `touch()` прототипа: правки копятся и уходят
+   * одним запросом через 0,6 с тишины; уход со страницы — сразу.
+   */
+  const pending = useRef<{ title?: string; content?: KbDoc }>({});
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [saved, setSaved] = useState(false);
+  const flush = useRef(() => {});
+  flush.current = () => {
+    clearTimeout(timer.current);
+    const values = pending.current;
+    pending.current = {};
+    if (!Object.keys(values).length) return;
+    actions.save(page.id, values);
+    setSaved(true);
+    timer.current = setTimeout(() => setSaved(false), 1500);
+  };
+  const queue = (values: { title?: string; content?: KbDoc }) => {
+    pending.current = { ...pending.current, ...values };
+    setSaved(false);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => flush.current(), 600);
+  };
+  useEffect(() => () => flush.current(), []);
+
   return (
     <>
       {/* `.kd-top`: крошки. */}
       <div className="sticky top-0 z-10 flex h-11 items-center gap-1 bg-surface px-5 text-[13px] text-fg-muted">
+        <span className="order-last ml-auto pl-3 text-xs text-fg-subtle">{saved ? t("kb.saved") : ""}</span>
         {path.map((p, at) => (
           <span key={p.id} className="flex min-w-0 items-center gap-1">
             {at > 0 && <span className="text-fg-subtle">/</span>}
@@ -206,6 +236,7 @@ function Page({
             <button
               type="button"
               title={t("kb.icon")}
+              disabled={!editable}
               onClick={toggle}
               className="-ml-1 grid size-14 place-items-center rounded-lg text-[44px] leading-none hover:bg-surface-hover"
             >
@@ -237,9 +268,13 @@ function Page({
 
         <input
           value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          onBlur={() => title.trim() !== page.title && actions.save(page.id, { title: title.trim() })}
-          onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
+          readOnly={!editable}
+          onChange={(event) => {
+            setTitle(event.target.value);
+            queue({ title: event.target.value.trim() });
+          }}
+          /* Enter — к тексту, как в прототипе: заголовок одной строкой. */
+          onKeyDown={(event) => event.key === "Enter" && (document.querySelector<HTMLElement>(".kb-body")?.focus(), event.preventDefault())}
           placeholder={t("kb.untitled")}
           className="mt-2 w-full bg-transparent text-[34px] leading-tight font-bold tracking-[-0.01em] outline-none placeholder:text-fg-subtle"
         />
@@ -248,7 +283,7 @@ function Page({
         </div>
 
         <Suspense fallback={null}>
-          <KbEditor doc={doc} editable={false} placeholder={t("kb.placeholder")} />
+          <KbEditor doc={doc} editable={editable} placeholder={t("kb.placeholder")} onChange={(content) => queue({ content })} />
         </Suspense>
 
         {/* `.kd-kids`: подстраницы. */}
@@ -268,14 +303,14 @@ function Page({
             ))}
           </div>
         )}
-        <button
+        {editable && <button
           type="button"
           onClick={() => onCreate(page.id)}
           className="mt-3 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-fg-subtle hover:bg-surface-hover hover:text-fg"
         >
           <Icon as={PlusIcon} size={15} />
           {t("kb.addSub")}
-        </button>
+        </button>}
       </article>
     </>
   );
