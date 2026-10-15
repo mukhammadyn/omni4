@@ -2245,5 +2245,15 @@
   "training.form.drop": "Нажмите, чтобы выбрать файлы",
   "training.form.linkTitle": "Название материала",
   "training.form.addLink": "Добавить ссылку",
-  "training.form.linkRequired": "Укажите ссылку"
+  "training.form.linkRequired": "Укажите ссылку",
+  "view.type.KNOWLEDGE": "База знаний",
+  "kb.untitled": "Без названия",
+  "kb.addSub": "Добавить подстраницу",
+  "kb.search": "Поиск по базе",
+  "kb.notFound": "Ничего не найдено",
+  "kb.empty": "Страниц пока нет",
+  "kb.newPage": "Новая страница",
+  "kb.icon": "Иконка",
+  "kb.updated": "Обновлено {{date}}",
+  "kb.placeholder": "Начните писать или нажмите «/» для команд…"
 }

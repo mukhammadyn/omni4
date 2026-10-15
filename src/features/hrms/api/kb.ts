@@ -1,13 +1,13 @@
 import { useMemo } from "react";
-import { PEOPLE, useCreateItem, useDeleteItems, useUpdateItem, type Item } from "@/features/item";
+import { MAX_LIMIT, PEOPLE, useCreateItem, useDeleteItems, useItems, useUpdateItem, type Item } from "@/features/item";
 import { session } from "@/shared/api/session";
 import { EMPTY_DOC, type KbDoc, type KbPage } from "../model/kb";
-import { related, text } from "./org";
+import { text } from "./org";
 import { useAll } from "./timesheet";
 
 export const KB = "hr_kb_articles";
 
-const toPage = (row: Item): KbPage => ({
+const toPage = (row: Item, authors: Map<string, string>): KbPage => ({
   id: text(row.guid),
   parentId: text(row.hr_kb_articles_id),
   /* Заголовки из hrms бывают с переводом строки и пробелами по краям. */
@@ -17,16 +17,31 @@ const toPage = (row: Item): KbPage => ({
   sortOrder: typeof row.sort_order === "number" ? row.sort_order : null,
   createdAt: text(row.created_at),
   updatedAt: text(row.updated_at),
-  author: text(related(row, "core_users_id").full_name),
+  author: authors.get(text(row.core_users_id)) ?? "",
 });
 
 /**
  * Вся база целиком: дереву нужны все страницы, поиску — их текст.
  * Страниц десятки, а не тысячи.
+ *
+ * Без связей: в `hr_kb_articles_id_data` бэкенд кладёт родителя целиком,
+ * с его текстом, — ответ omni4 весил 2,6 МБ вместо 1,1. Имена авторов —
+ * отдельным запросом, их единицы.
  */
 export function useKbPages() {
-  const { rows, loading } = useAll(KB, {});
-  return { pages: useMemo(() => rows.map(toPage), [rows]), loading };
+  const { rows, loading } = useAll(KB, {}, false);
+  const ids = useMemo(() => [...new Set(rows.map((r) => text(r.core_users_id)).filter(Boolean))], [rows]);
+  const people = useItems(ids.length ? PEOPLE : undefined, {
+    limit: MAX_LIMIT,
+    page: 1,
+    relations: false,
+    filters: { guid: { op: "is", values: ids } },
+  });
+  const pages = useMemo(() => {
+    const authors = new Map(people.page.rows.map((u) => [text(u.guid), text(u.full_name)]));
+    return rows.map((row) => toPage(row, authors));
+  }, [rows, people.page.rows]);
+  return { pages, loading };
 }
 
 /** Автор правки — своя строка `core_users`; у ADMIN её нет — пусто. */

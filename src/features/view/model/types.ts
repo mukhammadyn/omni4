@@ -31,6 +31,7 @@ export const VIEW_TYPES = [
   "ABSENCES",
   "SCHEDULE",
   "WORK_SCHEDULES",
+  "KNOWLEDGE",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -166,6 +167,11 @@ const TRAITS: Record<ViewType, ViewTraits> = {
   SCHEDULE: { ...HRMS, selfLoading: true },
   /** «Шаблоны» графика там же — карточки `hr_work_schedules` с днями. */
   WORK_SCHEDULES: { ...HRMS, selfLoading: true },
+  /**
+   * «База знаний» (`knowledge.html`, features/hrms) на `hr_kb_articles`:
+   * дерево страниц и страница с текстом. Грузит базу целиком сама.
+   */
+  KNOWLEDGE: { ...HRMS, selfLoading: true },
   BOARD: { implemented: true, inTabs: true, noGrouping: true },
   CALENDAR: { implemented: true, inTabs: true, noGrouping: true },
   CHART: { implemented: true, noGrouping: true },

@@ -98,6 +98,9 @@ import {
   useVacancyColumns,
   TRAININGS,
   useTrainingColumns,
+  KnowledgeBase,
+  KB_VIEW,
+  useKbActions,
   type EmployeeTab,
 } from "@/features/hrms";
 import { MicrofrontendPage } from "@/features/microfrontend";
@@ -250,6 +253,8 @@ const searchSchema = z.object({
    */
   day: z.string().optional().catch(undefined),
   period: z.string().optional().catch(undefined),
+  /** Открытая страница базы знаний (guid). Ссылку на неё пересылают. */
+  doc: z.string().optional().catch(undefined),
   /* Настройки сводной — в адресе: это не настройка view для всех,
      а то, как человек сейчас смотрит. */
   /* Полей строк несколько — через запятую: слаг поля это [a-z0-9_],
@@ -1273,6 +1278,7 @@ function MenuPage() {
   const [confirming, setConfirming] = useState(false);
   /** Открытое окно «Создать» графика — тип его view. */
   const [scheduleCreate, setScheduleCreate] = useState<string | null>(null);
+  const kbActions = useKbActions();
 
   /**
    * Завести черновик. Одно место на все три способа (кнопка в шапке,
@@ -1283,6 +1289,11 @@ function MenuPage() {
      проекта, если админ её задал (`attributes.url_object`). */
   const createRecord = () => {
     if (view && openCreateUrl(view)) return;
+    /* В базе знаний «Создать» — новая страница верхнего уровня. */
+    if (view?.type === KB_VIEW) {
+      setSearch({ doc: kbActions.create("") }, true);
+      return;
+    }
     /* У графика «Создать» — своё окно: смена или шаблон (features/hrms). */
     if (view && SCHEDULE_VIEWS.has(view.type)) {
       setScheduleCreate(view.type);
@@ -1487,7 +1498,9 @@ function MenuPage() {
             {/* Число без слова: «16 записей» требует согласования по падежу
                 в русском и узбекском, а множественные формы i18next стоят
                 трёх ключей на язык ради одного счётчика. */}
-            {supportedView && !treeView && (
+            {/* Экраны, что грузят данные сами, общего запроса строк не делают:
+                их «· 0» было бы неправдой. */}
+            {supportedView && !treeView && !sheetView && (
               <span className="shrink-0 pl-1 text-xs text-fg-muted">· {rows.count}</span>
             )}
             {isFetching && !rowsLoading && (
@@ -1624,7 +1637,7 @@ function MenuPage() {
                   (features/hrms), а не настройки view из ⋮. */}
               {/* Экраны HRMS ищут сотрудника сами — та же лупа, что
                   у таблиц, без меню полей. «Шаблонам» искать нечего. */}
-              {sheetView && view.type !== "WORK_SCHEDULES" && can.searchButton && (
+              {sheetView && view.type !== "WORK_SCHEDULES" && view.type !== KB_VIEW && can.searchButton && (
                 <SearchBox
                   value={searchText}
                   onChange={(next) => setSearch({ search: next || undefined }, true)}
@@ -2049,7 +2062,9 @@ function MenuPage() {
           {/* Пока варианты вкладок едут, запрос строк не запущен вовсе —
               и пустая таблица врала бы «записей нет». */}
           {sheetView ? (
-            view.type === "ABSENCES" ? (
+            view.type === KB_VIEW ? (
+              <KnowledgeBase pageId={search.doc ?? ""} onOpen={(doc) => setSearch({ doc }, true)} />
+            ) : view.type === "ABSENCES" ? (
               <Absences viewId={view.id} search={searchText} onOpenRow={openRow} onOpenEmployee={openEmployee} />
             ) : view.type === "WORK_SCHEDULES" ? (
               <>

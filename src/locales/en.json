@@ -2245,5 +2245,15 @@
   "training.form.drop": "Click to choose files",
   "training.form.linkTitle": "Material name",
   "training.form.addLink": "Add link",
-  "training.form.linkRequired": "Enter a link"
+  "training.form.linkRequired": "Enter a link",
+  "view.type.KNOWLEDGE": "Knowledge base",
+  "kb.untitled": "Untitled",
+  "kb.addSub": "Add subpage",
+  "kb.search": "Search the base",
+  "kb.notFound": "Nothing found",
+  "kb.empty": "No pages yet",
+  "kb.newPage": "New page",
+  "kb.icon": "Icon",
+  "kb.updated": "Updated {{date}}",
+  "kb.placeholder": "Start writing or press “/” for commands…"
 }

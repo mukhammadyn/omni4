@@ -26,3 +26,5 @@ export { TRAININGS } from "./api/training";
 export { useTrainingColumns } from "./ui/training-columns";
 export { TrainingPage } from "./ui/TrainingPage";
 export { TrainingForm } from "./ui/TrainingForm";
+export { KnowledgeBase, KB_VIEW } from "./ui/KnowledgeBase";
+export { useKbActions } from "./api/kb";
