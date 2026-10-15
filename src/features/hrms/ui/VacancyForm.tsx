@@ -39,15 +39,15 @@ const SECTIONS: Section[] = [
     icon: FileTextIcon,
     title: "vacancy.form.base",
     hint: "vacancy.form.baseHint",
-    slugs: ["title", "departments_id", "positions_id", "level", "headcount", "priority", "status"],
+    slugs: ["title", "hr_departments_id", "hr_positions_id", "level", "headcount", "priority", "status"],
   },
-  { id: "team", icon: UsersIcon, title: "vacancy.page.card.team", hint: "vacancy.form.teamHint", slugs: ["employees_id", "employees_id_2"] },
+  { id: "team", icon: UsersIcon, title: "vacancy.page.card.team", hint: "vacancy.form.teamHint", slugs: ["core_users_id", "core_users_id_2"] },
   {
     id: "terms",
     icon: WalletIcon,
     title: "vacancy.page.card.terms",
     hint: "vacancy.form.termsHint",
-    slugs: ["locations_id", "work_format", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
+    slugs: ["hr_locations_id", "work_format", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
   },
   {
     id: "dates",

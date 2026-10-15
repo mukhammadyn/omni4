@@ -27,9 +27,9 @@ const toCandidate = (row: Item): Candidate & PlanCandidate => ({
 });
 
 const toEmployee = (row: Item): PlanEmployee => ({
-  positionId: text(row.positions_id),
-  departmentId: text(row.departments_id),
-  locationId: text(row.locations_id),
+  positionId: text(row.hr_positions_id),
+  departmentId: text(row.hr_departments_id),
+  locationId: text(row.hr_locations_id),
   dismissalDate: text(row.dismissal_date),
   candidateId: text(row.hr_candidates_id),
 });
@@ -72,14 +72,14 @@ export function useVacancyFunnels(vacancyIds: string[]): Map<string, Funnel> | n
 export function useVacancyPlan(vacancies: Item[], today: string): Map<string, PlanRow> | null {
   const ids = useMemo(() => vacancies.map((row) => text(row.guid)).filter(Boolean), [vacancies]);
   const positions = useMemo(
-    () => [...new Set(vacancies.map((row) => text(row.positions_id)).filter(Boolean))],
+    () => [...new Set(vacancies.map((row) => text(row.hr_positions_id)).filter(Boolean))],
     [vacancies],
   );
   const candidates = useCandidates(ids);
   // ponytail: MAX_LIMIT сотрудников этих должностей — потолок одной порции.
   const employees = useItems(positions.length ? EMPLOYEES : undefined, {
     ...ALL,
-    filters: { positions_id: { op: "is", values: positions } },
+    filters: { hr_positions_id: { op: "is", values: positions } },
   });
 
   const loading = candidates.isLoading || employees.isLoading;
@@ -92,9 +92,9 @@ export function useVacancyPlan(vacancies: Item[], today: string): Map<string, Pl
         planRow(
           {
             id: text(row.guid),
-            positionId: text(row.positions_id),
-            departmentId: text(row.departments_id),
-            locationId: text(row.locations_id),
+            positionId: text(row.hr_positions_id),
+            departmentId: text(row.hr_departments_id),
+            locationId: text(row.hr_locations_id),
             headcount: typeof row.headcount === "number" ? row.headcount : 0,
             openedAt: text(row.opened_at),
             deadline: text(row.deadline),

@@ -33,7 +33,7 @@ export function useCandidatesTable(rows: Item[]) {
   const departments = useMemo(
     () =>
       new Map(
-        vacancies.page.rows.map((row) => [text(row.guid), text(related(row, "departments_id").name)]),
+        vacancies.page.rows.map((row) => [text(row.guid), text(related(row, "hr_departments_id").name)]),
       ),
     [vacancies.page.rows],
   );

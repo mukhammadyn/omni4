@@ -1,11 +1,10 @@
 import { useMemo } from "react";
 import { useTablePermissions } from "@/features/auth";
-import { MAX_LIMIT, useCreateItem, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
+import { MAX_LIMIT, PEOPLE, useCreateItem, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
 import { useTableSchema } from "@/features/table";
 import { session } from "@/shared/api/session";
 import { todayInput } from "@/shared/lib/date-value";
 import { stageHistoryRow } from "../model/stage-history";
-import { EMPLOYEES } from "./employee";
 import { text } from "./org";
 import { VACANCIES } from "./vacancy";
 
@@ -54,7 +53,7 @@ function useStageLog() {
         from,
         to,
         status,
-        by: session.getObjectIds()[EMPLOYEES],
+        by: session.getObjectIds()[PEOPLE],
         at: new Date().toISOString(),
         comment,
       }),

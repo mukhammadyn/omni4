@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useTablePermissions } from "@/features/auth";
-import { useCreateItem, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
+import { PEOPLE, useCreateItem, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
 import { useTableSchema } from "@/features/table";
 import { session } from "@/shared/api/session";
 import { candidateSteps } from "../model/candidate-steps";
@@ -85,7 +85,7 @@ export function useCandidate(guid: string) {
     return [...evaluations.page.rows, ...waiting];
   }, [evaluations.page.rows, pending]);
 
-  /* Сотрудник, заведённый из этого кандидата (`employees.hr_candidates_id`) —
+  /* Сотрудник, заведённый из этого кандидата (`hr_employees.hr_candidates_id`) —
      только у нанятого: «Создать сотрудника» или «Открыть сотрудника». */
   const employee = useItems(row?.status === "hired" ? EMPLOYEES : undefined, {
     limit: 1,
@@ -99,8 +99,8 @@ export function useCandidate(guid: string) {
     () => (row ? candidateSteps(stages, row, history.page.rows, allEvaluations) : []),
     [row, stages, history.page.rows, allEvaluations],
   );
-  /** Своя строка `employees` из токена; у ADMIN её нет — автор пустой. */
-  const me = session.getObjectIds()[EMPLOYEES];
+  /** Своя строка `core_users` из токена; у ADMIN её нет — автор пустой. */
+  const me = session.getObjectIds()[PEOPLE];
 
   return {
     row,
@@ -150,7 +150,7 @@ export function useCandidate(guid: string) {
         (e) =>
           text(e.hr_recruiting_stages_id) === stage &&
           typeof e.score === "number" &&
-          text(e.employees_id) === (me ?? ""),
+          text(e.core_users_id) === (me ?? ""),
       );
       if (!mine) return create(evaluationRow(guid, stage, me, { score }));
       /* Своя оценка ещё создаётся: PUT раньше POST ушёл бы в пустоту —
@@ -171,12 +171,12 @@ function evaluationRow(candidate: string, stage: string, by: string | undefined,
   return {
     hr_candidates_id: candidate,
     hr_recruiting_stages_id: stage,
-    ...(by ? { employees_id: by } : {}),
+    ...(by ? { core_users_id: by } : {}),
     ...values,
   };
 }
 
-/** Строка `employees` из нанятого кандидата. Пустые значения не пишутся. */
+/** Строка `hr_employees` из нанятого кандидата. Пустые значения не пишутся. */
 export function employeeFromCandidate(candidate: Item, guid: string): Item {
   const vacancy = related(candidate, "hr_vacancies_id");
   const values: Item = {
@@ -189,9 +189,9 @@ export function employeeFromCandidate(candidate: Item, guid: string): Item {
     personal_email: candidate.email,
     telegram_username: candidate.telegram_username,
     photo: candidate.photo,
-    positions_id: vacancy.positions_id,
-    departments_id: vacancy.departments_id,
-    locations_id: vacancy.locations_id,
+    hr_positions_id: vacancy.hr_positions_id,
+    hr_departments_id: vacancy.hr_departments_id,
+    hr_locations_id: vacancy.hr_locations_id,
     work_format: vacancy.work_format,
     employment_type: vacancy.employment_type,
     hire_date: text(candidate.start_date) || todayInput(),

@@ -4,11 +4,10 @@ import { hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 
 /*
  * Оргструктура читает таблицы HRMS по их слагам и полям из схемы
- * ERP (`ucode/erp/erp.dbml`): employees, departments, business_units,
- * locations, legal_entities. Это не угадывание полей показа связи
+ * ERP v2 (`omni4-v2/erp.dbml`): hr_employees, hr_departments. Это не угадывание полей показа связи
  * (CONTEXT, Relation) — экран сделан под эти таблицы и вне их
  * не показывается (FIXED_VIEW_TYPES). Связанная запись приезжает рядом
- * со ссылкой (`positions_id` → `positions_id_data`), её имя — `name`.
+ * со ссылкой (`hr_positions_id` → `hr_positions_id_data`), её имя — `name`.
  */
 
 export type Person = {
@@ -20,7 +19,7 @@ export type Person = {
   departmentId: string;
   location: string;
   locationId: string;
-  /** Руководитель — самосвязь `employees_id`. */
+  /** Руководитель — самосвязь `hr_employees_id`. */
   managerId: string;
   managerName: string;
   managerPhoto: string;
@@ -30,25 +29,16 @@ export type Department = {
   id: string;
   name: string;
   parentId: string;
+  /**
+   * Руководитель отдела — пользователь (`core_users_id`), а открывается
+   * его карточка сотрудника: `core_users.hr_employees_id`. Пусто — у
+   * пользователя нет карточки, открывать нечего.
+   */
   headId: string;
   /**
-   * Руководитель — из связанной записи (`employees_id_data`), а не из
+   * Имя и фото — из связанной записи (`core_users_id_data`), а не из
    * людей на экране: отбор view мог его отсеять.
    */
-  headName: string;
-  headPhoto: string;
-  color: string;
-};
-
-/** Ступень организации: юрлицо → бизнес-юнит → локация. */
-export type Unit = {
-  id: string;
-  kind: "entity" | "unit" | "location";
-  name: string;
-  /** Строка под именем: ИНН, описание, адрес. */
-  info: string;
-  parentId: string;
-  headId: string;
   headName: string;
   headPhoto: string;
   color: string;
@@ -61,15 +51,10 @@ export const related = (row: Item, slug: string) => {
 };
 export const firstText = (value: unknown) => text(Array.isArray(value) ? value[0] : value);
 
-/** Руководитель записи: самосвязь на сотрудника, `employees_id`. */
-const head = (row: Item) => {
-  const person = related(row, "employees_id");
-  return { headName: text(person.full_name), headPhoto: firstText(person.photo) };
-};
-
-const managerOf = (row: Item) => {
-  const { headName, headPhoto } = head(row);
-  return { managerName: headName, managerPhoto: headPhoto };
+/** Имя и фото человека по связи: «кто» — `core_users`, «о ком» — `hr_employees`; поля у обеих одни. */
+const who = (row: Item, slug: string) => {
+  const person = related(row, slug);
+  return { name: text(person.full_name), photo: firstText(person.photo) };
 };
 
 export function toPerson(row: Item): Person {
@@ -77,13 +62,14 @@ export function toPerson(row: Item): Person {
     id: text(row.guid),
     name: text(row.full_name) || [text(row.last_name), text(row.first_name)].filter(Boolean).join(" "),
     photo: firstText(row.photo),
-    position: text(related(row, "positions_id").name),
-    department: text(related(row, "departments_id").name),
-    departmentId: text(row.departments_id),
-    location: text(related(row, "locations_id").name),
-    locationId: text(row.locations_id),
-    managerId: text(row.employees_id),
-    ...managerOf(row),
+    position: text(related(row, "hr_positions_id").name),
+    department: text(related(row, "hr_departments_id").name),
+    departmentId: text(row.hr_departments_id),
+    location: text(related(row, "hr_locations_id").name),
+    locationId: text(row.hr_locations_id),
+    managerId: text(row.hr_employees_id),
+    managerName: who(row, "hr_employees_id").name,
+    managerPhoto: who(row, "hr_employees_id").photo,
   };
 }
 
@@ -91,81 +77,34 @@ function toDepartment(row: Item): Department {
   return {
     id: text(row.guid),
     name: text(row.name),
-    parentId: text(row.departments_id),
-    headId: text(row.employees_id),
-    ...head(row),
+    parentId: text(row.hr_departments_id),
+    headId: text(related(row, "core_users_id").hr_employees_id),
+    headName: who(row, "core_users_id").name,
+    headPhoto: who(row, "core_users_id").photo,
     color: text(row.color),
   };
-}
-
-function toUnits(entities: Item[], units: Item[], locations: Item[]): Unit[] {
-  return [
-    ...entities.map((row) => ({
-      id: text(row.guid),
-      kind: "entity" as const,
-      name: text(row.name),
-      info: text(row.inn),
-      parentId: "",
-      headId: "",
-      /* У юрлица руководитель — строка для документов, не сотрудник. */
-      headName: text(row.director_name),
-      headPhoto: "",
-      color: text(row.color),
-    })),
-    ...units.map((row) => ({
-      id: text(row.guid),
-      kind: "unit" as const,
-      name: text(row.name),
-      info: text(row.description),
-      parentId: text(row.legal_entities_id),
-      headId: text(row.employees_id),
-      ...head(row),
-      color: text(row.color),
-    })),
-    ...locations.map((row) => ({
-      id: text(row.guid),
-      kind: "location" as const,
-      name: text(row.name),
-      info: text(row.address),
-      parentId: text(row.business_units_id),
-      headId: "",
-      headName: "",
-      headPhoto: "",
-      color: text(row.color),
-    })),
-  ];
 }
 
 /*
  * Справочники целиком, одной порцией: их десятки строк, а дереву нужен
  * весь набор — половина отделов дала бы обрубленные ветки.
  *
- * Отделы нужны всем деревьям (ими красятся люди), юрлица, бизнес-юниты
- * и локации — только «Организации»: до неё их не спрашиваем.
+ * Отделы нужны обоим деревьям: ими красятся люди.
  */
 const ALL = { limit: MAX_LIMIT, page: 1 };
 
-export function useOrgDirectory({ units: withUnits }: { units: boolean }) {
-  const departments = useItems("departments", ALL);
-  const entities = useItems(withUnits ? "legal_entities" : undefined, ALL);
-  const units = useItems(withUnits ? "business_units" : undefined, ALL);
-  const locations = useItems(withUnits ? "locations" : undefined, ALL);
-  const queries = withUnits ? [departments, entities, units, locations] : [departments];
+export function useOrgDirectory() {
+  const departments = useItems("hr_departments", ALL);
 
-  /* Памяткой: от этих списков считаются цвета и деревья экрана. */
+  /* Памяткой: от этого списка считаются цвета и деревья экрана. */
   const departmentList = useMemo(() => departments.page.rows.map(toDepartment), [departments.page.rows]);
-  const unitList = useMemo(
-    () => toUnits(entities.page.rows, units.page.rows, locations.page.rows),
-    [entities.page.rows, units.page.rows, locations.page.rows],
-  );
 
   return {
     departments: departmentList,
-    units: unitList,
-    isLoading: queries.some((query) => query.isLoading),
-    /** Первый отказ словами сервера. null — всё загрузилось. */
-    error: queries.find((query) => query.error)?.error ?? null,
-    refetch: () => queries.forEach((query) => query.refetch()),
+    isLoading: departments.isLoading,
+    /** Отказ словами сервера. null — всё загрузилось. */
+    error: departments.error ?? null,
+    refetch: () => void departments.refetch(),
   };
 }
 

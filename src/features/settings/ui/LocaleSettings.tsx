@@ -23,7 +23,7 @@ import { RecordFields } from "./RecordSettings";
  * Локализация — `#s-locale` прототипа: язык интерфейса, формат даты,
  * валюта, НДС. Ниже — языки данных проекта и курсы валют.
  *
- * Формат даты, валюта и НДС — из `org_settings` Ядра: это истина
+ * Формат даты, валюта и НДС — из `core_settings` Ядра: это истина
  * компании, её читают функции расчёта. У проекта ucode валюта своя,
  * но с экрана убрана — два поля об одном расходились бы молча
  * (docs/STATUS.md). Часового пояса здесь нет: он личный и живёт
@@ -56,7 +56,7 @@ export function LocaleSettings() {
       </SettingRow>
 
       <RecordFields
-        table="org_settings"
+        table="core_settings"
         fields={["date_format", "base_currency", "vat_percent"]}
       />
 

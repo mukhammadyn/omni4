@@ -110,9 +110,7 @@ const GROUP_STYLE: Record<SchemaGroup, { label: TranslationKey; bg: string; fill
   platform: { label: "database.groupPlatform", bg: "bg-chart-other", fill: "fill-chart-other" },
   core: { label: "database.groupCore", bg: "bg-module-org", fill: "fill-module-org" },
   crm: { label: "database.groupCrm", bg: "bg-module-crm", fill: "fill-module-crm" },
-  pm: { label: "database.groupPm", bg: "bg-module-pm", fill: "fill-module-pm" },
   hr: { label: "database.groupHr", bg: "bg-module-hrms", fill: "fill-module-hrms" },
-  integrations: { label: "database.groupIntegrations", bg: "bg-chart-7", fill: "fill-chart-7" },
   other: { label: "database.groupOther", bg: "bg-chart-4", fill: "fill-chart-4" },
 };
 

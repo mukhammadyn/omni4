@@ -67,9 +67,9 @@ export function VacancyCards({
           const funnel = byVacancy ? (byVacancy.get(guid) ?? EMPTY_FUNNEL) : null;
           const days = daysOpen(text(row.opened_at), text(row.closed_at), today);
           const salary = salaryText(row, locale, t);
-          const dept = text(related(row, "departments_id").name);
-          const branch = text(related(row, "locations_id").name);
-          const team = ["employees_id", "employees_id_2"]
+          const dept = text(related(row, "hr_departments_id").name);
+          const branch = text(related(row, "hr_locations_id").name);
+          const team = ["core_users_id", "core_users_id_2"]
             .map((slug) => related(row, slug))
             .filter((person) => text(person.full_name));
 

@@ -22,7 +22,7 @@ const clock = (value: unknown) => text(value).slice(0, 5);
 
 export const toShift = (row: Item): Shift => ({
   id: text(row.guid),
-  employeeId: text(row.employees_id),
+  employeeId: text(row.hr_employees_id),
   date: text(row.date).slice(0, 10),
   start: clock(row.start_time),
   end: clock(row.end_time),
@@ -31,9 +31,9 @@ export const toShift = (row: Item): Shift => ({
   kind: kindOf(row.shift_kind),
   seriesId: text(row.series_id),
   templateId: text(row.hr_work_schedules_id),
-  locationId: text(row.locations_id),
-  positionId: text(row.positions_id),
-  projectId: text(row.pm_projects_id),
+  locationId: text(row.hr_locations_id),
+  positionId: text(row.hr_positions_id),
+  projectId: text(row.hr_projects_id),
   comment: text(row.comment),
 });
 
@@ -44,7 +44,7 @@ export const toShift = (row: Item): Shift => ({
  */
 const toRow = (draft: ShiftDraft, guid: string) => ({
   guid,
-  employees_id: draft.employeeId,
+  hr_employees_id: draft.employeeId,
   date: draft.date,
   start_time: draft.start,
   end_time: draft.end,
@@ -53,9 +53,9 @@ const toRow = (draft: ShiftDraft, guid: string) => ({
   shift_kind: draft.kind,
   series_id: draft.seriesId,
   hr_work_schedules_id: draft.templateId || null,
-  locations_id: draft.locationId || null,
-  positions_id: draft.positionId || null,
-  pm_projects_id: draft.projectId || null,
+  hr_locations_id: draft.locationId || null,
+  hr_positions_id: draft.positionId || null,
+  hr_projects_id: draft.projectId || null,
   comment: draft.comment,
   exception_type: "none",
 });
@@ -123,10 +123,10 @@ export type ScheduleEmployee = {
  * проекты — окну смены, грузятся, только когда окно открыто.
  */
 export function useScheduleDirectory({ forms = false }: { forms?: boolean } = {}) {
-  const departments = useAll("departments", {}, false);
-  const locations = useAll("locations", {}, false);
-  const positions = useAll("positions", {}, false);
-  const projects = useAll(forms ? "pm_projects" : undefined, {}, false);
+  const departments = useAll("hr_departments", {}, false);
+  const locations = useAll("hr_locations", {}, false);
+  const positions = useAll("hr_positions", {}, false);
+  const projects = useAll(forms ? "hr_projects" : undefined, {}, false);
   return useMemo(() => {
     const names = (rows: Item[]) => rows.map((row) => ({ id: text(row.guid), name: text(row.name) })).sort((a, b) => a.name.localeCompare(b.name));
     return {
@@ -170,9 +170,9 @@ function useNames(): Names {
 }
 
 const toEmployee = (row: Item, names: Names): ScheduleEmployee => {
-  const positionId = text(row.positions_id);
-  const departmentId = text(row.departments_id);
-  const locationId = text(row.locations_id);
+  const positionId = text(row.hr_positions_id);
+  const departmentId = text(row.hr_departments_id);
+  const locationId = text(row.hr_locations_id);
   return {
     id: text(row.guid),
     name: text(row.full_name) || [text(row.last_name), text(row.first_name)].filter(Boolean).join(" "),
@@ -253,7 +253,7 @@ export function useSchedule({
   /** Сотрудники порциями по столько — прокрутка, как в «Посещаемости». Без него — все. */
   pageSize?: number;
 }) {
-  const one = employeeId ? { employees_id: { op: "any" as const, values: [employeeId] } } : {};
+  const one = employeeId ? { hr_employees_id: { op: "any" as const, values: [employeeId] } } : {};
   // «—» (поле пустое) в отбор uuid не передать — такой отбор остаётся на клиенте.
   const only = (field: string, values: string[]): Filters =>
     values.length && !values.includes("") ? { [field]: { op: "any", values } } : {};
@@ -263,7 +263,7 @@ export function useSchedule({
     infinite: true,
     filters: employeeId
       ? { guid: { op: "any", values: [employeeId] } }
-      : { ...only("departments_id", departments), ...only("locations_id", locations) },
+      : { ...only("hr_departments_id", departments), ...only("hr_locations_id", locations) },
     search,
     // Порции идут по алфавиту — иначе новая порция вставала бы между строк.
     sorts: [{ field: "full_name", direction: "asc" }],
@@ -351,7 +351,7 @@ const upsert = (slug: string, objects: Record<string, unknown>[]) =>
  * усечённый список молча соврал бы, какие дни заняты.
  */
 async function shiftsOf(employeeIds: string[], from: string, to: string) {
-  const filters: Filters = { employees_id: { op: "any", values: employeeIds }, date: { op: "between", values: [from, to] } };
+  const filters: Filters = { hr_employees_id: { op: "any", values: employeeIds }, date: { op: "between", values: [from, to] } };
   const body = toRequestBody({ limit: MAX_LIMIT, page: 1, filters, relations: false });
   const shifts: Shift[] = [];
   for (let offset = 0; ; offset += MAX_LIMIT) {
@@ -415,7 +415,7 @@ const setEmployeeTemplate = async (employeeIds: string[], templateId: string | n
 
 /**
  * «Применить шаблон»: смены по шаблону на период и шаблон в карточку
- * каждого сотрудника (`employees.hr_work_schedules_id` — им «Шаблоны»
+ * каждого сотрудника (`hr_employees.hr_work_schedules_id` — им «Шаблоны»
  * считают, кто на шаблоне). С `replace` прежние смены сотрудников
  * в периоде снимаются — разовые тоже, как в прототипе.
  */

@@ -104,8 +104,8 @@ export function VacancyPlan({
   /** Подпись под названием: что включено в «Строке». Группа в ней не повторяется. */
   const details = (row: Item) =>
     [
-      settings.shows("dept") && group !== "dept" && text(related(row, "departments_id").name),
-      settings.shows("branch") && group !== "branch" && text(related(row, "locations_id").name),
+      settings.shows("dept") && group !== "dept" && text(related(row, "hr_departments_id").name),
+      settings.shows("branch") && group !== "branch" && text(related(row, "hr_locations_id").name),
       settings.shows("deadline") &&
         text(row.deadline) &&
         t("vacancy.plan.until", { date: formatDate(text(row.deadline), "date", locale) }),
@@ -369,15 +369,15 @@ function optionText(fields: Field[], language: string, slug: string, row: Item) 
 function groupKey(group: PlanGroup, fields: Field[], language: string, row: Item): string {
   switch (group) {
     case "branch":
-      return text(related(row, "locations_id").name);
+      return text(related(row, "hr_locations_id").name);
     case "dept":
-      return text(related(row, "departments_id").name);
+      return text(related(row, "hr_departments_id").name);
     case "status":
       return optionText(fields, language, "status", row);
     case "priority":
       return optionText(fields, language, "priority", row);
     case "recruiter":
-      return text(related(row, "employees_id").full_name);
+      return text(related(row, "core_users_id").full_name);
   }
 }
 

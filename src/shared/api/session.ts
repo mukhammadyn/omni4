@@ -110,12 +110,21 @@ export const session = {
    *
    * Живёт лишь в токене: в ответе логина мы этот список не сохраняем,
    * а шлюз читает его оттуда же (`objectRequest.Data["tables"]`).
+   *
+   * Сама таблица входа в `tables` не попадает: своя строка в ней —
+   * `user_id` токена (`login_table_slug`, session_service_v2.go:1848).
+   * Она добавляется сюда же: в схеме v2 таблица входа `core_users` —
+   * цель всех полей «кто», и «Я» в них — именно эта строка.
    */
   getObjectIds(): Record<string, string> {
-    const tables = readClaimValue(accessToken, "tables");
-    if (!Array.isArray(tables)) return {};
-
     const ids: Record<string, string> = {};
+    const login = readClaim(accessToken, "login_table_slug");
+    const me = readClaim(accessToken, "user_id");
+    if (login && me) ids[login] = me;
+
+    const tables = readClaimValue(accessToken, "tables");
+    if (!Array.isArray(tables)) return ids;
+
     for (const table of tables) {
       if (typeof table !== "object" || table === null) continue;
       const { table_slug: slug, object_id: id } = table as Record<string, unknown>;

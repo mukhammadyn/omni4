@@ -107,8 +107,8 @@ export type ConnectionSelection = Record<string, string>;
 
 /**
  * Выбор, который делать не нужно: у каждой связи ровно одна запись.
- * Так входит сотрудник — его строку в `employees` сервер находит сам
- * по `users.employees_id` (object_builder login.go:385), и экран выбора
+ * Так входит сотрудник — его строку в `hr_employees` сервер находит сам
+ * по `core_users.hr_employees_id` (object_builder login.go:385), и экран выбора
  * с единственным вариантом был бы лишним шагом. Иначе — null.
  */
 export function onlyChoice(connections: Connection[]): ConnectionSelection | null {

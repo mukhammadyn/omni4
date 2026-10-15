@@ -1,12 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import {
-  BriefcaseBusinessIcon,
-  Building2Icon,
-  LandmarkIcon,
-  MapPinIcon,
-  UsersIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { Building2Icon, UsersIcon, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   Avatar,
@@ -18,7 +11,7 @@ import {
   type OrgNode,
 } from "@/features/item";
 import type { TranslationKey } from "@/shared/lib/i18n";
-import { CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
+import { CHIP_STYLES, type ChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
 import { Tabs } from "@/shared/ui/tabs";
 import {
@@ -27,39 +20,30 @@ import {
   useOrgDirectory,
   type Department,
   type Person,
-  type Unit,
 } from "../api/org";
 
-type Mode = "emp" | "dept" | "unit";
+type Mode = "emp" | "dept";
 
 const MODES: { id: Mode; icon: LucideIcon; label: TranslationKey; hint: TranslationKey }[] = [
   { id: "emp", icon: UsersIcon, label: "org.mode.emp", hint: "org.hint.emp" },
   { id: "dept", icon: Building2Icon, label: "org.mode.dept", hint: "org.hint.dept" },
-  { id: "unit", icon: LandmarkIcon, label: "org.mode.unit", hint: "org.hint.unit" },
 ];
 
-/** Ступени организации — `UT` прототипа: свой значок и цвет у каждой. */
-const KINDS: Record<Unit["kind"], { icon: LucideIcon; color: ChipColor; label: TranslationKey }> = {
-  entity: { icon: LandmarkIcon, color: "gray", label: "org.kind.entity" },
-  unit: { icon: BriefcaseBusinessIcon, color: "purple", label: "org.kind.unit" },
-  location: { icon: MapPinIcon, color: "green", label: "org.kind.location" },
-};
-
 type DeptNode = Department & { members: Person[]; tone: ChipColor };
-type UnitNode = Unit & { count: number };
 
 /**
- * «Оргструктура» сотрудников HRMS — `drawOrg` прототипа: три дерева
+ * «Оргструктура» сотрудников HRMS — `drawOrg` прототипа: два дерева
  * на одном холсте.
  *
- *   Сотрудники   — руководитель → подчинённые (`employees.employees_id`);
- *   Отделы       — отдел → подотдел (`departments.departments_id`),
- *                  на узле руководитель и аватары людей ветки;
- *   Организация  — юрлицо → бизнес-юнит → локация, на узле число людей.
- *                  Регионов узлами нет: у локации это вариант поля
- *                  `region`, а не запись.
+ *   Сотрудники   — руководитель → подчинённые (`hr_employees.hr_employees_id`);
+ *   Отделы       — отдел → подотдел (`hr_departments.hr_departments_id`),
+ *                  на узле руководитель и аватары людей ветки.
  *
- * Люди — строки экрана: отбор и поиск view сужают все три дерева.
+ * Третьего дерева прототипа — «Организация», юрлицо → бизнес-юнит →
+ * локация — нет: в схеме v2 бизнес-юнитов нет, а юрлица — только
+ * продавец в счетах CRM. Подразделения — верхние узлы дерева отделов.
+ *
+ * Люди — строки экрана: отбор и поиск view сужают оба дерева.
  * Справочники — целиком (api/org).
  */
 export function OrgStructure({
@@ -77,7 +61,7 @@ export function OrgStructure({
 }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("emp");
-  const directory = useOrgDirectory({ units: mode === "unit" });
+  const directory = useOrgDirectory();
   const people = useMemo(() => rows.map(toPerson), [rows]);
   const deptColor = useMemo(
     () => departmentColors(directory.departments, colorOf),
@@ -126,26 +110,6 @@ export function OrgStructure({
       (dept) => dept.parentId,
     ).map(toNode);
   }, [mode, people, directory.departments, deptColor]);
-
-  const unitRoots = useMemo(() => {
-    if (mode !== "unit") return [];
-    const byLocation = new Map<string, number>();
-    for (const person of people) {
-      byLocation.set(person.locationId, (byLocation.get(person.locationId) ?? 0) + 1);
-    }
-    /* Людей считают локации; выше — сумма веток. */
-    const toNode = (node: OrgNode<Unit>): OrgNode<UnitNode> => {
-      const kids = node.kids.map(toNode);
-      const own = node.data.kind === "location" ? (byLocation.get(node.id) ?? 0) : 0;
-      const count = own + kids.reduce((sum, kid) => sum + kid.data.count, 0);
-      return { id: node.id, kids, data: { ...node.data, count } };
-    };
-    return buildTree(
-      directory.units,
-      (unit) => unit.id,
-      (unit) => unit.parentId,
-    ).map(toNode);
-  }, [mode, people, directory.units]);
 
   const openHead = (headId: string) => {
     if (headId) onOpenRow(headId);
@@ -245,73 +209,30 @@ export function OrgStructure({
   /* Вписывание мерит дерево при открытии: пустое вписалось бы в 100%. */
   if (directory.isLoading) return null;
 
-  if (mode === "dept") {
-    return (
-      <OrgChart
-        key={mode}
-        roots={deptRoots}
-        autoFit
-        toolbar={bar}
-        colorOf={(node) => node.data.tone}
-        onOpen={(node) => openHead(node.data.headId)}
-        legend={<span>{t("org.legend.dept")}</span>}
-        renderNode={(node) => (
-          <>
-            <div className="flex items-center gap-2.5">
-              <Tile icon={node.kids.length ? Building2Icon : UsersIcon} color={node.data.tone} />
-              <Lines
-                title={node.data.name}
-                sub={t("org.people", { count: node.data.members.length })}
-              />
-            </div>
-            <Meta>
-              {head(node.data)}
-              <Stack people={node.data.members} />
-            </Meta>
-          </>
-        )}
-      />
-    );
-  }
-
   return (
     <OrgChart
       key={mode}
-      roots={unitRoots}
+      roots={deptRoots}
       autoFit
       toolbar={bar}
-      colorOf={(node) =>
-        node.data.color ? hexToChipColor(node.data.color) : KINDS[node.data.kind].color
-      }
+      colorOf={(node) => node.data.tone}
       onOpen={(node) => openHead(node.data.headId)}
-      legend={Object.values(KINDS).map((kind) => (
-        <OrgLegendItem key={kind.label} color={kind.color} label={t(kind.label)} />
-      ))}
-      renderNode={({ data }) => {
-        const kind = KINDS[data.kind];
-        const color = data.color ? hexToChipColor(data.color) : kind.color;
-        const info =
-          data.kind === "entity" && data.info ? t("org.inn", { inn: data.info }) : data.info;
-
-        return (
-          <>
-            <span className="mb-1.5 block text-[10.5px] font-bold tracking-[0.5px] text-fg-muted uppercase">
-              {t(kind.label)}
-            </span>
-            <div className="flex items-center gap-2.5">
-              <Tile icon={kind.icon} color={color} />
-              <Lines title={data.name} sub={info} />
-            </div>
-            <Meta>
-              {head(data) ?? <span />}
-              <span className="inline-flex shrink-0 items-center gap-1 font-semibold">
-                <Icon as={UsersIcon} size={13} />
-                {data.count}
-              </span>
-            </Meta>
-          </>
-        );
-      }}
+      legend={<span>{t("org.legend.dept")}</span>}
+      renderNode={(node) => (
+        <>
+          <div className="flex items-center gap-2.5">
+            <Tile icon={node.kids.length ? Building2Icon : UsersIcon} color={node.data.tone} />
+            <Lines
+              title={node.data.name}
+              sub={t("org.people", { count: node.data.members.length })}
+            />
+          </div>
+          <Meta>
+            {head(node.data)}
+            <Stack people={node.data.members} />
+          </Meta>
+        </>
+      )}
     />
   );
 }

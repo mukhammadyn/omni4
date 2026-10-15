@@ -58,7 +58,7 @@ export function CompanySettings() {
       )}
 
       <RecordFields
-        table="legal_entities"
+        table="crm_legal_entities"
         pick="is_default"
         fields={[
           "name",

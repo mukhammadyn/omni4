@@ -92,9 +92,9 @@ export function useJobHistory({
         .filter((row) => row.is_active !== false)
         .map(
           (row): Band => ({
-            positionId: text(row.positions_id),
-            gradeId: text(row.grades_id),
-            gradeName: text(related(row, "grades_id").name),
+            positionId: text(row.hr_positions_id),
+            gradeId: text(row.hr_grades_id),
+            gradeName: text(related(row, "hr_grades_id").name),
             max: typeof row.salary_max === "number" ? row.salary_max : null,
             from: text(row.effective_from),
           }),
@@ -125,10 +125,10 @@ export function useJobHistory({
         reason: choice("change_reason", row),
         employment: choice("employment_type", row),
         format: choice("work_format", row)?.label ?? "",
-        position: text(related(row, "positions_id").name),
-        grade: text(related(row, "grades_id").name),
-        department: text(related(row, "departments_id").name),
-        location: text(related(row, "locations_id").name),
+        position: text(related(row, "hr_positions_id").name),
+        grade: text(related(row, "hr_grades_id").name),
+        department: text(related(row, "hr_departments_id").name),
+        location: text(related(row, "hr_locations_id").name),
         schedule: text(related(row, "hr_work_schedules_id").name),
         salary,
         currency: choice("currency", row)?.label ?? "",
@@ -136,7 +136,7 @@ export function useJobHistory({
       return {
         ...entry,
         issue: gradeIssue(
-          { positionId: text(row.positions_id), gradeId: text(row.grades_id), salary },
+          { positionId: text(row.hr_positions_id), gradeId: text(row.hr_grades_id), salary },
           bands,
         ),
       };
