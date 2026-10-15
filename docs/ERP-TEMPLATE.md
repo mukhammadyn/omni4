@@ -351,6 +351,13 @@ LIST, GALLERY); значение — поле или колонка-связь (
 | 1 | ABSENCES | Отсутствия |
 | 2 | TABLE | — |
 
+**HRMS / Тренинги** (`hr_trainings`)
+
+| # | Тип | Имя | Настройки |
+|---|---|---|---|
+| 1 | TABLE | Список | колонки: `title`, `category`, `starts_at`, `ends_at`, `core_users_id`, `location`, `status` |
+| 2 | CALENDAR | Календарь | `calendar_from_slug: "starts_at"`, `calendar_to_slug: "ends_at"`; колонки: `title` |
+
 **CRM / Сделки** (`crm_deals`)
 
 | # | Тип | Настройки |
