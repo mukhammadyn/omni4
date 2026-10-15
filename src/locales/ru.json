@@ -2267,5 +2267,18 @@
   "kb.slash.callout": "Выноска",
   "kb.slash.hr": "Разделитель",
   "kb.slash.table": "Таблица",
-  "kb.slash.image": "Картинка"
+  "kb.slash.image": "Картинка",
+  "kb.actions": "Действия",
+  "kb.duplicate": "Дублировать",
+  "kb.copySuffix": "(копия)",
+  "kb.move": "Переместить в…",
+  "kb.copyLink": "Скопировать ссылку",
+  "kb.linkCopied": "Ссылка скопирована",
+  "kb.deleteTitle": "Удалить «{{title}}»?",
+  "kb.deleteOne": "Страница будет удалена.",
+  "kb.deleteWithKids": "Вместе со страницей будут удалены вложенные страницы: {{count}}.",
+  "kb.moveTitle": "Переместить «{{title}}»",
+  "kb.parent": "Родительская страница",
+  "kb.topLevel": "— Верхний уровень —",
+  "kb.moveAction": "Переместить"
 }
