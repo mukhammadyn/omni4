@@ -2232,5 +2232,18 @@
   "training.optional": "Ixtiyoriy",
   "training.rework": "Nimani tuzatish kerak",
   "training.reworkDefault": "Qayta ishlash kerak",
-  "training.rejectHint": "{{name}} vazifani qayta topshira oladi."
+  "training.rejectHint": "{{name}} vazifani qayta topshira oladi.",
+  "training.form.new": "Yangi trening",
+  "training.form.title": "Treningni tahrirlash",
+  "training.form.subtitle": "Ma'lumotlarni to'ldiring, materiallar qo'shing va xodimlarni tayinlang",
+  "training.form.base": "Asosiy",
+  "training.form.baseHint": "Nima, qachon va qayerda",
+  "training.form.homeworkHint": "Xodimlar fayl topshiradi, trener yoki HR tekshiradi",
+  "training.form.participants": "Treningdan o'tadigan xodimlar",
+  "training.form.participantsHint": "Ishtirokchilarni tayinlang",
+  "training.form.materialsHint": "Taqdimotlar, hujjatlar, arxivlar yoki havolalar",
+  "training.form.drop": "Fayllarni tanlash uchun bosing",
+  "training.form.linkTitle": "Material nomi",
+  "training.form.addLink": "Havola qo'shish",
+  "training.form.linkRequired": "Havolani kiriting"
 }
