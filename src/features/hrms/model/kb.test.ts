@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { EMPTY_DOC, childrenOf, descendantsOf, docText, pathTo, toDoc, type KbPage } from "./kb";
+import { EMPTY_DOC, childrenOf, descendantsOf, docText, dropPlan, pathTo, toDoc, type KbPage } from "./kb";
 
 const text = (t: string, styles: Record<string, unknown> = {}) => ({ type: "text", text: t, styles });
 const block = (type: string, content: unknown[] = [], props: Record<string, unknown> = {}, children: unknown[] = []) => ({
@@ -138,4 +138,25 @@ test("текст документа — для поиска", () => {
   expect(docText(toDoc([block("paragraph", [text("один")]), block("bulletListItem", [text("два")])])).replace(/\s+/g, " ").trim()).toBe(
     "один два",
   );
+});
+
+test("перетаскивание: перед, после, внутрь; номера всем соседям; в свою ветку — нельзя", () => {
+  const pages = [page("r"), page("a", "r", { createdAt: "1" }), page("b", "r", { createdAt: "2" }), page("c", "r", { createdAt: "3" }), page("x")];
+  expect(dropPlan(pages, "c", "a", "before")).toEqual([
+    { id: "c", sortOrder: 0 },
+    { id: "a", sortOrder: 1 },
+    { id: "b", sortOrder: 2 },
+  ]);
+  expect(dropPlan(pages, "x", "b", "after")).toEqual([
+    { id: "a", sortOrder: 0 },
+    { id: "b", sortOrder: 1 },
+    { id: "x", sortOrder: 2, parentId: "r" },
+    { id: "c", sortOrder: 3 },
+  ]);
+  expect(dropPlan(pages, "x", "a", "in")).toEqual([{ id: "x", sortOrder: 0, parentId: "a" }]);
+  expect(dropPlan(pages, "r", "a", "in")).toEqual([]);
+  expect(dropPlan(pages, "a", "a", "after")).toEqual([]);
+  /* Порядок уже такой — писать нечего. */
+  const sorted = pages.map((p, i) => (p.parentId === "r" ? { ...p, sortOrder: i - 1 } : p));
+  expect(dropPlan(sorted, "b", "a", "after")).toEqual([]);
 });

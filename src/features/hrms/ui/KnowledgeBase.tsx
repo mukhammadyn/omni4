@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRightIcon, CopyIcon, FilePlusIcon, FolderInputIcon, LinkIcon, MoreHorizontalIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import { useTablePermissions } from "@/features/auth";
@@ -10,7 +10,7 @@ import { Icon } from "@/shared/ui/icon";
 import { Modal } from "@/shared/ui/modal";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { KB, useKbActions, useKbPages } from "../api/kb";
-import { childrenOf, descendantsOf, docText, pathTo, toDoc, type KbDoc, type KbPage } from "../model/kb";
+import { childrenOf, descendantsOf, docText, dropPlan, pathTo, toDoc, type DropWhere, type KbDoc, type KbPage } from "../model/kb";
 
 /* Редактор — отдельным чанком, как MULTI_LINE (ADR-0015). */
 const KbEditor = lazy(() => import("./KbEditor"));
@@ -44,6 +44,9 @@ export function KnowledgeBase({ pageId, onOpen }: { pageId: string; onOpen: (id:
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<KbPage | null>(null);
   const [moving, setMoving] = useState<KbPage | null>(null);
+  /* Перетаскивание в дереве: что тащим и куда встанет. */
+  const [dragId, setDragId] = useState("");
+  const [drop, setDrop] = useState<{ id: string; where: DropWhere } | null>(null);
 
   const current = pages.find((p) => p.id === pageId) ?? childrenOf(pages, "")[0];
   const path = useMemo(() => (current ? pathTo(pages, current.id) : []), [pages, current]);
@@ -80,6 +83,20 @@ export function KnowledgeBase({ pageId, onOpen }: { pageId: string; onOpen: (id:
     if (current && ids.includes(current.id)) onOpen(page.parentId || (childrenOf(pages, "").find((p) => p.id !== page.id)?.id ?? ""));
     actions.remove(ids);
     setDeleting(null);
+  };
+  /** Бросок: место по высоте строки — верхняя четверть «перед», нижняя «после», середина «внутрь». */
+  const dropAt = (event: DragEvent<HTMLElement>, target: KbPage): DropWhere | null => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const y = (event.clientY - box.top) / box.height;
+    const where: DropWhere = y < 0.25 ? "before" : y > 0.75 ? "after" : "in";
+    return dragId && dropPlan(pages, dragId, target.id, where).length ? where : null;
+  };
+  const dropOn = (target: KbPage, where: DropWhere) => {
+    const plan = dropPlan(pages, dragId, target.id, where);
+    plan.forEach((step) => actions.save(step.id, step));
+    if (where === "in") expand(target.id);
+    setDragId("");
+    setDrop(null);
   };
   const copyLink = (page: KbPage) => {
     const url = new URL(window.location.href);
@@ -160,8 +177,31 @@ export function KnowledgeBase({ pageId, onOpen }: { pageId: string; onOpen: (id:
           aria-selected={page.id === current?.id}
           aria-expanded={kids.length ? expanded : undefined}
           onClick={() => go(page.id)}
+          /* Перетаскивание — нативное, HTML5: порядок и родителя меняют руками,
+             как в Notion. Пока ищут — нет: дерево обрезано находками. */
+          draggable={can.update && !found}
+          onDragStart={(event) => {
+            event.dataTransfer.effectAllowed = "move";
+            setDragId(page.id);
+          }}
+          onDragEnd={() => {
+            setDragId("");
+            setDrop(null);
+          }}
+          onDragOver={(event) => {
+            const where = dropAt(event, page);
+            if (!where) return setDrop(null);
+            event.preventDefault();
+            if (drop?.id !== page.id || drop.where !== where) setDrop({ id: page.id, where });
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            const where = dropAt(event, page);
+            if (where) dropOn(page, where);
+          }}
+          data-drop={drop?.id === page.id ? drop.where : undefined}
           style={{ paddingLeft: 6 + depth * 16 }}
-          className="group flex h-7.5 cursor-pointer items-center gap-1 rounded-md pr-1 text-[13.5px] text-fg-muted hover:bg-surface-hover aria-selected:bg-surface-hover aria-selected:font-medium aria-selected:text-fg"
+          className={`group flex h-7.5 cursor-pointer items-center gap-1 rounded-md pr-1 text-[13.5px] text-fg-muted hover:bg-surface-hover aria-selected:bg-surface-hover aria-selected:font-medium aria-selected:text-fg data-[drop=after]:shadow-[inset_0_-2px_0_var(--color-accent)] data-[drop=before]:shadow-[inset_0_2px_0_var(--color-accent)] data-[drop=in]:bg-accent-subtle data-[drop=in]:ring-1 data-[drop=in]:ring-accent ${dragId === page.id ? "opacity-40" : ""}`}
         >
           {kids.length ? (
             <button
@@ -180,7 +220,11 @@ export function KnowledgeBase({ pageId, onOpen }: { pageId: string; onOpen: (id:
           )}
           <span className="w-5 shrink-0 text-center">{page.icon || DEFAULT_ICON}</span>
           <span className="min-w-0 flex-1 truncate">{page.title || t("kb.untitled")}</span>
-          <span className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100">{menu(page)}</span>
+          {/* Меню — в портале, но события React всплывают по дереву
+              компонентов: без остановки щелчок по пункту открывал строку. */}
+          <span onClick={(event) => event.stopPropagation()} className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+            {menu(page)}
+          </span>
           {can.write && <button
             type="button"
             title={t("kb.addSub")}
