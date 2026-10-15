@@ -1074,6 +1074,12 @@ function MenuPage() {
       void navigate({ to: "/vacancies/$itemId", params: { itemId: guid }, search: { menu: menuId } });
       return;
     }
+    /* Тренинг — тоже: участники с проверкой ДЗ и материалы
+       (features/hrms, TrainingPage). */
+    if (view?.tableSlug === TRAININGS) {
+      void navigate({ to: "/trainings/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
     /* Кандидата — тоже: воронка, оценки по этапам и история
        (features/hrms, CandidatePage). */
     if (view?.tableSlug === CANDIDATES) {

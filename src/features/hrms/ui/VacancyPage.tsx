@@ -596,7 +596,7 @@ function optionLabel(fields: Field[], slug: string, row: Item, language: string)
  * Статус вакансии кнопкой его цвета — `.vc-stbtn` прототипа: точка,
  * подпись, стрелка. Цвет — из варианта, через палитру чипов.
  */
-function StatusButton({
+export function StatusButton({
   field,
   value,
   language,
