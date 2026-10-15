@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import { MAX_LIMIT, PEOPLE, useCreateItem, useDeleteItems, useItems, useUpdateItem, type Item } from "@/features/item";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { MAX_LIMIT, PEOPLE, patchRow, useCreateItem, useDeleteItems, useItems, type Item } from "@/features/item";
+import { api } from "@/shared/api/client";
+import { keys } from "@/shared/lib/query-keys";
+import { reportError } from "@/shared/lib/toast";
 import { session } from "@/shared/api/session";
 import { EMPTY_DOC, type KbDoc, type KbPage } from "../model/kb";
 import { text } from "./org";
@@ -44,6 +48,30 @@ export function useKbPages() {
   return { pages, loading };
 }
 
+/**
+ * Правка страницы — PUT и подстановка в кэш, без перезапроса базы.
+ *
+ * Не `useUpdateItem`: тот после каждой правки перечитывает всё под
+ * ключом items, а автосохранение пишет на каждой паузе в наборе — это
+ * мегабайт базы на каждое предложение. Здесь строка в кэше правится
+ * на месте вместе с `updated_at`; формул и событий у таблицы нет, так
+ * что пересчитывать бэкенду нечего. Отказ — сообщение, кэш перечитывается.
+ */
+function useSaveKb() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ guid, values }: { guid: string; values: Item }) => api.put<unknown>(`/v2/items/${KB}`, { data: { guid, ...values } }),
+    onMutate: ({ guid, values }) =>
+      queryClient.setQueriesData({ queryKey: keys.items.table(KB) }, (page: unknown) =>
+        patchRow(page, { guid, values: { ...values, updated_at: new Date().toISOString() } }),
+      ),
+    onError: (error) => {
+      reportError(error, "common.saveFailed");
+      void queryClient.invalidateQueries({ queryKey: keys.items.table(KB) });
+    },
+  });
+}
+
 /** Автор правки — своя строка `core_users`; у ADMIN её нет — пусто. */
 const by = () => ({ core_users_id: session.getObjectIds()[PEOPLE] ?? null });
 
@@ -54,7 +82,7 @@ const by = () => ({ core_users_id: session.getObjectIds()[PEOPLE] ?? null });
  */
 export function useKbActions() {
   const create = useCreateItem(KB);
-  const update = useUpdateItem(KB);
+  const update = useSaveKb();
   const remove = useDeleteItems(KB);
   const add = (values: Item) => {
     const guid = crypto.randomUUID();

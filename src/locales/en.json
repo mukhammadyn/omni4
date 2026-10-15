@@ -2255,5 +2255,17 @@
   "kb.newPage": "New page",
   "kb.icon": "Icon",
   "kb.updated": "Updated {{date}}",
-  "kb.placeholder": "Start writing or press “/” for commands…"
+  "kb.placeholder": "Start writing or press “/” for commands…",
+  "kb.saved": "Saved",
+  "kb.slash.title": "Blocks",
+  "kb.slash.h2": "Heading",
+  "kb.slash.h3": "Subheading",
+  "kb.slash.ul": "Bulleted list",
+  "kb.slash.ol": "Numbered list",
+  "kb.slash.todo": "Checklist",
+  "kb.slash.quote": "Quote",
+  "kb.slash.callout": "Callout",
+  "kb.slash.hr": "Divider",
+  "kb.slash.table": "Table",
+  "kb.slash.image": "Image"
 }

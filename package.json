@@ -28,6 +28,7 @@
     "@tiptap/pm": "3.32.0",
     "@tiptap/react": "3.32.0",
     "@tiptap/starter-kit": "3.32.0",
+    "@tiptap/suggestion": "3.32.0",
     "axios": "^1.19.0",
     "hot-formula-parser": "^4.0.0",
     "i18next": "^26.3.6",

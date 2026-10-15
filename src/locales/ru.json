@@ -2255,5 +2255,17 @@
   "kb.newPage": "Новая страница",
   "kb.icon": "Иконка",
   "kb.updated": "Обновлено {{date}}",
-  "kb.placeholder": "Начните писать или нажмите «/» для команд…"
+  "kb.placeholder": "Начните писать или нажмите «/» для команд…",
+  "kb.saved": "Сохранено",
+  "kb.slash.title": "Блоки",
+  "kb.slash.h2": "Заголовок",
+  "kb.slash.h3": "Подзаголовок",
+  "kb.slash.ul": "Маркированный список",
+  "kb.slash.ol": "Нумерованный список",
+  "kb.slash.todo": "Чек-лист",
+  "kb.slash.quote": "Цитата",
+  "kb.slash.callout": "Выноска",
+  "kb.slash.hr": "Разделитель",
+  "kb.slash.table": "Таблица",
+  "kb.slash.image": "Картинка"
 }
