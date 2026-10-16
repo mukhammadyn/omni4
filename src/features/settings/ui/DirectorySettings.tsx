@@ -13,21 +13,16 @@ import {
   BOARD_ORDER,
   Cell,
   ItemDrawer,
-  blankItem,
-  relationDataKey,
-  rowErrors,
-  useCreateItem,
   useDeleteItems,
   useItems,
   useUpdateItem,
-  type Item,
 } from "@/features/item";
 import { collapseLanguages, localized, useTableSchema, type Field } from "@/features/table";
 import { useDataLanguages } from "@/features/workspace";
-import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { CHIP_DOT, hexToChipColor } from "@/shared/ui/chip";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
+import { DirectoryCreateDialog } from "./DirectoryCreateDialog";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { flattenTree } from "../model/directory-tree";
@@ -157,16 +152,13 @@ export function DirectorySettings({
   }, [schema.fields, directory.title, directory.columns, languages, language]);
 
   const update = useUpdateItem(directory.table);
-  const create = useCreateItem(directory.table);
   const remove = useDeleteItems(directory.table);
 
   const [openGuid, setOpenGuid] = useState("");
-  const [draft, setDraft] = useState<Item | null>(null);
-  const [showErrors, setShowErrors] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState("");
 
   const openRow = page.rows.find((row) => row.guid === openGuid);
-  const draftErrors = draft ? rowErrors(drawerFields, draft) : new Map();
 
   const label = (field: Field) => localized(field.labels, language, field.label);
   const toggle = (guid: string) =>
@@ -223,8 +215,7 @@ export function DirectorySettings({
           <Button
             onClick={() => {
               setOpenGuid("");
-              setShowErrors(false);
-              setDraft(blankItem(drawerFields));
+              setCreating(true);
             }}
           >
             <Icon as={PlusIcon} size={14} />
@@ -261,10 +252,7 @@ export function DirectorySettings({
                 return (
                   <tr
                     key={guid}
-                    onClick={() => {
-                      setDraft(null);
-                      setOpenGuid(guid);
-                    }}
+                    onClick={() => setOpenGuid(guid)}
                     className={`group cursor-pointer transition-colors hover:bg-surface-hover ${
                       openGuid === guid ? "bg-surface-active" : ""
                     }`}
@@ -394,61 +382,15 @@ export function DirectorySettings({
         />
       )}
 
-      {/* Новая запись — черновик: правки копятся и уезжают одним
-          запросом по кнопке, как у таблиц модулей. */}
-      {draft && (
-        <ItemDrawer
-          tableSlug={directory.table}
-          columns={drawerFields}
-          row={draft}
+      {/* Новая запись — окно: правки копятся и уезжают одним запросом по кнопке. */}
+      {creating && (
+        <DirectoryCreateDialog
+          table={directory.table}
+          title={`${t("dir.add")}: ${t(directory.titleKey)}`}
+          fields={drawerFields}
           relations={schema.relations}
-          locale={i18n.language}
           language={language}
-          languages={languages}
-          sections={NO_SECTIONS}
-          heading=""
-          creating
-          titlePlaceholder={t("table.addRow")}
-          onEdit={(_guid, slug, value) =>
-            setDraft((current) => (current ? { ...current, [slug]: value } : current))
-          }
-          onLink={(slug, item) =>
-            setDraft((current) =>
-              current
-                ? { ...current, [slug]: item?.guid ?? null, [relationDataKey(slug)]: item }
-                : current,
-            )
-          }
-          footer={
-            <>
-              {showErrors && draftErrors.size > 0 && (
-                <span className="mr-auto text-xs text-danger">
-                  {t("table.fillRequired", { count: draftErrors.size })}
-                </span>
-              )}
-              <Button variant="ghost" onClick={() => setDraft(null)}>
-                {t("action.cancel")}
-              </Button>
-              <Button
-                disabled={create.isPending}
-                onClick={() => {
-                  if (draftErrors.size) {
-                    setShowErrors(true);
-                    return;
-                  }
-                  create.mutate(draft, {
-                    onSuccess: () => {
-                      setDraft(null);
-                      toast.success(t("table.rowCreated"));
-                    },
-                  });
-                }}
-              >
-                {t("action.create")}
-              </Button>
-            </>
-          }
-          onClose={() => setDraft(null)}
+          onClose={() => setCreating(false)}
         />
       )}
 
