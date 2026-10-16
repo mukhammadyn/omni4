@@ -337,8 +337,8 @@ function TableMatrix({
 
         <tbody>
           {tables.map((table) => (
-            <tr key={table.slug} className="hover:bg-surface-hover">
-              <td className="sticky left-0 z-10 h-9 max-w-64 truncate border-b border-r border-border bg-surface px-3">
+            <tr key={table.slug} className="group/row hover:bg-surface-hover">
+              <td className="sticky left-0 z-10 h-9 max-w-64 truncate border-b border-r border-border bg-surface px-3 group-hover/row:tint-surface-hover">
                 <span className="text-fg">{table.label}</span>
                 <span className="ml-2 font-mono text-2xs text-fg-subtle">{table.slug}</span>
               </td>

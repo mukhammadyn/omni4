@@ -90,7 +90,7 @@ export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; 
             ) : (
               rows.map(({ employee, cells, totals }) => (
                 <tr key={employee.id} className="group">
-                  <td className={`${body} sticky left-0 z-10 bg-surface px-3 py-1 group-hover:bg-surface-hover`}>
+                  <td className={`${body} sticky left-0 z-10 bg-surface px-3 py-1 group-hover:tint-surface-hover`}>
                     <EmployeeName
                       employee={employee}
                       until={range.to}

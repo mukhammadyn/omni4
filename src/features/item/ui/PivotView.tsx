@@ -298,9 +298,9 @@ export function PivotView({
                 const group = row.level < deepest;
 
                 return (
-                  <tr key={key} className="hover:bg-surface-hover">
+                  <tr key={key} className="group/row hover:bg-surface-hover">
                     <th
-                      className="sticky left-0 border-r border-b border-border bg-surface py-1.5 pr-3 text-left font-normal"
+                      className="sticky left-0 border-r border-b border-border bg-surface py-1.5 pr-3 text-left font-normal group-hover/row:tint-surface-hover"
                       /* Отступ уровнем, а не вложенной разметкой: клетка
                          в таблице одна, а уровней бывает сколько угодно. */
                       style={{ paddingLeft: `${0.75 + row.level * 1.5}rem` }}

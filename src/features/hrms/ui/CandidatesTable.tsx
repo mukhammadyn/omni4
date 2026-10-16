@@ -194,7 +194,7 @@ export function CandidatesTable({
               <tr
                 key={guid || index}
                 onClick={() => onOpenRow(guid)}
-                className="group cursor-pointer hover:[&>td]:bg-surface-hover"
+                className="group cursor-pointer hover:[&>td]:tint-surface-hover"
               >
                 <td className={`${td} sticky left-0 z-[1] max-w-[360px] min-w-[300px] border-r bg-surface`}>
                   <span className="flex min-w-0 items-center gap-2.5">
