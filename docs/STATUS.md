@@ -524,12 +524,9 @@ HRMS вместо зашитых `day`/`night`/`remote`: название, цв�
 филиала — имя вида). Смены, дни шаблонов и цикл шаблона ссылаются на
 него через `hr_shift_kinds_id` (ERP-TEMPLATE §1.6). В omni4 таблица
 заведена, 1564 смены, 14 дней и 2 шаблона перенесены SQL-ом.
-**Хвост:** старые PICK_LIST `hr_shifts.shift_kind`,
+Старые PICK_LIST `hr_shifts.shift_kind`,
 `hr_work_schedule_days.shift_kind`, `hr_work_schedules.cycle_shift_kind`
-ещё в схеме — их читает прод до вливания ветки. После деплоя: перенести
-смены, записанные в окне между переносом и деплоем
-(`where hr_shift_kinds_id is null`), и удалить три поля. В omni5
-справочника нет.
+удалены после деплоя PR #12 (2026-10-16). В omni5 справочника нет.
 
 Смены «часов в день» (гибкие) — без `start_time`/`end_time`, норма
 в `planned_minutes` (`model/schedule`, `isFlexible`). Плашка «N из M»
