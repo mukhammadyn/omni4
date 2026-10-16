@@ -49,7 +49,7 @@ export function useWidgetData(input: Widget, filters: DashFilter[], values: Filt
   const compares = !records && widget.type !== "ratio" && widget.type !== "pivot" && widget.kind === "stat" && Boolean(widget.answers["period"]?.field && values["period"]?.length);
   const previous = useItems(enabled && compares ? slug : undefined, { limit: SAMPLE, page: 1, filters: previousQuery }, cacheScope);
   return {
-    ...access, schema: { ...schema, fields: output ? schema.fields.filter((field) => output.has(field.slug)) : schema.fields }, dataset: resolved.dataset, query, currencySlug, forbidden, effectiveSorts,
+    ...access, sqlMenuId: menuId, schema: { ...schema, fields: output ? schema.fields.filter((field) => output.has(field.slug)) : schema.fields }, dataset: resolved.dataset, query, currencySlug, forbidden, effectiveSorts,
     rows: items.page.rows, count: items.page.count,
     previous: compares ? previous.page.rows : undefined,
     exact: { value: items.page.count, previous: compares ? previous.page.count : undefined },

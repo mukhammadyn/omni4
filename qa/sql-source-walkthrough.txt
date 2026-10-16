@@ -1,0 +1,18 @@
+Dashboard SQL release validation — 2026-10-16
+
+This candidate supersedes the Oct 14/15 four-service candidates. Auth source and Auth protobufs are unchanged. Existing Auth V2HasAccessUser verifies the signed token and fresh stored session; builder independently verifies it and exact project/environment membership. Dashboard menu read permission grants SQL access to registered non-system, non-login application tables in that one resource, regardless of ordinary CRUD table/field/row permissions. Credential/platform data remain excluded. Ordinary CRUD is unchanged.
+
+Fresh automated Chrome 155 checks on this Mac used a separate headless profile and local synthetic fixtures, with production API adapters blocked:
+1. Existing Table title stays below visualization; Show empty values for Columns and Configure remain.
+2. Deals/Columns Table draft and a manually typed SQL draft survive switching tabs.
+3. With ordinary frontend table reads denied, server SQL catalog still offers deals and employees. Visual LEFT JOIN builds from their safe fields; Review leaves manual SQL unchanged, Replace SQL applies the reviewed draft.
+4. Real unchanged Auth -> gateway -> independent builder -> PostgreSQL returns Alice/USD/2 and Bob/USD/1. Backend fixture separately proves table/field CRUD denials and automatic row filters do not narrow SQL dashboard access.
+5. SQL Columns chart renders both groups. Adding the widget saves source+configuration in the synthetic UI persistence adapter. Reload retains the chart; Edit reopens SQL and configuration, and rerunning retrieves fresh rows. Real menu serialization is covered by frontend tests; no production menu write is claimed.
+6. Revoked synthetic session clears all prior SQL tables/charts and disables Run. Restoring the allowed actor produces fresh results.
+7. Advanced datasets SQL source also offers the server catalog with ordinary table reads denied.
+
+Evidence: qa/evidence/sql-table-controls.png, sql-dashboard-wide-chart.png, sql-reopened.png and sql-revoked.png. Full structured browser assertions and real service logs are in the release package evidence directory. Earlier screenshots remain in the preserved older work roots and are not evidence for this candidate.
+
+839/839 frontend tests, typecheck, lint and production build passed. Full builder/gateway builds and relevant race regressions passed. Existing Auth real-session integration passed wrong-signature JWT, revocation/fresh role, tenant mismatch and privileged-data rejection. Synthetic actor restoration is explicitly verified by HTTP 204, a successful JOIN and stored role/unexpired session checks.
+
+No new chart requests, heatmap/conversion changes, ARMADA changes or Udevs CRM changes were authored. All later upstream code is preserved. No shared push, deployment, activation or Library upload was performed. Production tenant IDs, running digests and runtime allowlists still need authorized verification.

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { XIcon, FilterIcon, SlidersHorizontalIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useSession } from "@/shared/api/use-session";
 import { useTablePermissions } from "@/features/auth";
 import { ChartCard, ChartRoles, FilterBar, chartTitle, filterKind, splittable, needsSplit } from "@/features/item";
 import { localized, useTables, type Field as TableField, type Relation } from "@/features/table";
@@ -24,18 +25,38 @@ import { filterKey, type Answer, type DashFilter, type FilterValues } from "../m
 import { WidgetContents, WidgetStatus } from "./WidgetContents";
 import { WidgetFields } from "./WidgetFields";
 import { VisualizationPicker } from "./VisualizationPicker";
+import { SqlQueryEditor } from "./SqlQueryEditor";
+import { SqlDatasetRunner, SqlResultView } from "./SqlDatasetRunner";
+import { sqlWidgetFrom, SQL_VISUALIZATIONS } from "../model/sql-widget";
+import { sqlEditorCopy } from "../model/sql-editor-copy";
+import { sqlSupportIssue } from "../model/sql-query-guidance";
+import { queryChartRows, queryFields, type QueryResult } from "../model/query-result";
 
 const noop = () => {};
 
 /** One local draft, compact controls and a large real preview. No writes until dashboard Save. */
 export function WidgetEditor({ initial, datasets, isNew, filters, values, menuId, onSave, onClose }: {
   initial: Widget; datasets: Dataset[]; filters: DashFilter[]; values: FilterValues; menuId: string;
-  isNew: boolean; onSave: (widget: Widget) => void; onClose: () => void;
+  isNew: boolean; onSave: (widget: Widget, dataset?: Dataset) => void; onClose: () => void;
 }) {
   const dialog = useDialogFocus(onClose);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const copy = sqlEditorCopy(i18n.language);
+  const existingSql = datasets.find((dataset) => dataset.id === initial.datasetId && dataset.source.kind === "sql");
+  const [sourceKind, setSourceKind] = useState<"table" | "sql">(existingSql ? "sql" : "table");
+  const [sqlDataset, setSqlDataset] = useState<Dataset>(() => existingSql ? { ...existingSql, id: crypto.randomUUID(), source: { ...existingSql.source } } : { id: crypto.randomUUID(), name: "SQL", source: { kind: "sql", sql: "", parameters: [], columns: [] } });
+  const [sqlWidget, setSqlWidget] = useState<Widget>(() => existingSql ? { ...initial } : { ...sqlWidgetFrom(sqlDataset), id: initial.id });
+  const session = useSession();
+  const sqlSignature = JSON.stringify([sqlDataset.source, session.getVersion()]);
+  const [sqlPreview, setSqlPreview] = useState<{ signature: string; result: QueryResult | null }>();
+  const sqlResult = sqlPreview?.signature === sqlSignature ? sqlPreview.result : null;
+  const sqlFields = sqlResult ? queryFields(sqlResult) : [];
+  const receiveResult = useCallback((result: QueryResult | null) => { setSqlPreview({ signature: sqlSignature, result }); if (result) { const fields = queryFields(result); setSqlWidget((current) => ({ ...current, groupSlug: current.groupSlug || fields.find((field) => field.type !== "NUMBER")?.slug || "", valueSlug: current.valueSlug || fields.find((field) => field.type === "NUMBER")?.slug || "" })); } }, [sqlSignature]);
+  let sqlAccurate = true;
+  if (sqlResult && sqlWidget.type !== "records") { try { queryChartRows(sqlResult); } catch { sqlAccurate = false; } }
+  const sqlReady = Boolean(sqlAccurate && sqlDataset.source.kind === "sql" && sqlDataset.source.sql.trim() && !sqlSupportIssue(sqlDataset.source.sql) && sqlResult && (sqlWidget.type === "records" || (sqlFields.some((field) => field.slug === sqlWidget.valueSlug && field.type === "NUMBER") && (sqlWidget.kind === "stat" || sqlFields.some((field) => field.slug === sqlWidget.groupSlug)))));
   const { current: language } = useDataLanguages();
-  const [draft, setDraft] = useState(initial);
+  const [draft, setDraft] = useState(() => existingSql ? resetWidgetSource(initial, "") : initial);
   const [previewPage, setPreviewPage] = useState(1);
   const [custom, setCustom] = useState(() => Boolean(initial.title));
   const data = useWidgetData(draft, filters, values, menuId, {}, previewPage, draft.sorts ?? [], datasets);
@@ -58,11 +79,13 @@ export function WidgetEditor({ initial, datasets, isNew, filters, values, menuId
   return <Modal onClose={onClose} className="flex items-start justify-center px-3 pt-[4dvh]">
     <div ref={dialog} data-modal role="dialog" aria-modal="true" aria-label={t(isNew ? "dashboard.addWidget" : "dashboard.editWidget")} className="flex h-[min(820px,92dvh)] w-[1100px] max-w-full flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-modal">
       <header className="flex shrink-0 items-start gap-3 border-b border-border px-5 py-4">
-        <div className="min-w-0 flex-1"><h2 className="text-lg font-semibold">{t(isNew ? "dashboard.addWidget" : "dashboard.editWidget")}</h2><p className="mt-1 text-sm text-fg-muted">{context || t("dashboard.simpleEditorHint")}</p></div>
+        <div className="min-w-0 flex-1"><h2 className="text-lg font-semibold">{t(isNew ? "dashboard.addWidget" : "dashboard.editWidget")}</h2><p className="mt-1 text-sm text-fg-muted">{sourceKind === "sql" ? copy.hint : context || t("dashboard.simpleEditorHint")}</p></div>
         <button type="button" aria-label={t("action.close")} onClick={onClose} className="grid size-8 shrink-0 place-items-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg"><Icon as={XIcon} size={18} /></button>
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-4 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:overflow-hidden">
         <div className="flex min-h-0 min-w-0 shrink-0 flex-col gap-2">
+          <div role="tablist" aria-label={copy.sourceTab} className="mb-1 flex shrink-0 border-b border-border">{(["table", "sql"] as const).map((kind) => <button key={kind} type="button" role="tab" id={`widget-source-${kind}`} aria-selected={sourceKind === kind} aria-controls={`widget-source-panel-${kind}`} onClick={() => setSourceKind(kind)} onKeyDown={(event) => { if (["ArrowLeft", "ArrowRight"].includes(event.key)) { event.preventDefault(); const next = kind === "table" ? "sql" : "table"; setSourceKind(next); document.getElementById(`widget-source-${next}`)?.focus(); } }} className={`flex-1 border-b-2 px-3 py-2 text-sm font-medium ${sourceKind === kind ? "border-accent text-fg" : "border-transparent text-fg-muted hover:text-fg"}`}>{kind === "table" ? "Table" : "SQL"}</button>)}</div>
+          <div id="widget-source-panel-table" role="tabpanel" aria-labelledby="widget-source-table" hidden={sourceKind !== "table"} className="min-h-0 flex-col gap-2 data-[active=true]:flex" data-active={sourceKind === "table"}>
           <div className="flex shrink-0 flex-col gap-2">
           <TablePicker value={effectiveTable} onPick={(tableSlug) => { if (tableSlug === effectiveTable) return; setDraft((current) => resetWidgetSource(current, tableSlug)); setPreviewPage(1); }} />
           {(slug || draft.type === "heading") && <WidgetFields widget={draft} fields={schema.fields} language={language} onChange={change} />}
@@ -90,13 +113,23 @@ export function WidgetEditor({ initial, datasets, isNew, filters, values, menuId
             </div>
           </details>
           </div>
+          </div>
+          <div id="widget-source-panel-sql" role="tabpanel" aria-labelledby="widget-source-sql" hidden={sourceKind !== "sql"} data-active={sourceKind === "sql"} className="min-h-0 flex-col gap-3 overflow-y-auto pr-1 data-[active=true]:flex">
+            <SqlQueryEditor dataset={sqlDataset} menuId={menuId} onChange={setSqlDataset} />
+            {sqlDataset.source.kind === "sql" && <SqlDatasetRunner menuId={menuId} sql={sqlDataset.source.sql} parameters={sqlDataset.source.parameters} hideResult onResult={receiveResult} />}
+            <VisualizationPicker value={visualizationOf(sqlWidget)} allowed={SQL_VISUALIZATIONS} onChange={(kind) => setSqlWidget((current) => ({ ...selectVisualization(current, kind, sqlFields), aggregation: "sum" }))} />
+            <Field label={t("dashboard.widgetTitle")}><Input aria-label={t("dashboard.widgetTitle")} value={sqlWidget.title} placeholder={t("dashboard.widgetTitleHint")} onChange={(event) => setSqlWidget({ ...sqlWidget, title: event.target.value })} /></Field>
+            <p className="text-2xs text-fg-muted">{copy.supportedVisualizations}</p>
+            {sqlWidget.type !== "records" && <><Field label={t("dashboard.groupField")}><Dropdown ariaLabel={t("dashboard.groupField")} value={sqlWidget.groupSlug} disabled={!sqlResult || sqlWidget.kind === "stat"} items={sqlFields.map((field) => ({ value: field.slug, label: field.label }))} onChange={(groupSlug) => setSqlWidget({ ...sqlWidget, groupSlug })} /></Field><Field label={t("pivot.value")}><Dropdown ariaLabel={t("pivot.value")} value={sqlWidget.valueSlug} disabled={!sqlResult} items={sqlFields.filter((field) => field.type === "NUMBER").map((field) => ({ value: field.slug, label: field.label }))} onChange={(valueSlug) => setSqlWidget({ ...sqlWidget, valueSlug })} /></Field></>}
+            <details className="rounded-md border border-border px-3 py-2"><summary className="cursor-pointer text-sm text-fg-muted">{copy.advanced}</summary><div className="mt-2 flex flex-col gap-2"><Field label={copy.split}><Dropdown ariaLabel={copy.split} value={sqlWidget.splitSlug} items={[{ value: "", label: copy.splitNone }, ...sqlFields.filter((field) => field.slug !== sqlWidget.groupSlug).map((field) => ({ value: field.slug, label: field.label }))]} onChange={(splitSlug) => setSqlWidget({ ...sqlWidget, splitSlug })} /></Field><p className="text-2xs text-fg-muted">{copy.draftHint}</p></div></details>
+          </div>
         </div>
         <div className="dashboard-widget-preview flex h-[420px] min-h-0 shrink-0 min-w-0 flex-col gap-3 rounded-xl border border-border p-4 md:h-full">
           <span className="text-sm text-fg-muted">{t("dashboard.preview")}</span>
-          <ChartCard config={{ ...draft, title, width: 12 }} columns={schema.fields} relations={schema.relations} rows={[]} language={language} showRowCount={false} scrollContent={draft.type !== "records"} aside={draft.type === "records" ? undefined : <WidgetStatus widget={draft} data={data} compact />} content={<WidgetContents widget={draft} data={data} language={language} editing page={previewPage} sorts={draft.sorts ?? []} onPage={setPreviewPage} onSorts={(sorts) => change({ sorts })} onChange={change} />} editing={false} dragged={false} over={false} onDragStart={noop} onDragEnd={noop} onDragOver={noop} onDrop={noop} onMove={noop} onChange={noop} onRemove={noop} plain />
+          {sourceKind === "sql" ? <div className="min-h-0 flex-1 overflow-auto"><h3 className="mb-3 text-base font-medium">{sqlWidget.title}</h3>{sqlResult ? <SqlResultView result={sqlResult} language={i18n.language} presentation={{ type: sqlWidget.type === "records" ? "table" : "chart", kind: sqlWidget.kind, group: sqlWidget.groupSlug, value: sqlWidget.valueSlug, split: sqlWidget.splitSlug }} hidePicker /> : <p className="text-sm text-fg-muted">{copy.beforePreview}</p>}</div> : <ChartCard config={{ ...draft, title, width: 12 }} columns={schema.fields} relations={schema.relations} rows={[]} language={language} showRowCount={false} scrollContent={draft.type !== "records"} aside={draft.type === "records" ? undefined : <WidgetStatus widget={draft} data={data} compact />} content={<WidgetContents widget={draft} data={data} language={language} editing page={previewPage} sorts={draft.sorts ?? []} onPage={setPreviewPage} onSorts={(sorts) => change({ sorts })} onChange={change} />} editing={false} dragged={false} over={false} onDragStart={noop} onDragEnd={noop} onDragOver={noop} onDrop={noop} onMove={noop} onChange={noop} onRemove={noop} plain />}
         </div>
       </div>
-      <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3"><span className="mr-auto hidden text-xs text-fg-muted sm:block">{t("dashboard.saveAfterAdding")}</span><Button type="button" variant="secondary" onClick={onClose}>{t("action.cancel")}</Button><Button type="button" disabled={!ready} onClick={() => onSave({ ...draft, title: title.trim() })}>{t(isNew ? "dashboard.addToDraft" : "dashboard.applyToDraft")}</Button></footer>
+      <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3"><span className="mr-auto hidden text-xs text-fg-muted sm:block">{t("dashboard.saveAfterAdding")}</span><Button type="button" variant="secondary" onClick={onClose}>{t("action.cancel")}</Button><Button type="button" disabled={sourceKind === "sql" ? !sqlReady : !ready} title={sourceKind === "sql" && !sqlReady ? copy.previewRequired : undefined} onClick={() => sourceKind === "sql" ? onSave({ ...sqlWidget, title: sqlWidget.title.trim() }, { ...sqlDataset, name: sqlWidget.title.trim() || "SQL" }) : onSave({ ...draft, title: title.trim() })}>{t(isNew ? "dashboard.addToDraft" : "dashboard.applyToDraft")}</Button></footer>
     </div>
   </Modal>;
 }

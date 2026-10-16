@@ -36,6 +36,7 @@ import type { DashFilter, FilterValues } from "../model/filters";
 import { readPrefs, toggle, writePrefs, type Prefs } from "../model/prefs";
 import { DashFilters } from "./DashFilters";
 import { DashNav, ModuleMark } from "./DashNav";
+import type { Dataset } from "../model/datasets";
 import { DatasetEditor } from "./DatasetEditor";
 import { WidgetGrid } from "./WidgetGrid";
 
@@ -79,7 +80,7 @@ export function DashboardsPage({
    * «Сохранить» пишет одной записью, «Отмена» возвращает как было.
    * Привязан к дашборду: ушли на соседнюю вкладку — правка брошена.
    */
-  const [layout, setLayout] = useState<{ id: string; widgets: Widget[]; filters: DashFilter[] } | null>(null);
+  const [layout, setLayout] = useState<{ id: string; widgets: Widget[]; filters: DashFilter[]; datasets?: Dataset[] } | null>(null);
   /** Что ждёт подтверждения удаления: дашборд или папка с дашбордами. */
   const [datasetsOpen, setDatasetsOpen] = useState(false);
   const [removing, setRemoving] = useState<{ kind: "dashboard" | "folder"; id: string } | null>(null);
@@ -186,7 +187,7 @@ export function DashboardsPage({
   return (
     <div className="relative flex min-h-0 flex-1">
       {nav}
-      {datasetsOpen && <DatasetEditor datasets={tree.datasets ?? []} menuId={menuId} onSave={(datasets) => apply({ ...tree, datasets })} onClose={() => setDatasetsOpen(false)} />}
+      {datasetsOpen && <DatasetEditor datasets={tree.datasets ?? []} menuId={menuId} onSave={(datasets) => apply({ ...tree, datasets })} onCreateWidget={current && !editing ? (datasets,widget)=>apply(patchDashboard({...tree,datasets},current.dashboard.id,dashboard=>({...dashboard,widgets:[...dashboard.widgets,widget]}))) : undefined} onClose={() => setDatasetsOpen(false)} />}
 
       {/* Страница прокручивается целиком, полоса вкладок липнет к верху —
           как `.scroller` и `.viewbar` прототипа. */}
@@ -306,7 +307,7 @@ export function DashboardsPage({
                           size="sm"
                           disabled={isSaving}
                           onClick={async () => {
-                            if (await patchCurrent({ widgets: layout.widgets, filters: layout.filters })) setLayout(null);
+                            if (await apply(patchDashboard({ ...tree, datasets: layout.datasets ?? tree.datasets ?? [] }, current.dashboard.id, (dashboard) => ({ ...dashboard, widgets: layout.widgets, filters: layout.filters })))) setLayout(null);
                           }}
                         >
                           <Icon as={CheckIcon} size={14} />
@@ -347,7 +348,7 @@ export function DashboardsPage({
               <WidgetGrid
                 key={current.dashboard.id}
                 menuId={menuId}
-                datasets={tree.datasets ?? []}
+                datasets={editing ? layout.datasets ?? tree.datasets ?? [] : tree.datasets ?? []}
                 widgets={editing ? layout.widgets : current.dashboard.widgets}
                 filters={editing ? layout.filters : current.dashboard.filters}
                 values={values}
@@ -359,6 +360,7 @@ export function DashboardsPage({
                 onWidgets={(widgets) =>
                   editing ? setLayout({ ...layout, widgets }) : patchCurrent({ widgets })
                 }
+                onSourceSave={(widgets, datasets) => editing ? setLayout({ ...layout, widgets, datasets }) : void apply(patchDashboard({ ...tree, datasets }, current.dashboard.id, (dashboard) => ({ ...dashboard, widgets })))}
               />
             </div>
           </div>

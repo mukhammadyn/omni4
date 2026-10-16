@@ -14,7 +14,7 @@ const groups: { key: "common" | "composition" | "analysis"; kinds: Visualization
   { key: "analysis", kinds: ["area", "combo", "heatmap", "scatter", "bubble", "map", "pivot", "ratio", "goal", "heading"] },
 ];
 
-export function VisualizationPicker({ value, onChange }: { value: Visualization; onChange: (value: Visualization) => void }) {
+export function VisualizationPicker({ value, onChange, allowed }: { value: Visualization; onChange: (value: Visualization) => void; allowed?: readonly Visualization[] | undefined }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const name = (kind: Visualization) => kind === "records" ? t("dashboard.plainTable") : t((["records", "pivot", "ratio", "goal", "heading"].includes(kind) ? `dashboard.widget.${kind}` : `chart.kind.${kind}`) as "chart.kind.bar");
@@ -23,10 +23,10 @@ export function VisualizationPicker({ value, onChange }: { value: Visualization;
     <span className="text-sm font-medium">{t("dashboard.visualization")}</span>
     <div className="relative"><Icon as={SearchIcon} size={15} className="pointer-events-none absolute top-2.5 left-2.5 text-fg-subtle" /><Input aria-label={t("dashboard.searchVisualizations")} placeholder={t("dashboard.searchVisualizations")} className="pl-8" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
     <div role="radiogroup" aria-label={t("dashboard.visualization")} className="flex flex-col gap-2">
-      {groups.map((group) => { const kinds = group.kinds.filter((kind) => name(kind).toLocaleLowerCase().includes(search.toLocaleLowerCase())); if (!kinds.length) return null;
+      {groups.map((group) => { const kinds = group.kinds.filter((kind) => (!allowed || allowed.includes(kind)) && name(kind).toLocaleLowerCase().includes(search.toLocaleLowerCase())); if (!kinds.length) return null;
         return group.key === "common" ? <div key={group.key}>{tiles(kinds)}</div> : <details key={`${group.key}-${Boolean(search)}-${group.kinds.includes(value)}`} open={Boolean(search) || group.kinds.includes(value)} className="rounded-md border border-border px-2 py-1"><summary className="cursor-pointer text-xs font-medium text-fg-muted">{t(`dashboard.visualizations.${group.key}` as const)}</summary><div className="pt-2">{tiles(kinds)}</div></details>;
       })}
-      {!groups.some((group) => group.kinds.some((kind) => name(kind).toLocaleLowerCase().includes(search.toLocaleLowerCase()))) && <p className="py-2 text-xs text-fg-muted">{t("dashboard.noVisualizations")}</p>}
+      {!groups.some((group) => group.kinds.some((kind) => (!allowed || allowed.includes(kind)) && name(kind).toLocaleLowerCase().includes(search.toLocaleLowerCase()))) && <p className="py-2 text-xs text-fg-muted">{t("dashboard.noVisualizations")}</p>}
     </div>
   </section>;
 }

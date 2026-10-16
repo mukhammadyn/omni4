@@ -3,7 +3,7 @@ import type { Widget } from "./dashboard";
 import { mergeFilters } from "./filters";
 
 export type DatasetField = { slug: string; label: string; type: string; target?: string; joinable?: boolean };
-/** Catalogs contain only metadata allowed by table rights and the current role layout. */
+/** Table sources use normal role metadata; SQL sources use the server dashboard catalog. */
 export type DatasetTable = { slug: string; label: string; fields: DatasetField[] };
 export type DatasetParameter = { name: string; type: "text" | "number" | "date" | "boolean"; required: boolean };
 export type DatasetJoin = { fromTable: string; field: string; toTable: string; kind: "left" | "inner" };
@@ -24,7 +24,7 @@ export function joinGuidance(join: DatasetJoin, catalog: DatasetTable[]): { vali
 
 export const CLIENT_SQL_CAPABILITY = {
   execution: false,
-  required: ["read-only", "tenant", "table-rights", "row-rights", "field-rights", "typed-parameters", "ordered-columns", "errors", "limits", "timeout", "cancel"] as const,
+  required: ["read-only", "tenant", "dashboard-read", "application-tables", "credential-exclusion", "typed-parameters", "ordered-columns", "errors", "limits", "timeout", "cancel"] as const,
 };
 
 export function datasetFields(dataset: Dataset, catalog: DatasetTable[]): DatasetField[] {
