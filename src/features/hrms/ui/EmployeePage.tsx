@@ -24,6 +24,7 @@ import {
   UsersIcon,
   type LucideIcon,
 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ActiveCell, Avatar, Cell } from "@/features/item";
 import { localized, type Field } from "@/features/table";
@@ -39,6 +40,9 @@ import { EMPLOYEES, toProfile, useEmployee, useNeighbours, useReports } from "..
 import { JOB_HISTORY } from "../api/job-history";
 import { PAYROLL_LINES } from "../api/payroll";
 import { SHIFTS } from "../api/schedule";
+
+/** Вкладка «Тренинги»: участия сотрудника, строка ведёт на страницу тренинга. */
+const TRAINING_PARTICIPANTS = "hr_training_participants";
 import { toPerson } from "../api/org";
 import { monthsBetween, toDay } from "../model/job-history";
 import { Card, Meta, Row, SideProp } from "./page-parts";
@@ -166,6 +170,7 @@ export function EmployeePage({
   onOrgChart: (viewId: string) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const employee = useEmployee(menuId, guid, language);
   const reports = useReports(guid);
   const neighbours = useNeighbours(guid);
@@ -406,6 +411,13 @@ export function EmployeePage({
               language={language}
               languages={languages}
               onLanguage={onLanguage}
+              /* Участие в тренинге открывает страницу тренинга (TrainingPage). */
+              onOpenRow={(item) => {
+                const training = item.hr_trainings_id;
+                if (tab.tableSlug !== TRAINING_PARTICIPANTS || typeof training !== "string" || !training) return false;
+                void navigate({ to: "/trainings/$itemId", params: { itemId: training }, search: { menu: "" } });
+                return true;
+              }}
               trail={[
                 { label: t("employee.back"), onClick: onBack },
                 { label: person.name, onClick: () => onTab(undefined) },
