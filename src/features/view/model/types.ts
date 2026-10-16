@@ -32,6 +32,8 @@ export const VIEW_TYPES = [
   "SCHEDULE",
   "WORK_SCHEDULES",
   "KNOWLEDGE",
+  "PAYROLL",
+  "BUDGET",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -172,6 +174,16 @@ const TRAITS: Record<ViewType, ViewTraits> = {
    * дерево страниц и страница с текстом. Грузит базу целиком сама.
    */
   KNOWLEDGE: { ...HRMS, selfLoading: true },
+  /**
+   * «Сводная по месяцам» начислений (`payroll.html`, features/hrms) на
+   * `hr_payroll_lines`: сотрудник × вид за расчётный месяц.
+   */
+  PAYROLL: { ...HRMS, selfLoading: true },
+  /**
+   * «Бюджет» ФОТ (`budget.html`, features/hrms) на `hr_budget_lines`
+   * и `hr_budget_amounts`: отделы → строки, план и факт по месяцам.
+   */
+  BUDGET: { ...HRMS, selfLoading: true },
   BOARD: { implemented: true, inTabs: true, noGrouping: true },
   CALENDAR: { implemented: true, inTabs: true, noGrouping: true },
   CHART: { implemented: true, noGrouping: true },
@@ -419,6 +431,12 @@ export type View = {
    * пользуются, а не то, что настраивает админ.
    */
   period: string;
+  /**
+   * Сводная, с которой PIVOT открывается (`attributes.pivot`) — те же
+   * ключи, что параметры адреса `pivotRow`, `pivotCol`… Адрес главнее:
+   * дальше раскладку человек крутит сам, как режим календаря.
+   */
+  pivot: Partial<Record<"row" | "col" | "value" | "agg" | "sort", string>> & { skipEmpty?: boolean };
   /**
    * Карточка галереи (`attributes.card`): `person` — карточка человека
    * (фото, статус, контакты; PeopleGallery), пусто — обычная. Читается

@@ -529,6 +529,7 @@ export function toView(dto: ViewDto): View {
     disableDates: toDisableDates(dto.disable_dates),
     charts: toCharts(dto.attributes?.["charts"]),
     period: typeof dto.attributes?.["period"] === "string" ? dto.attributes["period"] : "",
+    pivot: toPivot(dto.attributes?.["pivot"]),
     raw: { ...dto },
   };
 }
@@ -625,4 +626,16 @@ function toDefaultFilters(attributes: Record<string, unknown> | undefined): Reco
   if (typeof filters !== "object" || filters === null || Array.isArray(filters)) return {};
 
   return filters as Record<string, unknown>;
+}
+
+/** `attributes.pivot`: строки — как есть, остальное отбрасывается. */
+function toPivot(value: unknown): View["pivot"] {
+  if (!value || typeof value !== "object") return {};
+  const pivot: View["pivot"] = {};
+  for (const key of ["row", "col", "value", "agg", "sort"] as const) {
+    const item = (value as Record<string, unknown>)[key];
+    if (typeof item === "string" && item) pivot[key] = item;
+  }
+  if ((value as Record<string, unknown>)["skipEmpty"] === true) pivot.skipEmpty = true;
+  return pivot;
 }
