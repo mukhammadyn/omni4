@@ -1,0 +1,41 @@
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Button } from "@/shared/ui/button";
+import { Checkbox } from "@/shared/ui/checkbox";
+import { Dropdown } from "@/shared/ui/dropdown";
+import { Field, Input } from "@/shared/ui/input";
+import type { DatasetTable } from "../model/datasets";
+import { buildJoinSql, type JoinDraft, type JoinStep } from "../model/sql-join-builder";
+
+export function SqlJoinBuilder({ catalog, onUse }: { catalog: DatasetTable[]; onUse: (sql: string) => void }) {
+  const { i18n } = useTranslation(), ru = i18n.language.startsWith("ru"), uz = i18n.language.startsWith("uz");
+  const text = (en: string, russian: string, uzbek: string) => ru ? russian : uz ? uzbek : en;
+  const [plan, setPlan] = useState<JoinDraft>({ base: { table: catalog[0]?.slug ?? "", alias: "t" }, joins: [], columns: [], count: false });
+  const [review, setReview] = useState("");
+  const generated = buildJoinSql(plan, catalog), sources = [plan.base, ...plan.joins];
+  const fields = (alias: string) => catalog.find((table) => table.slug === sources.find((source) => source.alias === alias)?.table)?.fields ?? [];
+  const tableItems = catalog.map((table) => ({ value: table.slug, label: `${table.label} · ${table.slug}` }));
+  const change = (next: JoinDraft) => { setPlan(next); setReview(""); };
+  const changeJoin = (index: number, patch: Partial<JoinStep>) => change({ ...plan, joins: plan.joins.map((join, at) => at === index ? { ...join, ...patch } : join) });
+  const issues = { source: text("Choose permitted tables.", "Выберите доступные таблицы.", "Ruxsat etilgan jadvallarni tanlang."), alias: text("Use distinct aliases: letters, numbers and underscore; start with a letter.", "Псевдонимы должны отличаться: буквы, цифры, подчёркивание; начните с буквы.", "Turli taxalluslar yozing: harf, son va pastki chiziq; harfdan boshlang."), fields: text("Choose fields that exist in the permitted schema.", "Выберите поля из доступной схемы.", "Ruxsat etilgan sxemadan maydon tanlang."), condition: text("Join to one of the earlier sources using =.", "Соедините с одним из предыдущих источников через =.", "Oldingi manbalardan biri bilan = orqali ulang."), columns: text("Select at least one output column or Count rows.", "Выберите колонки результата или «Количество строк».", "Natija ustunlari yoki Qatorlar sonini tanlang."), limit: text("Maximum 3 joins and 64 result columns.", "Не больше 3 JOIN и 64 колонок.", "3 tagacha JOIN va 64 ustun.") };
+  return <div className="flex min-w-0 flex-col gap-3">
+    <p className="text-xs text-fg-muted">{text("Build a draft from permitted schema. Your SQL remains unchanged until Replace SQL. Equality joins only; LEFT keeps the first table's rows, INNER keeps matches.", "Соберите черновик по доступной схеме. Ваш SQL не изменится до «Заменить SQL». Только равенство: LEFT сохраняет строки первой таблицы, INNER — совпадения.", "Ruxsat etilgan sxemadan qoralama tuzing. SQLni almashtirish bosilmaguncha so‘rovingiz o‘zgarmaydi. Faqat tenglik: LEFT birinchi jadval qatorlarini, INNER mos qatorlarni qoldiradi.")}</p>
+    <Field label={text("Base table", "Основная таблица", "Asosiy jadval")}><Dropdown ariaLabel="JOIN base table" value={plan.base.table} items={tableItems} onChange={(table) => change({ ...plan, base: { ...plan.base, table }, columns: [], joins: [] })} /></Field>
+    <Field label={text("Base alias", "Псевдоним таблицы", "Jadval taxallusi")}><Input aria-label="JOIN base alias" value={plan.base.alias} onChange={(event) => change({ ...plan, base: { ...plan.base, alias: event.target.value }, columns: [], joins: [] })} /></Field>
+    {plan.joins.map((join, index) => <fieldset key={index} className="flex min-w-0 flex-col gap-2 rounded-md border border-border p-2"><legend className="px-1 text-xs font-medium">JOIN {index + 1}</legend>
+      <Dropdown ariaLabel={`JOIN ${index + 1} type`} value={join.kind} items={[{ value: "left", label: "LEFT JOIN" }, { value: "inner", label: "INNER JOIN" }]} onChange={(kind) => changeJoin(index, { kind: kind as "left" | "inner" })} />
+      <Dropdown ariaLabel={`JOIN ${index + 1} table`} value={join.table} items={tableItems} onChange={(table) => change({ ...plan, joins: plan.joins.map((item, at) => at === index ? { ...item, table, right: "" } : item), columns: plan.columns.filter((column) => column.alias !== join.alias) })} />
+      <Input aria-label={`JOIN ${index + 1} alias`} value={join.alias} placeholder="alias" onChange={(event) => changeJoin(index, { alias: event.target.value })} />
+      <Dropdown ariaLabel={`JOIN ${index + 1} left source`} value={join.from} items={sources.slice(0, index + 1).map((source) => ({ value: source.alias, label: `${source.alias} · ${source.table}` }))} onChange={(from) => changeJoin(index, { from, left: "" })} />
+      <Dropdown ariaLabel={`JOIN ${index + 1} left field`} value={join.left} placeholder={text("Matching field", "Поле для соединения", "Ulanish maydoni")} items={fields(join.from).map((field) => ({ value: field.slug, label: `${field.label} · ${field.slug}` }))} onChange={(left) => changeJoin(index, { left })} />
+      <span className="text-center font-mono text-sm">=</span>
+      <Dropdown ariaLabel={`JOIN ${index + 1} right field`} value={join.right} placeholder={text("Matching field", "Поле для соединения", "Ulanish maydoni")} items={fields(join.alias).map((field) => ({ value: field.slug, label: `${field.label} · ${field.slug}` }))} onChange={(right) => changeJoin(index, { right })} />
+      <Button type="button" variant="ghost" size="sm" onClick={() => change({ ...plan, joins: plan.joins.slice(0, index), columns: plan.columns.filter((column) => sources.slice(0, index + 1).some((source) => source.alias === column.alias)) })}>{text("Remove this and later joins", "Удалить этот и следующие JOIN", "Shu va keyingi JOINlarni o‘chirish")}</Button>
+    </fieldset>)}
+    <Button type="button" size="sm" variant="secondary" disabled={plan.joins.length >= 3 || !catalog.length} onClick={() => change({ ...plan, joins: [...plan.joins, { table: catalog.find((table) => table.slug !== plan.base.table)?.slug ?? plan.base.table, alias: `j${plan.joins.length + 1}`, kind: "left", from: plan.base.alias, left: "", right: "" }] })}>{text("Add JOIN", "Добавить JOIN", "JOIN qo‘shish")}</Button>
+    <fieldset className="flex min-w-0 flex-col gap-2"><legend className="mb-1 text-xs font-medium">{text("Returned columns", "Колонки результата", "Natija ustunlari")}</legend>{sources.map((source, index) => <div key={index} className="flex flex-col gap-1"><p className="text-2xs text-fg-muted">{source.alias} · {source.table}</p>{fields(source.alias).map((field) => { const selected = plan.columns.some((column) => column.alias === source.alias && column.field === field.slug); return <label key={field.slug} className="flex items-center gap-2 text-xs"><Checkbox aria-label={`${source.alias}.${field.slug}`} checked={selected} onChange={() => change({ ...plan, columns: selected ? plan.columns.filter((column) => column.alias !== source.alias || column.field !== field.slug) : [...plan.columns, { alias: source.alias, field: field.slug }] })} />{field.label}</label>; })}</div>)}<label className="mt-1 flex items-center gap-2 text-xs"><Checkbox aria-label="Count rows" checked={plan.count} onChange={(event) => change({ ...plan, count: event.target.checked })} />{text("Count rows (group by selected columns)", "Количество строк (группировка по выбранным колонкам)", "Qatorlar soni (tanlangan ustunlar bo‘yicha guruhlash)")}</label></fieldset>
+    {generated.issue && <p role="status" className="text-xs text-fg-muted">{issues[generated.issue]}</p>}
+    <Button type="button" size="sm" variant="secondary" disabled={Boolean(generated.issue)} onClick={() => setReview(generated.sql)}>{text("Review generated SQL", "Посмотреть собранный SQL", "Tuzilgan SQLni ko‘rish")}</Button>
+    {review && <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border p-2"><pre aria-label="Generated JOIN SQL" className="max-h-52 overflow-auto whitespace-pre-wrap break-words font-mono text-2xs">{review}</pre><Button type="button" size="sm" onClick={() => { onUse(review); setReview(""); }}>{text("Replace SQL", "Заменить SQL", "SQLni almashtirish")}</Button></div>}
+  </div>;
+}

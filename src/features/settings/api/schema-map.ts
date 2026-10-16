@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/shared/api/use-session";
 import { keys } from "@/shared/lib/query-keys";
 import { toSchemaMap } from "../model/schema-map";
-import { execSql } from "./sql";
+import { execSql, type SqlExecutionOptions } from "./sql";
 
 /**
  * Схема базы для диаграммы — двумя SQL-запросами к служебным таблицам
@@ -75,10 +75,7 @@ export function useSchemaMap() {
 
   const query = useQuery({
     queryKey: keys.tables.schemaMap(projectId, envId),
-    queryFn: async () => {
-      const [tables, links] = await Promise.all([execSql(TABLES_SQL), execSql(LINKS_SQL)]);
-      return toSchemaMap(tables.rows, links.rows);
-    },
+    queryFn: () => readSqlSchema(),
     enabled: Boolean(projectId && envId),
     /*
      * Диаграмма живая: ключ лежит под `keys.tables.all`, и любая правка
@@ -90,4 +87,11 @@ export function useSchemaMap() {
   });
 
   return { map: query.data, isLoading: query.isLoading, error: query.error };
+}
+
+/** The same existing SQL-console schema source, shared with dashboard JOIN tools. */
+export async function readSqlSchema(options?: SqlExecutionOptions) {
+  const [tables, links] = await Promise.all([execSql(TABLES_SQL, options), execSql(LINKS_SQL, options)]);
+  if (!tables.columns.length || !links.columns.length) throw new Error("SQL schema metadata was not returned. Check SQL-console access.");
+  return toSchemaMap(tables.rows, links.rows);
 }

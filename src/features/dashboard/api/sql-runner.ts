@@ -1,0 +1,47 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import i18n from "@/shared/lib/i18n";
+import { ApiError } from "@/shared/api/client";
+import { useSession } from "@/shared/api/use-session";
+import type { DatasetParameter } from "../model/datasets";
+import type { QueryResult } from "../model/query-result";
+import { executeDashboardQuery } from "./query-execution";
+
+type Output = { context: string; signature: string; result: QueryResult | null; busy: boolean; error: string | null };
+
+export function useSqlRunner(menuId: string, sql: string, parameters: DatasetParameter[], values: Record<string, string>, limit: number) {
+  const session = useSession();
+  const context = JSON.stringify([session.getProjectId(), session.getEnvironmentId(), session.getUserId(), session.getProfile()?.role, session.getPermissions(), menuId, session.getVersion()]);
+  const signature = JSON.stringify([sql, parameters, values, limit]);
+  const latest = useRef({ context, signature }); latest.current = { context, signature };
+  const controller = useRef<AbortController | null>(null);
+  const enabled = Boolean(session.getAccess() && session.getProjectId() && session.getEnvironmentId() && menuId);
+  const [output, setOutput] = useState<Output>({ context: "", signature: "", result: null, busy: false, error: null });
+  useEffect(() => () => { controller.current?.abort(); }, [context]);
+  useEffect(() => { controller.current?.abort(); }, [signature]);
+  const current = output.context === context && output.signature === signature;
+  // Serialized query inputs keep saved-widget autorun stable across result renders.
+  const run = useCallback(async () => {
+    if (!enabled) return;
+    controller.current?.abort(); const abort = new AbortController(); controller.current = abort;
+    setOutput({ context, signature, result: null, busy: true, error: null });
+    try {
+      const result = await executeDashboardQuery({ menu_id: menuId, sql, limit, parameters: parameters.map((parameter) => ({ name: parameter.name, type: parameter.type, value: Object.hasOwn(values, parameter.name) ? values[parameter.name] ?? "" : "" })) }, abort.signal);
+      if (!abort.signal.aborted && latest.current.context === context && latest.current.signature === signature) setOutput({ context, signature, result, busy: false, error: null });
+    } catch (error) { if (!abort.signal.aborted && latest.current.context === context && latest.current.signature === signature) setOutput({ context, signature, result: null, busy: false, error: queryFailure(error) }); }
+  }, [context, signature, enabled, menuId]);
+  const cancel = () => { controller.current?.abort(); setOutput({ context, signature, result: null, busy: false, error: null }); };
+  return { scopeKey: context, checking: false, enabled, maxRows: 1000, gateError: null, result: current ? output.result : null, busy: current && output.busy, error: current ? output.error : null, run, cancel };
+}
+
+function queryFailure(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 401) return i18n.language.startsWith("ru") ? "Нет доступа к SQL-консоли или сеансу. Проверьте аккаунт/проект или войдите снова." : i18n.language.startsWith("uz") ? "SQL Console huquqi yoki seans mavjud emas. Hisob/loyihani tekshiring yoki qayta kiring." : "SQL Console access or session is unavailable. Check the account/project or sign in again.";
+    const body = error.body;
+    if (typeof body === "string") return body;
+    if (body && typeof body === "object") {
+      const detail = (body as Record<string, unknown>)["error"];
+      if (detail && typeof detail === "object" && typeof (detail as Record<string, unknown>)["message"] === "string") return (detail as Record<string, unknown>)["message"] as string;
+    }
+  }
+  return error instanceof Error ? error.message : "Dashboard query failed";
+}

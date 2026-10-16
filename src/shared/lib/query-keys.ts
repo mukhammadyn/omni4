@@ -332,6 +332,7 @@ export const keys = {
    * пункта меню и не имеет отношения к колонкам view: таблица и drawer
    * показывают одну строку по-разному, и порядок у них разный.
    */
+  dashboardSql: (scope: string) => ["dashboard-sql", scope] as const,
   layouts: {
     all: ["layouts"] as const,
     byMenu: (envId: string, tableSlug: string, menuId: string) =>

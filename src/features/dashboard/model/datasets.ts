@@ -3,7 +3,7 @@ import type { Widget } from "./dashboard";
 import { mergeFilters } from "./filters";
 
 export type DatasetField = { slug: string; label: string; type: string; target?: string; joinable?: boolean };
-/** Catalogs contain only metadata allowed by table rights and the current role layout. */
+/** Table sources use normal role metadata; SQL sources reuse SQL-console schema metadata. */
 export type DatasetTable = { slug: string; label: string; fields: DatasetField[] };
 export type DatasetParameter = { name: string; type: "text" | "number" | "date" | "boolean"; required: boolean };
 export type DatasetJoin = { fromTable: string; field: string; toTable: string; kind: "left" | "inner" };
@@ -22,10 +22,8 @@ export function joinGuidance(join: DatasetJoin, catalog: DatasetTable[]): { vali
   return field.type === "LOOKUPS" ? { valid: true, reason: "fanout" } : { valid: field.type === "LOOKUP" && field.joinable === true, reason: "reference" };
 }
 
-export const CLIENT_SQL_CAPABILITY = {
-  execution: false,
-  required: ["read-only", "tenant", "table-rights", "row-rights", "field-rights", "typed-parameters", "ordered-columns", "errors", "limits", "timeout", "cancel"] as const,
-};
+/** Documents this client adapter; it is not a server security capability. */
+export const CLIENT_SQL_CAPABILITY = { execution: "existing-admin-sql", serverReadOnly: false, serverBoundsVerified: false } as const;
 
 export function datasetFields(dataset: Dataset, catalog: DatasetTable[]): DatasetField[] {
   if (dataset.source.kind === "sql") return dataset.source.columns;

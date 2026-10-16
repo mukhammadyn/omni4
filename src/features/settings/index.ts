@@ -13,3 +13,7 @@ export const SettingsPage = lazy(() =>
 export { useSettingsSections } from "./ui/sections";
 export { useProject, useWorkspaceTitle } from "./api/project";
 export { useProfile, useUpdateTimezone, useUserTimezone } from "./api/profile";
+
+export { execSql, useSavedQueries, type SqlResult } from "./api/sql";
+export { readSqlSchema } from "./api/schema-map";
+export type { SchemaMap } from "./model/schema-map";
