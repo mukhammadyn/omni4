@@ -15,6 +15,7 @@ export type Person = {
   name: string;
   photo: string;
   position: string;
+  positionId: string;
   department: string;
   departmentId: string;
   location: string;
@@ -63,6 +64,7 @@ export function toPerson(row: Item): Person {
     name: text(row.full_name) || [text(row.last_name), text(row.first_name)].filter(Boolean).join(" "),
     photo: firstText(row.photo),
     position: text(related(row, "hr_positions_id").name),
+    positionId: text(row.hr_positions_id),
     department: text(related(row, "hr_departments_id").name),
     departmentId: text(row.hr_departments_id),
     location: text(related(row, "hr_locations_id").name),
@@ -95,16 +97,52 @@ const ALL = { limit: MAX_LIMIT, page: 1 };
 
 export function useOrgDirectory() {
   const departments = useItems("hr_departments", ALL);
+  const positions = useItems("hr_positions", ALL);
 
   /* Памяткой: от этого списка считаются цвета и деревья экрана. */
   const departmentList = useMemo(() => departments.page.rows.map(toDepartment), [departments.page.rows]);
 
+  /* Должность → вышестоящая (`hr_positions.hr_positions_id`). */
+  const positionParent = useMemo(
+    () => new Map(positions.page.rows.map((row) => [text(row.guid), text(row.hr_positions_id)])),
+    [positions.page.rows],
+  );
+
   return {
     departments: departmentList,
-    isLoading: departments.isLoading,
+    positionParent,
+    isLoading: departments.isLoading || positions.isLoading,
     /** Отказ словами сервера. null — всё загрузилось. */
-    error: departments.error ?? null,
-    refetch: () => void departments.refetch(),
+    error: departments.error ?? positions.error ?? null,
+    refetch: () => {
+      void departments.refetch();
+      void positions.refetch();
+    },
+  };
+}
+
+/**
+ * Руководитель для дерева: свой (`hr_employees_id`), а не указан —
+ * первый на экране, кто занимает вышестоящую должность; нет такого —
+ * следующую выше. Иерархия должностей в проектах заполнена, а поле
+ * руководителя у людей — обычно нет, и дерево выходило плоским.
+ */
+export function managerByPosition(people: Person[], positionParent: Map<string, string>) {
+  const holder = new Map<string, string>();
+  for (const person of people) {
+    if (person.positionId && !holder.has(person.positionId)) holder.set(person.positionId, person.id);
+  }
+  return (person: Person) => {
+    if (person.managerId) return person.managerId;
+    const seen = new Set<string>();
+    let at = positionParent.get(person.positionId);
+    while (at && !seen.has(at)) {
+      seen.add(at);
+      const boss = holder.get(at);
+      if (boss && boss !== person.id) return boss;
+      at = positionParent.get(at);
+    }
+    return undefined;
   };
 }
 

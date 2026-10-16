@@ -24,6 +24,7 @@ import {
   UsersIcon,
   type LucideIcon,
 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ActiveCell, Avatar, Cell } from "@/features/item";
 import { localized, type Field } from "@/features/table";
@@ -32,17 +33,22 @@ import type { DataLanguage } from "@/features/workspace";
 import { formatDate } from "@/shared/lib/date-value";
 import type { TranslationKey } from "@/shared/lib/i18n";
 import { Button } from "@/shared/ui/button";
-import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
 import { EMPLOYEES, toProfile, useEmployee, useNeighbours, useReports } from "../api/employee";
 import { JOB_HISTORY } from "../api/job-history";
+import { PAYROLL_LINES } from "../api/payroll";
 import { SHIFTS } from "../api/schedule";
+
+/** Вкладка «Тренинги»: участия сотрудника, строка ведёт на страницу тренинга. */
+const TRAINING_PARTICIPANTS = "hr_training_participants";
 import { toPerson } from "../api/org";
 import { monthsBetween, toDay } from "../model/job-history";
 import { Card, Meta, Row, SideProp } from "./page-parts";
 import { ABSENCES_TAB, ATTENDANCE_TAB, SCHEDULE_TAB } from "./employee-tabs";
+import { DismissDialog } from "./DismissDialog";
+import { EmployeeCompensation } from "./EmployeeCompensation";
 import { EmployeeAbsences } from "./EmployeeAbsences";
 import { EmployeeAttendance } from "./EmployeeAttendance";
 import { EmployeeSchedule } from "./EmployeeSchedule";
@@ -164,6 +170,7 @@ export function EmployeePage({
   onOrgChart: (viewId: string) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const employee = useEmployee(menuId, guid, language);
   const reports = useReports(guid);
   const neighbours = useNeighbours(guid);
@@ -377,6 +384,8 @@ export function EmployeePage({
           <EmployeeSchedule employeeId={guid} />
         ) : own === ABSENCES_TAB ? (
           <EmployeeAbsences employeeId={guid} />
+        ) : tab?.tableSlug === PAYROLL_LINES && tab.direction === "incoming" ? (
+          <EmployeeCompensation employeeId={guid} departmentId={String(row.hr_departments_id ?? "")} />
         ) : tab?.tableSlug === JOB_HISTORY && tab.direction === "incoming" ? (
           <WorkHistory
             key={tab.id}
@@ -385,8 +394,6 @@ export function EmployeePage({
             menuId={menuId}
             locale={locale}
             language={language}
-            languages={languages}
-            onLanguage={onLanguage}
           />
         ) : tab?.viaUser && !employee.user ? (
           <p className="p-8 text-center text-sm text-fg-subtle">{t("employee.noUser")}</p>
@@ -404,6 +411,13 @@ export function EmployeePage({
               language={language}
               languages={languages}
               onLanguage={onLanguage}
+              /* Участие в тренинге открывает страницу тренинга (TrainingPage). */
+              onOpenRow={(item) => {
+                const training = item.hr_trainings_id;
+                if (tab.tableSlug !== TRAINING_PARTICIPANTS || typeof training !== "string" || !training) return false;
+                void navigate({ to: "/trainings/$itemId", params: { itemId: training }, search: { menu: "" } });
+                return true;
+              }}
               trail={[
                 { label: t("employee.back"), onClick: onBack },
                 { label: person.name, onClick: () => onTab(undefined) },
@@ -500,13 +514,11 @@ export function EmployeePage({
       </div>
 
       {dismissing && (
-        <ConfirmDialog
-          title={t("employee.action.dismiss")}
-          description={t("employee.dismissHint", { name: person.name })}
-          confirmLabel={t("employee.action.dismiss")}
-          busy={false}
-          onConfirm={() => {
-            employee.dismiss();
+        <DismissDialog
+          name={person.name}
+          language={language}
+          onConfirm={(date, reasonId) => {
+            employee.dismiss(date, reasonId);
             setDismissing(false);
           }}
           onClose={() => setDismissing(false)}

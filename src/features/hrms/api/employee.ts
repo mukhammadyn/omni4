@@ -4,7 +4,6 @@ import { MAX_LIMIT, PEOPLE, useItem, useItems, useUpdateItem, type Item } from "
 import { ALL_VIEW_RIGHTS, localized, useTableDetails, useTableSchema, useTableSettings } from "@/features/table";
 import { useTableMenuId } from "@/features/sidebar";
 import { relationTabs, useMenuViews } from "@/features/view";
-import { todayInput } from "@/shared/lib/date-value";
 import { firstText, related, text, toPerson } from "./org";
 
 /**
@@ -86,14 +85,11 @@ export function useEmployee(menuId: string, guid: string, language: string) {
     orgViewId: views.find((view) => view.type === "ORG")?.id,
     can: permissionOf(EMPLOYEES),
     edit: (slug: string, value: unknown) => update.mutate({ guid, values: { [slug]: value } }),
-    /**
-     * Увольнение: статус «Уволен» и дата — сегодня в поясе пользователя
-     * («ГГГГ-ММ-ДД», как пишет поле DATE). Причину и прочее правят полями.
-     */
-    dismiss: () =>
+    /** Увольнение: статус «Уволен», дата («ГГГГ-ММ-ДД», как пишет поле DATE) и причина. */
+    dismiss: (date: string, reasonId: string) =>
       update.mutate({
         guid,
-        values: { status: "dismissed", dismissal_date: todayInput() },
+        values: { status: "dismissed", dismissal_date: date, hr_dismissal_reasons_id: reasonId },
       }),
   };
 }
@@ -145,4 +141,29 @@ export function useNeighbours(guid: string) {
   const at = ids.indexOf(guid);
   if (at < 0 || ids.length < 2) return null;
   return { prev: ids[(at - 1 + ids.length) % ids.length]!, next: ids[(at + 1) % ids.length]! };
+}
+
+const DISMISSAL_REASONS = "hr_dismissal_reasons";
+
+/**
+ * Причины увольнения и их типы. Тип — поле причины (`dismissal_type`),
+ * у сотрудника хранится только причина: тип в форме лишь сужает список.
+ */
+export function useDismissalReasons(language: string) {
+  const { page } = useItems(DISMISSAL_REASONS, { limit: MAX_LIMIT, page: 1 });
+  const { schema } = useTableSchema(DISMISSAL_REASONS);
+  const options = schema.fields.find((field) => field.slug === "dismissal_type")?.options;
+
+  return useMemo(
+    () => ({
+      types: [...(options ?? new Map()).entries()].map(([value, option]) => ({
+        value,
+        label: localized(option.labels, language, option.label || value),
+      })),
+      reasons: page.rows
+        .filter((row) => row.is_active !== false)
+        .map((row) => ({ value: text(row.guid), label: text(row.name), type: firstText(row.dismissal_type) })),
+    }),
+    [options, page.rows, language],
+  );
 }

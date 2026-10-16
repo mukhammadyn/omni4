@@ -161,6 +161,10 @@ export function useJobHistory({
     create: (values: Item, onDone: () => void) => create.mutate(values, { onSuccess: onDone }),
     edit: (guid: string, slug: string, value: unknown) =>
       update.mutate({ guid, values: { [slug]: value } }),
+    /** Правка из формы: все её поля одним запросом. */
+    save: (guid: string, values: Item, onDone: () => void) =>
+      update.mutate({ guid, values }, { onSuccess: onDone }),
+    saving: update.isPending,
     remove: (guid: string) => remove.mutate([guid]),
   };
 }

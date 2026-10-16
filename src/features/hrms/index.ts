@@ -21,7 +21,8 @@ export { AttendanceList } from "./ui/AttendanceList";
 export { Absences } from "./ui/Absences";
 export { useEmployeesMenuId } from "./api/employee";
 export { ScheduleCalendar } from "./ui/ScheduleCalendar";
-export { ScheduleTools } from "./ui/ScheduleTools";
+export { PeopleFilterBar, ScheduleTools } from "./ui/ScheduleTools";
+
 export { WorkSchedules } from "./ui/WorkSchedules";
 export { SCHEDULE_VIEWS, ScheduleCreate } from "./ui/ScheduleCreate";
 export { TRAININGS } from "./api/training";

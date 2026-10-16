@@ -13,17 +13,19 @@ import {
 } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { ItemDrawer, relationDataKey, rowErrors, type Item } from "@/features/item";
-import type { DataLanguage } from "@/features/workspace";
+import { relationDataKey, type Item } from "@/features/item";
+import type { Field, Relation } from "@/features/table";
 import { todayInput } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { Chip, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
+import { Modal } from "@/shared/ui/modal";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { JOB_HISTORY, useJobHistory, type Choice, type JobEntry } from "../api/job-history";
 import { monthsBetween, toDay, type GradeIssue } from "../model/job-history";
+import { formError, FormField } from "./record-form";
 
 /**
  * Не переносятся в новую запись: её начало, конец и причина — то, чем
@@ -36,9 +38,8 @@ const FRESH = new Set(["guid", "date_from", "date_to", "change_reason", "is_curr
  * текущая сверху. Вместо таблицы связи — потому что запись здесь
  * читается целиком (должность, отдел, оклад, период), а не по колонкам.
  *
- * Правят и заводят запись карточкой записи (ItemDrawer): поля, их
- * порядок и права — из раскладки таблицы, как везде. Своей формы
- * у вкладки нет, чтобы не было второго способа править те же поля.
+ * Правят и заводят запись модалкой — `posModal` прототипа (JobDialog):
+ * поля в его порядке, права — из раскладки таблицы.
  */
 export function WorkHistory({
   employee,
@@ -46,8 +47,6 @@ export function WorkHistory({
   menuId,
   locale,
   language,
-  languages,
-  onLanguage,
 }: {
   employee: string;
   /** Колонка-ссылка на сотрудника — из вкладки связи. */
@@ -55,14 +54,11 @@ export function WorkHistory({
   menuId: string;
   locale: string;
   language: string;
-  languages: DataLanguage[];
-  onLanguage: (code: string) => void;
 }) {
   const { t } = useTranslation();
   const job = useJobHistory({ employee, link, menuId, language });
   const [open, setOpen] = useState(true);
   const [draft, setDraft] = useState<Item | null>(null);
-  const [showErrors, setShowErrors] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -70,7 +66,6 @@ export function WorkHistory({
   const current = entries.find((entry) => entry.current) ?? entries[0];
   const shown = open || !current ? entries : [current];
   const editRow = entries.find((entry) => entry.id === editing)?.row;
-  const errors = draft ? rowErrors(job.columns, draft) : new Map();
 
   /**
    * Новая запись — копия текущей (или выбранной) без периода и причины:
@@ -85,7 +80,6 @@ export function WorkHistory({
       const data = source[relationDataKey(field.slug)];
       if (data) copy[relationDataKey(field.slug)] = data;
     }
-    setShowErrors(false);
     setDraft({ ...copy, [link]: employee, date_from: todayInput() });
   };
 
@@ -138,76 +132,28 @@ export function WorkHistory({
         </div>
       )}
 
-      {editRow && (
-        <ItemDrawer
-          tableSlug={JOB_HISTORY}
-          columns={job.columns}
-          row={editRow}
+      {(editRow || draft) && (
+        <JobDialog
+          row={editRow ?? draft!}
+          creating={!editRow}
+          fields={job.fields}
           relations={job.relations}
           locale={locale}
           language={language}
-          languages={languages}
-          onLanguage={onLanguage}
-          sections={job.sections}
-          heading=""
-          titlePlaceholder={t("employee.work.entry")}
-          {...(job.can.update ? { onEdit: job.edit } : {})}
-          onClose={() => setEditing(null)}
-        />
-      )}
-
-      {/* Новая запись: правки копятся в черновике и уезжают одним
-          запросом по кнопке — как черновик строки в таблице. */}
-      {draft && (
-        <ItemDrawer
-          tableSlug={JOB_HISTORY}
-          columns={job.columns}
-          row={draft}
-          relations={job.relations}
-          locale={locale}
-          language={language}
-          languages={languages}
-          onLanguage={onLanguage}
-          sections={job.sections}
-          heading=""
-          creating
-          titlePlaceholder={t("employee.work.add")}
-          onEdit={(_guid, slug, value) =>
-            setDraft((prev) => (prev ? { ...prev, [slug]: value } : prev))
-          }
-          onLink={(slug, item) =>
-            setDraft((prev) =>
-              prev ? { ...prev, [slug]: item?.guid ?? null, [relationDataKey(slug)]: item } : prev,
-            )
-          }
-          footer={
-            <>
-              {showErrors && errors.size > 0 && (
-                <span className="mr-auto text-xs text-danger">
-                  {t("table.fillRequired", { count: errors.size })}
-                </span>
-              )}
-              <Button variant="ghost" onClick={() => setDraft(null)}>
-                {t("action.cancel")}
-              </Button>
-              <Button
-                disabled={job.creating}
-                onClick={() => {
-                  if (errors.size) {
-                    setShowErrors(true);
-                    return;
-                  }
-                  job.create(draft, () => {
-                    setDraft(null);
-                    toast.success(t("table.rowCreated"));
-                  });
-                }}
-              >
-                {t("action.create")}
-              </Button>
-            </>
-          }
-          onClose={() => setDraft(null)}
+          busy={job.creating || job.saving}
+          onSave={(values) => {
+            const done = () => {
+              setDraft(null);
+              setEditing(null);
+              toast.success(t(editRow ? "employee.work.saved" : "table.rowCreated"));
+            };
+            if (editRow) job.save(String(editRow.guid), values, done);
+            else job.create(values, done);
+          }}
+          onClose={() => {
+            setDraft(null);
+            setEditing(null);
+          }}
         />
       )}
 
@@ -420,4 +366,121 @@ function monthYear(date: Date, locale: string) {
     .map((part) => part.value)
     .join(" ");
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/*
+ * Поля модалки — порядок `posModal` прототипа. Чего нет в схеме или
+ * скрыто правами роли, того и в форме нет.
+ */
+const JOB_FIELDS = [
+  "employment_type",
+  "hr_departments_id",
+  "hr_locations_id",
+  "hr_positions_id",
+  "hr_grades_id",
+  "work_format",
+  "change_reason",
+  "hr_work_schedules_id",
+  "salary",
+  "currency",
+  "date_from",
+  "date_to",
+  "comment",
+];
+const JOB_WIDE = new Set(["change_reason", "hr_work_schedules_id", "comment"]);
+const JOB_REQUIRED = new Set(["hr_positions_id", "date_from"]);
+
+/** «Добавить / Редактировать должность» — `posModal` прототипа. */
+function JobDialog({
+  row,
+  creating,
+  fields,
+  relations,
+  locale,
+  language,
+  busy,
+  onSave,
+  onClose,
+}: {
+  row: Item;
+  creating: boolean;
+  fields: Field[];
+  relations: Relation[];
+  locale: string;
+  language: string;
+  busy: boolean;
+  onSave: (values: Item) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [form, setForm] = useState<Item>(row);
+  const [error, setError] = useState<string | null>(null);
+  const bySlug = new Map(fields.map((field) => [field.slug, field]));
+  const byId = new Map(relations.map((relation) => [relation.id, relation]));
+  const shown = JOB_FIELDS.flatMap((slug) => bySlug.get(slug) ?? []);
+
+  const submit = () => {
+    const required = shown.map((field) => (JOB_REQUIRED.has(field.slug) ? { ...field, required: true } : field));
+    const why = formError(required, form, language, t);
+    if (why) {
+      setError(why);
+      return;
+    }
+    // В запрос — только поля формы; ключи `<слаг>_data` нужны лишь подписям.
+    const values: Item = Object.fromEntries(
+      Object.entries(form).filter(([key]) => key !== "guid" && !key.endsWith("_data")),
+    );
+    onSave(values);
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <form
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-surface shadow-modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
+        <div className="px-5 pt-5">
+          <h2 className="text-xl font-semibold">{t(creating ? "employee.work.addTitle" : "employee.work.editTitle")}</h2>
+          <p className="mt-0.5 text-[13.5px] text-fg-muted">
+            {t(creating ? "employee.work.addHint" : "employee.work.editHint")}
+          </p>
+        </div>
+
+        <div className="grid min-h-0 grid-cols-2 gap-x-4 gap-y-3.5 overflow-y-auto px-5 py-4 max-md:grid-cols-1">
+          {shown.map((field) => (
+            <FormField
+              key={field.slug}
+              field={field}
+              row={form}
+              tableSlug={JOB_HISTORY}
+              relations={byId}
+              locale={locale}
+              language={language}
+              creating={creating}
+              required={JOB_REQUIRED.has(field.slug) || Boolean(field.required)}
+              wide={JOB_WIDE.has(field.slug)}
+              {...(field.slug === "date_to" ? { placeholder: t("employee.work.toHint") } : {})}
+              onChange={(value, extra) => {
+                setError(null);
+                setForm((prev) => ({ ...prev, [field.slug]: value, ...extra }));
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 border-t border-border px-5 py-3">
+          {error && <span className="mr-auto text-xs text-danger">{error}</span>}
+          <Button type="button" variant="ghost" className="ml-auto" onClick={onClose}>
+            {t("action.cancel")}
+          </Button>
+          <Button type="submit" disabled={busy}>
+            {t("action.save")}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
 }

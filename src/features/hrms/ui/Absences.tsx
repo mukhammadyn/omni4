@@ -8,7 +8,10 @@ import { Icon } from "@/shared/ui/icon";
 import { pageCount } from "@/shared/ui/pagination";
 import { useAbsenceRequests, useDecideRequest, useDecisions, useRoutes, type AbsenceRequest } from "../api/absences";
 import { progressOf, routeFor } from "../model/approval";
-import { Pager, PeriodBar, usePeriod, useScopedPage, type OpenEmployee } from "./attendance-parts";
+import { GroupedRows, Pager, PeriodBar, usePeriod, useScopedPage, type OpenEmployee } from "./attendance-parts";
+import { useScheduleSettings } from "./schedule-settings";
+import { EMPLOYEES } from "../api/employee";
+import { useAll } from "../api/timesheet";
 import { ABSENCES_TAB } from "./employee-tabs";
 
 const PAGE = 20;
@@ -50,6 +53,13 @@ export function Absences({
   const routes = useRoutes();
   const decide = useDecideRequest();
   const [only, setOnly] = useState<Set<Status>>(() => new Set());
+  const settings = useScheduleSettings(viewId);
+  /* Отбор — по полям сотрудника: заявки берутся тех, кто под него попал. */
+  const people = useAll(settings.active ? EMPLOYEES : undefined, settings.where, false);
+  const picked = useMemo(
+    () => (settings.active ? new Set(people.rows.map((row) => String(row.guid))) : null),
+    [settings.active, people.rows],
+  );
 
   const counts = useMemo(() => {
     const result: Record<Status, number> = { pending: 0, approved: 0, rejected: 0 };
@@ -61,11 +71,15 @@ export function Absences({
   const shown = useMemo(
     () =>
       requests.rows
-        .filter((request) => !only.size || only.has(request.status as Status))
+        .filter(
+          (request) =>
+            (!only.size || only.has(request.status as Status)) &&
+            (!picked || picked.has(request.employeeId)),
+        )
         .sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending") || b.from.localeCompare(a.from)),
-    [requests.rows, only],
+    [requests.rows, only, picked],
   );
-  const [page, setPage] = useScopedPage(`${range.from}|${query}|${[...only].join()}`);
+  const [page, setPage] = useScopedPage(`${range.from}|${query}|${[...only].join()}|${settings.active}`);
   const pages = pageCount(shown.length, PAGE);
   const current = Math.min(page, pages);
   const slice = shown.slice((current - 1) * PAGE, current * PAGE);
@@ -135,7 +149,8 @@ export function Absences({
                 </td>
               </tr>
             ) : (
-              slice.map((request) => {
+              <GroupedRows rows={slice} group={settings.group} keysOf={(request) => request} colSpan={COLUMNS.length}>
+              {(request) => {
                 const route = routeFor({ type: "absence", departmentId: request.departmentId, absenceTypeId: request.typeId }, routes);
                 const progress = route ? progressOf(route, decisions.get(request.id) ?? []) : null;
                 const color = hexToChipColor(request.typeColor);
@@ -217,7 +232,8 @@ export function Absences({
                     </td>
                   </tr>
                 );
-              })
+              }}
+              </GroupedRows>
             )}
           </tbody>
         </table>

@@ -53,6 +53,9 @@ export type SheetEmployee = {
   name: string;
   photo: string;
   position: string;
+  positionId: string;
+  departmentId: string;
+  locationId: string;
   hireDate: string;
   dismissalDate: string;
 };
@@ -62,6 +65,9 @@ const toEmployee = (row: Item): SheetEmployee => ({
   name: text(row.full_name) || [text(row.last_name), text(row.first_name)].filter(Boolean).join(" ") || "—",
   photo: text(row.photo),
   position: text(related(row, "hr_positions_id").name),
+  positionId: text(row.hr_positions_id),
+  departmentId: text(row.hr_departments_id),
+  locationId: text(row.hr_locations_id),
   hireDate: text(row.hire_date).slice(0, 10),
   dismissalDate: text(row.dismissal_date).slice(0, 10),
 });
@@ -127,6 +133,7 @@ export function useTimesheet({
   search,
   employeeId,
   pageSize,
+  where = {},
 }: {
   from: string;
   to: string;
@@ -137,12 +144,16 @@ export function useTimesheet({
   employeeId?: string;
   /** Сотрудники порциями по столько — прокрутка табеля, как в HRMS. Без него — все. */
   pageSize?: number;
+  /** Отбор сотрудников полосой фильтров (PeopleFilterBar). */
+  where?: Filters;
 }): Timesheet {
   const peopleQuery = useItems(EMPLOYEES, {
     limit: pageSize ?? MAX_LIMIT,
     page: 1,
     infinite: true,
-    filters: employeeId ? { guid: { op: "any", values: [employeeId] } } : {},
+    filters: employeeId
+      ? { guid: { op: "any", values: [employeeId] } }
+      : where,
     search,
     // Порции идут по алфавиту — иначе новая порция вставала бы между строк.
     sorts: [{ field: "full_name", direction: "asc" }],

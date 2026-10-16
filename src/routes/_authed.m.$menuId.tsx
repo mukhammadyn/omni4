@@ -85,6 +85,7 @@ import {
   CandidatesTable,
   ScheduleCalendar,
   ScheduleTools,
+  PeopleFilterBar,
   SCHEDULE_VIEWS,
   ScheduleCreate,
   WorkSchedules,
@@ -188,6 +189,11 @@ import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
 
+
+/** Экраны HRMS, где строки — сотрудники: у них свои фильтр и группировка (ScheduleTools). */
+const PEOPLE_VIEWS = new Set(["SCHEDULE", "ATTENDANCE", "ABSENCES"]);
+/** Сводные HRMS: фильтр по полям своей таблицы, без группировки. */
+const SUMMARY_VIEWS = new Set(["PAYROLL", "BUDGET"]);
 /**
  * Экран пункта меню. Маршрут ключуется на menuId, а не на слаге таблицы:
  * набор view принадлежит пункту меню (GET /v3/menus/{menuId}/views),
@@ -1664,7 +1670,8 @@ function MenuPage() {
                 />
               )}
               {vacancyPlanView && <VacancyPlanTools viewId={view.id} />}
-              {sheetView && view.type === "SCHEDULE" && <ScheduleTools viewId={view.id} />}
+              {sheetView && PEOPLE_VIEWS.has(view.type) && <ScheduleTools viewId={view.id} />}
+              {sheetView && SUMMARY_VIEWS.has(view.type) && <ScheduleTools viewId={view.id} grouping={false} />}
 
               {/* Действия таблицы: функции проекта над отмеченными
                   строками. Рядом с настройками, а не среди поиска
@@ -2059,6 +2066,10 @@ function MenuPage() {
               анимируем: у чипов внутри есть выпадающие списки, а сжать
               высоту можно только обрезающим контейнером — он бы их
               срезал (см. shared/ui/popover: меню лежит в потоке). */}
+          {sheetView && PEOPLE_VIEWS.has(view.type) && <PeopleFilterBar viewId={view.id} language={language} />}
+          {sheetView && SUMMARY_VIEWS.has(view.type) && (
+            <PeopleFilterBar viewId={view.id} language={language} tableSlug={view.tableSlug} />
+          )}
           {filtersVisible && !sheetView && (
             <FilterBar
               columns={columns}
@@ -2083,9 +2094,9 @@ function MenuPage() {
             view.type === KB_VIEW ? (
               <KnowledgeBase pageId={search.doc ?? ""} onOpen={(doc) => setSearch({ doc }, true)} />
             ) : view.type === "BUDGET" ? (
-              <BudgetSheet search={searchText} />
+              <BudgetSheet viewId={view.id} search={searchText} />
             ) : view.type === "PAYROLL" ? (
-              <PayrollPivot search={searchText} onOpenEmployee={openEmployee} />
+              <PayrollPivot viewId={view.id} search={searchText} onOpenEmployee={openEmployee} />
             ) : view.type === "ABSENCES" ? (
               <Absences viewId={view.id} search={searchText} onOpenRow={openRow} onOpenEmployee={openEmployee} />
             ) : view.type === "WORK_SCHEDULES" ? (

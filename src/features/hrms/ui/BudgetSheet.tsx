@@ -5,6 +5,7 @@ import { Avatar } from "@/features/item";
 import { CHIP_STYLES, type ChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
 import { useBudget, useBudgetEdit } from "../api/budget";
+import { useScheduleSettings } from "./schedule-settings";
 import {
   fullSum,
   groupByDept,
@@ -50,14 +51,15 @@ const PARTS = ["plan", "fact", "diff", "pct"] as const;
  * Сделано под эти две таблицы (FIXED_VIEW_TYPES): грузит сам (api/budget),
  * считает model/budget.
  */
-export function BudgetSheet({ search }: { search: string }) {
+export function BudgetSheet({ viewId, search }: { viewId: string; search: string }) {
   const { t, i18n } = useTranslation();
   const monthName = new Intl.DateTimeFormat(i18n.language, { month: "short" });
   const today = useMemo(() => new Date(), []);
   const [year, setYear] = useState(today.getFullYear());
   const [mode, setMode] = useState<BudgetMode>("m");
   const [folded, setFolded] = useState<Set<string>>(new Set());
-  const { lines, loading } = useBudget(year, search);
+  const { where } = useScheduleSettings(viewId);
+  const { lines, loading } = useBudget(year, search, where);
   const edit = useBudgetEdit(year);
   const depts = useMemo(() => groupByDept(lines), [lines]);
   const cols = periods(mode, year, today);
