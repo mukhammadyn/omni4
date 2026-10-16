@@ -16,7 +16,7 @@ export function WidgetContents({ widget, data, language, editing = false, page =
 }) {
   const { t, i18n } = useTranslation();
   if (widget.type === "heading") return <p className="whitespace-pre-wrap py-3 text-base text-fg-muted">{widget.body}</p>;
-  if (data.dataset?.source.kind==="sql") return <SqlDatasetWidget dataset={data.dataset} widget={widget} menuId={data.sqlMenuId} editing={editing} onChange={onChange} />;
+  if (data.dataset?.source.kind==="sql") return <SqlDatasetWidget dataset={data.dataset} widget={widget} menuId={data.sqlMenuId} />;
   if (!widget.tableSlug && !widget.datasetId) return <p className="text-sm text-fg-muted">{t("dashboard.pickTableFirst")}</p>;
   if (data.denied || data.forbidden) return <p className="text-sm text-fg-muted">{t("dashboard.noWidgetAccess")}</p>;
   if (data.error) return <div role="alert" className="text-sm text-danger">{t(data.error as "dashboard.filterConflict", { defaultValue: data.error })}<button type="button" className="ml-2 underline" onClick={data.refetch}>{t("dashboard.refresh")}</button></div>;
