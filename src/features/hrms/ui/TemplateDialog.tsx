@@ -5,11 +5,12 @@ import { Checkbox } from "@/shared/ui/checkbox";
 import { CHIP_COLORS, CHIP_HEX, hexToChipColor } from "@/shared/ui/chip";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Input } from "@/shared/ui/input";
+import { TimeInput } from "@/shared/ui/time-input";
 import { Modal } from "@/shared/ui/modal";
 import { toast } from "@/shared/lib/toast";
 import { useSaveTemplate } from "../api/schedule";
 import { blankTemplate, isClock, weekMinutesOf, type ShiftKind, type Template, type TemplateDay } from "../model/schedule";
-import { ClockInput, KindIcon, Row, Segments, useKinds, TEMPLATE_DOT, TemplatePreview, useDuration } from "./schedule-parts";
+import { KindIcon, Row, Segments, useKinds, TEMPLATE_DOT, TemplatePreview, useDuration } from "./schedule-parts";
 
 /** Норма недели; больше — переработка (`tplModal` прототипа). */
 const WEEK_NORM = 40 * 60;
@@ -107,11 +108,11 @@ export function TemplateDialog({ template, onClose }: { template?: Template; onC
                     {day.working ? (
                       <>
                         <div className="w-24">
-                          <ClockInput value={day.start} onChange={(start) => setDay(index, { start })} />
+                          <TimeInput value={day.start} onChange={(start) => setDay(index, { start })} />
                         </div>
                         <span className="text-fg-subtle">—</span>
                         <div className="w-24">
-                          <ClockInput value={day.end} onChange={(end) => setDay(index, { end })} />
+                          <TimeInput value={day.end} onChange={(end) => setDay(index, { end })} />
                         </div>
                         <div className="w-40">{kindPicker(day.kind, (kind) => setDay(index, { kind }))}</div>
                       </>
@@ -132,10 +133,10 @@ export function TemplateDialog({ template, onClose }: { template?: Template; onC
                   <Input type="number" min={1} max={7} value={form.cycle.off} onChange={(event) => setCycle({ off: Math.max(1, Number(event.target.value) || 1) })} />
                 </Row>
                 <Row label={t("template.shiftStart")}>
-                  <ClockInput value={form.cycle.start} onChange={(start) => setCycle({ start })} />
+                  <TimeInput value={form.cycle.start} onChange={(start) => setCycle({ start })} />
                 </Row>
                 <Row label={t("template.shiftEnd")}>
-                  <ClockInput value={form.cycle.end} onChange={(end) => setCycle({ end })} />
+                  <TimeInput value={form.cycle.end} onChange={(end) => setCycle({ end })} />
                 </Row>
               </div>
               <Row label={t("template.shiftKind")}>{kindPicker(form.cycle.kind, (kind) => setCycle({ kind }))}</Row>

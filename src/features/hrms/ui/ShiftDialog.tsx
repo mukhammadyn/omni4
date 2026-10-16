@@ -10,6 +10,7 @@ import { DatePicker } from "@/shared/ui/date-picker";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
+import { TimeInput } from "@/shared/ui/time-input";
 import { Modal } from "@/shared/ui/modal";
 import { Popover } from "@/shared/ui/popover";
 import {
@@ -44,7 +45,7 @@ import {
   type ShiftForm,
 } from "../model/schedule";
 import { MoreRows } from "./attendance-parts";
-import { ClockInput, DialogLoading, KindIcon, Row, Segments, useKinds, type OpenShift } from "./schedule-parts";
+import { DialogLoading, KindIcon, Row, Segments, useKinds, type OpenShift } from "./schedule-parts";
 
 /**
  * Окно смены — `shiftModal` прототипа. Новая смена — на одного или
@@ -444,10 +445,10 @@ function ShiftForm({
               {form.mode === "range" ? (
                 <div className="grid grid-cols-2 gap-3">
                   <Row label={t("shift.start")}>
-                    <ClockInput value={form.start} onChange={(start) => set({ start })} />
+                    <TimeInput value={form.start} onChange={(start) => set({ start })} />
                   </Row>
                   <Row label={t("shift.end")} hint={isClock(form.start) && isClock(form.end) && form.end <= form.start ? t("shift.overnight") : undefined}>
-                    <ClockInput value={form.end} onChange={(end) => set({ end })} />
+                    <TimeInput value={form.end} onChange={(end) => set({ end })} />
                   </Row>
                 </div>
               ) : (
