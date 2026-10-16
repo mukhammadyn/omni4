@@ -554,6 +554,7 @@
   "dir.absence": "Absence policy",
   "dir.absenceHint": "Absence types: paid or unpaid, day limit and minimum tenure.",
   "dir.add": "Add",
+  "dir.edit": "Edit",
   "dir.callQuality": "AI call analysis",
   "dir.callQualityHint": "Criteria versions the AI uses to score manager calls.",
   "dir.candidateSources": "Candidate sources",

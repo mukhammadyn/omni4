@@ -53,7 +53,11 @@ export function EmployeeSchedule({ employeeId }: { employeeId: string }) {
   }, [data.shifts, employeeId]);
   const locationName = useMemo(() => new Map(locations.map((item) => [item.id, item.name])), [locations]);
   const kinds = useKinds();
-  const place = (shift: Shift) => (kinds.of(shift.kind).remote ? kinds.of(shift.kind).name : locationName.get(shift.locationId) ?? "");
+  const place = (shift: Shift) => {
+    const kind = kinds.of(shift.kind);
+    // Удалённо — вид вместо филиала; филиала нет — тоже вид: под временем не должно быть пусто.
+    return kind.remote ? kind.name : locationName.get(shift.locationId) || (kind.id ? kind.name : "");
+  };
 
   const inRange = data.shifts.filter((shift) => shift.employeeId === employeeId && shift.date >= range.from && shift.date <= range.to);
   const minutes = inRange.reduce((sum, shift) => sum + shift.plannedMinutes, 0);

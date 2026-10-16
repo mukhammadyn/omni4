@@ -554,6 +554,7 @@
   "dir.absence": "Ishda boʻlmaslik siyosati",
   "dir.absenceHint": "Ishda boʻlmaslik turlari: haq toʻlanadigan va toʻlanmaydigan, kun limiti va minimal staj.",
   "dir.add": "Qoʻshish",
+  "dir.edit": "Tahrirlash",
   "dir.callQuality": "Qoʻngʻiroqlarni AI tahlili",
   "dir.callQualityHint": "AI menejer qoʻngʻiroqlarini baholaydigan mezonlar versiyalari.",
   "dir.candidateSources": "Nomzod manbalari",

@@ -12,10 +12,8 @@ import { useTablePermission } from "@/features/auth";
 import {
   BOARD_ORDER,
   Cell,
-  ItemDrawer,
   useDeleteItems,
   useItems,
-  useUpdateItem,
 } from "@/features/item";
 import { collapseLanguages, localized, useTableSchema, type Field } from "@/features/table";
 import { useDataLanguages } from "@/features/workspace";
@@ -151,7 +149,6 @@ export function DirectorySettings({
     );
   }, [schema.fields, directory.title, directory.columns, languages, language]);
 
-  const update = useUpdateItem(directory.table);
   const remove = useDeleteItems(directory.table);
 
   const [openGuid, setOpenGuid] = useState("");
@@ -361,23 +358,17 @@ export function DirectorySettings({
         </p>
       )}
 
+      {/* Правка — то же окно, что у новой записи, с её значениями. */}
       {openRow && (
-        <ItemDrawer
-          tableSlug={directory.table}
-          columns={drawerFields}
-          row={openRow}
+        <DirectoryCreateDialog
+          key={openGuid}
+          table={directory.table}
+          title={`${t("dir.edit")}: ${t(directory.titleKey)}`}
+          fields={drawerFields}
           relations={schema.relations}
-          locale={i18n.language}
           language={language}
-          languages={languages}
-          sections={NO_SECTIONS}
-          heading={titleField?.slug ?? ""}
-          {...(can.update
-            ? {
-                onEdit: (guid: string, slug: string, value: unknown) =>
-                  update.mutate({ guid, values: { [slug]: value } }),
-              }
-            : {})}
+          row={openRow}
+          readOnly={!can.update}
           onClose={() => setOpenGuid("")}
         />
       )}
@@ -414,8 +405,6 @@ export function DirectorySettings({
     </div>
   );
 }
-
-const NO_SECTIONS: { label: string; slugs: string[] }[] = [];
 
 function isGuid(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
