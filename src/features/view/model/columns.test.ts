@@ -46,6 +46,7 @@ const view = (columnIds: string[]): View => ({
   disableDates: null,
   charts: [],
   period: "",
+  pivot: {},
   card: "",
   layout: "calendar",
   tabGroupId: "",

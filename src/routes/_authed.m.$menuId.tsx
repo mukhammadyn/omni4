@@ -90,6 +90,8 @@ import {
   WorkSchedules,
   OrgStructure,
   Timesheet,
+  PayrollPivot,
+  BudgetSheet,
   VACANCIES,
   VacancyCards,
   VacancyPlan,
@@ -615,13 +617,17 @@ function MenuPage() {
    * тем, что раскладку графиков задаёт админ и она живёт в view.
    */
   const chartView = supportedView && view?.type === "CHART";
+  /*
+   * Адрес главнее `attributes.pivot`, поэтому снятое поле пишется в него
+   * пустым («»/false), а не стирается: иначе вернулось бы значение view.
+   */
   const pivotSetup: PivotSetup = {
-    rowSlugs: (search.pivotRow ?? "").split(",").filter(Boolean),
-    colSlug: search.pivotCol ?? "",
-    valueSlug: search.pivotValue ?? "",
-    aggregation: toAggregation(search.pivotAgg),
-    sort: parsePivotSort(search.pivotSort),
-    skipEmpty: search.pivotSkipEmpty === true,
+    rowSlugs: (search.pivotRow ?? view?.pivot.row ?? "").split(",").filter(Boolean),
+    colSlug: search.pivotCol ?? view?.pivot.col ?? "",
+    valueSlug: search.pivotValue ?? view?.pivot.value ?? "",
+    aggregation: toAggregation(search.pivotAgg ?? view?.pivot.agg),
+    sort: parsePivotSort(search.pivotSort ?? view?.pivot.sort),
+    skipEmpty: (search.pivotSkipEmpty ?? view?.pivot.skipEmpty) === true,
   };
   /*
    * TIMELINE — те же строки того же get-list, но каждая своей полосой
@@ -1054,8 +1060,12 @@ function MenuPage() {
    * страница берёт вкладки связей; не нашёлся — текущий.
    */
   const employeesMenu = useEmployeesMenuId();
-  const openEmployee = (guid: string, tab: EmployeeTab) =>
-    void navigate({ to: "/employees/$itemId", params: { itemId: guid }, search: { menu: employeesMenu ?? menuId, tab } });
+  const openEmployee = (guid: string, tab?: EmployeeTab) =>
+    void navigate({
+      to: "/employees/$itemId",
+      params: { itemId: guid },
+      search: { menu: employeesMenu ?? menuId, ...(tab ? { tab } : {}) },
+    });
 
   const openRow = (guid: string) => {
     setStepped(false);
@@ -2064,6 +2074,10 @@ function MenuPage() {
           {sheetView ? (
             view.type === KB_VIEW ? (
               <KnowledgeBase pageId={search.doc ?? ""} onOpen={(doc) => setSearch({ doc }, true)} />
+            ) : view.type === "BUDGET" ? (
+              <BudgetSheet search={searchText} />
+            ) : view.type === "PAYROLL" ? (
+              <PayrollPivot search={searchText} onOpenEmployee={openEmployee} />
             ) : view.type === "ABSENCES" ? (
               <Absences viewId={view.id} search={searchText} onOpenRow={openRow} onOpenEmployee={openEmployee} />
             ) : view.type === "WORK_SCHEDULES" ? (
@@ -2269,16 +2283,16 @@ function MenuPage() {
                 setSearch({
                   ...(next.rowSlugs === undefined
                     ? {}
-                    : { pivotRow: next.rowSlugs.join(",") || undefined }),
-                  ...(next.colSlug === undefined ? {} : { pivotCol: next.colSlug || undefined }),
+                    : { pivotRow: next.rowSlugs.join(",") }),
+                  ...(next.colSlug === undefined ? {} : { pivotCol: next.colSlug }),
                   ...(next.valueSlug === undefined
                     ? {}
-                    : { pivotValue: next.valueSlug || undefined }),
+                    : { pivotValue: next.valueSlug }),
                   ...(next.aggregation === undefined ? {} : { pivotAgg: next.aggregation }),
                   ...(next.sort === undefined ? {} : { pivotSort: formatPivotSort(next.sort) }),
                   ...(next.skipEmpty === undefined
                     ? {}
-                    : { pivotSkipEmpty: next.skipEmpty || undefined }),
+                    : { pivotSkipEmpty: next.skipEmpty }),
                 })
               }
             />

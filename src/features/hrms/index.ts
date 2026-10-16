@@ -14,6 +14,8 @@ export { NewCandidate } from "./ui/NewCandidate";
 export { CANDIDATES } from "./api/vacancy-page";
 export { NewVacancy } from "./ui/NewVacancy";
 export { Timesheet } from "./ui/Timesheet";
+export { PayrollPivot } from "./ui/PayrollPivot";
+export { BudgetSheet } from "./ui/BudgetSheet";
 export { AttendanceCalendar } from "./ui/AttendanceCalendar";
 export { AttendanceList } from "./ui/AttendanceList";
 export { Absences } from "./ui/Absences";
