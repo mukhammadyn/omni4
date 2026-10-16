@@ -12,14 +12,17 @@ import {
   useCreateItem,
   type Item,
 } from "@/features/item";
+import { IconPicker } from "@/features/icons";
 import { localized, type Field, type Relation } from "@/features/table";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
+import { CHIP_COLORS, CHIP_DOT, CHIP_HEX, hexToChipColor } from "@/shared/ui/chip";
 import { DatePicker } from "@/shared/ui/date-picker";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { Modal } from "@/shared/ui/modal";
+import { TimeInput } from "@/shared/ui/time-input";
 
 /**
  * Новая запись справочника — окно, как «Создать» в графике работы:
@@ -31,7 +34,7 @@ import { Modal } from "@/shared/ui/modal";
  * и второй набор редакторов разошёлся бы с первым.
  */
 /** Короткие значения — по два в ряд; текст, связь, файлы — на всю ширину. */
-const HALF = new Set<CellKind>(["color", "icon", "time", "number", "date", "datetime", "datetime_naive", "status", "multiselect"]);
+const HALF = new Set<CellKind>(["icon", "time", "number", "date", "datetime", "datetime_naive", "status", "multiselect"]);
 
 export function DirectoryCreateDialog({
   table,
@@ -67,13 +70,52 @@ export function DirectoryCreateDialog({
     });
   };
 
+  // Иконка — слева от названия, как у пункта меню (MenuFormDialog): это часть имени, а не отдельное поле.
+  const iconField = fields.find((field) => cellKind(field.type) === "icon");
+  const titleField = fields.find((field) => cellKind(field.type) === "text");
+  const iconPicker = (field: Field) => (
+    <IconPicker value={typeof draft[field.slug] === "string" ? String(draft[field.slug]) : ""} type="ICON" onChange={(icon) => set(field.slug, icon || null)} />
+  );
+
   const control = (field: Field) => {
     const value = draft[field.slug];
     const text = typeof value === "string" || typeof value === "number" ? String(value) : "";
     switch (cellKind(field.type)) {
       case "text":
-      case "link":
-        return <Input value={text} onChange={(event) => set(field.slug, event.target.value)} />;
+      case "link": {
+        const input = <Input value={text} autoFocus={field === titleField} onChange={(event) => set(field.slug, event.target.value)} />;
+        return field === titleField && iconField ? (
+          <div className="flex items-center gap-2">
+            {iconPicker(iconField)}
+            {input}
+          </div>
+        ) : (
+          input
+        );
+      }
+      case "icon":
+        return iconPicker(field);
+      case "time":
+        return <TimeInput value={text.slice(0, 5)} onChange={(time) => set(field.slug, time || null)} />;
+      case "color": {
+        const chosen = text ? hexToChipColor(text) : null;
+        return (
+          <div className="flex flex-wrap items-center gap-2">
+            {CHIP_COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                aria-label={color}
+                aria-pressed={chosen === color}
+                onClick={() => set(field.slug, CHIP_HEX[color])}
+                className={`size-6 rounded-full ${CHIP_DOT[color]} transition-shadow ${
+                  chosen === color ? "ring-2 ring-fg-subtle ring-offset-2 ring-offset-surface" : "hover:ring-2 hover:ring-border-strong"
+                }`}
+              />
+            ))}
+          </div>
+        );
+      }
       case "longtext":
         return (
           <textarea
@@ -123,6 +165,7 @@ export function DirectoryCreateDialog({
 
         <div className="grid grid-cols-2 gap-x-3 gap-y-3.5 overflow-auto px-5 pb-4">
           {fields
+            .filter((field) => !(field === iconField && titleField))
             .filter((field) => cellKind(field.type) !== "label" && cellKind(field.type) !== "button" && cellKind(field.type) !== "formula")
             .map((field) =>
               cellKind(field.type) === "boolean" ? (
