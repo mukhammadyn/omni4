@@ -107,7 +107,7 @@ export function AttendanceList({ viewId, search, onOpenEmployee }: { viewId: str
                     onClick={() => onOpenEmployee(employee.id, ATTENDANCE_TAB)}
                     className="group cursor-pointer"
                   >
-                    <td className={`${td} sticky left-0 z-10 bg-surface pl-3 group-hover:bg-surface-hover`}>
+                    <td className={`${td} sticky left-0 z-10 bg-surface pl-3 group-hover:tint-surface-hover`}>
                       <EmployeeName
                         employee={employee}
                         until={range.to}

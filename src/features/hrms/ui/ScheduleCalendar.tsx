@@ -294,7 +294,7 @@ export function ScheduleCalendar({
                   {!closed.has(group.id) &&
                     group.rows.map((row) => (
                       <tr key={row.id} className="group">
-                        <td className={`${body} sticky left-0 z-10 border-r bg-surface px-3 py-1.5 group-hover:bg-surface-hover`}>
+                        <td className={`${body} sticky left-0 z-10 border-r bg-surface px-3 py-1.5 group-hover:tint-surface-hover`}>
                           {row.position !== undefined ? (
                             <PositionName
                               name={row.position || "—"}
