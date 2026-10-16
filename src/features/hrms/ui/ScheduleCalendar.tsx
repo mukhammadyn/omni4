@@ -2,16 +2,15 @@ import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { BriefcaseIcon, ChevronDownIcon, RefreshCwIcon, SparkleIcon, UserIcon, UsersIcon, type LucideIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
-import { CHIP_STYLES, hexToChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
 import { useSchedule, useScheduleDirectory, type ScheduleEmployee } from "../api/schedule";
-import { byEmployeeDate, SHIFT_KINDS, type Shift, type ShiftKind, type Template } from "../model/schedule";
+import { byEmployeeDate, type Shift, type ShiftKind, type Template } from "../model/schedule";
 import { isWeekend } from "../model/timesheet";
 import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, useDayHead, usePeriod, type OpenEmployee } from "./attendance-parts";
 import { SCHEDULE_TAB } from "./employee-tabs";
 import { useScheduleSettings, type ScheduleGroup } from "./schedule-settings";
 import { NO_TEMPLATE } from "./ScheduleTools";
-import { KIND_STYLE, useDuration, type OpenShift } from "./schedule-parts";
+import { KindIcon, useDuration, useKinds, useShiftTime, type KindLook, type OpenShift } from "./schedule-parts";
 import { ApplyTemplateDialog } from "./ApplyTemplateDialog";
 import { ShiftDialog } from "./ShiftDialog";
 
@@ -30,10 +29,13 @@ export function ScheduleCalendar({
   viewId,
   search,
   onOpenEmployee,
+  onOpenTemplate,
 }: {
   viewId: string;
   search: string;
   onOpenEmployee: OpenEmployee;
+  /** Шаблон смены — на вкладке «Шаблоны». */
+  onOpenTemplate?: ((templateId: string) => void) | undefined;
 }) {
   const { t } = useTranslation();
   const period = usePeriod(viewId, undefined, search);
@@ -50,6 +52,7 @@ export function ScheduleCalendar({
   const { locations } = useScheduleDirectory();
   const head = useDayHead();
   const duration = useDuration();
+  const kindsOf = useKinds();
   const [kinds, setKinds] = useState<Set<ShiftKind>>(() => new Set());
   const [closed, setClosed] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<OpenShift | null>(null);
@@ -91,28 +94,30 @@ export function ScheduleCalendar({
    */
   const narrowed = Boolean(query) || settings.active > 0;
   const stats = useMemo(() => {
-    const counts: Record<ShiftKind | "off", number> = { day: 0, night: 0, remote: 0, off: 0 };
+    const byKind = new Map<ShiftKind, number>();
+    const count = (shift: Shift) => byKind.set(shift.kind, (byKind.get(shift.kind) ?? 0) + 1);
+    let off = 0;
     let minutes = 0;
     if (data.hasMore && !narrowed) {
       const worked = new Set<string>();
       for (const shift of data.shifts) {
-        counts[shift.kind] += 1;
+        count(shift);
         minutes += shift.plannedMinutes;
         worked.add(`${shift.employeeId}|${shift.date}`);
       }
-      counts.off = Math.max(0, data.total * dates.length - worked.size);
-      return { counts, minutes, people: data.total };
+      off = Math.max(0, data.total * dates.length - worked.size);
+      return { byKind, off, minutes, people: data.total };
     }
     for (const employee of employees)
       for (const date of dates) {
         const list = shiftsOf(employee.id, date);
-        if (!list.length) counts.off += 1;
+        if (!list.length) off += 1;
         for (const shift of list) {
-          counts[shift.kind] += 1;
+          count(shift);
           minutes += shift.plannedMinutes;
         }
       }
-    return { counts, minutes, people: employees.length };
+    return { byKind, off, minutes, people: employees.length };
   }, [employees, dates, shiftsOf, data.hasMore, data.shifts, data.total, narrowed]);
 
   /* Строки: сотрудники или должности, по группам. */
@@ -129,13 +134,8 @@ export function ScheduleCalendar({
     const keyOf: Record<Exclude<ScheduleGroup, "none">, (e: ScheduleEmployee) => [string, string]> = {
       dept: (e) => [e.departmentId, e.department],
       location: (e) => [e.locationId, e.location],
-      template: (e) => {
-        const template = templateOf(e);
-        return [template?.id ?? NO_TEMPLATE, template?.name ?? t("schedule.noTemplate")];
-      },
     };
-    // По должности шаблон не группирует: у людей одной должности он разный (`posView` прототипа).
-    if (settings.group === "none" || (settings.axis === "position" && settings.group === "template"))
+    if (settings.group === "none")
       return [{ id: "", label: "", rows: rowsOf(employees) }];
     const group = keyOf[settings.group];
     // Строки — целиком, по первому сотруднику: должность не делится между группами, как в прототипе.
@@ -150,7 +150,7 @@ export function ScheduleCalendar({
       // Крупные группы первыми, «—» (поле не заполнено) — в конце.
       .sort(([idA, a], [idB, b]) => Number(!idA) - Number(!idB) || b.rows.length - a.rows.length)
       .map(([id, { label, rows }]) => ({ id: `${settings.axis}:${settings.group}:${id}`, label, rows }));
-  }, [employees, settings.axis, settings.group, templateOf, t]);
+  }, [employees, settings.axis, settings.group]);
 
   const toggleGroup = (id: string) =>
     setClosed((prev) => {
@@ -159,7 +159,7 @@ export function ScheduleCalendar({
       return next;
     });
 
-  const width = month ? "min-w-[36px]" : scale === "week" ? "min-w-[136px]" : "min-w-[320px]";
+  const width = month ? "min-w-[40px]" : scale === "week" ? "min-w-[136px]" : "min-w-[320px]";
   const shade = (date: string) =>
     date === today ? "bg-accent-subtle/40" : data.holidays.has(date) ? "bg-chip-pink-bg/25" : isWeekend(date) ? "bg-danger-subtle/30" : "";
 
@@ -174,11 +174,11 @@ export function ScheduleCalendar({
         </div>
       );
     }
-    if (!row.position) return shown.map((shift) => <ShiftChip key={shift.id} shift={shift} mini={month} place={place(shift)} onOpen={open(shift)} />);
+    if (!row.position) return shown.map((shift) => <ShiftChip key={shift.id} shift={shift} kind={kindsOf.of(shift.kind)} mini={month} place={place(shift)} onOpen={open(shift)} />);
     // По должности — одинаковые смены одной плашкой «N из M».
     const same = new Map<string, Shift[]>();
     for (const shift of shown) {
-      const key = `${shift.kind}|${shift.start}|${shift.end}`;
+      const key = `${shift.kind}|${shift.start}|${shift.end}|${shift.plannedMinutes}`;
       same.set(key, [...(same.get(key) ?? []), shift]);
     }
     return [...same.values()]
@@ -190,24 +190,25 @@ export function ScheduleCalendar({
           <ShiftChip
             key={shift.id}
             shift={shift}
+            kind={kindsOf.of(shift.kind)}
             mini={month}
             place={t("schedule.ofTotal", { count, total: row.employees.length })}
             placeIcon={UsersIcon}
-            badge={month ? String(count) : undefined}
-            onOpen={open(shift)}
+            badge={month ? `${count}/${row.employees.length}` : undefined}
+            onOpen={() => onOpenShift({ shift, date: shift.date, seriesIds: list.map((item) => item.seriesId) })}
           />
         );
       });
   };
 
-  const place = (shift: Shift) => (shift.kind === "remote" ? t("schedule.kind.remote") : locationName.get(shift.locationId) ?? "");
+  const place = (shift: Shift) => (kindsOf.of(shift.kind).remote ? kindsOf.of(shift.kind).name : locationName.get(shift.locationId) ?? "");
   const open = (shift: Shift) => () => onOpenShift({ shift, date: shift.date });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PeriodBar view={period}>
         <div className="flex flex-wrap items-center gap-1">
-          {SHIFT_KINDS.map((kind) => (
+          {kindsOf.list.map(({ id: kind, name, stripe }) => (
             <button
               key={kind}
               type="button"
@@ -222,15 +223,15 @@ export function ScheduleCalendar({
                 kinds.has(kind) ? "bg-surface-active text-fg ring-1 ring-border-strong ring-inset" : "text-fg-muted hover:bg-surface-hover"
               }`}
             >
-              <i className={`size-2 rounded-full ${KIND_STYLE[kind].stripe}`} />
-              {t(`schedule.kind.${kind}`)}
-              <b className="font-semibold text-fg tabular-nums">{stats.counts[kind]}</b>
+              <i className={`size-2 rounded-full ${stripe}`} />
+              {name}
+              <b className="font-semibold text-fg tabular-nums">{stats.byKind.get(kind) ?? 0}</b>
             </button>
           ))}
           <span className="inline-flex h-7 items-center gap-1.5 px-1.5 text-[13px] text-fg-muted">
             <i className="size-2 rounded-full bg-fg-subtle/50" />
             {t("schedule.dayOff")}
-            <b className="font-semibold text-fg tabular-nums">{stats.counts.off}</b>
+            <b className="font-semibold text-fg tabular-nums">{stats.off}</b>
           </span>
         </div>
       </PeriodBar>
@@ -299,13 +300,13 @@ export function ScheduleCalendar({
                             <PositionName
                               name={row.position || "—"}
                               count={row.employees.length}
-                              departments={[...new Set(row.employees.map((e) => e.department).filter(Boolean))].join(", ")}
+                              // В группе по отделу отдел уже в шапке группы.
+                              departments={settings.group === "dept" ? "" : [...new Set(row.employees.map((e) => e.department).filter(Boolean))].join(", ")}
                             />
                           ) : (
                             <EmployeeHead
                               employee={row.employees[0]!}
                               until={range.to}
-                              template={month ? undefined : templateOf(row.employees[0]!)}
                               onOpen={() => onOpenEmployee(row.employees[0]!.id, SCHEDULE_TAB)}
                               onApply={() => setApplyFor(row.employees[0]!.id)}
                             />
@@ -335,7 +336,7 @@ export function ScheduleCalendar({
         {t("schedule.total", { count: stats.people, hours: duration(stats.minutes) })}
       </div>
 
-      {editing && <ShiftDialog open={editing} onClose={() => setEditing(null)} />}
+      {editing && <ShiftDialog open={editing} onClose={() => setEditing(null)} onOpenTemplate={onOpenTemplate} />}
       {applyFor && <ApplyTemplateDialog employeeIds={[applyFor]} onClose={() => setApplyFor(null)} />}
     </div>
   );
@@ -383,13 +384,11 @@ function AxisSwitch({ value, onChange }: { value: "employee" | "position"; onCha
 function EmployeeHead({
   employee,
   until,
-  template,
   onOpen,
   onApply,
 }: {
   employee: ScheduleEmployee;
   until: string;
-  template: Template | undefined;
   onOpen: () => void;
   onApply: () => void;
 }) {
@@ -408,19 +407,10 @@ function EmployeeHead({
           <Icon as={RefreshCwIcon} size={14} />
         </button>
       </div>
-      {template && <TemplateTag template={template} className="mt-1 ml-[38px]" />}
     </div>
   );
 }
 
-/** Метка шаблона — `.sg-tn` прототипа, цветом шаблона. */
-export function TemplateTag({ template, className = "" }: { template: Template; className?: string }) {
-  return (
-    <span className={`inline-flex max-w-[190px] items-center gap-1 truncate rounded px-1.5 py-px text-2xs ${CHIP_STYLES[hexToChipColor(template.color)]} ${className}`}>
-      {template.name}
-    </span>
-  );
-}
 
 /** Должность — `.sg-pos` прототипа: «2 сотр. · Разработка». */
 function PositionName({ name, count, departments }: { name: string; count: number; departments: string }) {
@@ -440,9 +430,21 @@ function PositionName({ name, count, departments }: { name: string; count: numbe
   );
 }
 
-/** Плашка смены — `.sg-chip` прототипа; в месяце — `.sg-mini` с часом начала. */
+/** Час и минуты сверху: «09⁰⁰». */
+function MiniClock({ clock }: { clock: string }) {
+  const [hours, minutes] = clock.split(":");
+  return (
+    <span>
+      {hours}
+      <sup className="text-[8px]">{minutes}</sup>
+    </span>
+  );
+}
+
+/** Плашка смены — `.sg-chip` прототипа; в месяце — `.sg-mini` с началом и концом. */
 function ShiftChip({
   shift,
+  kind: style,
   mini,
   place,
   placeIcon,
@@ -450,6 +452,7 @@ function ShiftChip({
   onOpen,
 }: {
   shift: Shift;
+  kind: KindLook;
   mini: boolean;
   place: string;
   placeIcon?: LucideIcon;
@@ -457,8 +460,9 @@ function ShiftChip({
   onOpen: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
-  const style = KIND_STYLE[shift.kind];
-  const time = `${shift.start}–${shift.end}`;
+  const time = useShiftTime()(shift);
+  // У гибкой смены нет часов — в месяце вместо них «8 ч».
+  const short = badge ?? (shift.start ? undefined : time);
   const click = onOpen
     ? (event: { stopPropagation: () => void }) => {
         event.stopPropagation();
@@ -467,8 +471,8 @@ function ShiftChip({
     : undefined;
   if (mini)
     return (
-      <button type="button" title={`${time}${place ? ` · ${place}` : ""}`} onClick={click} className={`h-6 w-[30px] rounded text-[11px] font-semibold tabular-nums hover:brightness-95 ${style.chip}`}>
-        {badge ?? shift.start.slice(0, 2)}
+      <button type="button" title={`${time}${place ? ` · ${place}` : ""}`} onClick={click} className={`flex min-w-[34px] flex-col items-center rounded px-0.5 py-0.5 text-[11px] leading-[13px] font-semibold tabular-nums hover:brightness-95 ${short ? "h-6 justify-center" : ""} ${style.chip}`}>
+        {short ?? [shift.start, shift.end].map((clock, index) => <MiniClock key={index} clock={clock} />)}
       </button>
     );
   return (
@@ -477,7 +481,7 @@ function ShiftChip({
       <b className="text-[13px] font-semibold tabular-nums">{time}</b>
       {place && (
         <span className="flex max-w-full items-center gap-1 truncate text-[11.5px] opacity-80">
-          <Icon as={placeIcon ?? style.icon} size={11} className="shrink-0" />
+          <span className="contents shrink-0">{placeIcon ? <Icon as={placeIcon} size={11} /> : <KindIcon kind={style} size={11} />}</span>
           <span className="truncate">{place}</span>
         </span>
       )}

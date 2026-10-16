@@ -3,13 +3,13 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { CHIP_COLORS, CHIP_HEX, hexToChipColor } from "@/shared/ui/chip";
-import { Icon } from "@/shared/ui/icon";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Input } from "@/shared/ui/input";
 import { Modal } from "@/shared/ui/modal";
 import { toast } from "@/shared/lib/toast";
 import { useSaveTemplate } from "../api/schedule";
-import { blankTemplate, isClock, SHIFT_KINDS, weekMinutesOf, type ShiftKind, type Template, type TemplateDay } from "../model/schedule";
-import { ClockInput, KIND_STYLE, Row, Segments, TEMPLATE_DOT, TemplatePreview, useDuration } from "./schedule-parts";
+import { blankTemplate, isClock, weekMinutesOf, type ShiftKind, type Template, type TemplateDay } from "../model/schedule";
+import { ClockInput, KindIcon, Row, Segments, useKinds, TEMPLATE_DOT, TemplatePreview, useDuration } from "./schedule-parts";
 
 /** Норма недели; больше — переработка (`tplModal` прототипа). */
 const WEEK_NORM = 40 * 60;
@@ -23,7 +23,8 @@ export function TemplateDialog({ template, onClose }: { template?: Template; onC
   const { t, i18n } = useTranslation();
   const duration = useDuration();
   const save = useSaveTemplate();
-  const [form, setForm] = useState<Template>(() => template ?? blankTemplate());
+  const kinds = useKinds();
+  const [form, setForm] = useState<Template>(() => template ?? blankTemplate(kinds.list[0]?.id));
   const set = (patch: Partial<Template>) => setForm((prev) => ({ ...prev, ...patch }));
   const setDay = (index: number, patch: Partial<TemplateDay>) =>
     set({ days: form.days.map((day, i) => (i === index ? { ...day, ...patch } : day)) });
@@ -38,7 +39,10 @@ export function TemplateDialog({ template, onClose }: { template?: Template; onC
     const clocks =
       form.type === "weekly" ? form.days.filter((day) => day.working).flatMap((day) => [day.start, day.end]) : [form.cycle.start, form.cycle.end];
     if (!clocks.every(isClock)) return toast.error(t("shift.badTime"));
-    save.mutate(form, {
+    // Окно открыли раньше, чем пришёл справочник, — пустой вид становится первым.
+    const first = kinds.list[0]?.id ?? "";
+    const filled = { ...form, days: form.days.map((day) => ({ ...day, kind: day.kind || first })), cycle: { ...form.cycle, kind: form.cycle.kind || first } };
+    save.mutate(filled, {
       onSuccess: () => {
         toast.success(template ? t("template.saved") : t("template.created"));
         onClose();
@@ -46,21 +50,11 @@ export function TemplateDialog({ template, onClose }: { template?: Template; onC
     });
   };
 
-  const kinds = (value: ShiftKind, onChange: (kind: ShiftKind) => void, labels: boolean) => (
-    <Segments
-      value={value}
-      items={SHIFT_KINDS.map((kind) => ({
-        value: kind,
-        label: (
-          <span title={t(`schedule.kind.${kind}`)} className="inline-flex items-center gap-1.5">
-            <Icon as={KIND_STYLE[kind].icon} size={13} />
-            {labels && t(`schedule.kind.${kind}`)}
-          </span>
-        ),
-      }))}
-      onChange={onChange}
-    />
+  // Список, а не кнопки: видов в справочнике сколько угодно.
+  const kindPicker = (value: ShiftKind, onChange: (kind: ShiftKind) => void) => (
+    <Dropdown value={value} items={kinds.list.map((kind) => ({ value: kind.id, label: kind.name, icon: <KindIcon kind={kind} size={14} /> }))} onChange={onChange} />
   );
+
 
   return (
     <Modal onClose={onClose}>
@@ -119,7 +113,7 @@ export function TemplateDialog({ template, onClose }: { template?: Template; onC
                         <div className="w-24">
                           <ClockInput value={day.end} onChange={(end) => setDay(index, { end })} />
                         </div>
-                        {kinds(day.kind, (kind) => setDay(index, { kind }), false)}
+                        <div className="w-40">{kindPicker(day.kind, (kind) => setDay(index, { kind }))}</div>
                       </>
                     ) : (
                       <span className="text-[13px] text-fg-subtle">{t("schedule.dayOff")}</span>
@@ -144,7 +138,7 @@ export function TemplateDialog({ template, onClose }: { template?: Template; onC
                   <ClockInput value={form.cycle.end} onChange={(end) => setCycle({ end })} />
                 </Row>
               </div>
-              <Row label={t("template.shiftKind")}>{kinds(form.cycle.kind, (kind) => setCycle({ kind }), true)}</Row>
+              <Row label={t("template.shiftKind")}>{kindPicker(form.cycle.kind, (kind) => setCycle({ kind }))}</Row>
             </>
           )}
 

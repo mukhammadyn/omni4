@@ -1,20 +1,40 @@
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ClockIcon, HouseIcon, MoonIcon, SunIcon, type LucideIcon } from "lucide-react";
+import { CircleIcon, ClockIcon } from "lucide-react";
+import { DynamicIcon } from "@/shared/ui/dynamic-icon";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { Modal } from "@/shared/ui/modal";
+import { Popover } from "@/shared/ui/popover";
 import { CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
-import { isClock, type Shift, type ShiftKind, type Template } from "../model/schedule";
+import { useShiftKinds } from "../api/schedule";
+import { isClock, isFlexible, type Shift, type ShiftKind, type ShiftKindRow, type Template } from "../model/schedule";
 
 /* Общее у экранов графика: календаря, окна смены, вкладки сотрудника. */
 
-/** Тип смены: подложка, полоса слева и значок — `KIND` прототипа. */
-export const KIND_STYLE: Record<ShiftKind, { chip: string; stripe: string; icon: LucideIcon }> = {
-  day: { chip: CHIP_STYLES.blue, stripe: "bg-chart-1", icon: SunIcon },
-  night: { chip: CHIP_STYLES.purple, stripe: "bg-chart-7", icon: MoonIcon },
-  remote: { chip: CHIP_STYLES.green, stripe: "bg-chart-3", icon: HouseIcon },
-};
+/** Вид смены с тем, чем его рисовать: подложка и полоса слева — цветом из справочника, токенами. */
+export type KindLook = ShiftKindRow & { chip: string; stripe: string };
+
+/** Вид удалён из справочника или не задан — серая плашка без подписи. */
+const NO_KIND: KindLook = { id: "", name: "—", color: "", icon: "", start: "", end: "", remote: false, chip: CHIP_STYLES.gray, stripe: "bg-fg-subtle" };
+
+/** Виды смен — `KIND` прототипа, но из справочника `hr_shift_kinds` (настройки HRMS). */
+export function useKinds() {
+  const { kinds, loading } = useShiftKinds();
+  return useMemo(() => {
+    const list = kinds.map((kind): KindLook => {
+      const color = hexToChipColor(kind.color);
+      return { ...kind, chip: CHIP_STYLES[color], stripe: TEMPLATE_DOT[color] };
+    });
+    const byId = new Map(list.map((kind) => [kind.id, kind]));
+    return { list, loading, of: (id: ShiftKind) => byId.get(id) ?? NO_KIND };
+  }, [kinds, loading]);
+}
+
+/** Значок вида: иконка из справочника, без неё — кружок. */
+export function KindIcon({ kind, size }: { kind: Pick<ShiftKindRow, "icon">; size: number }) {
+  return <DynamicIcon name={kind.icon} size={size} fallback={<Icon as={CircleIcon} size={size} />} />;
+}
 
 /** «8 ч», «7 ч 30 м». */
 export function useDuration() {
@@ -27,7 +47,14 @@ export function useDuration() {
 }
 
 /** Новая смена на клетке или правка существующей — окну смены; `start` — щелчок по часу недели. */
-export type OpenShift = { shift?: Shift; employeeId?: string; date: string; start?: string };
+export type OpenShift = {
+  shift?: Shift;
+  /** Серии остальных смен плашки «N из M» — правятся вместе с этой. */
+  seriesIds?: string[];
+  employeeId?: string;
+  date: string;
+  start?: string;
+};
 
 /**
  * Насыщенная точка цвета шаблона — `.tp-dot` прототипа. HEX из данных
@@ -66,6 +93,7 @@ export function useTemplateSummary() {
 /** Неделя или цикл клетками — `tplPreview` прототипа. */
 export function TemplatePreview({ template }: { template: Pick<Template, "type" | "days" | "cycle"> }) {
   const { i18n } = useTranslation();
+  const kinds = useKinds();
   const weekday = (index: number) =>
     new Intl.DateTimeFormat(i18n.language, { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 9, 12 + index)));
   const cells =
@@ -86,7 +114,7 @@ export function TemplatePreview({ template }: { template: Pick<Template, "type" 
         <div
           key={index}
           className={`flex flex-col items-center gap-px rounded-md px-0.5 py-1.5 text-center tabular-nums ${
-            cell.day ? KIND_STYLE[cell.day.kind].chip : "border border-border text-fg-subtle [background:repeating-linear-gradient(135deg,transparent_0_5px,var(--color-surface-hover)_5px_6px)]"
+            cell.day ? kinds.of(cell.day.kind).chip : "border border-border text-fg-subtle [background:repeating-linear-gradient(135deg,transparent_0_5px,var(--color-surface-hover)_5px_6px)]"
           }`}
         >
           <small className="text-[10.5px] capitalize opacity-80">{cell.label}</small>
@@ -125,19 +153,119 @@ export function DialogLoading({ onClose, error }: { onClose: () => void; error?:
  * Время «ЧЧ:ММ» текстом, как `.tin` прототипа: системное поле времени
  * пишет его по часам ОС — «06:00 PM» рядом с «09:00–17:00» в сетке.
  */
+/** «09:00–18:00», у гибкой смены — «8 ч». */
+export function useShiftTime() {
+  const { t } = useTranslation();
+  return (shift: Pick<Shift, "start" | "end" | "plannedMinutes">) =>
+    isFlexible(shift) ? t("shift.flexible", { hours: shift.plannedMinutes / 60 }) : `${shift.start}–${shift.end}`;
+}
+
+const HOUR_LIST = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+const MINUTE_LIST = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
+
+/**
+ * Время «ЧЧ:ММ»: вводится с клавиатуры (цифры, двоеточие ставится само)
+ * или выбирается в двух колонках — часы и минуты с шагом 5.
+ * Не `<input type="time">` — по той же причине, что DatePicker.
+ */
 export function ClockInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const { t } = useTranslation();
+  const [hour = "", minute = ""] = value.split(":");
+  const type = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 4);
+    onChange(digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits);
+  };
   return (
-    <div className="relative">
-      <Input
-        value={value}
-        inputMode="numeric"
-        maxLength={5}
-        placeholder="09:00"
-        aria-invalid={!isClock(value)}
-        onChange={(event) => onChange(event.target.value)}
-        className={`pr-8 tabular-nums ${isClock(value) ? "" : "border-danger"}`}
-      />
-      <Icon as={ClockIcon} size={15} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-fg-subtle" />
+    <Popover
+      trigger={({ open, toggle }) => (
+        <div className="relative">
+          <Input
+            value={value}
+            inputMode="numeric"
+            maxLength={5}
+            placeholder="09:00"
+            aria-invalid={!isClock(value)}
+            onFocus={() => !open && toggle()}
+            onClick={() => !open && toggle()}
+            onKeyDown={(event) => event.key === "Enter" && open && toggle()}
+            onChange={(event) => type(event.target.value)}
+            className={`pr-8 tabular-nums ${isClock(value) ? "" : "border-danger"}`}
+          />
+          <Icon as={ClockIcon} size={15} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-fg-subtle" />
+        </div>
+      )}
+    >
+      {(close) => (
+        <div className="w-44">
+          <div className="grid grid-cols-4 gap-1 border-b border-border pb-1.5">
+            {PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => {
+                  onChange(preset);
+                  close();
+                }}
+                className={`rounded-md py-1 text-xs tabular-nums transition-colors ${
+                  preset === value ? "bg-accent-subtle text-accent-text" : "text-fg-muted hover:bg-surface-hover hover:text-fg"
+                }`}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1.5 flex gap-1">
+            <ClockColumn label={t("time.hours")} items={HOUR_LIST} value={hour} onPick={(next) => onChange(`${next}:${minute.length === 2 ? minute : "00"}`)} />
+            <div className="w-px bg-border" />
+            <ClockColumn
+              label={t("time.minutes")}
+              items={MINUTE_LIST}
+              value={minute}
+              onPick={(next) => {
+                onChange(`${hour.length === 2 ? hour : "09"}:${next}`);
+                // Минуты — последний шаг выбора.
+                close();
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </Popover>
+  );
+}
+
+/** Частые начала и концы смен — в один клик. */
+const PRESETS = ["08:00", "09:00", "10:00", "13:00", "14:00", "17:00", "18:00", "20:00"];
+
+function ClockColumn({ label, items, value, onPick }: { label: string; items: string[]; value: string; onPick: (value: string) => void }) {
+  const list = useRef<HTMLDivElement>(null);
+  const active = useRef<HTMLButtonElement>(null);
+  // scrollTop, а не scrollIntoView: тот прокрутил бы и модальное окно под пикером (shared/ui/calendar, TimeColumn).
+  useEffect(() => {
+    const box = list.current;
+    const button = active.current;
+    if (box && button) box.scrollTop = button.offsetTop - box.clientHeight / 2 + button.clientHeight / 2;
+  }, []);
+  return (
+    <div className="flex flex-1 flex-col">
+      <span className="pb-1 text-center text-2xs font-medium tracking-wide text-fg-subtle uppercase">{label}</span>
+      <div ref={list} role="listbox" className="relative flex h-48 flex-col gap-px overflow-y-auto [scrollbar-width:none]">
+        {items.map((item) => (
+          <button
+            key={item}
+            ref={item === value ? active : undefined}
+            type="button"
+            role="option"
+            aria-selected={item === value}
+            onClick={() => onPick(item)}
+            className={`shrink-0 rounded-md py-1.5 text-center text-sm tabular-nums transition-colors ${
+              item === value ? "bg-accent-solid font-semibold text-accent-fg" : "text-fg hover:bg-surface-hover"
+            }`}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

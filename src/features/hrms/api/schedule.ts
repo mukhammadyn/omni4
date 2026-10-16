@@ -4,19 +4,20 @@ import { MAX_LIMIT, toRequestBody, useItems, type Filters, type Item, type Items
 import { api } from "@/shared/api/client";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError } from "@/shared/lib/toast";
-import { SHIFT_KINDS, WEEKDAYS, type Shift, type ShiftDraft, type ShiftKind, type Template } from "../model/schedule";
+import { WEEKDAYS, type Shift, type ShiftDraft, type ShiftKindRow, type Template } from "../model/schedule";
 import { EMPLOYEES } from "./employee";
 import { firstText, text } from "./org";
-import { plusDays } from "../model/timesheet";
 import { useAll } from "./timesheet";
 
 /** График работы: смены, шаблоны и их дни (`ucode/erp/erp.dbml`). */
 export const SHIFTS = "hr_shifts";
 export const WORK_SCHEDULES = "hr_work_schedules";
 export const WORK_SCHEDULE_DAYS = "hr_work_schedule_days";
+/** Виды смен — справочник настроек HRMS; на него ссылаются смены, дни шаблонов и цикл шаблона. */
+export const SHIFT_KINDS = "hr_shift_kinds";
+const KIND = "hr_shift_kinds_id";
 
 const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : 0);
-const kindOf = (value: unknown): ShiftKind => (SHIFT_KINDS as readonly unknown[]).includes(value) ? (value as ShiftKind) : "day";
 /** TIME приходит «ЧЧ:ММ» или «ЧЧ:ММ:СС». */
 const clock = (value: unknown) => text(value).slice(0, 5);
 
@@ -28,7 +29,7 @@ export const toShift = (row: Item): Shift => ({
   end: clock(row.end_time),
   breakMinutes: num(row.break_minutes),
   plannedMinutes: num(row.planned_minutes),
-  kind: kindOf(row.shift_kind),
+  kind: text(row[KIND]),
   seriesId: text(row.series_id),
   templateId: text(row.hr_work_schedules_id),
   locationId: text(row.hr_locations_id),
@@ -46,11 +47,12 @@ const toRow = (draft: ShiftDraft, guid: string) => ({
   guid,
   hr_employees_id: draft.employeeId,
   date: draft.date,
-  start_time: draft.start,
-  end_time: draft.end,
+  // Гибкая смена — без времени (model/schedule, isFlexible); колонка TIME пустую строку не примет.
+  start_time: draft.start || null,
+  end_time: draft.end || null,
   break_minutes: draft.breakMinutes,
   planned_minutes: draft.plannedMinutes,
-  shift_kind: draft.kind,
+  [KIND]: draft.kind || null,
   series_id: draft.seriesId,
   hr_work_schedules_id: draft.templateId || null,
   hr_locations_id: draft.locationId || null,
@@ -77,7 +79,7 @@ export const toTemplate = (row: Item, days: Item[]): Template => {
         working: day?.is_working === true,
         start: clock(day?.start_time) || "09:00",
         end: clock(day?.end_time) || "18:00",
-        kind: kindOf(day?.shift_kind),
+        kind: text(day?.[KIND]),
       };
     }),
     dayIds: own.map((day) => text(day.guid)),
@@ -86,10 +88,33 @@ export const toTemplate = (row: Item, days: Item[]): Template => {
       off: num(row.cycle_off_days) || 2,
       start: clock(row.cycle_start_time) || "08:00",
       end: clock(row.cycle_end_time) || "20:00",
-      kind: kindOf(row.cycle_shift_kind),
+      kind: text(row[KIND]),
     },
   };
 };
+
+/** Виды смен по порядку справочника. */
+export function useShiftKinds() {
+  const query = useAll(SHIFT_KINDS, {}, false);
+  const kinds = useMemo(
+    () =>
+      [...query.rows]
+        .sort((a, b) => num(a.sort_order) - num(b.sort_order) || text(a.name).localeCompare(text(b.name)))
+        .map(
+          (row): ShiftKindRow => ({
+            id: text(row.guid),
+            name: text(row.name),
+            color: text(row.color),
+            icon: text(row.icon),
+            start: clock(row.default_start),
+            end: clock(row.default_end),
+            remote: row.is_remote === true,
+          }),
+        ),
+    [query.rows],
+  );
+  return { kinds, loading: query.loading };
+}
 
 /** Шаблоны с днями. */
 export function useTemplates() {
@@ -320,20 +345,13 @@ export function useSchedule({
  * длиннее (model/schedule, isOneDate). Это одна строка, `limit: 1`;
  * отказ запроса — `error`, а не вечная загрузка.
  */
-export function useSeries(seriesId: string, from: string) {
-  const series = { series_id: { op: "any" as const, values: [seriesId] } };
-  const query = useAll(seriesId ? SHIFTS : undefined, { ...series, date: { op: "after", values: [plusDays(from, -1)] } }, false);
-  const earlier = useItems(seriesId ? SHIFTS : undefined, {
-    limit: 1,
-    page: 1,
-    filters: { ...series, date: { op: "before", values: [from] } },
-    relations: false,
-  });
+/** Строки серий целиком; несколько — у плашки «N из M» (ScheduleCalendar), в ней смены разных серий. */
+export function useSeries(seriesIds: string[]) {
+  const ids = [...new Set(seriesIds.filter(Boolean))].sort();
+  const query = useAll(ids.length ? SHIFTS : undefined, { series_id: { op: "any", values: ids } }, false);
   return {
     rows: useMemo(() => query.rows.map(toShift), [query.rows]),
-    earlier: earlier.page.rows.length > 0,
-    loading: query.loading || earlier.isLoading,
-    error: earlier.error,
+    loading: query.loading,
   };
 }
 
@@ -474,7 +492,7 @@ export function useSaveTemplate() {
           cycle_off_days: template.cycle.off,
           cycle_start_time: template.cycle.start,
           cycle_end_time: template.cycle.end,
-          cycle_shift_kind: template.cycle.kind,
+          [KIND]: template.cycle.kind || null,
         },
       ]);
       await upsert(
@@ -486,7 +504,7 @@ export function useSaveTemplate() {
           is_working: day.working,
           start_time: day.working ? day.start : null,
           end_time: day.working ? day.end : null,
-          shift_kind: day.kind,
+          [KIND]: day.kind || null,
         })),
       );
       if (template.dayIds.length) await api.delete<unknown>(`/v1/object/${WORK_SCHEDULE_DAYS}`, { data: { ids: template.dayIds } });

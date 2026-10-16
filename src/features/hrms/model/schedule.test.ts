@@ -23,8 +23,6 @@ const none = new Set<string>();
 test("time: overnight span, break only on long shifts, hours mode", () => {
   expect(plannedOf("20:00", "08:00", 60)).toBe(660);
   expect(plannedOf("09:00", "13:00", 60)).toBe(240);
-  expect(endOf({ mode: "hours", start: "09:00", end: "", hours: 8 })).toBe("18:00");
-  expect(endOf({ mode: "hours", start: "09:00", end: "", hours: 4 })).toBe("13:00");
   expect(weekdayOf("2026-10-12")).toBe(0);
   expect(weekdayOf("2026-10-18")).toBe(6);
 });
@@ -89,19 +87,34 @@ const shift = (date: string, id = date): Shift => ({
 const all = { days: "all", people: "all" } as const;
 const ctx = { today: "2026-10-14", holidays: none };
 
+test("hours a day: flexible shift without start and end, norm from hours", () => {
+  const rows = [shift("2026-10-14"), shift("2026-10-15")];
+  const form = { ...formOfSeries(rows, rows[0]!), mode: "hours" as const, hours: 6 };
+  const { add } = editSeries(rows, rows[0]!, form, all, ctx);
+  expect(add.map((r) => [r.start, r.end, r.breakMinutes, r.plannedMinutes])).toEqual([
+    ["", "", 0, 360],
+    ["", "", 0, 360],
+  ]);
+  // Открыли гибкую на правку — форма «часов в день» с её часами.
+  const flexible = { ...rows[0]!, start: "", end: "", plannedMinutes: 360 };
+  expect(formOfSeries([flexible], flexible)).toMatchObject({ mode: "hours", hours: 6 });
+  expect(endOf(form)).toBe("");
+});
+
 test("series form: fields of the clicked shift, dates and people of the series", () => {
   const rows = [shift("2026-10-12"), { ...shift("2026-10-14"), employeeId: "b", positionId: "p" }, shift("2026-10-19")];
   expect(formOfSeries(rows, rows[1]!)).toMatchObject({ from: "2026-10-12", to: "2026-10-19", weekdays: [0, 2], employeeIds: ["a", "b"], positionId: "p" });
 });
 
-test("edit patches only changed fields, keeps the past and the template pattern", () => {
+test("edit patches only changed fields, past included, keeps the template pattern", () => {
   const friday = { ...shift("2026-10-16"), start: "10:00", end: "15:00", breakMinutes: 30, plannedMinutes: 300 };
   const rows = [shift("2026-10-12"), shift("2026-10-14"), shift("2026-10-15"), friday];
   const form = formOfSeries(rows, rows[1]!);
-  // Только комментарий: время пятницы и её перерыв на месте, прошлое (12-е) не тронуто.
+  // Только комментарий: время пятницы и её перерыв на месте; прошлое (12-е) правится тоже.
   const { remove, add } = editSeries(rows, rows[1]!, { ...form, comment: "x" }, all, ctx);
   expect(remove).toEqual([]);
   expect(add.map((r) => [r.date, r.start, r.end, r.breakMinutes, r.comment])).toEqual([
+    ["2026-10-12", "09:00", "18:00", 60, "x"],
     ["2026-10-14", "09:00", "18:00", 60, "x"],
     ["2026-10-15", "09:00", "18:00", 60, "x"],
     ["2026-10-16", "10:00", "15:00", 30, "x"],
@@ -110,6 +123,7 @@ test("edit patches only changed fields, keeps the past and the template pattern"
   // Конец 12:00 — смены короткие, перерыв не положен; у пятницы своё начало (10–12).
   const short = editSeries(rows, rows[1]!, { ...form, end: "12:00" }, all, ctx).add;
   expect(short.map((r) => [r.end, r.breakMinutes, r.plannedMinutes])).toEqual([
+    ["12:00", 0, 180],
     ["12:00", 0, 180],
     ["12:00", 0, 180],
     ["12:00", 0, 120],
@@ -183,16 +197,14 @@ test("busy days: skip drops the new row, overwrite takes the standing one", () =
   expect(occupiedBy([{ employeeId: "b", date: "2026-10-15" }], [other])).toBeUndefined();
 });
 
-test("delete scope: past stays, one-date series goes whole", () => {
+test("scope covers the past: all days, and a single past day", () => {
   const rows = [shift("2026-10-12"), shift("2026-10-14"), shift("2026-10-19")];
   const form = formOfSeries(rows, rows[0]!);
-  expect(scopedRows(rows, rows[1]!, form, all, "2026-10-14").map((r) => r.id)).toEqual(["2026-10-14", "2026-10-19"]);
-  expect(scopedRows(rows, rows[1]!, form, { days: "single", people: "single" }, "2026-10-14").map((r) => r.id)).toEqual(["2026-10-14"]);
+  expect(scopedRows(rows, rows[1]!, form, all).map((r) => r.id)).toEqual(["2026-10-12", "2026-10-14", "2026-10-19"]);
+  expect(scopedRows(rows, rows[0]!, form, { days: "single", people: "single" }).map((r) => r.id)).toEqual(["2026-10-12"]);
   // Групповая смена на один прошлый день правится целиком.
   const group = [shift("2026-10-01"), { ...shift("2026-10-01", "b"), employeeId: "b" }];
-  expect(scopedRows(group, group[0]!, formOfSeries(group, group[0]!), all, "2026-10-14")).toHaveLength(2);
-  // Загружен только хвост серии (useSeries с даты): одна дата в строках — ещё не серия из одного дня.
-  expect(scopedRows(group, group[0]!, formOfSeries(group, group[0]!), all, "2026-10-14", false)).toEqual([]);
+  expect(scopedRows(group, group[0]!, formOfSeries(group, group[0]!), all)).toHaveLength(2);
 });
 
 test("own fields: position from the card, location from the form first, standing rows untouched", () => {
