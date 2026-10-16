@@ -7,7 +7,7 @@ import { Icon } from "@/shared/ui/icon";
 import { Popover } from "@/shared/ui/popover";
 import { Tooltip } from "@/shared/ui/tooltip";
 import { isWeekend, type Scale, type SheetCell, type SheetTotals } from "../model/timesheet";
-import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, useAttendance, useDayHead, type OpenDay, type OpenEmployee } from "./attendance-parts";
+import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, GroupedRows, useAttendance, useDayHead, type OpenDay, type OpenEmployee } from "./attendance-parts";
 import { ATTENDANCE_TAB } from "./employee-tabs";
 import { TimesheetDay } from "./TimesheetDay";
 
@@ -88,7 +88,9 @@ export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; 
                 </td>
               </tr>
             ) : (
-              rows.map(({ employee, cells, totals }) => (
+              <GroupedRows rows={rows} group={view.group} keysOf={({ employee }) => employee} colSpan={dates.length + 1 + TOTALS.length}>
+
+                {({ employee, cells, totals }) => (
                 <tr key={employee.id} className="group">
                   <td className={`${body} sticky left-0 z-10 bg-surface px-3 py-1 group-hover:tint-surface-hover`}>
                     <EmployeeName
@@ -112,7 +114,9 @@ export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; 
                   ))}
                   <TotalsCells totals={totals} />
                 </tr>
-              ))
+              )}
+
+              </GroupedRows>
             )}
           </tbody>
         </table>

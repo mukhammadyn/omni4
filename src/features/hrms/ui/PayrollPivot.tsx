@@ -5,6 +5,7 @@ import { Avatar } from "@/features/item";
 import { todayInput } from "@/shared/lib/date-value";
 import { Icon } from "@/shared/ui/icon";
 import { useLastPayMonth, usePayMonth } from "../api/payroll";
+import { useScheduleSettings } from "./schedule-settings";
 import { buildPayPivot, compactSum, type PayPivot } from "../model/payroll";
 
 const th = "h-9 border-b border-border px-2 text-[13px] font-normal text-fg-muted whitespace-nowrap";
@@ -25,12 +26,13 @@ const shift = (month: string, by: number) => {
  * Сделано под `hr_payroll_lines` (FIXED_VIEW_TYPES): строки грузит сам
  * (api/payroll), считает model/payroll.
  */
-export function PayrollPivot({ search, onOpenEmployee }: { search: string; onOpenEmployee: (guid: string) => void }) {
+export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: string; search: string; onOpenEmployee: (guid: string) => void }) {
   const { t, i18n } = useTranslation();
   const last = useLastPayMonth();
   const [picked, setPicked] = useState("");
   const month = picked || last.month || todayInput().slice(0, 7);
-  const { lines, loading } = usePayMonth(month, search);
+  const { where } = useScheduleSettings(viewId);
+  const { lines, loading } = usePayMonth(month, search, where);
   const pivot = useMemo(() => buildPayPivot(lines, false), [lines]);
   const title = new Intl.DateTimeFormat(i18n.language, { month: "long", year: "numeric" }).format(
     new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1),

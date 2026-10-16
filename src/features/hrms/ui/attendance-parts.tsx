@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { GAP, pageItems } from "@/shared/ui/pagination";
@@ -6,7 +6,9 @@ import { useUi } from "@/shared/lib/ui-store";
 import { todayInput } from "@/shared/lib/date-value";
 import { Icon } from "@/shared/ui/icon";
 import { useTimesheet, type SheetEmployee, type Timesheet } from "../api/timesheet";
+import { useScheduleDirectory } from "../api/schedule";
 import type { EmployeeTab } from "./employee-tabs";
+import { groupRows, useScheduleSettings, type GroupKeys, type ScheduleGroup } from "./schedule-settings";
 import { buildRow, datesOf, rangeOf, statusOf, stepAnchor, type DayStatus, type Scale, type SheetCell } from "../model/timesheet";
 
 /*
@@ -53,12 +55,20 @@ export type Period = ReturnType<typeof usePeriod>;
 export function useAttendance(viewId: string, scales: readonly Scale[] = SCALES, pageSize?: number, search = "") {
   const period = usePeriod(viewId, scales, search);
   const { range, dates, today, query } = period;
-  const sheet = useTimesheet({ ...range, dates, today, search: query, ...(pageSize ? { pageSize } : {}) });
+  const settings = useScheduleSettings(viewId);
+  const sheet = useTimesheet({
+    ...range,
+    dates,
+    today,
+    search: query,
+    ...(pageSize ? { pageSize } : {}),
+    where: settings.where,
+  });
   const rows = useMemo(
     () => sheet.employees.map((employee) => ({ employee, ...buildRow(sheet.inputOf(employee)) })),
     [sheet],
   );
-  return { ...period, sheet, rows };
+  return { ...period, sheet, rows, group: settings.group };
 }
 
 export type Attendance = ReturnType<typeof useAttendance>;
@@ -388,4 +398,44 @@ function PageButton({
 export function useScopedPage(scope: string) {
   const [paging, setPaging] = useState({ scope, page: 1 });
   return [paging.scope === scope ? paging.page : 1, (page: number) => setPaging({ scope, page })] as const;
+}
+
+/**
+ * Строки таблицы по группам «Группировки» (ScheduleTools): над каждой
+ * группой — строка с названием и числом. Без группировки — строки как есть.
+ */
+export function GroupedRows<T>({
+  rows,
+  group,
+  keysOf,
+  colSpan,
+  children,
+}: {
+  rows: T[];
+  group: ScheduleGroup;
+  keysOf: (row: T) => GroupKeys;
+  colSpan: number;
+  children: (row: T) => ReactNode;
+}) {
+  const directory = useScheduleDirectory();
+  const names = useMemo(() => {
+    const map = (list: { id: string; name: string }[]) => new Map(list.map((item) => [item.id, item.name]));
+    return { dept: map(directory.departments), location: map(directory.locations), position: map(directory.positions) };
+  }, [directory]);
+
+  return groupRows(rows, group, keysOf, (by, id) => names[by].get(id) ?? "").map((bucket) => (
+    <Fragment key={bucket.id || "all"}>
+      {group !== "none" && (
+        <tr>
+          <td colSpan={colSpan} className="h-9 border-b border-border bg-surface-soft px-3 text-[13px]">
+            <span className="sticky left-3 inline-flex items-center gap-2">
+              <b className="font-semibold">{bucket.label}</b>
+              <span className="text-fg-subtle">{bucket.rows.length}</span>
+            </span>
+          </td>
+        </tr>
+      )}
+      {bucket.rows.map(children)}
+    </Fragment>
+  ));
 }

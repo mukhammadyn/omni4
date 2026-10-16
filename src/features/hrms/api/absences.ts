@@ -22,6 +22,9 @@ export type AbsenceRequest = {
   employeeName: string;
   employeePhoto: string;
   departmentId: string;
+  /** Филиал и должность сотрудника — для отбора и группировки экрана. */
+  locationId: string;
+  positionId: string;
   departmentName: string;
   typeId: string;
   typeTitle: string;
@@ -47,6 +50,8 @@ const toRequest = (row: Item): AbsenceRequest => {
     // Отдел — заявки, а не сотрудника: по нему выбирается маршрут.
     departmentId: text(row.hr_departments_id) || text(person.hr_departments_id),
     departmentName: text(related(row, "hr_departments_id").name),
+    locationId: text(person.hr_locations_id),
+    positionId: text(person.hr_positions_id),
     typeId: text(row.hr_absence_types_id),
     typeTitle: text(kind.name),
     typeIcon: text(kind.icon),

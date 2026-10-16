@@ -16,6 +16,7 @@ import { Icon } from "@/shared/ui/icon";
 import { Tabs } from "@/shared/ui/tabs";
 import {
   departmentColors,
+  managerByPosition,
   toPerson,
   useOrgDirectory,
   type Department,
@@ -35,7 +36,8 @@ type DeptNode = Department & { members: Person[]; tone: ChipColor };
  * «Оргструктура» сотрудников HRMS — `drawOrg` прототипа: два дерева
  * на одном холсте.
  *
- *   Сотрудники   — руководитель → подчинённые (`hr_employees.hr_employees_id`);
+ *   Сотрудники   — руководитель → подчинённые (`hr_employees.hr_employees_id`),
+ *                  не указан — по иерархии должностей (`managerByPosition`);
  *   Отделы       — отдел → подотдел (`hr_departments.hr_departments_id`),
  *                  на узле руководитель и аватары людей ветки.
  *
@@ -79,10 +81,10 @@ export function OrgStructure({
         ? buildTree(
             people,
             (person) => person.id,
-            (person) => person.managerId,
+            managerByPosition(people, directory.positionParent),
           )
         : [],
-    [mode, people],
+    [mode, people, directory.positionParent],
   );
 
   const deptRoots = useMemo(() => {

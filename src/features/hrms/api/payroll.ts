@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { useItems, type Item } from "@/features/item";
+import { useTablePermissions } from "@/features/auth";
+import { useCreateItem, useDeleteItems, useItems, useUpdateItem, type Filters, type Item } from "@/features/item";
 import type { PayLine } from "../model/payroll";
 import { firstText, related, text } from "./org";
 import { useAll } from "./timesheet";
@@ -30,9 +31,10 @@ export function useLastPayMonth() {
 }
 
 /** Все строки за месяц. ponytail: валюта не учитывается — в проекте всё в UZS. */
-export function usePayMonth(month: string, search: string) {
+export function usePayMonth(month: string, search: string, where: Filters = {}) {
   const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
   const { rows, loading } = useAll(month ? PAYROLL_LINES : undefined, {
+    ...where,
     period: { op: "between", values: [`${month}-01`, `${month}-${last}`] },
   });
   const query = search.trim().toLowerCase();
@@ -41,4 +43,80 @@ export function usePayMonth(month: string, search: string) {
     [rows, query],
   );
   return { lines, loading };
+}
+
+/** Строка «Компенсации» сотрудника — `C` прототипа (employee.html, `#comp`). */
+export type PayRecord = {
+  id: string;
+  date: string;
+  typeId: string;
+  typeName: string;
+  kind: "accrual" | "deduction";
+  amount: number;
+  description: string;
+  createdAt: string;
+};
+
+export type PayType = { id: string; name: string; kind: "accrual" | "deduction" };
+
+const toRecord = (row: Item): PayRecord => ({
+  id: text(row.guid),
+  // Дата начисления; у строк без неё — расчётный месяц.
+  date: (text(row.date) || text(row.period)).slice(0, 10),
+  typeId: text(row.hr_pay_types_id),
+  typeName: text(related(row, "hr_pay_types_id").name) || "—",
+  kind: row.kind === "deduction" ? "deduction" : "accrual",
+  amount: typeof row.amount === "number" ? row.amount : Number(row.amount) || 0,
+  description: text(row.description),
+  createdAt: text(row.created_at),
+});
+
+export type PayDraft = Omit<PayRecord, "id" | "typeName" | "createdAt">;
+
+/** Начисления и удержания одного сотрудника, все строки; правка — тут же. */
+export function useEmployeePay(employeeId: string, departmentId: string) {
+  const { rows, loading } = useAll(PAYROLL_LINES, { hr_employees_id: { op: "is", values: [employeeId] } });
+  const types = useItems("hr_pay_types", { limit: 200, page: 1, relations: false });
+  const create = useCreateItem(PAYROLL_LINES);
+  const update = useUpdateItem(PAYROLL_LINES);
+  const remove = useDeleteItems(PAYROLL_LINES);
+  const can = useTablePermissions()(PAYROLL_LINES);
+
+  const records = useMemo(() => rows.map(toRecord), [rows]);
+  const payTypes = useMemo<PayType[]>(
+    () =>
+      types.page.rows
+        .filter((row) => row.is_active !== false)
+        .map((row) => ({ id: text(row.guid), name: text(row.name), kind: row.kind === "deduction" ? "deduction" : "accrual" })),
+    [types.page.rows],
+  );
+
+  /* Расчётный месяц — первое число месяца даты: по нему строит сводная (usePayMonth). */
+  const values = (draft: PayDraft) => ({
+    date: draft.date,
+    period: `${draft.date.slice(0, 7)}-01`,
+    hr_pay_types_id: draft.typeId,
+    kind: draft.kind,
+    amount: draft.amount,
+    description: draft.description,
+  });
+
+  return {
+    records,
+    payTypes,
+    loading,
+    can,
+    save: (draft: PayDraft, id?: string) =>
+      id
+        ? update.mutateAsync({ guid: id, values: values(draft) })
+        : create.mutateAsync({
+            guid: crypto.randomUUID(),
+            hr_employees_id: employeeId,
+            hr_departments_id: departmentId || null,
+            currency: "UZS",
+            source: "manual",
+            ...values(draft),
+          }),
+    remove: (id: string) => remove.mutateAsync([id]),
+  };
 }

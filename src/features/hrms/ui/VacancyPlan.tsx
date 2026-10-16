@@ -6,9 +6,10 @@ import { localized, optionOf, type Field } from "@/features/table";
 import { formatDate, todayInput } from "@/shared/lib/date-value";
 import { CHIP_STYLES } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
+import { Tooltip } from "@/shared/ui/tooltip";
 import { related, text } from "../api/org";
 import { VACANCIES, useVacancyPlan } from "../api/vacancy";
-import { cellState, monthOf, sumRows, type CellState, type Month, type PlanRow } from "../model/vacancy-plan";
+import { cellState, monthFigures, monthOf, sumRows, type CellState, type Month, type PlanRow } from "../model/vacancy-plan";
 import { usePlanSettings, type PlanGroup, type PlanHeight } from "./plan-settings";
 import { GROUP_ICON } from "./VacancyPlanTools";
 
@@ -117,10 +118,9 @@ export function VacancyPlan({
   const cells = (plan: PlanRow, strong = false) => (
     <>
       {months.map((month) => {
-        const p = plan.plan.get(month) ?? 0;
-        const h = plan.hired.get(month) ?? 0;
-        const state = cellState(p, h, month, now);
-        const need = p - h;
+        const f = monthFigures(plan, month);
+        const state = cellState(f, month, now);
+        const need = f.plan - f.fact;
         return (
           <td
             key={month}
@@ -129,20 +129,35 @@ export function VacancyPlan({
             {state === "empty" ? (
               <span className="text-border-strong">·</span>
             ) : (
-              <span
-                title={t("vacancy.plan.cellHint", { plan: p, hired: h })}
-                className="inline-flex items-center gap-1"
+              <Tooltip
+                label={
+                  <span className="flex flex-col">
+                    <span>{t("vacancy.plan.planFormula", f)}</span>
+                    <span>{t("vacancy.plan.factFormula", f)}</span>
+                  </span>
+                }
               >
-                <Fraction state={state} hired={h} plan={p} strong={strong} />
-                {need > 0 && month <= now && (
-                  <em className="text-2xs font-semibold text-danger not-italic">−{need}</em>
-                )}
-              </span>
+                <span className="inline-flex items-center gap-1">
+                  <Fraction state={state} fact={f.fact} plan={f.plan} strong={strong} />
+                  {need > 0 && month <= now && (
+                    <em className="text-2xs font-semibold text-danger not-italic">−{need}</em>
+                  )}
+                </span>
+              </Tooltip>
             )}
           </td>
         );
       })}
-      <td className={`${td} ${tail} font-semibold`}>{plan.total.plan}</td>
+      <td className={`${td} ${tail} font-semibold`}>
+        <Tooltip label={t("vacancy.plan.planFormula", plan.total)}>
+          <span>{plan.total.plan}</span>
+        </Tooltip>
+      </td>
+      <td className={`${td} ${tail} font-semibold`}>
+        <Tooltip label={t("vacancy.plan.factFormula", plan.total)}>
+          <span>{plan.total.fact}</span>
+        </Tooltip>
+      </td>
       <td className={`${td} ${tail}`}>{plan.total.staff}</td>
       <td className={`${td} ${tail}`}>
         {plan.total.hired ? (
@@ -198,6 +213,7 @@ export function VacancyPlan({
 
         <div className="flex flex-wrap items-center gap-4 text-[13px] text-fg-muted">
           <Stat color="blue" label={t("vacancy.plan.plan")} value={all.total.plan} />
+          <Stat color="blue" label={t("vacancy.plan.fact")} value={all.total.fact} />
           <Stat color="gray" label={t("vacancy.plan.working")} value={all.total.staff} />
           <Stat color="green" label={t("vacancy.plan.hired")} value={all.total.hired} />
           <Stat color="red" label={t("vacancy.plan.leaving")} value={all.total.leave} />
@@ -229,6 +245,7 @@ export function VacancyPlan({
                 </th>
               ))}
               <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.plan")}</th>
+              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.fact")}</th>
               <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.working")}</th>
               <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.hired")}</th>
               <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.leaving")}</th>
@@ -239,13 +256,13 @@ export function VacancyPlan({
           <tbody>
             {!plans ? (
               <tr>
-                <td colSpan={WINDOW + 6} className="py-8 text-center text-fg-subtle">
+                <td colSpan={WINDOW + 7} className="py-8 text-center text-fg-subtle">
                   {t("common.loading")}
                 </td>
               </tr>
             ) : !groups.length ? (
               <tr>
-                <td colSpan={WINDOW + 6} className="py-8 text-center text-fg-subtle">
+                <td colSpan={WINDOW + 7} className="py-8 text-center text-fg-subtle">
                   {t("table.noRows")}
                 </td>
               </tr>
@@ -382,14 +399,14 @@ function groupKey(group: PlanGroup, fields: Field[], language: string, row: Item
 }
 
 /** «нанято / план» плашкой. */
-function Fraction({ state, hired, plan, strong }: { state: CellState; hired: number; plan: number; strong?: boolean }) {
+function Fraction({ state, fact, plan, strong }: { state: CellState; fact: number; plan: number; strong?: boolean }) {
   return (
     <span
       className={`inline-flex items-baseline rounded-[5px] px-1.5 py-px text-xs tabular-nums ${CELL_STYLE[state]} ${
         strong ? "font-medium" : ""
       }`}
     >
-      <b className="font-semibold">{hired}</b>
+      <b className="font-semibold">{fact}</b>
       <i className="mx-0.5 not-italic opacity-60">/</i>
       {plan}
     </span>
@@ -447,7 +464,7 @@ function Stat({ color, label, value }: { color: keyof typeof STAT_DOT; label: st
 function Legend({ state, label }: { state: CellState; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <Fraction state={state} hired={state === "ok" ? 2 : 0} plan={state === "ok" ? 2 : 1} />
+      <Fraction state={state} fact={state === "ok" ? 2 : 0} plan={state === "ok" ? 2 : 1} />
       {label}
     </span>
   );

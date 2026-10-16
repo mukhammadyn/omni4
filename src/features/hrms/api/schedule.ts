@@ -265,30 +265,26 @@ export function useSchedule({
   to,
   employeeId,
   search = "",
-  departments = [],
-  locations = [],
+  where = {},
   pageSize,
 }: {
   from: string;
   to: string;
   employeeId?: string;
   search?: string;
-  departments?: string[];
-  locations?: string[];
+  /** Отбор сотрудников полосой фильтров (PeopleFilterBar). */
+  where?: Filters;
   /** Сотрудники порциями по столько — прокрутка, как в «Посещаемости». Без него — все. */
   pageSize?: number;
 }) {
   const one = employeeId ? { hr_employees_id: { op: "any" as const, values: [employeeId] } } : {};
-  // «—» (поле пустое) в отбор uuid не передать — такой отбор остаётся на клиенте.
-  const only = (field: string, values: string[]): Filters =>
-    values.length && !values.includes("") ? { [field]: { op: "any", values } } : {};
   const peopleQuery = useItems(EMPLOYEES, {
     limit: pageSize ?? MAX_LIMIT,
     page: 1,
     infinite: true,
     filters: employeeId
       ? { guid: { op: "any", values: [employeeId] } }
-      : { ...only("hr_departments_id", departments), ...only("hr_locations_id", locations) },
+      : where,
     search,
     // Порции идут по алфавиту — иначе новая порция вставала бы между строк.
     sorts: [{ field: "full_name", direction: "asc" }],

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useCreateItem, useUpdateItem, type Item } from "@/features/item";
+import { useCreateItem, useUpdateItem, type Item, type Filters } from "@/features/item";
 import type { BudgetLine, BudgetStatus } from "../model/budget";
 import { firstText, related, text } from "./org";
 import { useAll } from "./timesheet";
@@ -20,8 +20,8 @@ const monthKey = (year: number, month: number) => `${year}-${String(month + 1).p
  * ponytail: строки грузятся все и отбираются по `year` на клиенте — их
  * десятки; отбор числа на сервере понадобится, когда бюджет разрастётся.
  */
-export function useBudget(year: number, search: string) {
-  const lines = useAll(BUDGET_LINES, {});
+export function useBudget(year: number, search: string, where: Filters = {}) {
+  const lines = useAll(BUDGET_LINES, where);
   const amounts = useAll(BUDGET_AMOUNTS, { month: { op: "between", values: [`${year}-01-01`, `${year}-12-31`] } }, false);
   const query = search.trim().toLowerCase();
 

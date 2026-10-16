@@ -25,7 +25,7 @@ import {
   SHEET_PAGE,
   STATUS_DOT,
   StatusChips,
-  useAttendance,
+  GroupedRows, useAttendance,
   useDayHead,
   useStatusFilter,
   type OpenDay,
@@ -111,7 +111,9 @@ export function AttendanceCalendar({ viewId, search, onOpenEmployee }: { viewId:
                 </td>
               </tr>
             ) : (
-              rows.map(({ employee, cells }) => (
+              <GroupedRows rows={rows} group={view.group} keysOf={({ employee }) => employee} colSpan={dates.length + 1}>
+
+                {({ employee, cells }) => (
                 <tr key={employee.id} className="group">
                   <td className={`${body} sticky left-0 z-10 bg-surface px-3 py-1 group-hover:tint-surface-hover`}>
                     <EmployeeName
@@ -143,7 +145,9 @@ export function AttendanceCalendar({ viewId, search, onOpenEmployee }: { viewId:
                     );
                   })}
                 </tr>
-              ))
+              )}
+
+              </GroupedRows>
             )}
           </tbody>
         </table>

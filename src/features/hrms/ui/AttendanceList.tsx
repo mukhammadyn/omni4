@@ -8,7 +8,7 @@ import { Icon } from "@/shared/ui/icon";
 import { pageCount } from "@/shared/ui/pagination";
 import { ATTENDANCE_DAYS, markClock, useDayMarks, type DayMarks } from "../api/timesheet";
 import { listOf, statusOf, type DayStatus, type SheetCell } from "../model/timesheet";
-import { EmployeeName, Pager, useScopedPage, PeriodBar, StatusChips, useAttendance, useStatusFilter, type OpenDay, type OpenEmployee } from "./attendance-parts";
+import { EmployeeName, Pager, useScopedPage, PeriodBar, StatusChips, GroupedRows, useAttendance, useStatusFilter, type OpenDay, type OpenEmployee } from "./attendance-parts";
 import { ATTENDANCE_TAB } from "./employee-tabs";
 import { TimesheetDay } from "./TimesheetDay";
 
@@ -96,7 +96,9 @@ export function AttendanceList({ viewId, search, onOpenEmployee }: { viewId: str
                 </td>
               </tr>
             ) : (
-              slice.map(({ employee, cell }) => {
+              <GroupedRows rows={slice} group={view.group} keysOf={({ employee }) => employee} colSpan={COLUMNS.length}>
+
+                {({ employee, cell }) => {
                 const status = statusOf(cell)!;
                 const day = cell.day;
                 const mark = marks.get(`${employee.id}|${cell.date}`);
@@ -179,7 +181,9 @@ export function AttendanceList({ viewId, search, onOpenEmployee }: { viewId: str
                     </td>
                   </tr>
                 );
-              })
+              }}
+
+              </GroupedRows>
             )}
           </tbody>
         </table>
