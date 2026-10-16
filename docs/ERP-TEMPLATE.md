@@ -157,24 +157,23 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 |---|---|---|---|---|
 | Основное | Дашборды | LINK | `screen: "dashboards-entry"` | 📊 `1f4ca` |
 | Люди | Сотрудники | TABLE | `hr_employees` | 🧑‍💼 `1f9d1-200d-1f4bc` |
-| | История назначений | TABLE | `hr_job_history` | ⏳ `23f3` |
 | | Образование и сертификаты | TABLE | `hr_qualifications` | 🎓 `1f393` |
 | Рекрутинг | Вакансии | TABLE | `hr_vacancies` | 💼 `1f4bc` |
 | | Кандидаты | TABLE | `hr_candidates` | 🧾 `1f9fe` |
-| | Карьерный сайт | TABLE | `hr_career_site` | 📋 `1f4cb` |
-| Время | Отметки | TABLE | `hr_attendance_events` | ✅ `2705` |
-| | Посещаемость | TABLE | `hr_attendance_days` | 📅 `1f4c5` |
+| Время | Посещаемость | TABLE | `hr_attendance_days` | 📅 `1f4c5` |
 | | График работы | TABLE | `hr_shifts` | 🔁 `1f501` |
-| | Заявки | TABLE | `hr_requests` | 📥 `1f4e5` |
-| | Баланс отсутствий | TABLE | `hr_absence_balance` | ⚖️ `2696-fe0f` |
-| | Назначения штрафов | TABLE | `hr_penalty_assignments` | 🚨 `1f6a8` |
-| Обучение | Тренинги | TABLE | `hr_trainings` | 🧠 `1f9e0` |
+| Обучение | Тренинги | TABLE | `hr_trainings` | 🎓 `1f393` |
 | | База знаний | TABLE | `hr_kb_articles` | 📚 `1f4da` |
-| | Опросы | TABLE | `hr_surveys` | 🗳️ `1f5f3-fe0f` |
-| Финансы | Начисления | TABLE | `hr_payroll_lines` | 💰 `1f4b0` |
-| | Строки бюджета | TABLE | `hr_budget_lines` | 📊 `1f4ca` |
-| | Оценки KPI | TABLE | `hr_kpi_scorecards` | 💯 `1f4af` |
+| | Опросы | TABLE | `hr_surveys` | 📋 `1f4cb` |
+| Финансы | Зарплата | TABLE | `hr_payroll_lines` | 💵 `1f4b5` |
+| | Бюджет | TABLE | `hr_budget_lines` | 💰 `1f4b0` |
 | Система | Настройки | LINK | `screen: "settings"` | ⚙️ `2699-fe0f` |
+
+Таблицы без пункта меню (`hr_job_history`, `hr_career_site`,
+`hr_attendance_events`, `hr_requests`, `hr_absence_balance`,
+`hr_penalty_assignments`, `hr_kpi_scorecards`) остаются в схеме: их
+показывают вкладки сотрудника, «Отсутствия» в «Посещаемости» и функции.
+Пунктов для них нет с 2026-10-16 — omni4 выровнен по omni5.
 
 **Пункт «Сотрудники» обязателен:** страница сотрудника берёт вкладки
 из view этого пункта (находит его по таблице, `useTableMenuId`).
@@ -265,7 +264,18 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | `SCHEDULE` | `hr_shifts` | — | «Календарь» графика |
 | `WORK_SCHEDULES` | `hr_work_schedules` | — | «Шаблоны» графика |
 | `KNOWLEDGE` | `hr_kb_articles` | — | «База знаний»: дерево и страница |
+| `PAYROLL` | `hr_payroll_lines` | — | «Сводная по месяцам»: сотрудник × вид за расчётный месяц (`period`), начисления и удержания группами, «К выплате» |
+| `PIVOT` | любая | `pivot` — см. ниже | обычная сводная |
+| `BUDGET` | `hr_budget_lines` (+ `hr_budget_amounts`) | — | «Бюджет» ФОТ: отделы → строки, план и факт по месяцам/кварталам года, правка в ячейке |
 | `LIST` | любая | — | список |
+
+`attributes.pivot` у `PIVOT` — раскладка, с которой сводная открывается
+(ключ наш, бэкенд про него не знает): `row` — слаги полей строк через
+запятую, `col` — слаг поля колонок, `value` — поле значения, `agg` —
+`count` / `sum` / `avg` / `min` / `max`, `sort`, `skipEmpty: true` — не
+считать строки без значения. Параметры адреса (`pivotRow`, `pivotCol`…)
+главнее: человек крутит раскладку сам, во view она из интерфейса пока
+не сохраняется — только через API.
 
 Общий атрибут `chips_by_id` — полоса значений над таблицей (TABLE,
 LIST, GALLERY); значение — поле или колонка-связь (см. §0).
@@ -345,13 +355,6 @@ LIST, GALLERY); значение — поле или колонка-связь (
 | 2 | WORK_SCHEDULES | Шаблоны | `hr_work_schedules` |
 | 3 | TABLE | — | |
 
-**HRMS / Заявки** (`hr_requests`)
-
-| # | Тип | Имя |
-|---|---|---|
-| 1 | ABSENCES | Отсутствия |
-| 2 | TABLE | — |
-
 **HRMS / Тренинги** (`hr_trainings`)
 
 | # | Тип | Имя | Настройки |
@@ -364,6 +367,28 @@ LIST, GALLERY); значение — поле или колонка-связь (
 | # | Тип | Имя |
 |---|---|---|
 | 1 | KNOWLEDGE | База знаний |
+| 2 | TABLE | — |
+
+**HRMS / Зарплата** (`hr_payroll_lines`) — колонки сводной — виды
+из `hr_pay_types` (`kind` — начисление или удержание, порядок —
+`sort_order`). `PAYROLL` и `PIVOT` стоят оба, пока их сравнивают
+(2026-10-16, в omni4 и omni5); потом один уберут.
+
+| # | Тип | Имя | Атрибуты |
+|---|---|---|---|
+| 1 | TABLE | Таблица | |
+| 2 | PAYROLL | Сводная | |
+| 3 | PIVOT | Сводная (PIVOT) | `pivot: {row: "hr_employees_id", col: "hr_pay_types_id", value: "amount", agg: "sum", skipEmpty: true}` |
+
+**HRMS / Бюджет** (`hr_budget_lines`) — суммы лежат
+в `hr_budget_amounts`: строка на месяц, `month` — первое число,
+`amount_key` = «guid строки:ГГГГ-ММ». Нет строки суммы — экран заводит её
+при первой правке. Строка без `hr_employees_id` — вакансия, подпись —
+должность или `title`.
+
+| # | Тип | Имя |
+|---|---|---|
+| 1 | BUDGET | Сводная таблица |
 | 2 | TABLE | — |
 
 **CRM / Сделки** (`crm_deals`)
@@ -454,6 +479,16 @@ localhost) под ADMIN.
 «Сотрудники» плоское; в omni4 так же), у вакансий пусты рекрутер
 и нанимающий менеджер, у шаблонов графика перерыв 300 минут (в omni4
 исправлен на 60). Дашборды omni4 в omni5 не переносились.
+
+**2026-10-16, меню omni5 → omni4.** Меню правили в omni5; omni4
+выровнен по нему: убраны 7 пунктов HRMS (§3.2) и LINK «Dashboards»
+в корне, «Начисления» → «Зарплата», «Строки бюджета» → «Бюджет».
+Обход дерева по API — расхождений нет, кроме места системных папок
+(Content, Settings, Files, Users) в корне. В omni5 заведены вкладки
+`PAYROLL`, `PIVOT` и `BUDGET` (§4.2). В браузере не проверено.
+Иконки тоже по omni5: «Тренинги» 🎓, «Опросы» 📋, «Зарплата» 💵,
+«Бюджет» 💰. Расходится одна — «Воронки» в настройках CRM: в omni4 🛒,
+в omni5 иконки нет; шаблон её не задаёт.
 
 ## 8. Открыто
 
