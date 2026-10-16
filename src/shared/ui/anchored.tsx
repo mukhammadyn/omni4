@@ -34,6 +34,19 @@ export function Anchored({
   children: ReactNode;
 }) {
   const box = useRef<HTMLDivElement>(null);
+  /*
+   * Куда портал: окно, в котором лежит якорь, иначе <body>. Как у Popover:
+   * из <body> редактор с z-50 уходил под окно (Modal, z-60), открывший его.
+   * Своего элемента у якоря нет — только прямоугольник, — поэтому окно
+   * ищется по точке в его середине, один раз, пока якорь ещё на экране.
+   */
+  const [host] = useState<Element>(
+    () =>
+      document
+        // jsdom точку не ищет: метода там нет.
+        .elementFromPoint?.(anchor.left + anchor.width / 2, anchor.top + anchor.height / 2)
+        ?.closest("[data-modal]") ?? document.body,
+  );
   const [placed, setPlaced] = useState<{ left: number; top: number } | null>(null);
 
   /*
@@ -122,7 +135,7 @@ export function Anchored({
         {children}
       </div>
     </>,
-    document.body,
+    host,
   );
 }
 

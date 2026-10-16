@@ -6,6 +6,7 @@ import {
   Cell,
   blankItem,
   cellKind,
+  type CellKind,
   relationDataKey,
   rowErrors,
   useCreateItem,
@@ -29,6 +30,9 @@ import { Modal } from "@/shared/ui/modal";
  * редактор, что у ячейки (ActiveCell): у каждого типа он уже есть,
  * и второй набор редакторов разошёлся бы с первым.
  */
+/** Короткие значения — по два в ряд; текст, связь, файлы — на всю ширину. */
+const HALF = new Set<CellKind>(["color", "icon", "time", "number", "date", "datetime", "datetime_naive", "status", "multiselect"]);
+
 export function DirectoryCreateDialog({
   table,
   title,
@@ -117,18 +121,18 @@ export function DirectoryCreateDialog({
       <div className="flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
         <h2 className="px-5 pt-4 pb-3 text-xl font-semibold">{title}</h2>
 
-        <div className="flex flex-col gap-3.5 overflow-auto px-5 pb-4">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-3.5 overflow-auto px-5 pb-4">
           {fields
             .filter((field) => cellKind(field.type) !== "label" && cellKind(field.type) !== "button" && cellKind(field.type) !== "formula")
             .map((field) =>
               cellKind(field.type) === "boolean" ? (
                 // Флажок — подписью справа, как «Заменить существующие смены»: рамка поля ему ни к чему.
-                <label key={field.slug} className="flex cursor-pointer items-center gap-2.5 text-sm text-fg">
+                <label key={field.slug} className="flex h-(--spacing-input) cursor-pointer items-center gap-2.5 self-end text-sm text-fg">
                   <Checkbox checked={draft[field.slug] === true} onChange={() => set(field.slug, draft[field.slug] !== true)} />
                   {localized(field.labels, language, field.label)}
                 </label>
               ) : (
-                <div key={field.slug} className="flex flex-col gap-1.5">
+                <div key={field.slug} className={`flex flex-col gap-1.5 ${HALF.has(cellKind(field.type)) ? "" : "col-span-2"}`}>
                   {label(field)}
                   {control(field)}
                   {showErrors && errors.has(field.slug) && (
