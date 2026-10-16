@@ -10,6 +10,7 @@ import {
   relationDataKey,
   rowErrors,
   useCreateItem,
+  useUpdateItem,
   type Item,
 } from "@/features/item";
 import { IconPicker } from "@/features/icons";
@@ -42,9 +43,15 @@ export function DirectoryCreateDialog({
   fields,
   relations,
   language,
+  row,
+  readOnly = false,
   onClose,
 }: {
   table: string;
+  /** Запись на правку; нет — новая. */
+  row?: Item | undefined;
+  /** Прав на правку нет — только посмотреть. */
+  readOnly?: boolean;
   title: string;
   fields: Field[];
   relations: Relation[];
@@ -53,7 +60,8 @@ export function DirectoryCreateDialog({
 }) {
   const { t, i18n } = useTranslation();
   const create = useCreateItem(table);
-  const [draft, setDraft] = useState<Item>(() => blankItem(fields));
+  const update = useUpdateItem(table);
+  const [draft, setDraft] = useState<Item>(() => row ?? blankItem(fields));
   const [showErrors, setShowErrors] = useState(false);
   const [active, setActive] = useState<{ field: Field; anchor: DOMRect } | null>(null);
   const errors = rowErrors(fields, draft);
@@ -62,6 +70,20 @@ export function DirectoryCreateDialog({
 
   const submit = () => {
     if (errors.size) return setShowErrors(true);
+    if (row) {
+      // Уезжает только изменённое: PUT с полной строкой перезаписал бы и то, что правили рядом.
+      const values = Object.fromEntries(fields.filter((field) => draft[field.slug] !== row[field.slug]).map((field) => [field.slug, draft[field.slug] ?? null]));
+      if (!Object.keys(values).length) return onClose();
+      return update.mutate(
+        { guid: String(row["guid"]), values },
+        {
+          onSuccess: () => {
+            toast.success(t("settings.saved"));
+            onClose();
+          },
+        },
+      );
+    }
     create.mutate(draft, {
       onSuccess: () => {
         toast.success(t("table.rowCreated"));
@@ -191,9 +213,11 @@ export function DirectoryCreateDialog({
           <Button variant="ghost" onClick={onClose}>
             {t("action.cancel")}
           </Button>
-          <Button disabled={create.isPending} onClick={submit}>
-            {t("action.create")}
-          </Button>
+          {!readOnly && (
+            <Button disabled={create.isPending || update.isPending} onClick={submit}>
+              {row ? t("action.save") : t("action.create")}
+            </Button>
+          )}
         </div>
       </div>
 

@@ -201,7 +201,11 @@ export function ScheduleCalendar({
       });
   };
 
-  const place = (shift: Shift) => (kindsOf.of(shift.kind).remote ? kindsOf.of(shift.kind).name : locationName.get(shift.locationId) ?? "");
+  const place = (shift: Shift) => {
+    const kind = kindsOf.of(shift.kind);
+    // Удалённо — вид вместо филиала; филиала нет — тоже вид: под временем не должно быть пусто.
+    return kind.remote ? kind.name : locationName.get(shift.locationId) || (kind.id ? kind.name : "");
+  };
   const open = (shift: Shift) => () => onOpenShift({ shift, date: shift.date });
 
   return (
