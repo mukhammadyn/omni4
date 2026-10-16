@@ -26,6 +26,7 @@ export function SqlDatasetRunner({ menuId, sql, parameters, presentation, onPres
   useEffect(() => { if (autoRun && !effective.length && runner.enabled && !issue) { void runner.run(); } }, [autoRun, effective.length, runner.enabled, runner.run, issue]);
   return <section aria-label={copy.title} className="flex min-w-0 flex-col gap-3 rounded-lg border border-border p-3">
     <p className="text-xs text-fg-muted">{copy.supported}</p>
+    <p className="text-2xs text-fg-muted">{copy.legacyNotice}</p>
     {issue && <p role="alert" className="text-sm text-danger">{copy.syntax[issue]}</p>}
     {effective.map((parameter) => <Field key={parameter.name} label={`:${parameter.name} · ${parameter.type}`}><Input aria-label={`${copy.value}: ${parameter.name}`} type={parameter.type === "date" ? "date" : "text"} inputMode={parameter.type === "number" ? "decimal" : undefined} placeholder={parameter.type === "boolean" ? "true / false" : undefined} value={Object.hasOwn(values, parameter.name) ? values[parameter.name] ?? "" : ""} onChange={(event) => setValues({ ...values, [parameter.name]: event.target.value })} /></Field>)}
     <div className="flex flex-wrap items-end gap-2">

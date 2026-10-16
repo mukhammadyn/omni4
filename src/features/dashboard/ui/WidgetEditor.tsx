@@ -115,7 +115,7 @@ export function WidgetEditor({ initial, datasets, isNew, filters, values, menuId
           </div>
           </div>
           <div id="widget-source-panel-sql" role="tabpanel" aria-labelledby="widget-source-sql" hidden={sourceKind !== "sql"} data-active={sourceKind === "sql"} className="min-h-0 flex-col gap-3 overflow-y-auto pr-1 data-[active=true]:flex">
-            <SqlQueryEditor dataset={sqlDataset} menuId={menuId} onChange={setSqlDataset} />
+            <SqlQueryEditor active={sourceKind === "sql"} dataset={sqlDataset} menuId={menuId} onChange={setSqlDataset} />
             {sqlDataset.source.kind === "sql" && <SqlDatasetRunner menuId={menuId} sql={sqlDataset.source.sql} parameters={sqlDataset.source.parameters} hideResult onResult={receiveResult} />}
             <VisualizationPicker value={visualizationOf(sqlWidget)} allowed={SQL_VISUALIZATIONS} onChange={(kind) => setSqlWidget((current) => ({ ...selectVisualization(current, kind, sqlFields), aggregation: "sum" }))} />
             <Field label={t("dashboard.widgetTitle")}><Input aria-label={t("dashboard.widgetTitle")} value={sqlWidget.title} placeholder={t("dashboard.widgetTitleHint")} onChange={(event) => setSqlWidget({ ...sqlWidget, title: event.target.value })} /></Field>

@@ -1,5 +1,5 @@
-import { api, ApiError } from "@/shared/api/client";
-import { toQueryResult } from "../model/query-result";
+import { execSql } from "@/features/settings";
+import { legacyQueryResult, prepareDashboardSql } from "../model/legacy-sql";
 
 export type QueryExecutionInput = {
   menu_id: string;
@@ -8,14 +8,9 @@ export type QueryExecutionInput = {
   limit: number;
 };
 
-/** For the advanced dataset runner only. No basic editor activation or admin SQL fallback. */
+/** Reuse the existing SQL console; its existing server permissions apply unchanged. */
 export async function executeDashboardQuery(input: QueryExecutionInput, signal?: AbortSignal) {
-  try { return toQueryResult(await api.post<unknown>("/v2/dashboard/query", input, { ...(signal ? { signal } : {}), timeout: 6500 })); }
-  catch (error) {
-    if (error instanceof ApiError && error.body && typeof error.body === "object") {
-      const detail = (error.body as Record<string, unknown>)["error"];
-      if (detail && typeof detail === "object" && typeof (detail as Record<string, unknown>)["message"] === "string") throw new Error((detail as Record<string, unknown>)["message"] as string, { cause: error });
-    }
-    throw error;
-  }
+  const request = prepareDashboardSql(input.sql, input.parameters, input.limit);
+  const result = await execSql(request.sql, { signal, timeout: 15000, skipAuthRefresh: true, params: request.params });
+  return legacyQueryResult(result, input.limit);
 }

@@ -1,31 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/shared/api/client";
+import { readSqlSchema, type SchemaMap } from "@/features/settings";
 import { useSession } from "@/shared/api/use-session";
 import { keys } from "@/shared/lib/query-keys";
 import type { DatasetTable } from "../model/datasets";
-import { queryCapability } from "../model/query-capability";
 
-/** Normalize the safe SQL schema returned by the dashboard capability endpoint. */
-export function sqlCatalog(value: unknown): DatasetTable[] {
-  if (!value || typeof value !== "object") return [];
-  const tables = (value as Record<string, unknown>)["tables"];
-  if (!Array.isArray(tables)) return [];
-  return tables.flatMap((raw): DatasetTable[] => {
-    if (!raw || typeof raw !== "object") return [];
-    const table = raw as Record<string, unknown>;
-    if (typeof table["slug"] !== "string" || !Array.isArray(table["fields"])) return [];
-    const fields = table["fields"].flatMap((raw) => {
-      if (!raw || typeof raw !== "object") return [];
-      const field = raw as Record<string, unknown>;
-      if (typeof field["key"] !== "string" || typeof field["type"] !== "string") return [];
-      const type = ["int2", "int4", "int8", "numeric", "float4", "float8"].includes(field["type"]) ? "NUMBER"
-        : field["type"] === "uuid" ? "UUID"
-        : field["type"] === "bool" ? "CHECKBOX"
-        : ["date", "timestamp", "timestamptz"].includes(field["type"]) ? "DATE_TIME" : "SINGLE_LINE";
-      return [{ slug: field["key"], label: field["key"], type }];
-    });
-    return [{ slug: table["slug"], label: table["slug"], fields }];
-  });
+/** Suggestions reuse SQL-console metadata; they do not grant or enforce data access. */
+export function sqlCatalog(schema: SchemaMap | undefined): DatasetTable[] {
+  return (schema?.tables ?? []).filter((table) => table.group !== "platform").map((table) => ({
+    slug: table.slug, label: table.label,
+    fields: table.fields.filter((field) => !["PASSWORD", "BUTTON", "FORMULA", "FILE", "PHOTO"].includes(field.type)).map((field) => {
+      const relation = schema?.links.find((link) => link.from === table.slug && link.field === field.slug);
+      return { slug: field.slug, label: field.slug, type: field.type, ...(relation ? { target: relation.to, joinable: relation.type === "Many2One" } : {}) };
+    }),
+  }));
 }
 
 export function useSqlCatalog(menuId: string, enabled = true) {
@@ -33,9 +20,8 @@ export function useSqlCatalog(menuId: string, enabled = true) {
   const scope = JSON.stringify([session.getProjectId(), session.getEnvironmentId(), session.getUserId(), session.getVersion(), menuId]);
   const query = useQuery({
     queryKey: keys.dashboardSql(scope),
-    queryFn: ({ signal }) => api.get<unknown>("/v2/dashboard/query/capabilities", { params: { menu_id: menuId }, signal, timeout: 6500 }),
-    enabled: Boolean(enabled && menuId && session.getAccess()), staleTime: 0, retry: false,
+    queryFn: ({ signal }) => readSqlSchema({ signal, timeout: 15000, skipAuthRefresh: true }),
+    enabled: Boolean(enabled && menuId && session.getAccess() && session.getProjectId() && session.getEnvironmentId()), staleTime: 0, retry: false,
   });
-  const gate = queryCapability(query.data, session.getProjectId(), session.getEnvironmentId(), menuId);
-  return { ...gate, tables: gate.enabled && !query.error ? sqlCatalog(query.data) : [], checking: query.isPending, error: query.error };
+  return { tables: query.error ? [] : sqlCatalog(query.data), checking: query.isPending, error: query.error };
 }

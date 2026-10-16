@@ -24,7 +24,8 @@ test("join guidance is based on permitted schema relationships, never guessed na
   expect(joinGuidance({ fromTable: "deals", field: "owner", toTable: "employees", kind: "left" }, catalog)).toEqual({ valid: true, reason: "reference" });
   expect(joinGuidance({ fromTable: "deals", field: "amount", toTable: "employees", kind: "left" }, catalog).valid).toBe(false);
   expect(joinSqlGuidance(catalog.slice(0, 1))).toEqual([]);
-  expect(CLIENT_SQL_CAPABILITY.execution).toBe(false);
+  expect(CLIENT_SQL_CAPABILITY.execution).toBe("existing-admin-sql");
+  expect(CLIENT_SQL_CAPABILITY.serverReadOnly).toBe(false);
 });
 
 test("completing a quoted identifier replaces its quotes as one token", () => {

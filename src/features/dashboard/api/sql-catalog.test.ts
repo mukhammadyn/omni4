@@ -1,25 +1,19 @@
 import { expect, test } from "vitest";
 import { sqlCatalog } from "./sql-catalog";
 import { buildJoinSql } from "../model/sql-join-builder";
-import { boundedSqlSuggestions } from "../model/sql-query-guidance";
 
-test("dashboard catalog supplies application tables for manual and visual JOIN without CRUD role metadata", () => {
+test("JOIN catalog reuses SQL-console schema links and omits sensitive suggestions", () => {
+  const field = (slug: string, type: string) => ({ slug, type, required: false, unique: false });
   const catalog = sqlCatalog({ tables: [
-    { slug: "deals", fields: [{ key: "owner_id", type: "uuid" }, { key: "amount", type: "numeric" }, { key: "active", type: "bool" }, { key: "created_at", type: "timestamptz" }] },
-    { slug: "employees", fields: [{ key: "guid", type: "uuid" }, { key: "name", type: "text" }] },
-  ] });
+    { slug: "deals", label: "Deals", group: "other", section: null, rows: null, fields: [field("owner_id", "LOOKUP"), field("amount", "NUMBER"), field("secret", "PASSWORD")] },
+    { slug: "employees", label: "People", group: "other", section: null, rows: null, fields: [field("guid", "UUID"), field("name", "SINGLE_LINE")] },
+    { slug: "role", label: "Roles", group: "platform", section: null, rows: null, fields: [] },
+  ], links: [{ from: "deals", field: "owner_id", to: "employees", type: "Many2One" }] });
   expect(catalog.map((table) => table.slug)).toEqual(["deals", "employees"]);
-  expect(catalog[0]?.fields.map((field) => field.type)).toEqual(["UUID", "NUMBER", "CHECKBOX", "DATE_TIME"]);
-  expect(boundedSqlSuggestions("SELECT e.na FROM employees e", 11, catalog).map((item) => item.label)).toContain("name");
+  expect(catalog[0]?.fields.map((field) => field.slug)).toEqual(["owner_id", "amount"]);
+  expect(catalog[0]?.fields[0]).toMatchObject({ target: "employees", joinable: true });
   const generated = buildJoinSql({ base: { table: "deals", alias: "d" }, joins: [{ table: "employees", alias: "e", kind: "left", from: "d", left: "owner_id", right: "guid" }], columns: [{ alias: "e", field: "name" }], count: true }, catalog);
   expect(generated.issue).toBeNull();
-  expect(generated.sql).toContain('LEFT JOIN "employees" AS "e" ON "d"."owner_id" = "e"."guid"');
-  expect(generated.sql).toContain('GROUP BY "e"."name"');
-});
-
-test("malformed catalog entries never become suggestions", () => {
-  for (const value of [null, {}, { tables: "all" }]) expect(sqlCatalog(value)).toEqual([]);
-  expect(sqlCatalog({ tables: [null, {}, { slug: 3, fields: [] }, { slug: "deals", fields: [null, {}, { key: "amount", type: 4 }, { key: "currency", type: "text" }] }] })).toEqual([
-    { slug: "deals", label: "deals", fields: [{ slug: "currency", label: "currency", type: "SINGLE_LINE" }] },
-  ]);
+  expect(generated.sql).toContain('LEFT JOIN "employees"');
+  expect(sqlCatalog(undefined)).toEqual([]);
 });

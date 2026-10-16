@@ -58,15 +58,17 @@ type ExecDto = {
  * Здесь остаётся честная нормализация — пусто значит пусто.
  */
 export function useRunSql() {
-  return useMutation({ mutationFn: execSql });
+  return useMutation({ mutationFn: (sql: string) => execSql(sql) });
 }
 
 /**
  * Сам поход в базу — отдельно от мутации: им же читает схему диаграмма
  * (`api/schema-map`), у которой запрос свой, а ответ тот же.
  */
-export async function execSql(sql: string): Promise<SqlResult> {
-  const dto = await api.post<ExecDto>(EXEC_QUERY, { sql });
+export type SqlExecutionOptions = { signal?: AbortSignal | undefined; timeout?: number | undefined; params?: string[] | undefined; skipAuthRefresh?: boolean | undefined };
+
+export async function execSql(sql: string, options?: SqlExecutionOptions): Promise<SqlResult> {
+  const dto = await api.post<ExecDto>(EXEC_QUERY, { sql, ...(options?.params?.length ? { params: options.params } : {}) }, options ? { ...(options.skipAuthRefresh ? { skipAuthRefresh: true } : {}), ...(options.signal ? { signal: options.signal } : {}), ...(options.timeout !== undefined ? { timeout: options.timeout } : {}) } : undefined);
 
   const rows = (dto.rows ?? []).filter((row): row is Record<string, unknown> => Boolean(row));
   const types = dto.types ?? {};
@@ -114,13 +116,14 @@ type QueryDto = { id?: string; name?: string; sql?: string };
  * Порядок — какой отдаёт ручка (`created_at DESC`): только что
  * сохранённый оказывается сверху, там же, куда смотрят.
  */
-export function useSavedQueries() {
-  const envId = useSession().getEnvironmentId() ?? "";
+export function useSavedQueries(options?: { enabled?: boolean; skipAuthRefresh?: boolean }) {
+  const session = useSession();
+  const envId = session.getEnvironmentId() ?? "";
 
   const query = useQuery({
-    queryKey: keys.settings.sqlQueries(envId),
-    queryFn: () => api.get<{ endpoints?: QueryDto[] }>(QUERIES, { params: { limit: 100 } }),
-    enabled: Boolean(envId),
+    queryKey: [...keys.settings.sqlQueries(envId), session.getProjectId(), session.getUserId(), session.getVersion()],
+    queryFn: () => api.get<{ endpoints?: QueryDto[] }>(QUERIES, { params: { limit: 100 }, ...(options?.skipAuthRefresh ? { skipAuthRefresh: true } : {}) }),
+    enabled: Boolean(envId && options?.enabled !== false),
     staleTime: 60_000,
     select: (data): SavedQuery[] =>
       (data.endpoints ?? [])
