@@ -8,7 +8,7 @@
  * `information_schema` показала бы таблицы без единой стрелки.
  */
 
-export type SchemaField = { slug: string; type: string; required: boolean; unique: boolean };
+export type SchemaField = { slug: string; label?: string; type: string; required: boolean; unique: boolean };
 
 /**
  * Группа таблицы на диаграмме — вкладка над холстом.
@@ -172,9 +172,9 @@ function parseFields(value: unknown): SchemaField[] {
 
   return list.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
-    const { slug, type, required, unique } = item as Record<string, unknown>;
+    const { slug, label, type, required, unique } = item as Record<string, unknown>;
     return typeof slug === "string" && slug
-      ? [{ slug, type: typeof type === "string" ? type : "", required: required === true, unique: unique === true }]
+      ? [{ slug, ...(typeof label === "string" && label.trim() ? { label } : {}), type: typeof type === "string" ? type : "", required: required === true, unique: unique === true }]
       : [];
   });
 }

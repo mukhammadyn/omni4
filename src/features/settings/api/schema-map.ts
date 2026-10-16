@@ -44,7 +44,7 @@ const TABLES_SQL = `SELECT t.slug, t.label, t.is_system,
      AND i.deleted_at IS NULL AND s.deleted_at IS NULL
    ORDER BY s."order" LIMIT 1) AS section,
   (SELECT c.reltuples::bigint FROM pg_class c WHERE c.oid = to_regclass(quote_ident(t.slug))) AS rows,
-  COALESCE((SELECT json_agg(json_build_object('slug', f.slug, 'type', f.type,
+  COALESCE((SELECT json_agg(json_build_object('slug', f.slug, 'label', f.label, 'type', f.type,
                                               'required', f.required, 'unique', f."unique") ORDER BY f.created_at)
             FROM field f WHERE f.table_id = t.id AND f.deleted_at IS NULL), '[]'::json) AS fields
 FROM "table" t

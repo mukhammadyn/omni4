@@ -34,7 +34,7 @@ test("visual JOIN fails closed for unavailable fields, disconnected aliases, unk
 test("JOIN identifiers are quoted and raw output uses distinct stable column aliases", () => {
   const special = [{ slug: 'odd"table', label: "Odd", fields: [{ slug: 'a"b', label: "Odd field", type: "SINGLE_LINE" }] }];
   const result = buildJoinSql({ base: { table: special[0]!.slug, alias: "t" }, joins: [], columns: [{ alias: "t", field: 'a"b' }], count: false }, special);
-  expect(result.sql).toContain('"t"."a""b" AS "a""b"');
+  expect(result.sql).toContain('"t"."a""b" AS "Odd field"');
   expect(result.sql).toContain('FROM "odd""table" AS "t"');
 });
 

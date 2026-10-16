@@ -7,7 +7,7 @@ const catalog: DatasetTable[] = [
 ];
 test("SQL assistance uses actual alias columns and sees FROM after the caret", () => {
   const sql = "SELECT d.am FROM deals AS d";
-  expect(sqlSuggestions(sql, 11, catalog)).toEqual([{ value: '"amount"', label: "amount", detail: "Amount · NUMBER", replaceFrom: 9, replaceTo: 11 }]);
+  expect(sqlSuggestions(sql, 11, catalog)).toEqual([{ value: '"amount"', label: "Amount", detail: "Deals", replaceFrom: 9, replaceTo: 11 }]);
   expect(sqlSuggestions("SELECT * FROM de", 16, catalog)[0]?.value).toBe('"deals"');
 });
 test("parameters exclude casts, literals, dollar strings and nested comments", () => {

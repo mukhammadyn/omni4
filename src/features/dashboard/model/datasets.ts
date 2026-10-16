@@ -1,6 +1,7 @@
 import { parseFilters, type Filters } from "@/features/item";
 import type { Widget } from "./dashboard";
 import { mergeFilters } from "./filters";
+import { parseJoinDraft, type JoinDraft } from "./sql-join-builder";
 
 export type DatasetField = { slug: string; label: string; type: string; target?: string; joinable?: boolean };
 /** Table sources use normal role metadata; SQL sources reuse SQL-console schema metadata. */
@@ -10,7 +11,7 @@ export type DatasetJoin = { fromTable: string; field: string; toTable: string; k
 export type Dataset = {
   id: string; name: string;
   source: { kind: "table"; tableSlug: string; fields: string[]; filters: Filters; joins: DatasetJoin[] }
-    | { kind: "sql"; sql: string; parameters: DatasetParameter[]; columns: DatasetField[] };
+    | { kind: "sql"; sql: string; parameters: DatasetParameter[]; columns: DatasetField[]; visual?: JoinDraft | undefined; sqlMode?: "visual" | "manual" | undefined };
 };
 
 /** Relationship guidance is advisory; executing joins requires a verified server contract. */
@@ -55,7 +56,7 @@ export function toDatasets(value: unknown): Dataset[] {
       const join = raw as Record<string, unknown>;
       return typeof join["fromTable"] === "string" && typeof join["toTable"] === "string" && typeof join["field"] === "string" && (join["kind"] === "left" || join["kind"] === "inner") ? [{ fromTable: join["fromTable"], toTable: join["toTable"], field: join["field"], kind: join["kind"] }] : [];
     }) : [] } }];
-    if (source["kind"] === "sql" && typeof source["sql"] === "string") return [{ ...identity, source: { kind: "sql", sql: source["sql"], columns: [], parameters: Array.isArray(source["parameters"]) ? source["parameters"].flatMap((raw): DatasetParameter[] => {
+    if (source["kind"] === "sql" && typeof source["sql"] === "string") return [{ ...identity, source: { kind: "sql", sql: source["sql"], columns: [], ...(source["sqlMode"] === "visual" || source["sqlMode"] === "manual" ? { sqlMode: source["sqlMode"] } : {}), ...(parseJoinDraft(source["visual"]) ? { visual: parseJoinDraft(source["visual"])! } : {}), parameters: Array.isArray(source["parameters"]) ? source["parameters"].flatMap((raw): DatasetParameter[] => {
       if (!raw || typeof raw !== "object") return [];
       const p = raw as Record<string, unknown>;
       return typeof p["name"] === "string" && ["text", "number", "date", "boolean"].includes(p["type"] as string) ? [{ name: p["name"], type: p["type"] as DatasetParameter["type"], required: p["required"] === true }] : [];

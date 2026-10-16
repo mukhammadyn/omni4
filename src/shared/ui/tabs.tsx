@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { type LucideIcon } from "lucide-react";
+import { MODULE_PILL, MODULE_PILL_ACTIVE, MODULE_PILL_IDLE } from "./module-pill";
 import { Icon } from "@/shared/ui/icon";
 
 /**
@@ -46,6 +47,12 @@ export type TabItem = {
  * вкладок.
  */
 const STYLES = {
+  module: {
+    track: "flex min-w-0 w-full items-center",
+    tab: `${MODULE_PILL} min-w-0 flex-1 justify-center`,
+    active: MODULE_PILL_ACTIVE,
+    idle: MODULE_PILL_IDLE,
+  },
   underline: {
     track:
       "flex min-w-0 max-w-full gap-1 self-stretch overflow-x-auto [scrollbar-width:none]",
@@ -67,18 +74,22 @@ export function Tabs({
   activeId,
   onSelect,
   variant = "underline",
+  panelPrefix,
+  ariaLabel,
 }: {
   tabs: TabItem[];
   activeId: string;
   onSelect: (id: string) => void;
   variant?: keyof typeof STYLES;
+  panelPrefix?: string;
+  ariaLabel?: string;
 }) {
   if (!tabs.length) return null;
 
   const style = STYLES[variant];
 
   return (
-    <div className={style.track}>
+    <div className={style.track} role={panelPrefix ? "tablist" : undefined} aria-label={ariaLabel}>
       {tabs.map((item) => {
         const active = item.id === activeId;
 
@@ -86,7 +97,19 @@ export function Tabs({
           <button
             key={item.id}
             type="button"
-            aria-current={active ? "page" : undefined}
+            aria-current={!panelPrefix && active ? "page" : undefined}
+            role={panelPrefix ? "tab" : undefined}
+            id={panelPrefix ? `${panelPrefix}-${item.id}` : undefined}
+            aria-selected={panelPrefix ? active : undefined}
+            aria-controls={panelPrefix ? `${panelPrefix}-panel-${item.id}` : undefined}
+            tabIndex={panelPrefix ? active ? 0 : -1 : undefined}
+            onKeyDown={panelPrefix ? (event) => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+              event.preventDefault();
+              const at = tabs.findIndex((tab) => tab.id === item.id);
+              const index = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (at + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+              const next = tabs[index]!; onSelect(next.id); document.getElementById(`${panelPrefix}-${next.id}`)?.focus();
+            } : undefined}
             onClick={() => onSelect(item.id)}
             {...(item.title ? { title: item.title } : {})}
             className={`${style.tab} whitespace-nowrap ${active ? style.active : style.idle}`}
@@ -96,7 +119,7 @@ export function Tabs({
                 у `.view-tab` прототипа. У сегмента плашкой служит сама
                 кнопка, и эта обёртка ничего не красит. */}
             <span
-              className={`inline-flex items-center gap-1.5 ${
+              className={`inline-flex items-center ${variant === "module" ? "gap-1.25" : "gap-1.5"} ${
                 variant === "underline"
                   ? "rounded-[5px] px-1.5 py-0.75 transition-colors group-hover/tab:bg-surface-hover"
                   : ""
