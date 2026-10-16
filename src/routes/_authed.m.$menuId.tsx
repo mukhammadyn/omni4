@@ -230,6 +230,8 @@ const searchSchema = z.object({
   /** Раскрытая строка (guid). В адресе, а не в состоянии: ссылку на
       конкретную запись пересылают чаще, чем на список. */
   item: z.string().optional().catch(undefined),
+  /** Шаблон графика, открытый со смены (view WORK_SCHEDULES). */
+  template: z.string().optional().catch(undefined),
   /** Открытая вкладка связи в карточке (id relation view). Пусто — сама карточка. */
   tab: z.string().optional().catch(undefined),
   /**
@@ -1016,8 +1018,9 @@ function MenuPage() {
    * Без id — «любой»: после удаления открытого view в адресе не должно
    * остаться ссылки на несуществующий, и pickView возьмёт первую вкладку.
    */
-  const openView = (id?: string) =>
+  const openView = (id?: string, extra: Partial<typeof search> = {}) =>
     setSearch({
+      ...extra,
       view: id,
       page: 1,
       item: undefined,
@@ -1033,6 +1036,11 @@ function MenuPage() {
       limit: undefined,
       filtersOpen: undefined,
     });
+
+  /** Шаблон смены — вкладка «Шаблоны» с открытым окном шаблона. Нет вкладки — имя не ссылка. */
+  const templatesView = tabs.find((item) => item.type === "WORK_SCHEDULES");
+  const openTemplate = templatesView ? (id: string) => openView(templatesView.id, { template: id }) : undefined;
+  const clearTemplate = () => setSearch({ template: undefined }, true);
 
   /**
    * Щелчок по строке открывает карточку — если админ не задал своего
@@ -2082,12 +2090,12 @@ function MenuPage() {
               <Absences viewId={view.id} search={searchText} onOpenRow={openRow} onOpenEmployee={openEmployee} />
             ) : view.type === "WORK_SCHEDULES" ? (
               <>
-                <WorkSchedules />
+                <WorkSchedules openId={search.template} onOpened={clearTemplate} />
                 {scheduleCreate && <ScheduleCreate viewType={scheduleCreate} onClose={() => setScheduleCreate(null)} />}
               </>
             ) : view.type === "SCHEDULE" ? (
               <>
-                <ScheduleCalendar viewId={view.id} search={searchText} onOpenEmployee={openEmployee} />
+                <ScheduleCalendar viewId={view.id} search={searchText} onOpenEmployee={openEmployee} onOpenTemplate={openTemplate} />
                 {scheduleCreate && <ScheduleCreate viewType={scheduleCreate} onClose={() => setScheduleCreate(null)} />}
               </>
             ) : view.layout === "list" ? (

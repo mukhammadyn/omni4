@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CalendarXIcon, CheckIcon, ChevronDownIcon, LayoutTemplateIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
+import { CalendarXIcon, CheckIcon, ChevronDownIcon, LayoutTemplateIcon, SearchIcon, SparkleIcon, Trash2Icon, XIcon } from "lucide-react";
 import { useTablePermissions } from "@/features/auth";
 import { Avatar } from "@/features/item";
 import { todayInput } from "@/shared/lib/date-value";
@@ -27,14 +27,12 @@ import {
 import {
   draftsOfForm,
   editSeries,
-  endOf,
   formOfSeries,
   isClock,
   isOneDate,
   occupiedBy,
   resolveBusy,
   scopedRows,
-  SHIFT_KINDS,
   toClock,
   toMinutes,
   weekdayOf,
@@ -46,33 +44,43 @@ import {
   type ShiftForm,
 } from "../model/schedule";
 import { MoreRows } from "./attendance-parts";
-import { ClockInput, DialogLoading, KIND_STYLE, Row, Segments, type OpenShift } from "./schedule-parts";
+import { ClockInput, DialogLoading, KindIcon, Row, Segments, useKinds, type OpenShift } from "./schedule-parts";
 
 /**
  * Окно смены — `shiftModal` прототипа. Новая смена — на одного или
  * нескольких сотрудников, на день или серией по дням недели. Правка
  * и удаление серии (`series_id`) — по двум осям, как в HRMS: какие дни
- * и кому; прошлое не трогается — норма табеля (model/schedule,
+ * и кому, прошлые дни тоже (model/schedule,
  * editSeries). «Только 14 окт.» снимает один день у одного сотрудника.
  */
-export function ShiftDialog({ open, onClose }: { open: OpenShift; onClose: () => void }) {
+export function ShiftDialog({
+  open,
+  onClose,
+  onOpenTemplate,
+}: {
+  open: OpenShift;
+  onClose: () => void;
+  /** Имя шаблона в подсказке — ссылка на него. Нет — просто текст. */
+  onOpenTemplate?: ((templateId: string) => void) | undefined;
+}) {
   const { shift } = open;
-  const today = todayInput();
   // Строки без серии (заведённые в обход графика) — серия из одной строки.
-  // Серия — с сегодня или со щёлкнутого дня, что раньше: прошлое правка не трогает.
-  const series = useSeries(shift?.seriesId ?? "", shift && shift.date < today ? shift.date : today);
+  // Серия целиком: прошлые дни правятся тоже.
+  const series = useSeries([shift?.seriesId ?? "", ...(open.seriesIds ?? [])]);
   const rows = useMemo(() => (shift && !shift.seriesId ? [shift] : series.rows), [shift, series.rows]);
   // Сотрудник новой смены (его должность и филиал) или правимой — для «Только <имя>».
   const subject = useEmployeesById([shift?.employeeId ?? open.employeeId ?? ""].filter(Boolean));
+  // Новой смене нужен первый вид справочника — до того, как форма запомнит начальное состояние.
+  const kinds = useKinds();
 
-  if (shift?.seriesId && series.error) return <DialogLoading onClose={onClose} error={series.error} />;
-  if (subject.loading || (shift?.seriesId && series.loading)) return <DialogLoading onClose={onClose} />;
+  if (subject.loading || kinds.loading || (shift?.seriesId && series.loading)) return <DialogLoading onClose={onClose} />;
   return (
     <ShiftForm
       key={shift?.id ?? "new"}
       open={open}
+      onOpenTemplate={onOpenTemplate}
       rows={rows}
-      oneDate={!series.earlier && isOneDate(rows)}
+      oneDate={isOneDate(rows)}
       subject={subject.employees[0]}
       onClose={onClose}
     />
@@ -81,6 +89,7 @@ export function ShiftDialog({ open, onClose }: { open: OpenShift; onClose: () =>
 
 function ShiftForm({
   open,
+  onOpenTemplate,
   rows,
   oneDate,
   subject,
@@ -92,6 +101,7 @@ function ShiftForm({
   oneDate: boolean;
   subject: ScheduleEmployee | undefined;
   onClose: () => void;
+  onOpenTemplate: ((templateId: string) => void) | undefined;
 }) {
   const { t, i18n } = useTranslation();
   const editing = Boolean(open.shift);
@@ -102,6 +112,7 @@ function ShiftForm({
   // Бэкенд права проверит сам; здесь — чтобы не предлагать то, что он отклонит.
   const can = useTablePermissions()(SHIFTS);
   const anchor = open.shift;
+  const kinds = useKinds();
   const [form, setForm] = useState<ShiftForm>(() => {
     if (anchor) return formOfSeries(rows, anchor);
     const employee = subject;
@@ -109,11 +120,11 @@ function ShiftForm({
       employeeIds: employee ? [employee.id] : [],
       positionId: employee?.positionId ?? "",
       mode: "range",
-      start: open.start ?? "09:00",
+      start: open.start ?? (kinds.list[0]?.start || "09:00"),
       // С часа — те же девять часов, что у 09–18, но не позже 23:00, как в прототипе.
-      end: open.start ? toClock(Math.min(23 * 60, toMinutes(open.start) + 9 * 60)) : "18:00",
+      end: open.start ? toClock(Math.min(23 * 60, toMinutes(open.start) + 9 * 60)) : kinds.list[0]?.end || "18:00",
       hours: 8,
-      kind: "day",
+      kind: kinds.list[0]?.id ?? "",
       from: open.date,
       to: open.date,
       weekdays: [],
@@ -179,7 +190,7 @@ function ShiftForm({
   } => {
     if (!confirm) return { remove: [], add: [], gaps: [], conflicts: [] };
     if (confirm === "delete")
-      return { remove: anchor ? scopedRows(rows, anchor, form, scope, today, oneDate).map((row) => row.id) : [], add: [], gaps: [], conflicts: [] };
+      return { remove: anchor ? scopedRows(rows, anchor, form, scope, oneDate).map((row) => row.id) : [], add: [], gaps: [], conflicts: [] };
     const plan = planOf(scope, fillGaps);
     return { ...plan, ...resolveBusy(plan.add, busy, policy) };
   }, [anchor, confirm, rows, form, scope, today, holidays, oneDate, fillGaps, busy, policy, newSeriesId, cards]);
@@ -209,7 +220,7 @@ function ShiftForm({
       : t("shift.created");
 
   const commit = (next: { remove: string[]; add: (ShiftDraft & { id?: string })[] }, message: string) => {
-    // Пустое изменение — не успех: правка целиком в прошлом или ничего не тронуто.
+    // Пустое изменение — не успех: ничего не тронуто.
     if (!next.remove.length && !next.add.length) {
       toast.error(t("shift.nothing"));
       return setConfirm(null);
@@ -219,7 +230,7 @@ function ShiftForm({
 
   const save = async () => {
     if (!form.employeeIds.length) return toast.error(t("shift.needEmployees"));
-    if (form.mode === "range" ? !isClock(form.start) || !isClock(form.end) : !isClock(form.start) || form.hours <= 0)
+    if (form.mode === "range" ? !isClock(form.start) || !isClock(form.end) : !(form.hours > 0 && form.hours <= 24))
       return toast.error(t("shift.badTime"));
     if (!one && !form.weekdays.length) return toast.error(t("shift.needWeekdays"));
     // Новая серия задним числом переписала бы норму табеля; один прошлый день — можно.
@@ -232,7 +243,8 @@ function ShiftForm({
     } catch {
       return;
     }
-    const own = (row: Shift) => Boolean(anchor) && (anchor!.seriesId ? row.seriesId === anchor!.seriesId : row.id === anchor!.id);
+    const ownSeries = new Set(rows.map((row) => row.seriesId).filter(Boolean));
+    const own = (row: Shift) => Boolean(anchor) && (row.seriesId ? ownSeries.has(row.seriesId) : row.id === anchor!.id);
     const others = found.filter((row) => !own(row));
     // С пропусками — самый широкий план: занятость проверяется по всему, что может лечь.
     const widest = planOf({ days: "all", people: "all" }, true);
@@ -254,8 +266,7 @@ function ShiftForm({
 
   // Удаление по умолчанию сужено до одной строки (hrms ADR-0004).
   const askDelete = () => {
-    // Прошлый день серии не снимается — «только этот» там недоступен, ближайшее — «с него и дальше» (то есть с сегодня).
-    setScope({ days: manyDates && open.date < today ? "following" : "single", people: "single" });
+    setScope({ days: "single", people: "single" });
     setConfirm("delete");
   };
   const skipDay = () => anchor && commit({ remove: [anchor.id], add: [] }, t("shift.skipped", { day }));
@@ -277,7 +288,7 @@ function ShiftForm({
               {manyDates && (
                 <Row label={t("shift.scope.days")}>
                   <div className="flex flex-col gap-1.5">
-                    <Choice on={scope.days === "single"} disabled={open.date < today} onClick={() => setScope({ ...scope, days: "single" })}>
+                    <Choice on={scope.days === "single"} onClick={() => setScope({ ...scope, days: "single" })}>
                       {t("shift.only", { day })}
                     </Choice>
                     <Choice on={scope.days === "following"} onClick={() => setScope({ ...scope, days: "following" })}>
@@ -348,7 +359,6 @@ function ShiftForm({
                   </div>
                 </div>
               )}
-              {manyDates && rows.some((row) => row.date < today) && <p className="text-xs text-fg-subtle">{t("shift.scope.past")}</p>}
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
               <Button variant="ghost" onClick={() => setConfirm(null)}>
@@ -378,7 +388,18 @@ function ShiftForm({
               {template && (
                 <div className="flex gap-2 rounded-lg bg-accent-subtle px-3 py-2.5 text-[13px] text-fg">
                   <Icon as={LayoutTemplateIcon} size={15} className="mt-0.5 shrink-0 text-accent-text" />
-                  <span>{t("shift.fromTemplate", { name: template.name })}</span>
+                  <TemplateNote
+                    text={t("shift.fromTemplate", { name: NAME_MARK })}
+                    name={template.name}
+                    onOpen={onOpenTemplate && (() => (onClose(), onOpenTemplate(template.id)))}
+                  />
+                </div>
+              )}
+              {anchor && !template && (
+                <div className="flex gap-2 rounded-lg bg-surface-soft px-3 py-2.5 text-[13px] text-fg">
+                  {/* Та же искорка, что у такой смены в календаре (ScheduleCalendar, ShiftChip). */}
+                  <Icon as={SparkleIcon} size={15} className="mt-0.5 shrink-0 text-chart-2" />
+                  <span>{t("shift.manual")}</span>
                 </div>
               )}
 
@@ -408,36 +429,32 @@ function ShiftForm({
                   ]}
                   onChange={(mode) => set({ mode })}
                 />
-                <Segments
-                  full
+                {/* Список, а не кнопки: видов в справочнике сколько угодно. */}
+                <Dropdown
                   value={form.kind}
-                  items={SHIFT_KINDS.map((kind) => ({
-                    value: kind,
-                    label: (
-                      <>
-                        <Icon as={KIND_STYLE[kind].icon} size={13} />
-                        {t(`schedule.kind.${kind}`)}
-                      </>
-                    ),
-                  }))}
-                  onChange={(kind) => set({ kind })}
+                  items={kinds.list.map((kind) => ({ value: kind.id, label: kind.name, icon: <KindIcon kind={kind} size={14} /> }))}
+                  onChange={(id) => {
+                    const kind = kinds.of(id);
+                    // Новой смене — время вида; правка своё время не теряет.
+                    set({ kind: id, ...(!anchor && kind.start && kind.end ? { start: kind.start, end: kind.end } : {}) });
+                  }}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Row label={t("shift.start")}>
-                  <ClockInput value={form.start} onChange={(start) => set({ start })} />
-                </Row>
-                {form.mode === "range" ? (
+              {form.mode === "range" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <Row label={t("shift.start")}>
+                    <ClockInput value={form.start} onChange={(start) => set({ start })} />
+                  </Row>
                   <Row label={t("shift.end")} hint={isClock(form.start) && isClock(form.end) && form.end <= form.start ? t("shift.overnight") : undefined}>
                     <ClockInput value={form.end} onChange={(end) => set({ end })} />
                   </Row>
-                ) : (
-                  <Row label={t("shift.hours")} hint={isClock(form.start) ? t("shift.until", { end: endOf(form) }) : undefined}>
-                    <Input type="number" min={1} max={16} value={form.hours} onChange={(event) => set({ hours: Number(event.target.value) })} />
-                  </Row>
-                )}
-              </div>
+                </div>
+              ) : (
+                <Row label={t("shift.hours")} hint={t("shift.anyTime")}>
+                  <Input type="number" min={1} max={24} step={0.5} value={form.hours} onChange={(event) => set({ hours: Number(event.target.value) })} />
+                </Row>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <Row label={t("shift.from")}>
@@ -525,6 +542,26 @@ function ShiftForm({
 }
 
 /** Вариант оси — как выбор шаблона в «Применить». */
+/** Метка места имени в переводе: имя — кнопка, а `<Trans>` ради одной ссылки не нужен. */
+const NAME_MARK = "\u0000";
+
+function TemplateNote({ text, name, onOpen }: { text: string; name: string; onOpen: (() => void) | undefined }) {
+  const [before, after] = text.split(NAME_MARK);
+  return (
+    <span>
+      {before}
+      {onOpen ? (
+        <button type="button" onClick={onOpen} className="font-medium text-accent-text underline-offset-2 hover:underline">
+          {name}
+        </button>
+      ) : (
+        name
+      )}
+      {after}
+    </span>
+  );
+}
+
 function Choice({ on, disabled, onClick, children }: { on: boolean; disabled?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -560,13 +597,21 @@ export function EmployeePicker({ value, onChange }: { value: string[]; onChange:
     <Popover
       className="w-full"
       trigger={({ open, toggle: flip }) => (
-        <div className="flex min-h-9 w-full items-start gap-0.5 rounded-md border border-border-strong bg-input py-1 pr-1 pl-1.5">
+        // Открывает всё поле, а не только стрелка; крестики — свои клики, мимо него.
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={open}
+          onClick={flip}
+          onKeyDown={(event) => (event.key === "Enter" || event.key === " ") && (event.preventDefault(), flip())}
+          className={`flex min-h-9 w-full cursor-pointer items-start gap-0.5 rounded-md border bg-input py-1 pr-1 pl-1.5 ${open ? "border-accent" : "border-border-strong hover:border-fg-subtle"}`}
+        >
           <div className="flex min-h-7 flex-1 flex-wrap items-center gap-1">
             {value.length ? (
               value.map((id) => (
                 <span key={id} className="inline-flex h-6 max-w-full items-center gap-1 rounded bg-surface-hover pr-1 pl-2 text-xs">
                   <span className="truncate">{byId.get(id)?.name ?? "…"}</span>
-                  <button type="button" onClick={() => toggle(id)} className="grid size-4 place-items-center rounded text-fg-subtle hover:bg-border">
+                  <button type="button" onClick={(event) => (event.stopPropagation(), toggle(id))} className="grid size-4 place-items-center rounded text-fg-subtle hover:bg-border">
                     <Icon as={XIcon} size={11} />
                   </button>
                 </span>
@@ -576,13 +621,13 @@ export function EmployeePicker({ value, onChange }: { value: string[]; onChange:
             )}
           </div>
           {value.length > 0 && (
-            <button type="button" onClick={() => onChange([])} title={t("shift.clear")} className="grid h-7 w-6 place-items-center rounded text-fg-subtle hover:bg-surface-hover">
+            <button type="button" onClick={(event) => (event.stopPropagation(), onChange([]))} title={t("shift.clear")} className="grid h-7 w-6 place-items-center rounded text-fg-subtle hover:bg-surface-hover">
               <Icon as={XIcon} size={14} />
             </button>
           )}
-          <button type="button" onClick={flip} aria-expanded={open} className="grid h-7 w-6 place-items-center rounded text-fg-subtle hover:bg-surface-hover">
+          <span className="grid h-7 w-6 place-items-center text-fg-subtle">
             <Icon as={ChevronDownIcon} size={14} />
-          </button>
+          </span>
         </div>
       )}
     >

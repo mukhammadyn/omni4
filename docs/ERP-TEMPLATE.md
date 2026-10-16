@@ -79,6 +79,14 @@ Id меню, view, полей и связей в каждом проекте с�
    с ними строкой.
 5. **`core_users.timezone_id`** (SINGLE_LINE) — личный часовой пояс
    (ADR-0014). В v2 его нет; без колонки пояс не сохраняется.
+6. **`hr_shift_kinds`** — виды смен (added 2026-10-16, в v2 нет). Поля:
+   `name`, `color` (COLOR), `icon` (ICON), `default_start`/`default_end`
+   (TIME), `is_remote` (CHECKBOX), `sort_order` (NUMBER). Many2One на неё
+   из `hr_shifts`, `hr_work_schedule_days`, `hr_work_schedules` —
+   колонка `hr_shift_kinds_id` у всех трёх, подпись «Вид смены» («Вид
+   смены цикла» у шаблона). Заменяет PICK_LIST `shift_kind` /
+   `cycle_shift_kind` с зашитыми `day`/`night`/`remote`: экран читает
+   только связь. Пункт меню не нужен — справочник в настройках HRMS.
 
 ## 2. Вход и права
 
@@ -417,6 +425,7 @@ LIST, GALLERY); значение — поле или колонка-связь (
 | `hr_recruiting_pipelines` | одна воронка с `is_default: true` | новая вакансия берёт её |
 | `hr_recruiting_stages` | этапы этой воронки с `sort_order` | воронка, «Следующий этап» |
 | `hr_absence_types` | типы с `name`, `icon`, `color`, `limit_days`, `limit_period`, `sort_order` | табель, баланс, заявки |
+| `hr_shift_kinds` | «Дневная» (`lucide:sun`), «Ночная» (`lucide:moon`), «Удалённо» (`lucide:house`, `is_remote`) с цветом, временем и `sort_order` | график работы: смены, шаблоны |
 | `hr_rejection_reasons`, `hr_candidate_sources` | несколько активных | отказ / резерв, источник кандидата |
 | `crm_pipelines` + `crm_stages` | воронка с этапами (при CRM) | доска сделок |
 | `hr_task_lists` + `hr_task_statuses` | лист с статусами (при Проектах) | трекер задач |

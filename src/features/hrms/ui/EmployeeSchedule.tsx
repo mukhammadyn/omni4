@@ -8,7 +8,7 @@ import { useSchedule, useScheduleDirectory } from "../api/schedule";
 import { byEmployeeDate, spanOf, toClock, toMinutes, type Shift } from "../model/schedule";
 import { datesOf, isWeekend, rangeOf, stepAnchor } from "../model/timesheet";
 import { NavButton, useDayHead, usePeriodLabel } from "./attendance-parts";
-import { KIND_STYLE, Segments, useDuration, type OpenShift } from "./schedule-parts";
+import { Segments, useDuration, useKinds, useShiftTime, type KindLook, type OpenShift } from "./schedule-parts";
 import { ShiftDialog } from "./ShiftDialog";
 
 type Scale = "week" | "month";
@@ -44,6 +44,7 @@ export function EmployeeSchedule({ employeeId }: { employeeId: string }) {
   const { locations } = useScheduleDirectory();
   const head = useDayHead();
   const duration = useDuration();
+  const shiftTime = useShiftTime();
   const label = usePeriodLabel({ scale, anchor, range });
 
   const shiftsOn = useMemo(() => {
@@ -51,7 +52,8 @@ export function EmployeeSchedule({ employeeId }: { employeeId: string }) {
     return (date: string) => of(employeeId, date).sort((a, b) => a.start.localeCompare(b.start));
   }, [data.shifts, employeeId]);
   const locationName = useMemo(() => new Map(locations.map((item) => [item.id, item.name])), [locations]);
-  const place = (shift: Shift) => (shift.kind === "remote" ? t("schedule.kind.remote") : locationName.get(shift.locationId) ?? "");
+  const kinds = useKinds();
+  const place = (shift: Shift) => (kinds.of(shift.kind).remote ? kinds.of(shift.kind).name : locationName.get(shift.locationId) ?? "");
 
   const inRange = data.shifts.filter((shift) => shift.employeeId === employeeId && shift.date >= range.from && shift.date <= range.to);
   const minutes = inRange.reduce((sum, shift) => sum + shift.plannedMinutes, 0);
@@ -148,7 +150,7 @@ export function EmployeeSchedule({ employeeId }: { employeeId: string }) {
                     <i key={hour} className="absolute inset-x-0 h-px bg-border/70" style={{ top: i * HOUR_PX }} />
                   ))}
                   {shiftsOn(date).map((shift) => (
-                    <WeekShift key={shift.id} shift={shift} place={place(shift)} onOpen={openShift(shift)} />
+                    <WeekShift key={shift.id} shift={shift} kind={kinds.of(shift.kind)} place={place(shift)} onOpen={openShift(shift)} />
                   ))}
                 </div>
               ))}
@@ -187,13 +189,11 @@ export function EmployeeSchedule({ employeeId }: { employeeId: string }) {
                       key={shift.id}
                       type="button"
                       onClick={openShift(shift)}
-                      title={`${shift.start}–${shift.end}${place(shift) ? ` · ${place(shift)}` : ""}`}
-                      className={`relative flex min-w-0 items-center gap-1.5 overflow-hidden rounded-[5px] py-0.5 pr-1.5 pl-2 text-left text-[11.5px] hover:brightness-95 ${KIND_STYLE[shift.kind].chip}`}
+                      title={`${shiftTime(shift)}${place(shift) ? ` · ${place(shift)}` : ""}`}
+                      className={`relative flex min-w-0 items-center gap-1.5 overflow-hidden rounded-[5px] py-0.5 pr-1.5 pl-2 text-left text-[11.5px] hover:brightness-95 ${kinds.of(shift.kind).chip}`}
                     >
-                      <i className={`absolute inset-y-0 left-0 w-[3px] ${KIND_STYLE[shift.kind].stripe}`} />
-                      <b className="font-semibold whitespace-nowrap tabular-nums">
-                        {shift.start}–{shift.end}
-                      </b>
+                      <i className={`absolute inset-y-0 left-0 w-[3px] ${kinds.of(shift.kind).stripe}`} />
+                      <b className="font-semibold whitespace-nowrap tabular-nums">{shiftTime(shift)}</b>
                       <span className="min-w-0 flex-1 truncate opacity-80">{place(shift)}</span>
                     </button>
                   ))}
@@ -219,22 +219,22 @@ function HolidayTag({ name }: { name: string }) {
 }
 
 /** Смена в колонке дня — `.sw-sh`; что вне 07–22 (ночная), обрезается краем сетки. */
-function WeekShift({ shift, place, onOpen }: { shift: Shift; place: string; onOpen: (event: MouseEvent) => void }) {
+function WeekShift({ shift, kind, place, onOpen }: { shift: Shift; kind: KindLook; place: string; onOpen: (event: MouseEvent) => void }) {
+  const time = useShiftTime()(shift);
   const start = toMinutes(shift.start);
-  const top = Math.max(0, (start / 60 - FIRST_HOUR) * HOUR_PX);
-  const bottom = Math.min(HOURS.length * HOUR_PX, ((start + spanOf(shift.start, shift.end)) / 60 - FIRST_HOUR) * HOUR_PX);
+  // ponytail: у гибкой смены нет часов — плашка в час сверху колонки; своя полоса «весь день», если начнёт мешать.
+  const top = shift.start ? Math.max(0, (start / 60 - FIRST_HOUR) * HOUR_PX) : 0;
+  const bottom = shift.start ? Math.min(HOURS.length * HOUR_PX, ((start + spanOf(shift.start, shift.end)) / 60 - FIRST_HOUR) * HOUR_PX) : HOUR_PX;
   if (bottom <= top) return null;
   return (
     <button
       type="button"
       onClick={onOpen}
       style={{ top, height: bottom - top - 2 }}
-      className={`absolute inset-x-1 z-[1] flex flex-col gap-px overflow-hidden rounded-md py-1 pr-1.5 pl-2.5 text-left text-xs hover:shadow-md ${KIND_STYLE[shift.kind].chip}`}
+      className={`absolute inset-x-1 z-[1] flex flex-col gap-px overflow-hidden rounded-md py-1 pr-1.5 pl-2.5 text-left text-xs hover:shadow-md ${kind.chip}`}
     >
-      <i className={`absolute inset-y-0 left-0 w-[3px] ${KIND_STYLE[shift.kind].stripe}`} />
-      <b className="text-[12.5px] font-semibold tabular-nums">
-        {shift.start}–{shift.end}
-      </b>
+      <i className={`absolute inset-y-0 left-0 w-[3px] ${kind.stripe}`} />
+      <b className="text-[12.5px] font-semibold tabular-nums">{time}</b>
       {place && <span className="truncate opacity-80">{place}</span>}
     </button>
   );

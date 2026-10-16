@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Building2Icon, FilterIcon, LayersIcon, LayoutTemplateIcon, NetworkIcon, XIcon, type LucideIcon } from "lucide-react";
+import { Building2Icon, FilterIcon, LayersIcon, NetworkIcon, XIcon, type LucideIcon } from "lucide-react";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
@@ -10,7 +10,6 @@ import { SCHEDULE_FILTERS, SCHEDULE_GROUPS, useScheduleSettings, type ScheduleFi
 const ICON: Record<Exclude<ScheduleGroup, "none">, LucideIcon> = {
   dept: NetworkIcon,
   location: Building2Icon,
-  template: LayoutTemplateIcon,
 };
 
 /** Отбор «без шаблона» — сотрудник, у которого шаблона нет ни в сменах, ни в карточке. */

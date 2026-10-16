@@ -8,8 +8,21 @@
  */
 import { datesOf } from "./timesheet";
 
-export const SHIFT_KINDS = ["day", "night", "remote"] as const;
-export type ShiftKind = (typeof SHIFT_KINDS)[number];
+/** Вид смены — guid строки справочника `hr_shift_kinds` (настройки HRMS); пусто — не задан. */
+export type ShiftKind = string;
+
+/** Строка `hr_shift_kinds`: «Утро», «День», «Ночь» — как заведёт компания. */
+export type ShiftKindRow = {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+  /** Время по умолчанию — подставляется в смену при выборе вида; пусто — не трогать. */
+  start: string;
+  end: string;
+  /** Удалённая: вместо филиала у смены — «Удалённо». */
+  remote: boolean;
+};
 
 /** Варианты `weekday` у `hr_work_schedule_days`, с понедельника. */
 export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
@@ -85,7 +98,7 @@ export const weekdayOf = (date: string) => (new Date(`${date}T00:00:00Z`).getUTC
 
 const DEFAULT_BREAK = 60;
 
-export const blankTemplate = (): Template => ({
+export const blankTemplate = (kind: ShiftKind = ""): Template => ({
   id: "",
   name: "",
   color: "#3B82F6",
@@ -94,9 +107,9 @@ export const blankTemplate = (): Template => ({
   graceMinutes: 0,
   description: "",
   active: true,
-  days: WEEKDAYS.map((_, index) => ({ working: index < 5, start: "09:00", end: "18:00", kind: "day" })),
+  days: WEEKDAYS.map((_, index) => ({ working: index < 5, start: "09:00", end: "18:00", kind })),
   dayIds: [],
-  cycle: { work: 2, off: 2, start: "08:00", end: "20:00", kind: "day" },
+  cycle: { work: 2, off: 2, start: "08:00", end: "20:00", kind },
 });
 
 /** Часов в неделю на человека; у цикла — в среднем. */
@@ -157,9 +170,15 @@ export type ShiftForm = {
   comment: string;
 };
 
-/** Конец смены: в режиме «часов в день» — от начала, с часом перерыва у длинной. */
-export const endOf = (form: Pick<ShiftForm, "mode" | "start" | "end" | "hours">) =>
-  form.mode === "hours" ? toClock(toMinutes(form.start) + form.hours * 60 + (form.hours > 5 ? DEFAULT_BREAK : 0)) : form.end;
+/**
+ * «Часов в день» — гибкая смена: N часов в любое время дня, без начала
+ * и конца. В строке пустые `start_time`/`end_time`, норма — `planned_minutes`.
+ */
+export const isFlexible = (shift: Pick<Shift, "start">) => !shift.start;
+
+/** Начало и конец смены формы; у гибкой — пусто. */
+export const startOf = (form: Pick<ShiftForm, "mode" | "start">) => (form.mode === "hours" ? "" : form.start);
+export const endOf = (form: Pick<ShiftForm, "mode" | "end">) => (form.mode === "hours" ? "" : form.end);
 
 /** Даты серии: один день — он сам; иначе дни недели периода без праздников. */
 export const datesOfForm = (form: Pick<ShiftForm, "from" | "to" | "weekdays">, holidays: ReadonlySet<string>) =>
@@ -171,16 +190,18 @@ export const datesOfForm = (form: Pick<ShiftForm, "from" | "to" | "weekdays">, h
 export type ShiftDraft = Omit<Shift, "id">;
 
 export const draftsOfForm = (form: ShiftForm, seriesId: string, holidays: ReadonlySet<string>): ShiftDraft[] => {
+  const start = startOf(form);
   const end = endOf(form);
-  const breakMinutes = spanOf(form.start, end) > 300 ? DEFAULT_BREAK : 0;
+  const breakMinutes = start && spanOf(start, end) > 300 ? DEFAULT_BREAK : 0;
+  const plannedMinutes = start ? plannedOf(start, end, breakMinutes) : form.hours * 60;
   return datesOfForm(form, holidays).flatMap((date) =>
     form.employeeIds.map((employeeId) => ({
       employeeId,
       date,
-      start: form.start,
+      start,
       end,
       breakMinutes,
-      plannedMinutes: plannedOf(form.start, end, breakMinutes),
+      plannedMinutes,
       kind: form.kind,
       seriesId,
       templateId: "",
@@ -217,10 +238,10 @@ export const formOfSeries = (rows: Shift[], anchor: Shift): ShiftForm => {
   return {
     employeeIds: [...new Set(rows.map((row) => row.employeeId))],
     positionId: anchor.positionId,
-    mode: "range",
-    start: anchor.start,
-    end: anchor.end,
-    hours: 8,
+    mode: isFlexible(anchor) ? "hours" : "range",
+    start: anchor.start || "09:00",
+    end: anchor.end || "18:00",
+    hours: isFlexible(anchor) ? anchor.plannedMinutes / 60 : 8,
     kind: anchor.kind,
     from,
     to,
@@ -239,20 +260,18 @@ export const formOfSeries = (rows: Shift[], anchor: Shift): ShiftForm => {
  */
 export type SeriesScope = { days: "single" | "following" | "all"; people: "all" | "single" };
 
-/** Серия из одной даты правится целиком, и в прошлом тоже. */
+/** Серия из одной даты правится целиком. */
 export const isOneDate = (rows: Shift[]) => new Set(rows.map((row) => row.date)).size <= 1;
 
 /**
  * Строки серии в области правки: даты формы × ось дней × ось людей.
- * Прошлое не трогается — по сменам табель считает норму, и правка
- * задним числом переписала бы итоги.
+ * Прошлые дни правятся тоже: «все дни серии» — вся серия.
  */
 export const scopedRows = (
   rows: Shift[],
   anchor: Shift,
   form: Pick<ShiftForm, "from" | "to" | "weekdays">,
   scope: SeriesScope,
-  today: string,
   /** Строки — не вся серия (api/schedule, useSeries): одна ли у неё дата, знает тот, кто грузил. */
   one = isOneDate(rows),
 ) => {
@@ -260,7 +279,6 @@ export const scopedRows = (
     one || (date >= form.from && date <= form.to && (form.from === form.to || form.weekdays.includes(weekdayOf(date))));
   return rows.filter(
     (row) =>
-      (one || row.date >= today) &&
       inForm(row.date) &&
       (scope.days === "all" || (scope.days === "following" ? row.date >= anchor.date : row.date === anchor.date)) &&
       (scope.people === "all" || row.employeeId === anchor.employeeId),
@@ -289,11 +307,13 @@ export const editSeries = (
     fillGaps = false,
   }: { today: string; holidays: ReadonlySet<string>; oneDate?: boolean; fillGaps?: boolean },
 ) => {
-  const target = scopedRows(rows, anchor, form, scope, today, oneDate);
+  const target = scopedRows(rows, anchor, form, scope, oneDate);
+  const start = startOf(form);
   const end = endOf(form);
   const patch: Partial<Shift> = {};
-  if (form.start !== anchor.start) patch.start = form.start;
+  if (start !== anchor.start) patch.start = start;
   if (end !== anchor.end) patch.end = end;
+  if (!start && form.hours * 60 !== anchor.plannedMinutes) patch.plannedMinutes = form.hours * 60;
   if (form.kind !== anchor.kind) patch.kind = form.kind;
   if (form.positionId !== anchor.positionId) patch.positionId = form.positionId;
   if (form.locationId !== anchor.locationId) patch.locationId = form.locationId;
@@ -308,9 +328,8 @@ export const editSeries = (
   // Строка без серии (заведена в обход графика) с новыми людьми становится серией.
   const seriesId = anchor.seriesId || crypto.randomUUID();
   if (added.length && !anchor.seriesId) patch.seriesId = seriesId;
-  const cutoff = oneDate ? "" : today;
   const inDays = (date: string) =>
-    date >= cutoff && (scope.days === "all" || (scope.days === "following" ? date >= anchor.date : date === anchor.date));
+    (scope.days === "all" || (scope.days === "following" ? date >= anchor.date : date === anchor.date));
 
   const changed = Object.keys(patch).length > 0;
   // Где у участника уже есть строка — после правки: перенесённая смена занимает новый день.
@@ -335,6 +354,7 @@ export const editSeries = (
             .filter((row) => keep.has(row.employeeId))
             .map((row) => {
               const next = { ...row, ...patch };
+              if (isFlexible(next)) return { ...next, breakMinutes: 0, plannedMinutes: form.hours * 60 };
               // Время не трогали — перерыв строки (у шаблона свой) как есть. Тронули — короткой
               // смене он не положен, длинной остаётся свой или обычный.
               const retimed = patch.start !== undefined || patch.end !== undefined;

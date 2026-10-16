@@ -30,6 +30,7 @@ import {
   RulerIcon,
   ScaleIcon,
   SignalIcon,
+  SunMoonIcon,
   UsersRoundIcon,
 } from "lucide-react";
 import type { TranslationKey } from "@/shared/lib/i18n";
@@ -398,6 +399,15 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             hintKey: "dir.schedulesHint",
             icon: CalendarClockIcon,
             columns: ["type", "is_active"],
+          },
+          {
+            id: "hr-shift-kinds",
+            table: "hr_shift_kinds",
+            titleKey: "dir.shiftKinds",
+            hintKey: "dir.shiftKindsHint",
+            icon: SunMoonIcon,
+            columns: ["color", "icon", "default_start", "default_end", "is_remote"],
+            sort: ["sort_order"],
           },
         ],
       },

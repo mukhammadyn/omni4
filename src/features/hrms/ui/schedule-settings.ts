@@ -8,7 +8,8 @@ import { useUi } from "@/shared/lib/ui-store";
  */
 
 /** Группировки — `GRPS` прототипа; бизнес-юнита и региона у сотрудника нет. */
-export const SCHEDULE_GROUPS = ["none", "dept", "location", "template"] as const;
+// Шаблон — только отбор: группировать по нему не нужно.
+export const SCHEDULE_GROUPS = ["none", "dept", "location"] as const;
 export type ScheduleGroup = (typeof SCHEDULE_GROUPS)[number];
 /** Отборы — `SCHF` прототипа, кроме типа смены: он счётчиками над сеткой. */
 export const SCHEDULE_FILTERS = ["dept", "location", "template"] as const;

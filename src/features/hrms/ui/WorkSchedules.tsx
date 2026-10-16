@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ClockIcon, CoffeeIcon, CopyIcon, InfoIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import { Avatar, useItemCounts, type Filters } from "@/features/item";
@@ -26,7 +26,7 @@ import { TemplateDialog } from "./TemplateDialog";
  * сиротами, а применить другой — дело одного окна. Сделан под
  * `hr_work_schedules` (FIXED_VIEW_TYPES).
  */
-export function WorkSchedules() {
+export function WorkSchedules({ openId, onOpened }: { openId?: string | undefined; onOpened?: () => void } = {}) {
   const { t } = useTranslation();
   const { templates, loading } = useTemplates();
   const { employees } = useScheduleEmployees();
@@ -40,6 +40,13 @@ export function WorkSchedules() {
   const [applying, setApplying] = useState<Template | null>(null);
   const onEdit = (template?: Template) => setEditing(template ?? null);
   const onApply = setApplying;
+  // Пришли по ссылке со смены (ShiftDialog) — открыть этот шаблон, когда список загрузится.
+  const linked = templates.find((template) => template.id === openId);
+  useEffect(() => {
+    if (!linked) return;
+    setEditing(linked);
+    onOpened?.();
+  }, [linked, onOpened]);
 
   const today = todayInput();
   const future = useItemCounts(
