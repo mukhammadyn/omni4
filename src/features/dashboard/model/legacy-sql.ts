@@ -1,5 +1,5 @@
 import type { SqlResult } from "@/features/settings";
-import { sqlLex } from "./sql-assist";
+import { quoteSqlName, sqlLex } from "./sql-assist";
 import { sqlSupportIssue } from "./sql-query-guidance";
 import { toQueryResult } from "./query-result";
 
@@ -31,9 +31,32 @@ export function prepareDashboardSql(sql: string, parameters: Parameter[], limit:
   return { sql: `SELECT * FROM (\n${text}\n) AS "dashboard_preview" LIMIT ${limit + 1}`, params };
 }
 
-/** Legacy rows are unordered maps; precision already lost by protobuf cannot be restored. */
+const exactNumeric = new Set(["numeric", "int8"]);
+const missingMetadata = "SQL returned no column metadata. The existing endpoint hides SQL/conversion errors; verify syntax and source columns.";
+
+/** LIMIT 0 obtains native output types without serializing numeric result values. */
+export function numericProjection(sql: string, schema: SqlResult) {
+  if (!schema.columns.length) throw new Error(missingMetadata);
+  if (schema.columns.length > 64 || schema.columns.some((key) => !key || ["__proto__", "constructor", "prototype"].includes(key))) throw new Error("Unsupported SQL output schema");
+  const exactColumns = schema.columns.filter((key) => exactNumeric.has(schema.types[key] ?? ""));
+  if (!exactColumns.length) return { sql, exactColumns };
+  const fields = schema.columns.map((key) => `"dashboard_values".${quoteSqlName(key)}${exactColumns.includes(key) ? `::text AS ${quoteSqlName(key)}` : ""}`);
+  return { sql: `SELECT ${fields.join(", ")} FROM (\n${sql}\n) AS "dashboard_values"`, exactColumns };
+}
+
+/** The data response must match the inspected schema and text transport exactly. */
+export function restoreNumericSchema(schema: SqlResult, result: SqlResult, exactColumns: string[]): SqlResult {
+  if (!result.columns.length) throw new Error(missingMetadata);
+  if (result.columns.length !== schema.columns.length || schema.columns.some((key) => !result.columns.includes(key) || result.types[key] !== (exactColumns.includes(key) ? "text" : schema.types[key]))) throw new Error("SQL output schema changed during preview; run again");
+  for (const row of result.rows) for (const key of exactColumns) {
+    if (row[key] !== null && typeof row[key] !== "string") throw new Error("Exact SQL numeric text was not returned");
+  }
+  return { ...result, columns: schema.columns, types: schema.types };
+}
+
+/** Legacy output maps lose SELECT order; native numeric/int8 are transported as SQL text. */
 export function legacyQueryResult(result: SqlResult, limit: number) {
-  if (!result.columns.length) throw new Error("SQL returned no column metadata. The existing endpoint may have hidden a SQL error; check the query in SQL Console.");
+  if (!result.columns.length) throw new Error(missingMetadata);
   if (new TextEncoder().encode(JSON.stringify(result)).length > 2 * 1024 * 1024) throw new Error("SQL preview response is too large");
   const numeric = ["int8", "numeric"], supported = new Set(["int2", "int4", "float4", "float8", ...numeric, "text", "varchar", "bpchar", "uuid", "bool", "date", "timestamp", "timestamptz"]);
   const columns = result.columns.map((key) => {

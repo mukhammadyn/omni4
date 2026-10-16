@@ -36,14 +36,14 @@ export function supportedSqlExamples(catalog: DatasetTable[]): SQLExample[] {
   const examples: SQLExample[] = [{ kind: "table", sql: `SELECT ${source.fields.slice(0, 4).map((field) => ref("t", field.slug)).join(", ")}\nFROM ${quoteSqlName(source.slug)} AS "t"\nLIMIT 100` }];
   const numeric = source.fields.find((field) => ["NUMBER", "FLOAT", "FLOAT_NOLIMIT", "MONEY", "INCREMENT_ID"].includes(field.type));
   const dimension = source.fields.find((field) => field.slug === "currency") ?? source.fields.find((field) => ["SINGLE_LINE", "STATUS"].includes(field.type));
-  if (numeric && dimension) examples.push({ kind: "totals", sql: `SELECT ${ref("t", dimension.slug)} AS "label", SUM(${ref("t", numeric.slug)})::float8 AS "total"\nFROM ${quoteSqlName(source.slug)} AS "t"\nGROUP BY ${ref("t", dimension.slug)}\nORDER BY "total" DESC\nLIMIT 100` });
+  if (numeric && dimension) examples.push({ kind: "totals", sql: `SELECT ${ref("t", dimension.slug)} AS "label", SUM(${ref("t", numeric.slug)}) AS "total"\nFROM ${quoteSqlName(source.slug)} AS "t"\nGROUP BY ${ref("t", dimension.slug)}\nORDER BY "total" DESC\nLIMIT 100` });
   const relation = source.fields.find((field) => field.type === "LOOKUP" && field.joinable && field.target);
   const target = catalog.find((table) => table.slug === relation?.target);
   const label = target?.fields.find((field) => ["SINGLE_LINE", "STATUS"].includes(field.type));
   if (relation && target && label && target.fields.some((field) => field.slug === "guid")) {
     const currency = source.fields.find((field) => field.slug === "currency");
     const groups = [ref("related", label.slug), ...(currency ? [ref("t", currency.slug)] : [])];
-    examples.push({ kind: "join", sql: `SELECT ${groups[0]} AS "label"${currency ? `, ${groups[1]} AS "currency"` : ""}, ${numeric ? `SUM(${ref("t", numeric.slug)})::float8` : "COUNT(*)"} AS "total"\nFROM ${quoteSqlName(source.slug)} AS "t"\nLEFT JOIN ${quoteSqlName(target.slug)} AS "related" ON ${ref("t", relation.slug)} = "related"."guid"\nGROUP BY ${groups.join(", ")}\nORDER BY "total" DESC\nLIMIT 100` });
+    examples.push({ kind: "join", sql: `SELECT ${groups[0]} AS "label"${currency ? `, ${groups[1]} AS "currency"` : ""}, ${numeric ? `SUM(${ref("t", numeric.slug)})` : "COUNT(*)"} AS "total"\nFROM ${quoteSqlName(source.slug)} AS "t"\nLEFT JOIN ${quoteSqlName(target.slug)} AS "related" ON ${ref("t", relation.slug)} = "related"."guid"\nGROUP BY ${groups.join(", ")}\nORDER BY "total" DESC\nLIMIT 100` });
   }
   return examples;
 }

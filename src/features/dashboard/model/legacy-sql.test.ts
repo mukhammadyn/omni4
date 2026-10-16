@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { legacyQueryResult, prepareDashboardSql } from "./legacy-sql";
+import { legacyQueryResult, numericProjection, prepareDashboardSql, restoreNumericSchema } from "./legacy-sql";
 import { queryChartRows } from "./query-result";
 
 test("preview wrapping retains manual SQL text and protects trailing comments", () => {
@@ -26,4 +26,16 @@ test("legacy map columns, empty schema and extra preview row are normalized hone
 test("unsafe protobuf numbers cannot be advertised as exact chart values", () => {
   const result = legacyQueryResult({ columns: ["total"], rows: [{ total: 9007199254740992 }], types: { total: "int8" }, rowsAffected: 1 }, 100);
   expect(() => queryChartRows(result)).toThrow("precision");
+});
+
+test("SUM/AVG and large integers preserve decimal text while charts reject rounding", () => {
+  const schema = { columns: ["total", "average", "big"], rows: [], types: { total: "numeric", average: "numeric", big: "int8" }, rowsAffected: 0 };
+  const plan = numericProjection("SELECT SUM(amount) AS total,AVG(amount) AS average,MAX(count) AS big FROM deals", schema);
+  expect(plan.sql).not.toContain("float8");
+  expect(plan.exactColumns).toEqual(schema.columns);
+  const result = legacyQueryResult(restoreNumericSchema(schema, { ...schema, types: { total: "text", average: "text", big: "text" }, rows: [{ total: "132.34", average: "44.1133333333333333", big: "9007199254740993" }] }, plan.exactColumns), 100);
+  expect(result.rows[0]).toEqual({ total: "132.34", average: "44.1133333333333333", big: "9007199254740993" });
+  expect(() => queryChartRows(result)).toThrow("precision");
+  const safe = legacyQueryResult(restoreNumericSchema({ ...schema, columns: ["average"], types: { average: "numeric" } }, { ...schema, columns: ["average"], types: { average: "text" }, rows: [{ average: "56.1700000000000000" }] }, ["average"]), 100);
+  expect(queryChartRows(safe)).toEqual([{ average: 56.17 }]);
 });
