@@ -107,6 +107,7 @@ export function RelationView({
   languages = EMPTY_LANGUAGES,
   onLanguage,
   trail,
+  onOpenRow,
   settings,
   saving = false,
 }: {
@@ -141,6 +142,11 @@ export function RelationView({
    * собой всё остальное, и без крошек непонятно, где мы оказались.
    */
   trail?: { label: string; onClick: () => void }[] | undefined;
+  /**
+   * Открыть строку своей страницей вместо карточки. true — открыто,
+   * карточка не нужна.
+   */
+  onOpenRow?: ((row: Item) => boolean) | undefined;
   /**
    * Правки настроек вкладки. Не заданы — панели «⋯» нет вовсе: настройки
    * лежат в раскладке карточки, и правит их тот, у кого есть права
@@ -449,6 +455,7 @@ export function RelationView({
       rows.rows.find((item) => item.guid === guid) ??
       undated.find((item) => item.guid === guid);
     if (openRowUrl(tab.view, row)) return;
+    if (row && onOpenRow?.(row)) return;
 
     setOpenGuid(guid);
   };
