@@ -228,7 +228,8 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | | Опросы | TABLE | `hr_surveys` | 📋 `1f4cb` |
 | Финансы | Зарплата | TABLE | `hr_payroll_lines` | 💵 `1f4b5` |
 | | Бюджет | TABLE | `hr_budget_lines` | 💰 `1f4b0` |
-| Система | Настройки | LINK | `screen: "settings"` | ⚙️ `2699-fe0f` |
+| Система | Имущество | TABLE | `hr_assets` | 📦 `1f4e6` |
+| | Настройки | LINK | `screen: "settings"` | ⚙️ `2699-fe0f` |
 
 Таблицы без пункта меню (`hr_job_history`, `hr_career_site`,
 `hr_attendance_events`, `hr_requests`, `hr_absence_balance`,
@@ -315,7 +316,7 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 
 | Тип | Таблица | Атрибуты | Экран |
 |---|---|---|---|
-| `GALLERY` | любая | `card: "person"` | «Сетка» людей |
+| `GALLERY` | любая | `card: "person"` / `"asset"` (только `hr_assets`) | «Сетка» людей / имущества |
 | `ORG` | `hr_employees` | — | «Оргструктура» |
 | `VACANCIES` | `hr_vacancies` | — | «Карточки» вакансий |
 | `VACANCY_PLAN` | `hr_vacancies` | — | «Планирование» найма |
@@ -368,7 +369,7 @@ LIST, GALLERY); значение — поле или колонка-связь (
 | Посещаемость | `hr_attendance_days` | `hr_employees_id` | `EmployeeAttendance` |
 | График работы | `hr_shifts` | `hr_employees_id` | `EmployeeSchedule` |
 | Документы | `hr_documents` | `hr_employees_id` | таблица |
-| Имущество | `hr_assets` | `hr_employees_id` | таблица |
+| Имущество | `hr_assets` | `hr_employees_id` | `EmployeeAssets`: что на руках, выдать со склада, вернуть |
 | KPI | `hr_kpi_scorecards` | `hr_employees_id` | таблица |
 | Тренинги | `hr_training_participants` | `hr_employees_id` | таблица |
 | Опросы | `hr_survey_participants` | `hr_employees_id` | `EmployeeSurveys`: участие, «Пройти» на своей карточке |
@@ -457,6 +458,22 @@ LIST, GALLERY); значение — поле или колонка-связь (
 «Опросы» роли не нужен. Назначение и прохождение пока пишутся
 с клиента; облачной функции (как `survey_assign_employees` и
 `survey_submit` в udevs-hrms-reports) в omni4 нет.
+
+**HRMS / Имущество** (`hr_assets`, журнал — `hr_asset_movements`) —
+у TABLE сверх колонок меню строки (features/hrms, asset-columns).
+
+| # | Тип | Имя | Настройки |
+|---|---|---|---|
+| 1 | TABLE | Таблица | колонки: `photos`, `name`, `inventory_number`, `category`, `serial_number`, `cost`, `currency`, `hr_employees_id`, `status` |
+| 2 | GALLERY | Сетка | `attributes.card: "asset"` — карточка имущества (`AssetGallery`, поля по слагам, колонки view не читает) |
+
+Строка открывается страницей (`/assets/$id`), «Создать» — формой
+(`/assets/new`). Статус и владелец меняются только движением со
+страницы: запись в журнал (`action`) и новое состояние вещи; владелец
+остаётся только у «Выдано». Цвета `hr_assets.status` (PICK_LIST):
+`in_stock` `#9E9E9E`, `assigned` `#22A06B`, `repair` `#E3C11F`,
+`written_off` `#E5484D` (2026-10-19). Облачной функции движения (как
+`move_property` в udevs-hrms-reports) в omni4 нет — пишется с клиента.
 
 **HRMS / База знаний** (`hr_kb_articles`)
 

@@ -442,10 +442,10 @@ export type View = {
   pivot: Partial<Record<"row" | "col" | "value" | "agg" | "sort", string>> & { skipEmpty?: boolean };
   /**
    * Карточка галереи (`attributes.card`): `person` — карточка человека
-   * (фото, статус, контакты; PeopleGallery), пусто — обычная. Читается
-   * только у GALLERY.
+   * (фото, статус, контакты; PeopleGallery), `asset` — карточка имущества
+   * (features/hrms, AssetGallery), пусто — обычная. Читается только у GALLERY.
    */
-  card: "" | "person";
+  card: "" | "person" | "asset";
   /**
    * Раскладка посещаемости (`attributes.layout`). Читается только
    * у ATTENDANCE; пустая и незнакомая — календарь: так view ATTENDANCE,

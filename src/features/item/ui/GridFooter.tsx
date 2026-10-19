@@ -6,6 +6,7 @@ import {
   LoaderCircleIcon,
   Trash2Icon,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
@@ -48,6 +49,7 @@ export function GridFooter({
   onPage,
   onLimit,
   onDeleteSelected,
+  aside,
 }: {
   /** Открытая страница. Не задана — строки догружаются прокруткой. */
   page?: number | undefined;
@@ -68,6 +70,8 @@ export function GridFooter({
    * чужие строки не предлагают вовсе.
    */
   onDeleteSelected?: (() => void) | undefined;
+  /** Своё справа, перед страницами: «Общая стоимость» у имущества. */
+  aside?: ReactNode;
 }) {
   const { t } = useTranslation();
   const pages = pageCount(total, limit);
@@ -102,51 +106,54 @@ export function GridFooter({
         )}
       </div>
 
-      {!paged ? (
-        <p className="flex shrink-0 items-center gap-1.5 text-xs text-fg-muted tabular-nums">
-          {loadingMore && <Icon as={LoaderCircleIcon} size={12} className="animate-spin" />}
-          {t("table.shownOf", { shown, total })}
-        </p>
-      ) : (
-        <nav className="flex items-center gap-0.5" aria-label={t("table.pages")}>
-          <Step
-            label={t("table.prevPage")}
-            icon={ChevronLeftIcon}
-            disabled={page <= 1}
-            onClick={() => onPage(page - 1)}
-          />
+      <div className="flex min-w-0 items-center gap-4">
+        {aside}
+        {!paged ? (
+          <p className="flex shrink-0 items-center gap-1.5 text-xs text-fg-muted tabular-nums">
+            {loadingMore && <Icon as={LoaderCircleIcon} size={12} className="animate-spin" />}
+            {t("table.shownOf", { shown, total })}
+          </p>
+        ) : (
+          <nav className="flex items-center gap-0.5" aria-label={t("table.pages")}>
+            <Step
+              label={t("table.prevPage")}
+              icon={ChevronLeftIcon}
+              disabled={page <= 1}
+              onClick={() => onPage(page - 1)}
+            />
 
-          {pageItems(page, pages).map((item, index) =>
-            item === GAP ? (
-              // Многоточие — не кнопка: нажимать там нечего.
-              <span key={`${GAP}${index}`} className={`${pageButton} text-fg-subtle`} aria-hidden>
-                …
-              </span>
-            ) : (
-              <button
-                key={item}
-                type="button"
-                aria-current={item === page ? "page" : undefined}
-                onClick={() => onPage(item)}
-                className={`${pageButton} ${
-                  item === page
-                    ? "bg-surface-active font-semibold text-fg"
-                    : "text-fg-muted hover:bg-surface-hover hover:text-fg"
-                }`}
-              >
-                {item}
-              </button>
-            ),
-          )}
+            {pageItems(page, pages).map((item, index) =>
+              item === GAP ? (
+                // Многоточие — не кнопка: нажимать там нечего.
+                <span key={`${GAP}${index}`} className={`${pageButton} text-fg-subtle`} aria-hidden>
+                  …
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  type="button"
+                  aria-current={item === page ? "page" : undefined}
+                  onClick={() => onPage(item)}
+                  className={`${pageButton} ${
+                    item === page
+                      ? "bg-surface-active font-semibold text-fg"
+                      : "text-fg-muted hover:bg-surface-hover hover:text-fg"
+                  }`}
+                >
+                  {item}
+                </button>
+              ),
+            )}
 
-          <Step
-            label={t("table.nextPage")}
-            icon={ChevronRightIcon}
-            disabled={page >= pages}
-            onClick={() => onPage(page + 1)}
-          />
-        </nav>
-      )}
+            <Step
+              label={t("table.nextPage")}
+              icon={ChevronRightIcon}
+              disabled={page >= pages}
+              onClick={() => onPage(page + 1)}
+            />
+          </nav>
+        )}
+      </div>
     </div>
   );
 }

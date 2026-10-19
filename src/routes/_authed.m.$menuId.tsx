@@ -103,6 +103,10 @@ import {
   useTrainingColumns,
   SURVEYS,
   useSurveyColumns,
+  ASSETS,
+  useAssetColumns,
+  AssetGallery,
+  AssetTotal,
   SurveyTemplates,
   SURVEY_TEMPLATES_VIEW,
   KnowledgeBase,
@@ -656,7 +660,7 @@ function MenuPage() {
   /** Галерея (`r_gallery` прототипа) — то же самое карточками. */
   const galleryView = supportedView && view?.type === "GALLERY";
   /** «Сетка» сотрудников — та же галерея, карточка человека (ADR-0016). */
-  const GalleryCards = view?.card === "person" ? PeopleGallery : Gallery;
+  const GalleryCards = view?.card === "person" ? PeopleGallery : view?.card === "asset" ? AssetGallery : Gallery;
   /** «Карточки» вакансий (features/hrms) — та же галерея, карточка вакансии. */
   const vacancyCardsView = supportedView && view?.type === "VACANCIES";
   /** Таблица кандидатов (features/hrms): колонки по вкладке-статусу. */
@@ -1113,6 +1117,11 @@ function MenuPage() {
       void navigate({ to: "/trainings/$itemId", params: { itemId: guid }, search: { menu: menuId } });
       return;
     }
+    /* Имущество — тоже: действия, история и владелец (features/hrms, AssetPage). */
+    if (view?.tableSlug === ASSETS) {
+      void navigate({ to: "/assets/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
     /* Опрос — тоже: вопросы в конструкторе SurveyJS (features/hrms, SurveyForm). */
     if (view?.tableSlug === SURVEYS) {
       void navigate({ to: "/surveys/$itemId", params: { itemId: guid }, search: { menu: menuId } });
@@ -1198,6 +1207,11 @@ function MenuPage() {
   /* Участники и прогресс ДЗ — у таблицы тренингов (features/hrms). */
   const trainingColumns = useTrainingColumns(
     view?.tableSlug === TRAININGS && view.type === "TABLE" ? rows.rows : undefined,
+  );
+  /* Меню строки — у таблицы имущества (features/hrms). */
+  const assetColumns = useAssetColumns(
+    view?.tableSlug === ASSETS && view.type === "TABLE" ? rows.rows : undefined,
+    (guid, edit) => void navigate({ to: "/assets/$itemId", params: { itemId: guid }, search: { menu: menuId, ...(edit ? { edit } : {}) } }),
   );
   /* Назначено, заполняемость и меню строки — у таблицы опросов (features/hrms). */
   const surveyColumns = useSurveyColumns(
@@ -1347,6 +1361,11 @@ function MenuPage() {
        и материалы в карточку сбоку не помещаются. */
     if (view?.tableSlug === TRAININGS) {
       void navigate({ to: "/trainings/new", search: { menu: menuId } });
+      return;
+    }
+    /* Имущество — формой с фото и выдачей (property.html?new=1). */
+    if (view?.tableSlug === ASSETS) {
+      void navigate({ to: "/assets/new", search: { menu: menuId } });
       return;
     }
     /* Опрос — тоже: вопросы собираются в конструкторе SurveyJS. */
@@ -2459,7 +2478,13 @@ function MenuPage() {
               tableSlug={view.tableSlug}
               columns={columns}
               extra={
-                view.tableSlug === TRAININGS ? trainingColumns : view.tableSlug === SURVEYS ? surveyColumns : vacancyColumns
+                view.tableSlug === TRAININGS
+                  ? trainingColumns
+                  : view.tableSlug === SURVEYS
+                    ? surveyColumns
+                    : view.tableSlug === ASSETS
+                      ? assetColumns
+                      : vacancyColumns
               }
               /* Та же подстановка, что и в карточке: настройка, которая
                  работает в одном из двух мест, хуже отсутствующей. */
@@ -2595,6 +2620,8 @@ function MenuPage() {
               setTableLimit(view.tableSlug, next);
               setSearch({ limit: next, page: 1 });
             }}
+            /* «Общая стоимость» имущества — по всему отбору, а не странице. */
+            {...(view.tableSlug === ASSETS ? { aside: <AssetTotal filters={effectiveFilters} search={searchText} /> } : {})}
             /* Кнопка удаления отмеченных переехала в шапку, к остальным
                действиям над выделением (TableActions) — см. выше. */
           />

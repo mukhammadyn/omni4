@@ -428,6 +428,13 @@ structpb.NewStruct(...)` (`view.go:351` и `:355`): это НОВЫЙ указа
 Шаг сетки в календаре поэтому постоянный, 60 минут
 (`features/item/model/calendar.ts`, `SLOT_MINUTES`).
 
+**POST view не читает `columns` из запроса** (added 2026-10-19).
+`viewRepo.Create` (`storage/postgres/view.go:81-100`) сам собирает
+колонки: все поля таблицы и все её связи — и пишет их в INSERT,
+`req.Columns` не используется. Новый view всегда со всеми колонками;
+свой состав — вторым запросом, PUT того же view (так заведена «Сетка»
+имущества).
+
 **PUT view всегда переписывает четыре колонки.** `calendar_from_slug`,
 `calendar_to_slug`, `group_fields` и `columns` подставляются
 безусловно (`view.go:625`), даже когда их не прислали. Тело собирается
