@@ -254,8 +254,8 @@ export function FormField({
   );
 }
 
-/** `.switch` прототипа: «Показывать в объявлении». */
-function Switch({ on, label, onToggle }: { on: boolean; label: string; onToggle: () => void }) {
+/** `.switch` прототипа: «Показывать в объявлении». `hint` — пояснение после подписи. */
+export function Switch({ on, label, hint, onToggle }: { on: boolean; label: string; hint?: string; onToggle: () => void }) {
   return (
     <button
       type="button"
@@ -267,7 +267,8 @@ function Switch({ on, label, onToggle }: { on: boolean; label: string; onToggle:
       <span className="relative h-4.5 w-7.5 shrink-0 rounded-full bg-border-strong transition-colors group-aria-checked:bg-accent-solid">
         <span className="absolute top-0.5 left-0.5 size-3.5 rounded-full bg-white shadow-sm transition-[left] group-aria-checked:left-3.5" />
       </span>
-      {label}
+      {hint ? <span className="font-medium">{label}</span> : label}
+      {hint && <span className="text-left text-fg-subtle">— {hint}</span>}
     </button>
   );
 }

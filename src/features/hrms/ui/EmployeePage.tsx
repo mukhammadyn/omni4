@@ -1,5 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { Suspense, useMemo, useState, type ReactNode } from "react";
 import {
+  KeyRoundIcon,
   AwardIcon,
   BriefcaseIcon,
   Building2Icon,
@@ -26,8 +27,10 @@ import {
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ActiveCell, Avatar, Cell } from "@/features/item";
+import { ActiveCell, Avatar, Cell, PEOPLE } from "@/features/item";
+import { session } from "@/shared/api/session";
 import { localized, type Field } from "@/features/table";
+import { UserDialog } from "@/features/settings";
 import { RelationView } from "@/features/view";
 import type { DataLanguage } from "@/features/workspace";
 import { formatDate } from "@/shared/lib/date-value";
@@ -43,10 +46,12 @@ import { SHIFTS } from "../api/schedule";
 
 /** Вкладка «Тренинги»: участия сотрудника, строка ведёт на страницу тренинга. */
 const TRAINING_PARTICIPANTS = "hr_training_participants";
-import { toPerson } from "../api/org";
+import { text, toPerson } from "../api/org";
 import { monthsBetween, toDay } from "../model/job-history";
 import { Card, Meta, Row, SideProp } from "./page-parts";
-import { ABSENCES_TAB, ATTENDANCE_TAB, SCHEDULE_TAB } from "./employee-tabs";
+import { ABSENCES_TAB, ATTENDANCE_TAB, SCHEDULE_TAB, SURVEYS_TAB } from "./employee-tabs";
+import { EmployeeSurveys } from "./EmployeeSurveys";
+import { SURVEY_PARTICIPANTS } from "../api/survey";
 import { DismissDialog } from "./DismissDialog";
 import { EmployeeCompensation } from "./EmployeeCompensation";
 import { EmployeeAbsences } from "./EmployeeAbsences";
@@ -61,11 +66,13 @@ const OWN_TABLES: Record<string, string> = {
   [ABSENCES_TAB]: "hr_requests",
   [ATTENDANCE_TAB]: "hr_attendance_days",
   [SCHEDULE_TAB]: SHIFTS,
+  [SURVEYS_TAB]: SURVEY_PARTICIPANTS,
 };
 const OWN_TITLES: Record<string, TranslationKey> = {
   [ABSENCES_TAB]: "employeeAbsences.title",
   [ATTENDANCE_TAB]: "employeeAttendance.title",
   [SCHEDULE_TAB]: "employeeSchedule.title",
+  [SURVEYS_TAB]: "survey.take.title",
 };
 const OWN_TABS = new Set(Object.keys(OWN_TABLES));
 
@@ -178,6 +185,7 @@ export function EmployeePage({
   /** «Изменить»: поля правятся, только пока режим включён, — как в прототипе. */
   const [editing, setEditing] = useState(false);
   const [dismissing, setDismissing] = useState(false);
+  const [granting, setGranting] = useState(false);
   const bySlug = useMemo(
     () => new Map(employee.fields.map((field) => [field.slug, field])),
     [employee.fields],
@@ -305,6 +313,13 @@ export function EmployeePage({
                 />
               </>
             )}
+            {/* Нет строки в `core_users` — нет и входа: заводим её отсюда. */}
+            {employee.can.write && !employee.user && (
+              <Button variant="secondary" onClick={() => setGranting(true)}>
+                <Icon as={KeyRoundIcon} size={15} />
+                {t("employee.grantAccess")}
+              </Button>
+            )}
             {employee.can.write && (
               /* Правка сохраняется сразу, по полю, поэтому выход
                  из режима — «Готово», а не «Сохранить». */
@@ -382,6 +397,15 @@ export function EmployeePage({
           <EmployeeAttendance employeeId={guid} />
         ) : own === SCHEDULE_TAB ? (
           <EmployeeSchedule employeeId={guid} />
+        ) : own === SURVEYS_TAB ? (
+          <EmployeeSurveys
+            employeeId={guid}
+            /* Своя карточка — вошедший и есть этот сотрудник: тогда «Пройти». */
+            own={Boolean(employee.user?.guid) && employee.user?.guid === session.getObjectIds()[PEOPLE]}
+            locale={locale}
+            language={language}
+            onOpenSurvey={(survey) => void navigate({ to: "/surveys/$itemId", params: { itemId: survey }, search: { menu: "" } })}
+          />
         ) : own === ABSENCES_TAB ? (
           <EmployeeAbsences employeeId={guid} />
         ) : tab?.tableSlug === PAYROLL_LINES && tab.direction === "incoming" ? (
@@ -512,6 +536,15 @@ export function EmployeePage({
           </div>
         )}
       </div>
+
+      {granting && (
+        <Suspense>
+          <UserDialog
+            employee={{ id: guid, name: person.name, email: text(row.email), phone: text(row.phone) }}
+            onClose={() => setGranting(false)}
+          />
+        </Suspense>
+      )}
 
       {dismissing && (
         <DismissDialog
