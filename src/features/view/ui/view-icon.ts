@@ -1,5 +1,6 @@
 import {
   BookOpenIcon,
+  FolderOpenIcon,
   Grid3x3Icon,
   WalletIcon,
   CalendarCheckIcon,
@@ -58,6 +59,7 @@ const ICONS: Record<string, LucideIcon> = {
   WORK_SCHEDULES: LayoutTemplateIcon,
   KNOWLEDGE: BookOpenIcon,
   SURVEY_TEMPLATES: LayoutTemplateIcon,
+  DOCUMENTS: FolderOpenIcon,
   PAYROLL: Grid3x3Icon,
   BUDGET: WalletIcon,
   "ATTENDANCE.sheet": SheetIcon,

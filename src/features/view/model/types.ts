@@ -33,6 +33,7 @@ export const VIEW_TYPES = [
   "WORK_SCHEDULES",
   "KNOWLEDGE",
   "SURVEY_TEMPLATES",
+  "DOCUMENTS",
   "PAYROLL",
   "BUDGET",
   "BOARD",
@@ -177,6 +178,11 @@ const TRAITS: Record<ViewType, ViewTraits> = {
   KNOWLEDGE: { ...HRMS, selfLoading: true },
   /** «Шаблоны» опросов (`surveys.html#tpl`, features/hrms) на `hr_surveys`. */
   SURVEY_TEMPLATES: { ...HRMS, selfLoading: true },
+  /**
+   * «Документы» (`documents.html`, features/hrms) на `hr_documents`:
+   * папки или сотрудники, файлы сеткой и списком. Грузит всё сама.
+   */
+  DOCUMENTS: { ...HRMS, selfLoading: true },
   /**
    * «Сводная по месяцам» начислений (`payroll.html`, features/hrms) на
    * `hr_payroll_lines`: сотрудник × вид за расчётный месяц.

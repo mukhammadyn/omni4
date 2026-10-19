@@ -59,7 +59,9 @@ const TRAINING_PARTICIPANTS = "hr_training_participants";
 import { text, toPerson } from "../api/org";
 import { monthsBetween, toDay } from "../model/job-history";
 import { Card, Meta, Row, SideProp } from "./page-parts";
-import { ABSENCES_TAB, ASSETS_TAB, ATTENDANCE_TAB, SCHEDULE_TAB, SURVEYS_TAB } from "./employee-tabs";
+import { ABSENCES_TAB, ASSETS_TAB, ATTENDANCE_TAB, DOCS_TAB, SCHEDULE_TAB, SURVEYS_TAB } from "./employee-tabs";
+import { DocumentBrowser } from "./DocumentBrowser";
+import { DOCUMENTS } from "../api/document";
 import { EmployeeAssets } from "./EmployeeAssets";
 import { ASSETS } from "../api/asset";
 import { EmployeeSurveys } from "./EmployeeSurveys";
@@ -80,6 +82,7 @@ const OWN_TABLES: Record<string, string> = {
   [SCHEDULE_TAB]: SHIFTS,
   [SURVEYS_TAB]: SURVEY_PARTICIPANTS,
   [ASSETS_TAB]: ASSETS,
+  [DOCS_TAB]: DOCUMENTS,
 };
 const OWN_TITLES: Record<string, TranslationKey> = {
   [ABSENCES_TAB]: "employeeAbsences.title",
@@ -87,6 +90,7 @@ const OWN_TITLES: Record<string, TranslationKey> = {
   [SCHEDULE_TAB]: "employeeSchedule.title",
   [SURVEYS_TAB]: "survey.take.title",
   [ASSETS_TAB]: "asset.tab.title",
+  [DOCS_TAB]: "doc.title",
 };
 const OWN_TABS = new Set(Object.keys(OWN_TABLES));
 
@@ -427,6 +431,10 @@ export function EmployeePage({
           <EmployeeAttendance employeeId={guid} />
         ) : own === SCHEDULE_TAB ? (
           <EmployeeSchedule employeeId={guid} />
+        ) : own === DOCS_TAB ? (
+          <section className="mb-3.5 rounded-[10px] border border-border bg-surface p-4">
+            <DocumentBrowser employeeId={guid} locale={locale} />
+          </section>
         ) : own === ASSETS_TAB ? (
           <EmployeeAssets
             employeeId={guid}

@@ -229,6 +229,7 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | Финансы | Зарплата | TABLE | `hr_payroll_lines` | 💵 `1f4b5` |
 | | Бюджет | TABLE | `hr_budget_lines` | 💰 `1f4b0` |
 | Система | Имущество | TABLE | `hr_assets` | 📦 `1f4e6` |
+| Система | Документы | TABLE | `hr_documents` | 🗂️ `1f5c2-fe0f`; view `DOCUMENTS` |
 | | Настройки | LINK | `screen: "settings"` | ⚙️ `2699-fe0f` |
 
 Таблицы без пункта меню (`hr_job_history`, `hr_career_site`,
@@ -368,7 +369,7 @@ LIST, GALLERY); значение — поле или колонка-связь (
 | Отсутствия | `hr_requests` | `hr_employees_id` | `EmployeeAbsences` |
 | Посещаемость | `hr_attendance_days` | `hr_employees_id` | `EmployeeAttendance` |
 | График работы | `hr_shifts` | `hr_employees_id` | `EmployeeSchedule` |
-| Документы | `hr_documents` | `hr_employees_id` | таблица |
+| Документы | `hr_documents` | `hr_employees_id` | `DocumentBrowser` по сотруднику |
 | Имущество | `hr_assets` | `hr_employees_id` | `EmployeeAssets`: что на руках, выдать со склада, вернуть |
 | KPI | `hr_kpi_scorecards` | `hr_employees_id` | таблица |
 | Тренинги | `hr_training_participants` | `hr_employees_id` | таблица |
