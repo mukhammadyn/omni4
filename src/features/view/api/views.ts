@@ -482,7 +482,7 @@ function toViews(data: ViewsResponseDto): View[] {
   return (data.views ?? []).filter((dto) => dto.id).map(toView);
 }
 
-const toCard = (value: unknown): View["card"] => (value === "person" ? "person" : "");
+const toCard = (value: unknown): View["card"] => (value === "person" || value === "asset" ? value : "");
 
 const toLayout = (value: unknown): AttendanceLayout =>
   ATTENDANCE_LAYOUTS.find((layout) => layout === value) ?? "calendar";

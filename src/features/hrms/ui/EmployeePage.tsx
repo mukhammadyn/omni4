@@ -1,5 +1,15 @@
 import { Suspense, useMemo, useState, type ReactNode } from "react";
 import {
+  CalendarDaysIcon,
+  CalendarOffIcon,
+  ClipboardListIcon,
+  FileTextIcon,
+  FolderIcon,
+  GraduationCapIcon,
+  ListChecksIcon,
+  PackageIcon,
+  TargetIcon,
+  WalletIcon,
   KeyRoundIcon,
   AwardIcon,
   BriefcaseIcon,
@@ -49,7 +59,9 @@ const TRAINING_PARTICIPANTS = "hr_training_participants";
 import { text, toPerson } from "../api/org";
 import { monthsBetween, toDay } from "../model/job-history";
 import { Card, Meta, Row, SideProp } from "./page-parts";
-import { ABSENCES_TAB, ATTENDANCE_TAB, SCHEDULE_TAB, SURVEYS_TAB } from "./employee-tabs";
+import { ABSENCES_TAB, ASSETS_TAB, ATTENDANCE_TAB, SCHEDULE_TAB, SURVEYS_TAB } from "./employee-tabs";
+import { EmployeeAssets } from "./EmployeeAssets";
+import { ASSETS } from "../api/asset";
 import { EmployeeSurveys } from "./EmployeeSurveys";
 import { SURVEY_PARTICIPANTS } from "../api/survey";
 import { DismissDialog } from "./DismissDialog";
@@ -67,14 +79,32 @@ const OWN_TABLES: Record<string, string> = {
   [ATTENDANCE_TAB]: "hr_attendance_days",
   [SCHEDULE_TAB]: SHIFTS,
   [SURVEYS_TAB]: SURVEY_PARTICIPANTS,
+  [ASSETS_TAB]: ASSETS,
 };
 const OWN_TITLES: Record<string, TranslationKey> = {
   [ABSENCES_TAB]: "employeeAbsences.title",
   [ATTENDANCE_TAB]: "employeeAttendance.title",
   [SCHEDULE_TAB]: "employeeSchedule.title",
   [SURVEYS_TAB]: "survey.take.title",
+  [ASSETS_TAB]: "asset.tab.title",
 };
 const OWN_TABS = new Set(Object.keys(OWN_TABLES));
+
+/** Значок вкладки в «Больше» — `MORE_IC` прототипа, по таблице вкладки. */
+const TAB_ICONS: Record<string, LucideIcon> = {
+  [JOB_HISTORY]: BriefcaseIcon,
+  [PAYROLL_LINES]: WalletIcon,
+  hr_requests: CalendarOffIcon,
+  hr_attendance_days: ClockIcon,
+  [SHIFTS]: CalendarDaysIcon,
+  hr_documents: FileTextIcon,
+  hr_assets: PackageIcon,
+  hr_kpi_scorecards: TargetIcon,
+  hr_training_participants: GraduationCapIcon,
+  hr_survey_participants: ClipboardListIcon,
+  hr_qualifications: AwardIcon,
+  hr_tasks: ListChecksIcon,
+};
 
 /*
  * Карточки «Личного» — `TABS.personal` прототипа (employee.html).
@@ -247,11 +277,11 @@ export function EmployeePage({
   const ownOf = (tableSlug: string) => Object.entries(OWN_TABLES).find(([, slug]) => slug === tableSlug)?.[0];
   const relationTabs = employee.tabs.map((item) => {
     const ownId = ownOf(item.tableSlug);
-    return { id: ownId ?? item.id, label: item.label };
+    return { id: ownId ?? item.id, label: item.label, icon: TAB_ICONS[item.tableSlug] ?? FolderIcon };
   });
   const missing = Object.keys(OWN_TABLES)
     .filter((id) => !relationTabs.some((item) => item.id === id))
-    .map((id) => ({ id, label: t(OWN_TITLES[id]!) }));
+    .map((id) => ({ id, label: t(OWN_TITLES[id]!), icon: TAB_ICONS[OWN_TABLES[id]!] ?? FolderIcon }));
   const work = employee.tabs.findIndex((item) => item.tableSlug === JOB_HISTORY);
   const allTabs = [
     { id: PERSONAL, label: t("employee.tab.personal") },
@@ -397,6 +427,13 @@ export function EmployeePage({
           <EmployeeAttendance employeeId={guid} />
         ) : own === SCHEDULE_TAB ? (
           <EmployeeSchedule employeeId={guid} />
+        ) : own === ASSETS_TAB ? (
+          <EmployeeAssets
+            employeeId={guid}
+            locale={locale}
+            language={language}
+            onOpenAsset={(asset) => void navigate({ to: "/assets/$itemId", params: { itemId: asset }, search: { menu: "" } })}
+          />
         ) : own === SURVEYS_TAB ? (
           <EmployeeSurveys
             employeeId={guid}
@@ -616,7 +653,7 @@ function MoreTabs({
   label,
   onSelect,
 }: {
-  tabs: { id: string; label: string }[];
+  tabs: { id: string; label: string; icon?: LucideIcon }[];
   activeId: string;
   label: string;
   onSelect: (id: string) => void;
@@ -648,6 +685,7 @@ function MoreTabs({
         tabs.map((tab) => (
           <PopoverItem
             key={tab.id}
+            {...(tab.icon ? { icon: <Icon as={tab.icon} size={16} className="shrink-0 text-fg-muted" /> } : {})}
             {...(tab.id === activeId
               ? { trailing: <Icon as={CheckIcon} size={14} className="shrink-0" /> }
               : {})}
