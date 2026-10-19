@@ -83,10 +83,14 @@ export function Anchored({
      * о нём не знает. Карточка чужой записи из редактора связи иначе
      * закрывалась вместе со всем редактором от первого же движения
      * колеса. Метка та же, что у Popover и сайдбара.
+     *
+     * Меню, открытое отсюда (`data-popover`), — тоже: список годов
+     * в календаре — Popover в <body>, и его прокрутка закрывала
+     * календарь вместе со списком.
      */
     const onScroll = (event: Event) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest?.("[data-modal]")) return;
+      if (target?.closest?.("[data-modal],[data-popover]")) return;
       if (!box.current?.contains(target)) onClose();
     };
 
