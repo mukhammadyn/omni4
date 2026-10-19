@@ -105,19 +105,6 @@ export const keys = {
     options: (projectId: string, type: string) =>
       [...keys.settings.all, "options", projectId, type] as const,
     /**
-     * Люди проекта. Список приходит по ОДНОМУ типу клиента — так его
-     * отдаёт ручка, — поэтому тип в ключе. Поиск и страница тоже:
-     * это и есть запрос, а не отбор в памяти.
-     */
-    usersAll: () => [...keys.settings.all, "users"] as const,
-    users: (
-      projectId: string,
-      clientTypeId: string,
-      search: string,
-      page: number,
-      limit: number,
-    ) => [...keys.settings.usersAll(), projectId, clientTypeId, search, page, limit] as const,
-    /**
      * API-ключи. Ключ выдаётся в ОДНОМ окружении (`environment_id`
      * берётся из заголовка запроса), поэтому окружение в ключе кэша:
      * иначе список prod и dev делил бы одну ячейку.

@@ -10,6 +10,10 @@ import { lazy } from "react";
 export const SettingsPage = lazy(() =>
   import("./ui/SettingsPage").then((module) => ({ default: module.SettingsPage })),
 );
+/** «Дать вход» со страницы сотрудника — тоже чанком, по той же причине. */
+export const UserDialog = lazy(() =>
+  import("./ui/UserSettings").then((module) => ({ default: module.UserDialog })),
+);
 export { useSettingsSections } from "./ui/sections";
 export { useProject, useWorkspaceTitle } from "./api/project";
 export { useProfile, useUpdateTimezone, useUserTimezone } from "./api/profile";
