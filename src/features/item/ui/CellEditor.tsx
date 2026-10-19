@@ -775,7 +775,9 @@ function DateEditor({
 
   return (
     <Anchored anchor={anchor} onClose={onClose}>
-      <div className={`${card} border-border p-2`}>
+      {/* w-fit: Anchored тянет блок до ширины якоря, а календарю в широком
+          поле формы растягиваться некуда — справа оставалась пустота. */}
+      <div className={`${card} w-fit border-border p-2`}>
         <Suspense fallback={<CalendarFallback />}>
         <div className="flex gap-2">
           <Calendar
@@ -1474,15 +1476,20 @@ function FileEditor({
     const picked = files ? [...files] : [];
     if (!picked.length) return;
 
-    upload.mutate(
-      {
+    /*
+     * mutateAsync, а не onSuccess у mutate: тот не вызывается, если
+     * редактор успел закрыться (клик мимо, прокрутка, окно выбора файла),
+     * и загруженный файл молча не доезжал до записи — в черновике новой
+     * записи его потом не было. Ошибку уже показал хук.
+     */
+    upload
+      .mutateAsync({
         // Одиночному полю второй файл некуда девать — берём первый.
         files: multiple ? picked : picked.slice(0, 1),
         folder: uploadFolder(field.attributes),
         ratio: uploadRatio(field.attributes),
-      },
-      { onSuccess: (added) => write(multiple ? [...urls, ...added] : added) },
-    );
+      })
+      .then((added) => write(multiple ? [...urls, ...added] : added), () => undefined);
   };
 
   return (
