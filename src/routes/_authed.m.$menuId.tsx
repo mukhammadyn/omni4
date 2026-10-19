@@ -101,6 +101,10 @@ import {
   useVacancyColumns,
   TRAININGS,
   useTrainingColumns,
+  SURVEYS,
+  useSurveyColumns,
+  SurveyTemplates,
+  SURVEY_TEMPLATES_VIEW,
   KnowledgeBase,
   KB_VIEW,
   useKbActions,
@@ -1109,6 +1113,11 @@ function MenuPage() {
       void navigate({ to: "/trainings/$itemId", params: { itemId: guid }, search: { menu: menuId } });
       return;
     }
+    /* Опрос — тоже: вопросы в конструкторе SurveyJS (features/hrms, SurveyForm). */
+    if (view?.tableSlug === SURVEYS) {
+      void navigate({ to: "/surveys/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
     /* Кандидата — тоже: воронка, оценки по этапам и история
        (features/hrms, CandidatePage). */
     if (view?.tableSlug === CANDIDATES) {
@@ -1189,6 +1198,11 @@ function MenuPage() {
   /* Участники и прогресс ДЗ — у таблицы тренингов (features/hrms). */
   const trainingColumns = useTrainingColumns(
     view?.tableSlug === TRAININGS && view.type === "TABLE" ? rows.rows : undefined,
+  );
+  /* Назначено, заполняемость и меню строки — у таблицы опросов (features/hrms). */
+  const surveyColumns = useSurveyColumns(
+    view?.tableSlug === SURVEYS && view.type === "TABLE" ? rows.rows : undefined,
+    (guid, edit) => void navigate({ to: "/surveys/$itemId", params: { itemId: guid }, search: { menu: menuId, ...(edit ? { edit } : {}) } }),
   );
 
   /*
@@ -1333,6 +1347,11 @@ function MenuPage() {
        и материалы в карточку сбоку не помещаются. */
     if (view?.tableSlug === TRAININGS) {
       void navigate({ to: "/trainings/new", search: { menu: menuId } });
+      return;
+    }
+    /* Опрос — тоже: вопросы собираются в конструкторе SurveyJS. */
+    if (view?.tableSlug === SURVEYS) {
+      void navigate({ to: "/surveys/new", search: { menu: menuId } });
       return;
     }
     /* Кандидата — тоже страницей (candidate.html?new=1): вакансию
@@ -2091,7 +2110,9 @@ function MenuPage() {
           {/* Пока варианты вкладок едут, запрос строк не запущен вовсе —
               и пустая таблица врала бы «записей нет». */}
           {sheetView ? (
-            view.type === KB_VIEW ? (
+            view.type === SURVEY_TEMPLATES_VIEW ? (
+              <SurveyTemplates onUse={(tpl) => void navigate({ to: "/surveys/new", search: { menu: menuId, tpl } })} />
+            ) : view.type === KB_VIEW ? (
               <KnowledgeBase pageId={search.doc ?? ""} onOpen={(doc) => setSearch({ doc }, true)} />
             ) : view.type === "BUDGET" ? (
               <BudgetSheet viewId={view.id} search={searchText} />
@@ -2437,7 +2458,9 @@ function MenuPage() {
             <DataGrid
               tableSlug={view.tableSlug}
               columns={columns}
-              extra={view.tableSlug === TRAININGS ? trainingColumns : vacancyColumns}
+              extra={
+                view.tableSlug === TRAININGS ? trainingColumns : view.tableSlug === SURVEYS ? surveyColumns : vacancyColumns
+              }
               /* Та же подстановка, что и в карточке: настройка, которая
                  работает в одном из двух мест, хуже отсутствующей. */
               newRowDefaults={newRowDefaults}

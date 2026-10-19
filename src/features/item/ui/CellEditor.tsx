@@ -202,7 +202,9 @@ export function ActiveCell({
   const relational = kind === "relation";
   const linkable = relational && relation && isLinkable(relation.type);
 
-  if (!kind || !guid || (relational && !linkable)) {
+  /* Черновик новой записи guid ещё не имеет — правка уходит в черновик
+     (onEdit, onLink), а не запросом, так что он и не нужен. */
+  if (!kind || (!guid && !creating) || (relational && !linkable)) {
     return (
       <Anchored anchor={anchor} onClose={onClose}>
         <div className={`${card} border-border max-h-72 max-w-md overflow-auto px-2 py-1.5 text-sm`}>
@@ -226,7 +228,7 @@ export function ActiveCell({
         field={field}
         relation={relation}
         row={row}
-        rowGuid={guid}
+        rowGuid={guid ?? ""}
         tableSlug={tableSlug}
         anchor={anchor}
         language={language}
@@ -379,7 +381,7 @@ export function ActiveCell({
         <ScannerEditor
           field={field}
           value={value}
-          guid={guid}
+          guid={guid ?? ""}
           tableSlug={tableSlug}
           anchor={anchor}
           check={check}

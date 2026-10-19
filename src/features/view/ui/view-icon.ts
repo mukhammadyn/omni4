@@ -57,6 +57,7 @@ const ICONS: Record<string, LucideIcon> = {
   SCHEDULE: CalendarRangeIcon,
   WORK_SCHEDULES: LayoutTemplateIcon,
   KNOWLEDGE: BookOpenIcon,
+  SURVEY_TEMPLATES: LayoutTemplateIcon,
   PAYROLL: Grid3x3Icon,
   BUDGET: WalletIcon,
   "ATTENDANCE.sheet": SheetIcon,

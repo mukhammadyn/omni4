@@ -86,6 +86,18 @@ importers:
       react18:
         specifier: file:vendor/react18
         version: file:vendor/react18
+      survey-core:
+        specifier: ^3.2.1
+        version: 3.2.1
+      survey-creator-core:
+        specifier: ^3.2.1
+        version: 3.2.1(survey-core@3.2.1)
+      survey-creator-react:
+        specifier: ^3.2.1
+        version: 3.2.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(survey-core@3.2.1)(survey-creator-core@3.2.1(survey-core@3.2.1))(survey-react-ui@3.2.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(survey-core@3.2.1))
+      survey-react-ui:
+        specifier: ^3.2.1
+        version: 3.2.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(survey-core@3.2.1)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1908,6 +1920,40 @@ packages:
   supports-color@10.2.2:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
     engines: {node: '>=18'}
+
+  survey-core@3.2.1:
+    resolution: {integrity: sha512-FqkhwoJyzVQuoB9p5AId0KR0SfAFgY5axtG16bfjYGLhn6cqeDx1ZPFqRuVw3zCSp2dg+BUtMAEkGZSJ7N8qAA==}
+
+  survey-creator-core@3.2.1:
+    resolution: {integrity: sha512-jJBU1k1cB1CPfpUvVpN4R6laZaTyFctKq0o1wMTm8+PxUr8kj2EhNBEvVCwbdWuKAOAXxikdoIdTCOf2pFXcYQ==}
+    engines: {node: '>=0.10.0'}
+    peerDependencies:
+      ace-builds: ^1.4.12
+      survey-core: 3.2.1
+    peerDependenciesMeta:
+      ace-builds:
+        optional: true
+
+  survey-creator-react@3.2.1:
+    resolution: {integrity: sha512-3pv6n1M90Rhe96jDkUezouGs1oAThRpJ0kHnXbffa9B1NElZGtbkEz7h46eSeyp40HFXtK4gbiYqROcXAqTp8g==}
+    engines: {node: '>=0.10.0'}
+    peerDependencies:
+      ace-builds: ^1.4.12
+      react: ^16.5.0 || ^17.0.1 || ^18.1.0 || ^19.0.0
+      react-dom: ^16.5.0 || ^17.0.1 || ^18.1.0 || ^19.0.0
+      survey-core: 3.2.1
+      survey-creator-core: 3.2.1
+      survey-react-ui: 3.2.1
+    peerDependenciesMeta:
+      ace-builds:
+        optional: true
+
+  survey-react-ui@3.2.1:
+    resolution: {integrity: sha512-8bPyj721X/L9+yf9JtNRuLhwOupws6FBnbHCGqnzKiDFbBCDNhXkrT4YZrtLS241EFsOaNINFBNpPkoDkva/MQ==}
+    peerDependencies:
+      react: ^16.5.0 || ^17.0.1 || ^18.1.0 || ^19.0.0
+      react-dom: ^16.5.0 || ^17.0.1 || ^18.1.0 || ^19.0.0
+      survey-core: 3.2.1
 
   swagger2openapi@7.0.8:
     resolution: {integrity: sha512-upi/0ZGkYgEcLeGieoz8gT74oWHA0E7JivX7aN9mAf+Tc7BQoRBvnIGHoPDw+f9TXTW4s6kGYCZJtauP6OYp7g==}
@@ -3906,6 +3952,26 @@ snapshots:
       ansi-regex: 5.0.1
 
   supports-color@10.2.2: {}
+
+  survey-core@3.2.1: {}
+
+  survey-creator-core@3.2.1(survey-core@3.2.1):
+    dependencies:
+      survey-core: 3.2.1
+
+  survey-creator-react@3.2.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(survey-core@3.2.1)(survey-creator-core@3.2.1(survey-core@3.2.1))(survey-react-ui@3.2.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(survey-core@3.2.1)):
+    dependencies:
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+      survey-core: 3.2.1
+      survey-creator-core: 3.2.1(survey-core@3.2.1)
+      survey-react-ui: 3.2.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(survey-core@3.2.1)
+
+  survey-react-ui@3.2.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(survey-core@3.2.1):
+    dependencies:
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+      survey-core: 3.2.1
 
   swagger2openapi@7.0.8:
     dependencies:

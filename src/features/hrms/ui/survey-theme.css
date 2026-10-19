@@ -1,0 +1,54 @@
+/*
+ * SurveyJS на наших токенах. Библиотека объявляет переменные
+ * на `:where(.sd-theme-root)` — с нулевой специфичностью, — и всё
+ * остальное (оттенки, прозрачности) выводит из этих нескольких через
+ * `rgba(from …)`. Перекрыть их — и конструктор, и предпросмотр
+ * следуют теме приложения, тёмной тоже.
+ *
+ * `!important` — не от безысходности: Creator и поверхность
+ * конструктора кладут переменные своей темы в inline `style` корня
+ * (survey-creator-react, `themeVariables`; survey-core, `applyThemeCore`),
+ * а inline перебивает любой селектор без него.
+ */
+.omni-survey,
+.omni-survey .sd-theme-root,
+.omni-survey [style*="--sjs2-"] {
+  --sjs2-typography-font-family-text: var(--font-sans) !important;
+  --sjs2-typography-font-family-display: var(--font-sans) !important;
+  --sjs2-color-utility-body: var(--color-surface) !important;
+  --sjs2-color-utility-sheet: var(--color-surface) !important;
+  --sjs2-color-utility-surface-survey: var(--color-surface-soft) !important;
+  --sjs2-color-utility-surface-designer: var(--color-surface-soft) !important;
+  --sjs2-color-utility-surface-presets-manager: var(--color-surface-soft) !important;
+  --sjs2-color-utility-surface-json-editor: var(--color-surface) !important;
+  --sjs2-color-utility-surface-logic: var(--color-surface-soft) !important;
+  --sjs2-color-utility-surface-translations: var(--color-surface-soft) !important;
+  --sjs2-color-utility-tabs: var(--color-surface) !important;
+  --sjs2-color-utility-toolbox: var(--color-surface) !important;
+  --sjs2-color-utility-property-grid: var(--color-surface) !important;
+  --sjs2-color-utility-scrollbar: var(--color-border-strong) !important;
+  --sjs2-color-utility-overlay: var(--color-overlay) !important;
+  --sjs2-color-bg-basic-primary: var(--color-surface) !important;
+  --sjs2-color-bg-basic-secondary: var(--color-bg) !important;
+  --sjs2-color-bg-basic-tertiary: var(--color-surface-active) !important;
+  --sjs2-color-bg-basic-primary-dim: var(--color-bg) !important;
+  --sjs2-color-bg-basic-secondary-dim: var(--color-surface-active) !important;
+  --sjs2-color-bg-basic-primary-disabled: var(--color-bg) !important;
+  --sjs2-color-bg-neutral-secondary: var(--color-bg) !important;
+  --sjs2-color-fg-basic-primary: var(--color-fg) !important;
+  --sjs2-color-fg-neutral-on-primary: var(--color-surface) !important;
+  --sjs2-color-border-basic-primary: var(--color-fg) !important;
+  --sjs2-color-border-basic-secondary: var(--color-border-strong) !important;
+  --sjs2-color-border-basic-secondary-disabled: var(--color-border) !important;
+  --sjs2-color-project-brand-600: var(--color-accent-solid) !important;
+  --sjs2-color-project-brand-700: var(--color-accent-solid-hover) !important;
+  --sjs2-color-project-brand-800: var(--color-accent-text) !important;
+  --sjs2-color-fg-brand-on-primary: var(--color-accent-fg) !important;
+  --sjs2-color-border-brand-on-primary: var(--color-accent-fg) !important;
+}
+
+/* Свой контекст наложения: z-index панелей Creator (боковая панель,
+   всплывающие окна) не поднимается над футером формы. */
+.omni-survey {
+  isolation: isolate;
+}
