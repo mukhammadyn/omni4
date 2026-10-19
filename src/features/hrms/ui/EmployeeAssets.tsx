@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FileSignatureIcon, PackageIcon, PlusIcon, Undo2Icon } from "lucide-react";
+import { FileSignatureIcon, FolderInputIcon, LoaderCircleIcon, PackageIcon, PlusIcon, Undo2Icon } from "lucide-react";
 import { useTablePermissions } from "@/features/auth";
-import type { Item } from "@/features/item";
+import { useUploadFiles, type Item } from "@/features/item";
 import { localized, optionOf, useTableSchema } from "@/features/table";
 import { formatDate, todayInput } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
@@ -15,7 +15,8 @@ import { Modal } from "@/shared/ui/modal";
 import { ASSETS, useEmployeeAssets, useMoveAsset, useStockAssets } from "../api/asset";
 import { related, text, useOrgDirectory } from "../api/org";
 import { money, MOVE, totals } from "../model/asset";
-import { printAct } from "./asset-act";
+import { actHtml, actNumber, printAct, type Act } from "./asset-act";
+import { DOCUMENTS, useAddDocuments } from "../api/document";
 import { AssetThumb, moveKey } from "./asset-parts";
 import { Card } from "./page-parts";
 
@@ -43,6 +44,10 @@ export function EmployeeAssets({
   const move = useMoveAsset();
   const { departments } = useOrgDirectory();
   const [issuing, setIssuing] = useState(false);
+  const upload = useUploadFiles();
+  const addDocs = useAddDocuments();
+  const saving = upload.isPending || addDocs.isPending;
+  const canSaveDoc = useTablePermissions()(DOCUMENTS).write;
   if (isLoading) return <p className="p-8 text-center text-sm text-fg-subtle">{t("common.loading")}</p>;
 
   const category = schema.fields.find((f) => f.slug === "category");
@@ -62,6 +67,39 @@ export function EmployeeAssets({
     .join(" · ");
   const th = "px-2.5 py-2 text-left text-[12.5px] font-medium text-fg-muted";
 
+  const act = (): Act => {
+    const person = related(assets[0]!, "hr_employees_id");
+    const date = (value: string) => formatDate(value, "date", locale) ?? "";
+    return {
+      employee: text(person.full_name),
+      department: departments.find((d) => d.id === text(person.hr_departments_id))?.name ?? "",
+      date: date(todayInput()),
+      lines: assets.map((row) => ({
+        name: text(row.name),
+        inventory: text(row.inventory_number),
+        serial: text(row.serial_number),
+        cost: row.cost,
+        currency: text(row.currency) || "UZS",
+        issued: date(issuedOn(text(row.guid))),
+      })),
+    };
+  };
+
+  /* Акт — в «Документы» сотрудника: файл .html, папка — «Без папки». */
+  const saveAct = async () => {
+    const data = act();
+    const title = `${t("asset.act.title")} № ${actNumber(data.date)} — ${data.employee}`;
+    const file = new File([actHtml(data, false)], `${title}.html`, { type: "text/html" });
+    try {
+      const [url] = await upload.mutateAsync({ files: [file], folder: "Media" });
+      if (!url) return;
+      await addDocs.mutateAsync({ employee: employeeId, folder: "", number: actNumber(data.date), files: [{ url, name: title }] });
+      toast.success(t("asset.act.saved"));
+    } catch {
+      /* Сообщение уже показал onError мутации. */
+    }
+  };
+
   return (
     <Card icon={PackageIcon} title={t("asset.tab.title")} count={assets.length}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -74,26 +112,17 @@ export function EmployeeAssets({
             size="sm"
             variant="secondary"
             onClick={() => {
-              const person = related(assets[0]!, "hr_employees_id");
-              const date = (value: string) => formatDate(value, "date", locale) ?? "";
-              const opened = printAct({
-                employee: text(person.full_name),
-                department: departments.find((d) => d.id === text(person.hr_departments_id))?.name ?? "",
-                date: date(todayInput()),
-                lines: assets.map((row) => ({
-                  name: text(row.name),
-                  inventory: text(row.inventory_number),
-                  serial: text(row.serial_number),
-                  cost: row.cost,
-                  currency: text(row.currency) || "UZS",
-                  issued: date(issuedOn(text(row.guid))),
-                })),
-              });
-              if (!opened) toast.error(t("asset.act.blocked"));
+              if (!printAct(act())) toast.error(t("asset.act.blocked"));
             }}
           >
             <Icon as={FileSignatureIcon} size={14} />
             {t("asset.act.title")}
+          </Button>
+        )}
+        {assets.length > 0 && canSaveDoc && (
+          <Button size="sm" variant="secondary" disabled={saving} onClick={() => void saveAct()}>
+            <Icon as={saving ? LoaderCircleIcon : FolderInputIcon} size={14} className={saving ? "animate-spin" : ""} />
+            {t("asset.act.save")}
           </Button>
         )}
         {can.update && (

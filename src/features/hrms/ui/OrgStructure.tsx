@@ -150,6 +150,12 @@ export function OrgStructure({
     );
   }
 
+  /*
+   * Без иерархии должностей дерево людей вышло бы плоским, а свёрнутые
+   * ветки `OrgChart` считает один раз, при открытии, — ждём справочник.
+   */
+  if (mode === "emp" && directory.isLoading) return null;
+
   if (mode === "emp") {
     const colorOfPerson = (person: Person) =>
       person.departmentId

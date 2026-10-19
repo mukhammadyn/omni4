@@ -14,12 +14,17 @@ const esc = (value: string) =>
  * Цвета — чёрный по белому, не токены приложения: это бумага, у неё
  * нет тёмной темы.
  *
- * ponytail: печать из окна, без хранения. С разделом «Документы» акт
- * переедет на `hr_document_templates` и будет ложиться в `hr_documents`.
+ * Тот же HTML сохраняется в «Документы» сотрудника (`saveAct` в
+ * EmployeeAssets) — файлом .html, без автопечати.
  */
-export function printAct({ employee, department, lines, date }: { employee: string; department: string; lines: ActLine[]; date: string }) {
+export type Act = { employee: string; department: string; lines: ActLine[]; date: string };
+
+/** Номер акта — дата без точек: один акт сотруднику в день. */
+export const actNumber = (date: string) => date.replaceAll(".", "").replaceAll("-", "");
+
+export function actHtml({ employee, department, lines, date }: Act, print: boolean) {
   const t = i18n.t.bind(i18n);
-  const number = date.replaceAll(".", "").replaceAll("-", "");
+  const number = actNumber(date);
   const sum = totals(lines.map((l) => ({ cost: l.cost, currency: l.currency })))
     .map((x) => `${money(x.sum)} ${x.currency}`)
     .join(" · ");
@@ -31,7 +36,7 @@ export function printAct({ employee, department, lines, date }: { employee: stri
         }</td><td>${esc(l.issued)}</td></tr>`,
     )
     .join("");
-  const html = `<!doctype html><html lang="${i18n.language}"><head><meta charset="utf-8"><title>${esc(t("asset.act.title"))} — ${esc(employee)}</title>
+  return `<!doctype html><html lang="${i18n.language}"><head><meta charset="utf-8"><title>${esc(t("asset.act.title"))} — ${esc(employee)}</title>
 <style>
 body{font:13px/1.5 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#000;background:#fff;margin:32px auto;max-width:760px;padding:0 16px}
 h1{font-size:18px;text-align:center;margin:0 0 4px}.sub{text-align:center;margin:0 0 24px}
@@ -50,8 +55,12 @@ ${department ? `<p>${esc(t("asset.act.department"))}: ${esc(department)}</p>` : 
 ${sum ? `<p><b>${esc(t("asset.total"))}</b> ${esc(sum)}</p>` : ""}
 <div class="sign"><div><b>${esc(t("asset.act.gave"))}</b><div class="line"></div><small>${esc(t("asset.act.signHint"))}</small></div>
 <div><b>${esc(t("asset.act.took"))}</b><div class="line"></div><small>${esc(employee)}</small></div></div>
-<script>window.onload=function(){window.print()}</script>
+${print ? "<script>window.onload=function(){window.print()}</script>" : ""}
 </body></html>`;
+}
+
+export function printAct(act: Act) {
+  const html = actHtml(act, true);
   const win = window.open("", "_blank");
   if (!win) return false;
   win.document.write(html);

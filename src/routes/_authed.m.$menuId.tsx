@@ -111,6 +111,8 @@ import {
   SURVEY_TEMPLATES_VIEW,
   KnowledgeBase,
   KB_VIEW,
+  DocumentBrowser,
+  DOCUMENTS_VIEW,
   useKbActions,
   type EmployeeTab,
 } from "@/features/hrms";
@@ -1699,7 +1701,7 @@ function MenuPage() {
                   (features/hrms), а не настройки view из ⋮. */}
               {/* Экраны HRMS ищут сотрудника сами — та же лупа, что
                   у таблиц, без меню полей. «Шаблонам» искать нечего. */}
-              {sheetView && view.type !== "WORK_SCHEDULES" && view.type !== KB_VIEW && can.searchButton && (
+              {sheetView && view.type !== "WORK_SCHEDULES" && view.type !== KB_VIEW && view.type !== DOCUMENTS_VIEW && can.searchButton && (
                 <SearchBox
                   value={searchText}
                   onChange={(next) => setSearch({ search: next || undefined }, true)}
@@ -2131,6 +2133,8 @@ function MenuPage() {
           {sheetView ? (
             view.type === SURVEY_TEMPLATES_VIEW ? (
               <SurveyTemplates onUse={(tpl) => void navigate({ to: "/surveys/new", search: { menu: menuId, tpl } })} />
+            ) : view.type === DOCUMENTS_VIEW ? (
+              <DocumentBrowser locale={i18n.language} onOpenEmployee={openEmployee} />
             ) : view.type === KB_VIEW ? (
               <KnowledgeBase pageId={search.doc ?? ""} onOpen={(doc) => setSearch({ doc }, true)} />
             ) : view.type === "BUDGET" ? (
