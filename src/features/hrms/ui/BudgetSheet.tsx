@@ -352,7 +352,7 @@ function EditCell({
   );
 }
 
-function NavButton({ label, onClick, icon }: { label: string; onClick: () => void; icon: typeof ChevronLeftIcon }) {
+export function NavButton({ label, onClick, icon }: { label: string; onClick: () => void; icon: typeof ChevronLeftIcon }) {
   return (
     <button
       type="button"

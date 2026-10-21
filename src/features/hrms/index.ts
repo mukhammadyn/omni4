@@ -1,6 +1,6 @@
 export { EMPLOYEES } from "./api/employee";
 export { EmployeePage } from "./ui/EmployeePage";
-export { ABSENCES_TAB, ATTENDANCE_TAB, SCHEDULE_TAB, type EmployeeTab } from "./ui/employee-tabs";
+export { ABSENCES_TAB, ATTENDANCE_TAB, KPI_TAB, SCHEDULE_TAB, type EmployeeTab } from "./ui/employee-tabs";
 export { OrgStructure } from "./ui/OrgStructure";
 export { VACANCIES } from "./api/vacancy";
 export { useVacancyColumns } from "./ui/vacancy-columns";
@@ -16,6 +16,7 @@ export { NewVacancy } from "./ui/NewVacancy";
 export { Timesheet } from "./ui/Timesheet";
 export { PayrollPivot } from "./ui/PayrollPivot";
 export { BudgetSheet } from "./ui/BudgetSheet";
+export { KpiSheet } from "./ui/KpiSheet";
 export { AttendanceCalendar } from "./ui/AttendanceCalendar";
 export { AttendanceList } from "./ui/AttendanceList";
 export { Absences } from "./ui/Absences";
