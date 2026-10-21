@@ -1,4 +1,7 @@
 import { useMemo } from "react";
+import { api } from "@/shared/api/client";
+import { todayInput } from "@/shared/lib/date-value";
+import { reportError } from "@/shared/lib/toast";
 import { useTablePermission } from "@/features/auth";
 import {
   MAX_LIMIT,
@@ -13,6 +16,7 @@ import {
 } from "@/features/item";
 import { localized, optionOf, useTableSchema, type Field } from "@/features/table";
 import { gradeIssue, type Band, type GradeIssue } from "../model/job-history";
+import { EMPLOYEES } from "./employee";
 import { firstText, related, text } from "./org";
 
 /** История назначений (`erp.dbml`, hr_job_history): приём, переводы, повышения, оклад. */
@@ -42,6 +46,28 @@ export type JobEntry = {
   currency: string;
   issue: GradeIssue | null;
 };
+
+/** Поля назначения, которые сотрудник держит у себя копией ([snap] в erp.dbml). */
+const SNAP = ["hr_departments_id", "hr_positions_id", "hr_grades_id", "hr_locations_id", "hr_work_schedules_id", "employment_type", "work_format"];
+
+/**
+ * Копия текущего назначения в карточку сотрудника. Текущее — последнее
+ * по `date_from`, уже начавшееся и не закрытое.
+ *
+ * ponytail: по схеме это делает функция после записи в hr_job_history,
+ * но её нет — без копии отдел и должность не доходят до KPI, графика,
+ * зарплаты и списка. Появится функция — отсюда уходит.
+ */
+async function currentSnap(employee: string, link: string): Promise<Item | null> {
+  /* Клиент API уже снял внешнюю обёртку: здесь `{ data: { count, response } }`. */
+  type List = { data?: { response?: Item[] } };
+  const today = todayInput();
+  const res = await api.post<List>(`/v2/object/get-list/${JOB_HISTORY}`, { data: { [link]: employee, limit: 100 } });
+  const current = (res.data?.response ?? [])
+    .filter((r) => text(r.date_from).slice(0, 10) <= today && (!r.date_to || text(r.date_to).slice(0, 10) >= today))
+    .sort((a, b) => text(b.date_from).localeCompare(text(a.date_from)))[0];
+  return current ? Object.fromEntries(SNAP.map((slug) => [slug, current[slug] ?? null])) : null;
+}
 
 const SORT = [{ field: "date_from", direction: "desc" as const }];
 const ALL = { limit: MAX_LIMIT, page: 1 };
@@ -79,6 +105,21 @@ export function useJobHistory({
   const create = useCreateItem(JOB_HISTORY);
   const update = useUpdateItem(JOB_HISTORY);
   const remove = useDeleteItems(JOB_HISTORY);
+  /* Через общую правку строки: у таблицы входа она сама добавит from_auth_service (authBypass). */
+  const updateEmployee = useUpdateItem(EMPLOYEES);
+  /*
+   * Через промис, а не `mutate(…, { onSuccess })`: колбэки вызова
+   * теряются, если вкладка «Работа» перемонтировалась, пока шёл запрос
+   * (список перезапрашивается сразу после правки) — копия молча не уходила.
+   */
+  const after = (write: Promise<unknown>, onDone?: () => void) =>
+    void write
+      .then(() => {
+        onDone?.();
+        return currentSnap(employee, link);
+      })
+      .then((values) => values && updateEmployee.mutateAsync({ guid: employee, values }))
+      .catch((error: unknown) => reportError(error, "common.saveFailed"));
 
   /** Поля без запрещённых роли: оклад скрыт правами — его нет и в ленте. */
   const fields = useMemo(
@@ -158,13 +199,12 @@ export function useJobHistory({
     ),
     sections: layout.sections,
     creating: create.isPending,
-    create: (values: Item, onDone: () => void) => create.mutate(values, { onSuccess: onDone }),
-    edit: (guid: string, slug: string, value: unknown) =>
-      update.mutate({ guid, values: { [slug]: value } }),
+    create: (values: Item, onDone: () => void) => after(create.mutateAsync(values), onDone),
+    edit: (guid: string, slug: string, value: unknown) => after(update.mutateAsync({ guid, values: { [slug]: value } })),
     /** Правка из формы: все её поля одним запросом. */
     save: (guid: string, values: Item, onDone: () => void) =>
-      update.mutate({ guid, values }, { onSuccess: onDone }),
+      after(update.mutateAsync({ guid, values }), onDone),
     saving: update.isPending,
-    remove: (guid: string) => remove.mutate([guid]),
+    remove: (guid: string) => after(remove.mutateAsync([guid])),
   };
 }

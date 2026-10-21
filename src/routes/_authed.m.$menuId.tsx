@@ -93,6 +93,8 @@ import {
   Timesheet,
   PayrollPivot,
   BudgetSheet,
+  KpiSheet,
+  KPI_TAB,
   VACANCIES,
   VacancyCards,
   VacancyPlan,
@@ -1332,6 +1334,8 @@ function MenuPage() {
   const [confirming, setConfirming] = useState(false);
   /** Открытое окно «Создать» графика — тип его view. */
   const [scheduleCreate, setScheduleCreate] = useState<string | null>(null);
+  /* «Создать» у сводной KPI — окно «Добавить KPI» (KpiSheet). */
+  const [kpiCreate, setKpiCreate] = useState(false);
   const kbActions = useKbActions();
 
   /**
@@ -1346,6 +1350,10 @@ function MenuPage() {
     /* В базе знаний «Создать» — новая страница верхнего уровня. */
     if (view?.type === KB_VIEW) {
       setSearch({ doc: kbActions.create("") }, true);
+      return;
+    }
+    if (view?.type === "KPI") {
+      setKpiCreate(true);
       return;
     }
     /* У графика «Создать» — своё окно: смена или шаблон (features/hrms). */
@@ -1711,7 +1719,7 @@ function MenuPage() {
               )}
               {vacancyPlanView && <VacancyPlanTools viewId={view.id} />}
               {sheetView && PEOPLE_VIEWS.has(view.type) && <ScheduleTools viewId={view.id} />}
-              {sheetView && SUMMARY_VIEWS.has(view.type) && <ScheduleTools viewId={view.id} grouping={false} />}
+              {sheetView && (SUMMARY_VIEWS.has(view.type) || view.type === "KPI") && <ScheduleTools viewId={view.id} grouping={false} />}
 
               {/* Действия таблицы: функции проекта над отмеченными
                   строками. Рядом с настройками, а не среди поиска
@@ -2107,6 +2115,7 @@ function MenuPage() {
               высоту можно только обрезающим контейнером — он бы их
               срезал (см. shared/ui/popover: меню лежит в потоке). */}
           {sheetView && PEOPLE_VIEWS.has(view.type) && <PeopleFilterBar viewId={view.id} language={language} />}
+          {sheetView && view.type === "KPI" && <PeopleFilterBar viewId={view.id} language={language} />}
           {sheetView && SUMMARY_VIEWS.has(view.type) && (
             <PeopleFilterBar viewId={view.id} language={language} tableSlug={view.tableSlug} />
           )}
@@ -2137,6 +2146,8 @@ function MenuPage() {
               <DocumentBrowser locale={i18n.language} onOpenEmployee={openEmployee} />
             ) : view.type === KB_VIEW ? (
               <KnowledgeBase pageId={search.doc ?? ""} onOpen={(doc) => setSearch({ doc }, true)} />
+            ) : view.type === "KPI" ? (
+              <KpiSheet viewId={view.id} search={searchText} create={kpiCreate} onCreateClose={() => setKpiCreate(false)} onOpenEmployee={(guid) => openEmployee(guid, KPI_TAB)} />
             ) : view.type === "BUDGET" ? (
               <BudgetSheet viewId={view.id} search={searchText} />
             ) : view.type === "PAYROLL" ? (

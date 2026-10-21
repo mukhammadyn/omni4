@@ -228,15 +228,18 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | | Опросы | TABLE | `hr_surveys` | 📋 `1f4cb` |
 | Финансы | Зарплата | TABLE | `hr_payroll_lines` | 💵 `1f4b5` |
 | | Бюджет | TABLE | `hr_budget_lines` | 💰 `1f4b0` |
+| | KPI | TABLE | `hr_kpi_scorecards` | 🎯 `1f3af` |
 | Система | Имущество | TABLE | `hr_assets` | 📦 `1f4e6` |
 | Система | Документы | TABLE | `hr_documents` | 🗂️ `1f5c2-fe0f`; view `DOCUMENTS` |
 | | Настройки | LINK | `screen: "settings"` | ⚙️ `2699-fe0f` |
 
 Таблицы без пункта меню (`hr_job_history`, `hr_career_site`,
 `hr_attendance_events`, `hr_requests`, `hr_absence_balance`,
-`hr_penalty_assignments`, `hr_kpi_scorecards`) остаются в схеме: их
+`hr_penalty_assignments`) остаются в схеме: их
 показывают вкладки сотрудника, «Отсутствия» в «Посещаемости» и функции.
 Пунктов для них нет с 2026-10-16 — omni4 выровнен по omni5.
+`hr_kpi_scorecards` вернулся пунктом «KPI» в «Финансы» 2026-10-21 —
+в omni4 и omni5 сразу; карта сотрудника — его вкладка «KPI».
 
 **Пункт «Сотрудники» обязателен:** страница сотрудника берёт вкладки
 из view этого пункта (находит его по таблице, `useTableMenuId`).
@@ -331,6 +334,7 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | `PAYROLL` | `hr_payroll_lines` | — | «Сводная по месяцам»: сотрудник × вид за расчётный месяц (`period`), начисления и удержания группами, «К выплате» |
 | `PIVOT` | любая | `pivot` — см. ниже | обычная сводная |
 | `BUDGET` | `hr_budget_lines` (+ `hr_budget_amounts`) | — | «Бюджет» ФОТ: отделы → строки, план и факт по месяцам/кварталам года, правка в ячейке |
+| `KPI` | `hr_kpi_scorecards` (+ `hr_kpi_results`, `hr_kpi_metrics`) | — | «KPI»: отделы → сотрудники → показатели, вид неделя/месяц/квартал/год, «Цель · Факт · %» по периодам, правка факта; «Создать» — «Добавить KPI». Подробно — §4.2 «HRMS / KPI» |
 | `LIST` | любая | — | список |
 
 `attributes.pivot` у `PIVOT` — раскладка, с которой сводная открывается
@@ -364,17 +368,17 @@ LIST, GALLERY); значение — поле или колонка-связь (
 
 | Вкладка | `relation_table_slug` | Колонка в чужой таблице | Внутри |
 |---|---|---|---|
-| Работа | `hr_job_history` | `hr_employees_id` | история работы (свой экран) |
+| Работа | `hr_job_history` | `hr_employees_id` | история работы (свой экран); после правки текущее назначение копируется в `hr_employees` ([snap], фронт вместо функции) |
 | Компенсация | `hr_payroll_lines` | `hr_employees_id` | таблица |
 | Отсутствия | `hr_requests` | `hr_employees_id` | `EmployeeAbsences` |
 | Посещаемость | `hr_attendance_days` | `hr_employees_id` | `EmployeeAttendance` |
 | График работы | `hr_shifts` | `hr_employees_id` | `EmployeeSchedule` |
 | Документы | `hr_documents` | `hr_employees_id` | `DocumentBrowser` по сотруднику |
 | Имущество | `hr_assets` | `hr_employees_id` | `EmployeeAssets`: что на руках, выдать со склада, вернуть |
-| KPI | `hr_kpi_scorecards` | `hr_employees_id` | таблица |
-| Тренинги | `hr_training_participants` | `hr_employees_id` | таблица |
+| KPI | `hr_kpi_scorecards` | `hr_employees_id` | `EmployeeKpi`: карта за период, итог, рейтинг, бонус, шаги статуса |
+| Тренинги | `hr_training_participants` | `hr_employees_id` | `EmployeeTrainings`: KPI, фильтр по статусу, карточки, «Назначить тренинг» |
 | Опросы | `hr_survey_participants` | `hr_employees_id` | `EmployeeSurveys`: участие, «Пройти» на своей карточке |
-| Задачи | `hr_tasks` | `core_users_id` — **связь с `core_users`**, не с сотрудником | таблица задач его пользователя |
+| Задачи | `hr_tasks` | `core_users_id` — **связь с `core_users`**, не с сотрудником | **скрыта в коде** с 2026-10-21 (EmployeePage): view можно не заводить |
 
 Вкладка «Задачи» ведётся через пользователя: в v2 у `hr_tasks` нет связи
 с `hr_employees`. View заводится на пункте «Сотрудники», как остальные,
@@ -504,6 +508,40 @@ LIST, GALLERY); значение — поле или колонка-связь (
 |---|---|---|
 | 1 | BUDGET | Сводная таблица |
 | 2 | TABLE | — |
+
+**HRMS / KPI** (`hr_kpi_scorecards`) — пункт в «Финансах» с 2026-10-21,
+в omni4 и omni5.
+
+| # | Тип | Имя |
+|---|---|---|
+| 1 | KPI | Сводная таблица |
+| 2 | SECTION | — |
+
+TABLE у пункта удалён: карты правятся сводной и вкладкой сотрудника.
+Модель (`erp.dbml`):
+
+- `hr_kpi_metrics` — шаблон показателя. `hr_positions_id` пуст — разовый
+  показатель, не шаблон. `period_type`: `weekly` / `monthly` /
+  `quarterly` / `yearly` (`weekly` добавлен 2026-10-21); новая карта
+  берёт шаблоны должности (нет — отдела) **своего** вида.
+- `hr_kpi_scorecards` — карта сотрудника за период. Вида у карты нет:
+  он по датам (1 день — день, ≤7 — неделя, ≤31 — месяц, ≤92 — квартал,
+  иначе год). Неделя — пн–пт; день — только дочерний вид.
+  `status`: `draft` → `self_review` → `manager_review` → `approved`;
+  «Вернуть в работу» — снова `draft`. При утверждении фронт пишет
+  `total_score`, `bonus_coefficient`, `rating`, `approved_at`,
+  `core_users_id` — в схеме это [fn], функции нет.
+- `hr_kpi_results` — строка карты: цель, факт, вес. Разбивка на дочерние
+  периоды (год → кварталы → месяцы → недели → дни): у детей
+  `parent_result_id` = guid строки родителя (SINGLE_LINE, не LOOKUP —
+  связь таблицы на себя), у родителя `aggregation` (`sum` / `min` /
+  `max` / `avg`). Оба поля добавлены 2026-10-21. Факт родителя
+  пересчитывает фронт при вводе факта ребёнка.
+
+Расчёт: выполнение = факт / цель (у `direction: down` — наоборот), баллы
+= вес × min(120, выполнение) / 100, итог карты — сумма баллов; рейтинг и
+коэффициент бонуса: ≥110 → ×1.2, ≥100 → ×1.0 «Превышает», ≥85 → ×0.8
+«Соответствует», ≥70 → ×0.5 «Частично», иначе 0 «Ниже ожиданий».
 
 **CRM / Сделки** (`crm_deals`)
 

@@ -6,7 +6,6 @@ import {
   FileTextIcon,
   FolderIcon,
   GraduationCapIcon,
-  ListChecksIcon,
   PackageIcon,
   TargetIcon,
   WalletIcon,
@@ -54,12 +53,14 @@ import { JOB_HISTORY } from "../api/job-history";
 import { PAYROLL_LINES } from "../api/payroll";
 import { SHIFTS } from "../api/schedule";
 
-/** Вкладка «Тренинги»: участия сотрудника, строка ведёт на страницу тренинга. */
-const TRAINING_PARTICIPANTS = "hr_training_participants";
 import { text, toPerson } from "../api/org";
 import { monthsBetween, toDay } from "../model/job-history";
 import { Card, Meta, Row, SideProp } from "./page-parts";
-import { ABSENCES_TAB, ASSETS_TAB, ATTENDANCE_TAB, DOCS_TAB, SCHEDULE_TAB, SURVEYS_TAB } from "./employee-tabs";
+import { ABSENCES_TAB, ASSETS_TAB, ATTENDANCE_TAB, DOCS_TAB, SCHEDULE_TAB, SURVEYS_TAB, TRAININGS_TAB, KPI_TAB } from "./employee-tabs";
+import { EmployeeKpi } from "./EmployeeKpi";
+import { SCORECARDS } from "../api/kpi";
+import { EmployeeTrainings } from "./EmployeeTrainings";
+import { PARTICIPANTS as TRAINING_PARTICIPANTS } from "../api/training";
 import { DocumentBrowser } from "./DocumentBrowser";
 import { DOCUMENTS } from "../api/document";
 import { EmployeeAssets } from "./EmployeeAssets";
@@ -80,6 +81,8 @@ const OWN_TABLES: Record<string, string> = {
   [ABSENCES_TAB]: "hr_requests",
   [ATTENDANCE_TAB]: "hr_attendance_days",
   [SCHEDULE_TAB]: SHIFTS,
+  [TRAININGS_TAB]: TRAINING_PARTICIPANTS,
+  [KPI_TAB]: SCORECARDS,
   [SURVEYS_TAB]: SURVEY_PARTICIPANTS,
   [ASSETS_TAB]: ASSETS,
   [DOCS_TAB]: DOCUMENTS,
@@ -88,6 +91,8 @@ const OWN_TITLES: Record<string, TranslationKey> = {
   [ABSENCES_TAB]: "employeeAbsences.title",
   [ATTENDANCE_TAB]: "employeeAttendance.title",
   [SCHEDULE_TAB]: "employeeSchedule.title",
+  [TRAININGS_TAB]: "training.back",
+  [KPI_TAB]: "kpi.title",
   [SURVEYS_TAB]: "survey.take.title",
   [ASSETS_TAB]: "asset.tab.title",
   [DOCS_TAB]: "doc.title",
@@ -103,11 +108,10 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   [SHIFTS]: CalendarDaysIcon,
   hr_documents: FileTextIcon,
   hr_assets: PackageIcon,
-  hr_kpi_scorecards: TargetIcon,
+  [SCORECARDS]: TargetIcon,
   hr_training_participants: GraduationCapIcon,
   hr_survey_participants: ClipboardListIcon,
   hr_qualifications: AwardIcon,
-  hr_tasks: ListChecksIcon,
 };
 
 /*
@@ -279,14 +283,16 @@ export function EmployeePage({
    * (истории назначений), как в прототипе.
    */
   const ownOf = (tableSlug: string) => Object.entries(OWN_TABLES).find(([, slug]) => slug === tableSlug)?.[0];
-  const relationTabs = employee.tabs.map((item) => {
+  /* «Задачи» сотрудника в карточке не нужны — их место в модуле задач. */
+  const linked = employee.tabs.filter((item) => item.tableSlug !== "hr_tasks");
+  const relationTabs = linked.map((item) => {
     const ownId = ownOf(item.tableSlug);
     return { id: ownId ?? item.id, label: item.label, icon: TAB_ICONS[item.tableSlug] ?? FolderIcon };
   });
   const missing = Object.keys(OWN_TABLES)
     .filter((id) => !relationTabs.some((item) => item.id === id))
     .map((id) => ({ id, label: t(OWN_TITLES[id]!), icon: TAB_ICONS[OWN_TABLES[id]!] ?? FolderIcon }));
-  const work = employee.tabs.findIndex((item) => item.tableSlug === JOB_HISTORY);
+  const work = linked.findIndex((item) => item.tableSlug === JOB_HISTORY);
   const allTabs = [
     { id: PERSONAL, label: t("employee.tab.personal") },
     ...relationTabs.slice(0, work + 1),
@@ -442,6 +448,20 @@ export function EmployeePage({
             language={language}
             onOpenAsset={(asset) => void navigate({ to: "/assets/$itemId", params: { itemId: asset }, search: { menu: "" } })}
           />
+        ) : own === KPI_TAB ? (
+          <EmployeeKpi
+            employeeId={guid}
+            positionId={String(row.hr_positions_id ?? "")}
+            departmentId={String(row.hr_departments_id ?? "")}
+            language={language}
+          />
+        ) : own === TRAININGS_TAB ? (
+          <EmployeeTrainings
+            employeeId={guid}
+            locale={locale}
+            language={language}
+            onOpenTraining={(training) => void navigate({ to: "/trainings/$itemId", params: { itemId: training }, search: { menu: "" } })}
+          />
         ) : own === SURVEYS_TAB ? (
           <EmployeeSurveys
             employeeId={guid}
@@ -480,13 +500,6 @@ export function EmployeePage({
               language={language}
               languages={languages}
               onLanguage={onLanguage}
-              /* Участие в тренинге открывает страницу тренинга (TrainingPage). */
-              onOpenRow={(item) => {
-                const training = item.hr_trainings_id;
-                if (tab.tableSlug !== TRAINING_PARTICIPANTS || typeof training !== "string" || !training) return false;
-                void navigate({ to: "/trainings/$itemId", params: { itemId: training }, search: { menu: "" } });
-                return true;
-              }}
               trail={[
                 { label: t("employee.back"), onClick: onBack },
                 { label: person.name, onClick: () => onTab(undefined) },

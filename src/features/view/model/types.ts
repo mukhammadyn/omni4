@@ -36,6 +36,7 @@ export const VIEW_TYPES = [
   "DOCUMENTS",
   "PAYROLL",
   "BUDGET",
+  "KPI",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -193,6 +194,11 @@ const TRAITS: Record<ViewType, ViewTraits> = {
    * и `hr_budget_amounts`: отделы → строки, план и факт по месяцам.
    */
   BUDGET: { ...HRMS, selfLoading: true },
+  /**
+   * Сводная KPI за год (features/hrms, KpiSheet) на `hr_kpi_scorecards`:
+   * отделы → сотрудники → показатели, по кварталам цель, факт и %.
+   */
+  KPI: { ...HRMS, selfLoading: true },
   BOARD: { implemented: true, inTabs: true, noGrouping: true },
   CALENDAR: { implemented: true, inTabs: true, noGrouping: true },
   CHART: { implemented: true, noGrouping: true },

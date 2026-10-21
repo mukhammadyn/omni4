@@ -184,3 +184,33 @@ export function useTrainingDraftSource(guid: string) {
     ...useTrainingParts(guid),
   };
 }
+
+/** Участия сотрудника с тренингом (связь) — вкладка «Тренинги» карточки. */
+export function useEmployeeTrainings(employeeId: string) {
+  const query = useItems(employeeId ? PARTICIPANTS : undefined, {
+    ...ALL,
+    filters: { hr_employees_id: { op: "is", values: [employeeId] } },
+  });
+  /* Строка без тренинга — пустая, заведённая из таблицы связи: показывать нечего. */
+  const participants = useMemo(() => query.page.rows.filter((row) => text(row.hr_trainings_id)), [query.page.rows]);
+  return { participants, isLoading: query.isLoading };
+}
+
+/** Тренинги для «Назначить тренинг»: id, название, нужно ли ДЗ. */
+export function useTrainingOptions(enabled: boolean) {
+  const query = useItems(enabled ? TRAININGS : undefined, { ...ALL, relations: false });
+  return query.page.rows.map((row) => ({ id: text(row.guid), title: text(row.title), homework: row.homework_required === true }));
+}
+
+/** «Назначить тренинг» из карточки сотрудника: одна строка участия со сроком. */
+export function useAssignTraining() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { training: string; employee: string; homework: boolean; due: string }) =>
+      api.post<unknown>(`/v2/items/${PARTICIPANTS}`, {
+        data: { ...participantRow(a.training, a.employee, a.homework), due_date: a.due || null },
+      }),
+    onError: (error) => reportError(error, "common.saveFailed"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.items.table(PARTICIPANTS) }),
+  });
+}
