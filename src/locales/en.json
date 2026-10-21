@@ -2718,5 +2718,9 @@
   "kpi.deleteText": "The row will be removed from the scorecard{{period}} together with its children ({{kids}}). Its actual will be lost.",
   "kpi.unlinkTemplate": "Also remove it from the position's templates — it won't go into new scorecards",
   "kpi.deleted": "KPI deleted",
-  "kpi.approvedLocked": "Scorecard is approved — reopen it first"
+  "kpi.approvedLocked": "Scorecard is approved — reopen it first",
+  "kpi.note.label": "Note on the actual",
+  "kpi.note.placeholder": "E.g.: shortfall due to vacation",
+  "kpi.note.clear": "Delete",
+  "kpi.note.add": "Add a note on the actual"
 }

@@ -50,6 +50,8 @@ export type Result = {
   parentId: string;
   /** Есть у родителя: факт не вводится, а собирается из дочерних. */
   aggregation: Aggregation | "";
+  /** Заметка к строке за период — «почему недобор» (`comment`). */
+  comment: string;
 };
 
 const toResult = (row: Item): Result => ({
@@ -61,6 +63,7 @@ const toResult = (row: Item): Result => ({
   created: text(row.created_at),
   parentId: text(row.parent_result_id),
   aggregation: text(row.aggregation) as Aggregation | "",
+  comment: text(row.comment),
 });
 
 /*

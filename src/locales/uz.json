@@ -2718,5 +2718,9 @@
   "kpi.deleteText": "Qator kartadan{{period}} ichki qatorlari ({{kids}}) bilan birga o'chadi. Fakti yo'qoladi.",
   "kpi.unlinkTemplate": "Lavozim shablonlaridan ham olib tashlash — yangi kartalarga tushmaydi",
   "kpi.deleted": "KPI o'chirildi",
-  "kpi.approvedLocked": "Karta tasdiqlangan — avval «Qayta ochish»"
+  "kpi.approvedLocked": "Karta tasdiqlangan — avval «Qayta ochish»",
+  "kpi.note.label": "Faktga izoh",
+  "kpi.note.placeholder": "Masalan: ta'til sababli kamomad",
+  "kpi.note.clear": "O'chirish",
+  "kpi.note.add": "Faktga izoh qo'shish"
 }
