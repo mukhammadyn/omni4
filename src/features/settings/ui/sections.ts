@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useGlobalRight } from "@/features/auth";
 import type { TranslationKey } from "@/shared/lib/i18n";
-import { DIRECTORY_TABS, type Directory, type RecordSection } from "./directories";
+import { DIRECTORY_TABS, type Directory, type OptionsSection, type RecordSection } from "./directories";
 
 /**
  * Разделы настроек и их группы — отдельно от самих разделов: крошки
@@ -63,6 +63,8 @@ export type SettingsSection = {
   directory?: Directory;
   /** Раздел — одна строка таблицы Ядра (RecordSettings). */
   record?: RecordSection;
+  /** Раздел — варианты поля без своей таблицы (OptionsSettings). */
+  options?: OptionsSection;
 };
 
 export type SettingsGroup = {
@@ -204,7 +206,11 @@ const TABS: SettingsTab[] = [
       items: group.items.map((item) =>
         "fields" in item
           ? { id: item.id, labelKey: item.titleKey, icon: item.icon, record: item }
-          : { id: item.id, labelKey: item.titleKey, icon: item.icon, wide: true, directory: item },
+          : "screen" in item
+            ? { id: item.id, labelKey: item.titleKey, icon: item.icon, wide: true }
+            : "tables" in item
+            ? { id: item.id, labelKey: item.titleKey, icon: item.icon, wide: true, options: item }
+            : { id: item.id, labelKey: item.titleKey, icon: item.icon, wide: true, directory: item },
       ),
     })),
   })),

@@ -37,6 +37,7 @@ export { SurveyPage } from "./ui/SurveyPage";
 export { SurveyTemplates, SURVEY_TEMPLATES_VIEW } from "./ui/SurveyTemplates";
 export { KnowledgeBase, KB_VIEW } from "./ui/KnowledgeBase";
 export { DocumentBrowser, DOCUMENTS_VIEW } from "./ui/DocumentBrowser";
+export { DocumentDrive } from "./ui/DocumentDrive";
 export { useKbActions } from "./api/kb";
 export { ASSETS } from "./api/asset";
 export { useAssetColumns } from "./ui/asset-columns";

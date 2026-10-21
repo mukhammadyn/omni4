@@ -176,6 +176,17 @@ body {
   --color-chip-pink-fg: #4c2337;
   --color-chip-brown-bg: #eee0da;
   --color-chip-brown-fg: #442a1e;
+  /* Точка и кружок цвета — насыщенный `--c-*` прототипа: цвет текста
+     чипа в тёмной теме у всех оттенков почти белый. */
+  --color-chip-gray-dot: #787774;
+  --color-chip-brown-dot: #9f6b53;
+  --color-chip-orange-dot: #d9730d;
+  --color-chip-yellow-dot: #cb912f;
+  --color-chip-green-dot: #448361;
+  --color-chip-blue-dot: #337ea9;
+  --color-chip-purple-dot: #9065b0;
+  --color-chip-pink-dot: #c14c8a;
+  --color-chip-red-dot: #d44c47;
 
   /* ── Палитра графиков ────────────────────────────────────────── */
   /*
@@ -389,6 +400,15 @@ body {
     --color-chip-pink-fg: rgba(255, 255, 255, 0.88);
     --color-chip-brown-bg: #603b2c;
     --color-chip-brown-fg: rgba(255, 255, 255, 0.88);
+    --color-chip-gray-dot: #9b9b9b;
+    --color-chip-brown-dot: #ba856f;
+    --color-chip-orange-dot: #c77d48;
+    --color-chip-yellow-dot: #ca9849;
+    --color-chip-green-dot: #529e72;
+    --color-chip-blue-dot: #5e87c9;
+    --color-chip-purple-dot: #9d68d3;
+    --color-chip-pink-dot: #d15796;
+    --color-chip-red-dot: #df5452;
 
     /* Свои ступени, а не осветлённые светлые: тёмная тема проверена
        тем же набором проверок против подложки #202020 (прежний

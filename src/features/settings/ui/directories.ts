@@ -30,6 +30,7 @@ import {
   RulerIcon,
   ScaleIcon,
   SignalIcon,
+  SparklesIcon,
   SunMoonIcon,
   UsersRoundIcon,
 } from "lucide-react";
@@ -61,16 +62,49 @@ export type Directory = {
   icon: typeof BriefcaseIcon;
   /** Поле-название: первая колонка, по нему поиск. Нет — `name`. */
   title?: string;
+  /** Название — цветным тегом (`nm:'tag'` прототипа), а не точкой. */
+  tag?: boolean;
   /** Колонки после названия, слагами. */
   columns: string[];
   /** Ссылка на себя — справочник рисуется деревом (`.ot` прототипа). */
   parent?: string;
+  /** Сколько уровней у дерева: 2 — «группа → элемент», вкладывать только в корень. */
+  depth?: number;
+  /**
+   * PICK_LIST, варианты которого — корни дерева («Тип → Причины»
+   * увольнения): у типа нет своей строки, он вариант поля причины.
+   * Тип правится тут же — подпись и цвет варианта.
+   */
+  groupBy?: string;
   /**
    * Порядок строк, слагами по приоритету; «-» впереди — по убыванию.
    * Этапы сначала по воронке: иначе этапы разных воронок идут
    * вперемешку. Нет — как отдаёт сервер.
    */
   sort?: string[];
+  /**
+   * Сколько строк другой таблицы ссылаются на запись — «Сотрудники»
+   * у отдела. `totalKey` — ещё колонка суммы по всем вложенным;
+   * `rollup` — та же сумма в самой колонке (у группы грейдов своих людей нет).
+   */
+  counts?: { table: string; field: string; labelKey: TranslationKey; totalKey?: TranslationKey; rollup?: boolean };
+};
+
+/**
+ * Варианты PICK_LIST, у которого нет своей таблицы, — списком, как
+ * справочник прототипа («Типы занятости»). Поле одно и то же в
+ * нескольких таблицах; правка уходит во все (api/field-options).
+ */
+export type OptionsSection = {
+  id: string;
+  titleKey: TranslationKey;
+  hintKey: TranslationKey;
+  icon: typeof BriefcaseIcon;
+  field: string;
+  /** Таблицы с этим полем. Первая — откуда читать варианты и считать строки. */
+  tables: string[];
+  /** Название — точкой цвета (`nm:'dot'` прототипа), а не тегом. */
+  dot?: boolean;
 };
 
 /**
@@ -126,8 +160,28 @@ export const CURRENCY_RATES: Directory = {
   sort: ["-date", "currency"],
 };
 
+/**
+ * Свой экран раздела (CONTENT в SettingsPage), а не данные: «Файлы
+ * и документы» — файловый менеджер HRMS и справочник шаблонов вкладками.
+ */
+export type ScreenSection = { id: string; titleKey: TranslationKey; icon: typeof BriefcaseIcon; screen: true };
+
+/**
+ * Шаблоны документов — вкладка «Шаблоны» раздела «Файлы и документы».
+ * `Использований` — документы, созданные по шаблону.
+ */
+export const DOC_TEMPLATES: Directory = {
+  id: "hr-doc-templates",
+  table: "hr_document_templates",
+  titleKey: "dir.docTemplates",
+  hintKey: "dir.docTemplatesHint",
+  icon: FileTextIcon,
+  columns: ["category", "requires_signature"],
+  counts: { table: "hr_documents", field: "hr_document_templates_id", labelKey: "dir.used" },
+};
+
 /** Справочник или одна запись: различаются полем `fields` у записи. */
-export type DirectoryGroup = { titleKey: TranslationKey; items: (Directory | RecordSection)[] };
+export type DirectoryGroup = { titleKey: TranslationKey; items: (Directory | RecordSection | OptionsSection | ScreenSection)[] };
 
 export type DirectoryTab = {
   id: string;
@@ -285,8 +339,14 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             hintKey: "dir.departmentsHint",
             icon: NetworkIcon,
             parent: "hr_departments_id",
-            columns: ["core_users_id", "is_active"],
+            columns: ["core_users_id"],
             sort: ["sort_order"],
+            counts: {
+              table: "hr_employees",
+              field: "hr_departments_id",
+              labelKey: "dir.employees",
+              totalKey: "dir.employeesTotal",
+            },
           },
           {
             id: "hr-positions",
@@ -295,7 +355,8 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             hintKey: "dir.positionsHint",
             icon: IdCardIcon,
             parent: "hr_positions_id",
-            columns: ["hr_departments_id", "level", "is_active"],
+            columns: ["hr_departments_id", "level"],
+            counts: { table: "hr_employees", field: "hr_positions_id", labelKey: "dir.employees" },
           },
         ],
       },
@@ -303,45 +364,51 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
         titleKey: "dir.groupHr",
         items: [
           {
+            id: "hr-emp-types",
+            titleKey: "dir.empTypes",
+            hintKey: "dir.empTypesHint",
+            icon: BriefcaseIcon,
+            field: "employment_type",
+            tables: ["hr_employees", "hr_job_history", "hr_vacancies"],
+          },
+          {
+            id: "hr-skills",
+            titleKey: "dir.skills",
+            hintKey: "dir.skillsHint",
+            icon: SparklesIcon,
+            field: "skills",
+            dot: true,
+            tables: ["hr_employees", "hr_vacancies", "hr_candidates"],
+          },
+          {
             id: "hr-grades",
             table: "hr_grades",
             titleKey: "dir.grades",
             hintKey: "dir.gradesHint",
             icon: SignalIcon,
-            columns: ["level", "min_tenure_months", "is_active"],
+            tag: true,
+            parent: "hr_grades_id",
+            depth: 2,
+            columns: ["level", "min_tenure_months"],
             sort: ["sort_order"],
+            counts: { table: "hr_employees", field: "hr_grades_id", labelKey: "dir.employees", rollup: true },
           },
+          { id: "hr-files", titleKey: "dir.files", icon: FolderOpenIcon, screen: true },
           {
             id: "hr-term",
             table: "hr_dismissal_reasons",
             titleKey: "dir.dismissal",
             hintKey: "dir.dismissalHint",
             icon: LogOutIcon,
-            columns: ["dismissal_type", "rehire_allowed", "is_active"],
-          },
-          {
-            id: "hr-doc-folders",
-            table: "hr_document_folders",
-            titleKey: "dir.docFolders",
-            hintKey: "dir.docFoldersHint",
-            icon: FolderOpenIcon,
-            columns: [],
-            sort: ["sort_order"],
-          },
-          {
-            id: "hr-doc-templates",
-            table: "hr_document_templates",
-            titleKey: "dir.docTemplates",
-            hintKey: "dir.docTemplatesHint",
-            icon: FileTextIcon,
-            columns: ["category", "hr_document_folders_id", "requires_signature", "is_active"],
+            groupBy: "dismissal_type",
+            depth: 2,
+            columns: ["rehire_allowed"],
           },
         ],
       },
       {
         titleKey: "dir.groupPay",
         items: [
-          NORMS,
           {
             id: "hr-comp",
             table: "hr_pay_types",
@@ -369,6 +436,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             title: "hr_positions_id",
             columns: ["hr_grades_id", "salary_min", "salary_max", "currency", "effective_from", "is_active"],
           },
+          NORMS,
         ],
       },
       {

@@ -51,15 +51,15 @@ export const CHIP_STYLES: Record<ChipColor, string> = {
  */
 /** Точка цвета — у полосы таймлайна (`.tl-bar .dot` прототипа). */
 export const CHIP_DOT: Record<ChipColor, string> = {
-  gray: "bg-chip-gray-fg",
-  blue: "bg-chip-blue-fg",
-  green: "bg-chip-green-fg",
-  yellow: "bg-chip-yellow-fg",
-  orange: "bg-chip-orange-fg",
-  red: "bg-chip-red-fg",
-  purple: "bg-chip-purple-fg",
-  pink: "bg-chip-pink-fg",
-  brown: "bg-chip-brown-fg",
+  gray: "bg-chip-gray-dot",
+  blue: "bg-chip-blue-dot",
+  green: "bg-chip-green-dot",
+  yellow: "bg-chip-yellow-dot",
+  orange: "bg-chip-orange-dot",
+  red: "bg-chip-red-dot",
+  purple: "bg-chip-purple-dot",
+  pink: "bg-chip-pink-dot",
+  brown: "bg-chip-brown-dot",
 };
 
 export const CHIP_SURFACE: Record<ChipColor, string> = {
