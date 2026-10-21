@@ -18,7 +18,7 @@ import { columnsOf, completion, CURSOR_OF, KPI_TYPES, periodOf, ratingOf, SCOREC
 import { useUi } from "@/shared/lib/ui-store";
 import { NavButton } from "./BudgetSheet";
 import { useScheduleSettings } from "./schedule-settings";
-import { RATING_COLOR, StatusStep, usePeriodLabel } from "./EmployeeKpi";
+import { CommentCell, RATING_COLOR, StatusStep, usePeriodLabel } from "./EmployeeKpi";
 import { Segments } from "./schedule-parts";
 
 /* Подсветка текущего периода поверх фона: сам accent-subtle полупрозрачный, и строки просвечивали бы под липкой шапкой. */
@@ -253,7 +253,7 @@ export function KpiSheet({
                         const kidsOpen = openParents.has(parentKey);
                         return (
                         <Fragment key={parentKey}>
-                          <tr className="text-fg-muted">
+                          <tr className="group/row text-fg-muted hover:bg-surface-hover">
                             <td style={{ width: W, minWidth: W, maxWidth: W }} className={`${cell} ${sticky} pl-10`}>
                               <span className="flex min-w-0 items-center gap-1">
                               {hasKids ? (
@@ -298,6 +298,7 @@ export function KpiSheet({
                               return [
                                 <td key={`${q}-t`} className={`${cell} border-l text-right`}>{r.target.toLocaleString(i18n.language)}</td>,
                                 <td key={`${q}-a`} className={`${cell} text-right text-fg`}>
+                                  <CommentCell result={r} canEdit={canEdit && e.cards[q]?.status !== SCORECARD.approved}>
                                   {editable ? (
                                     <CommitInput
                                       label={t("kpi.col.actual")}
@@ -311,6 +312,7 @@ export function KpiSheet({
                                   ) : (
                                     r.actual.toLocaleString(i18n.language)
                                   )}
+                                  </CommentCell>
                                 </td>,
                                 <td key={`${q}-p`} className={`${cell} text-right ${pctTone(pct)}`}>{r.actual == null ? "—" : `${pct}%`}</td>,
                               ];
@@ -323,7 +325,7 @@ export function KpiSheet({
                                 const pct = completion(k.result.target, k.result.actual, k.result.metric.direction);
                                 const editable = canEdit && k.status !== SCORECARD.approved;
                                 return (
-                                  <tr key={k.result.id} className="text-fg-muted">
+                                  <tr key={k.result.id} className="group/row text-fg-muted hover:bg-surface-hover">
                                     <td style={{ width: W, minWidth: W, maxWidth: W }} className={`${cell} ${sticky} pl-20 text-xs`}>
                                       ↳ {periodLabel(k.period, true)}
                                     </td>
@@ -333,6 +335,7 @@ export function KpiSheet({
                                         : [
                                             <td key={`${c}-t`} className={`${cell} border-l text-right`}>{k.result.target.toLocaleString(i18n.language)}</td>,
                                             <td key={`${c}-a`} className={`${cell} text-right text-fg`}>
+                                              <CommentCell result={k.result} canEdit={editable}>
                                               {editable ? (
                                                 <CommitInput
                                                   label={t("kpi.col.actual")}
@@ -346,6 +349,7 @@ export function KpiSheet({
                                               ) : (
                                                 k.result.actual.toLocaleString(i18n.language)
                                               )}
+                                              </CommentCell>
                                             </td>,
                                             <td key={`${c}-p`} className={`${cell} text-right ${pctTone(pct)}`}>{k.result.actual == null ? "—" : `${pct}%`}</td>,
                                           ],

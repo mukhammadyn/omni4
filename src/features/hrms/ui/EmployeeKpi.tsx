@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRightIcon, CheckIcon, PlusIcon, RotateCcwIcon, TargetIcon } from "lucide-react";
+import { ArrowRightIcon, CheckIcon, MessageSquarePlusIcon, MessageSquareTextIcon, PlusIcon, RotateCcwIcon, TargetIcon } from "lucide-react";
 import type { Item } from "@/features/item";
 import { localized, optionOf, useTableSchema, type Field } from "@/features/table";
 import { todayInput } from "@/shared/lib/date-value";
@@ -28,6 +28,7 @@ import {
   useUpdateActual,
   useUpdateResult,
   useUpdateScorecard,
+  type Result,
 } from "../api/kpi";
 import { coefficientOf, completion, KPI_TYPES, NEXT_STATUS, lastPeriods, ratingOf, SCORECARD, scoreOf, typeOfRange, type KpiType, type Period } from "../model/kpi";
 import { Segments } from "./schedule-parts";
@@ -207,7 +208,7 @@ export function EmployeeKpi({ employeeId, positionId, departmentId, language }: 
                   fmt(value, r.metric.unit)
                 );
               return (
-                <tr key={r.id} className="border-b border-border">
+                <tr key={r.id} className="group/row border-b border-border">
                   <td className="py-2">
                     <span className="font-medium">{r.metric.name || "—"}</span>
                     {r.aggregation && (
@@ -222,7 +223,9 @@ export function EmployeeKpi({ employeeId, positionId, departmentId, language }: 
                     {!editable && r.metric.direction === "down" ? "≤ " : ""}
                     {cell("target", r.target)}
                   </td>
-                  <td className="py-2 text-right font-semibold">{cell("actual", r.actual)}</td>
+                  <td className="py-2 pr-2 text-right font-semibold">
+                    <CommentCell result={r} canEdit={Boolean(editable)}>{cell("actual", r.actual)}</CommentCell>
+                  </td>
                   <td className="py-2 pl-4">
                     <span className="flex items-center gap-2">
                       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-hover">
@@ -406,5 +409,71 @@ export function StatusStep({ card, total, label, canEdit }: { card: { id: string
         </div>
       )}
     </Popover>
+  );
+}
+
+/**
+ * Заметка к ячейке факта — как в udevs_hrms_admin (comments.tsx), но
+ * одна на строку за период: поле `comment` строки карты. Есть заметка —
+ * метка в углу и текст при наведении; клик по метке — мини-редактор
+ * у ячейки. Пишут обычно «почему недобор».
+ */
+export function CommentCell({ result, canEdit, children }: { result: Result; canEdit: boolean; children: ReactNode }) {
+  const { t } = useTranslation();
+  const update = useUpdateResult();
+  const [text, setText] = useState(result.comment);
+  if (!result.comment && !canEdit) return <>{children}</>;
+  return (
+    <span className="group/comment flex items-center justify-end gap-1" title={result.comment || undefined}>
+      {/* Значок слева от значения: есть заметка — виден всегда и окрашен, нет — проступает при наведении на строку. */}
+      <Popover
+        align="end"
+        className="shrink-0"
+        trigger={({ toggle }) => (
+          <button
+            type="button"
+            onClick={() => (setText(result.comment), toggle())}
+            aria-label={t("kpi.note.label")}
+            title={result.comment || t("kpi.note.add")}
+            className={`grid size-6 place-items-center rounded transition-opacity hover:bg-surface-hover ${
+              result.comment ? "text-warning" : "text-fg-subtle opacity-40 group-hover/comment:opacity-100 group-hover/row:opacity-100"
+            }`}
+          >
+            <Icon as={result.comment ? MessageSquareTextIcon : MessageSquarePlusIcon} size={14} />
+          </button>
+        )}
+      >
+        {(close) => (
+          <div className="flex w-72 flex-col gap-2 p-2">
+            <textarea
+              autoFocus
+              rows={3}
+              value={text}
+              readOnly={!canEdit}
+              placeholder={t("kpi.note.placeholder")}
+              onChange={(e) => setText(e.target.value)}
+              className="w-full resize-none rounded-md border border-border-strong bg-input px-2.5 py-1.5 text-sm text-fg outline-none placeholder:text-fg-subtle focus:border-accent"
+            />
+            {canEdit && (
+              <div className="flex justify-end gap-1.5">
+                {result.comment && (
+                  <Button size="sm" variant="ghost" onClick={() => (update.mutate({ guid: result.id, values: { comment: null } }), close())}>
+                    {t("kpi.note.clear")}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  disabled={text.trim() === result.comment}
+                  onClick={() => (update.mutate({ guid: result.id, values: { comment: text.trim() || null } }), close())}
+                >
+                  {t("action.save")}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Popover>
+      {children}
+    </span>
   );
 }
