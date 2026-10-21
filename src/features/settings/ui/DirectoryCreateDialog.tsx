@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, GitForkIcon, Trash2Icon } from "lucide-react";
 import {
   ActiveCell,
   Cell,
@@ -20,6 +20,7 @@ import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { CHIP_COLORS, CHIP_DOT, CHIP_HEX, hexToChipColor } from "@/shared/ui/chip";
 import { DatePicker } from "@/shared/ui/date-picker";
+import { Dropdown, type DropdownItem } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { Modal } from "@/shared/ui/modal";
@@ -45,6 +46,10 @@ export function DirectoryCreateDialog({
   language,
   row,
   readOnly = false,
+  defaults,
+  parent,
+  note,
+  onDelete,
   onClose,
 }: {
   table: string;
@@ -56,12 +61,22 @@ export function DirectoryCreateDialog({
   fields: Field[];
   relations: Relation[];
   language: string;
+  /** Значения новой записи поверх пустых: родитель и его цвет у «Добавить вложенный». */
+  defaults?: Item | undefined;
+  /**
+   * Ссылка на себя — списком дерева, а не поиском связи: в нём нет
+   * самой записи и её потомков, и цикл из окна не собрать.
+   */
+  parent?: { slug: string; options: DropdownItem[] } | undefined;
+  /** Строка под полями: «Вложенных элементов: 3». */
+  note?: string | undefined;
+  onDelete?: (() => void) | undefined;
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const create = useCreateItem(table);
   const update = useUpdateItem(table);
-  const [draft, setDraft] = useState<Item>(() => row ?? blankItem(fields));
+  const [draft, setDraft] = useState<Item>(() => row ?? { ...blankItem(fields), ...defaults });
   const [showErrors, setShowErrors] = useState(false);
   const [active, setActive] = useState<{ field: Field; anchor: DOMRect } | null>(null);
   const errors = rowErrors(fields, draft);
@@ -102,6 +117,15 @@ export function DirectoryCreateDialog({
   const control = (field: Field) => {
     const value = draft[field.slug];
     const text = typeof value === "string" || typeof value === "number" ? String(value) : "";
+    if (field.slug === parent?.slug) {
+      return (
+        <Dropdown
+          value={text}
+          items={[{ value: "", label: t("dir.topLevel") }, ...parent.options]}
+          onChange={(guid) => setDraft((current) => ({ ...current, [field.slug]: guid || null, [relationDataKey(field.slug)]: undefined }))}
+        />
+      );
+    }
     switch (cellKind(field.type)) {
       case "text":
       case "link": {
@@ -206,9 +230,21 @@ export function DirectoryCreateDialog({
                 </div>
               ),
             )}
+          {note && (
+            <p className="col-span-2 flex items-center gap-1.5 text-[13px] text-fg-subtle">
+              <Icon as={GitForkIcon} size={14} />
+              {note}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+          {onDelete && (
+            <Button variant="danger" className="mr-auto" onClick={onDelete}>
+              <Icon as={Trash2Icon} size={14} />
+              {t("action.delete")}
+            </Button>
+          )}
           {showErrors && errors.size > 0 && <span className="mr-auto text-xs text-danger">{t("table.fillRequired", { count: errors.size })}</span>}
           <Button variant="ghost" onClick={onClose}>
             {t("action.cancel")}

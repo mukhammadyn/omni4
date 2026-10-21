@@ -80,7 +80,7 @@ const ext = (doc: Doc) => {
 };
 
 /** Значок и цвет файла — `FT` прототипа. */
-function fileLook(doc: Doc): { icon: LucideIcon; color: ChipColor } {
+export function fileLook(doc: Doc): { icon: LucideIcon; color: ChipColor } {
   const e = ext(doc);
   if (e === "pdf") return { icon: FileTextIcon, color: "red" };
   if (e === "doc" || e === "docx") return { icon: FileTextIcon, color: "blue" };
@@ -558,7 +558,7 @@ export function DocumentBrowser({
 }
 
 /** «Загрузить документы»: сотрудник, папка, файлы — `uploadModal` прототипа. */
-function UploadDialog({
+export function UploadDialog({
   employeeId,
   fixedEmployee,
   folders,
@@ -703,7 +703,7 @@ function UploadDialog({
 }
 
 /** Новая папка или правка: имя и цвет — `dNewF` прототипа. */
-function FolderDialog({ folder, order, onClose }: { folder?: DocFolder; order: number; onClose: () => void }) {
+export function FolderDialog({ folder, order, onClose }: { folder?: DocFolder; order: number; onClose: () => void }) {
   const { t } = useTranslation();
   const [name, setName] = useState(folder?.name ?? "");
   const [color, setColor] = useState<ChipColor>(folder?.color ?? "blue");
@@ -811,7 +811,7 @@ const kb = (size: number) => (size > 1048576 ? `${(size / 1048576).toFixed(1)} M
  * печать, скачивание; справа — сведения, «Переместить в папку»,
  * «Копировать ссылку», «Удалить». Стрелки листают.
  */
-function DocumentViewer({
+export function DocumentViewer({
   list,
   index,
   folders,

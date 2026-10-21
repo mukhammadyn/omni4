@@ -15,6 +15,8 @@ import { DirectorySettings } from "./DirectorySettings";
 import { EndpointSettings } from "./EndpointSettings";
 import { LocaleSettings } from "./LocaleSettings";
 import { ProfileSettings } from "./ProfileSettings";
+import { HrFilesSettings } from "./HrFilesSettings";
+import { OptionsSettings } from "./OptionsSettings";
 import { RecordSettings } from "./RecordSettings";
 import { RoleSettings } from "./RoleSettings";
 import { UserSettings } from "./UserSettings";
@@ -55,6 +57,7 @@ const CONTENT: Record<string, () => React.JSX.Element> = {
   billing: BillingSettings,
   resources: ResourceSettings,
   activity: ActivityLog,
+  "hr-files": HrFilesSettings,
 };
 
 /**
@@ -73,6 +76,8 @@ export function SettingsPage({ section }: { section: string | undefined }) {
     <DirectorySettings directory={active.directory} />
   ) : active?.record ? (
     <RecordSettings section={active.record} />
+  ) : active?.options ? (
+    <OptionsSettings section={active.options} />
   ) : (
     Content && <Content />
   );
