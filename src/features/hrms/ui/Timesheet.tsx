@@ -6,8 +6,8 @@ import { CHIP_STYLES, hexToChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
 import { Popover } from "@/shared/ui/popover";
 import { Tooltip } from "@/shared/ui/tooltip";
-import { isWeekend, type Scale, type SheetCell, type SheetTotals } from "../model/timesheet";
-import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, GroupedRows, useAttendance, useDayHead, type OpenDay, type OpenEmployee } from "./attendance-parts";
+import type { Scale, SheetCell, SheetTotals } from "../model/timesheet";
+import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, GroupedRows, useAttendance, dayTone, useDayHead, type OpenDay, type OpenEmployee } from "./attendance-parts";
 import { ATTENDANCE_TAB } from "./employee-tabs";
 import { TimesheetDay } from "./TimesheetDay";
 
@@ -53,8 +53,9 @@ export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; 
                 <th
                   key={date}
                   className={`${headCell} z-20 px-0.5 text-center font-medium ${scale === "week" ? "min-w-[84px]" : "min-w-[36px]"} ${
-                    date === today ? "bg-accent-subtle text-accent-text" : isWeekend(date) ? "text-danger" : "text-fg-muted"
+                    dayTone(date, today, sheet.holidays)
                   }`}
+                  title={sheet.holidays.get(date)}
                 >
                   <div className="text-xs leading-tight">{head.day(date)}</div>
                   <div className="text-2xs font-normal leading-tight opacity-70">{head.weekday(date)}</div>

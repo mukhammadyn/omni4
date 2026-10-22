@@ -9,7 +9,7 @@ import { useTimesheet, type SheetEmployee, type Timesheet } from "../api/timeshe
 import { useScheduleDirectory } from "../api/schedule";
 import type { EmployeeTab } from "./employee-tabs";
 import { groupRows, useScheduleSettings, type GroupKeys, type ScheduleGroup } from "./schedule-settings";
-import { buildRow, datesOf, rangeOf, statusOf, stepAnchor, type DayStatus, type Scale, type SheetCell } from "../model/timesheet";
+import { buildRow, datesOf, isWeekend, rangeOf, statusOf, stepAnchor, type DayStatus, type Scale, type SheetCell } from "../model/timesheet";
 
 /*
  * Общее у экранов посещаемости — «Календаря» и «Табеля»: период,
@@ -72,6 +72,16 @@ export function useAttendance(viewId: string, scales: readonly Scale[] = SCALES,
 }
 
 export type Attendance = ReturnType<typeof useAttendance>;
+
+/** Цвет числа в шапке дня: сегодня, праздник компании (как в графике), выходной. */
+export const dayTone = (date: string, today: string, holidays: ReadonlyMap<string, string>) =>
+  date === today
+    ? "bg-accent-subtle text-accent-text"
+    : holidays.has(date)
+      ? "text-chip-pink-dot shadow-[inset_0_-2px_0_var(--color-chip-pink-dot)]"
+      : isWeekend(date)
+        ? "text-danger"
+        : "text-fg-muted";
 
 /** Сотрудников за порцию у табеля и календаря — примерно экран. */
 export const SHEET_PAGE = 30;
