@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { todayInput } from "@/shared/lib/date-value";
 import { Button } from "@/shared/ui/button";
+import { CHIP_DOT, hexToChipColor } from "@/shared/ui/chip";
 import { DatePicker } from "@/shared/ui/date-picker";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Modal } from "@/shared/ui/modal";
@@ -24,6 +25,12 @@ export function DismissDialog({
   const [date, setDate] = useState(todayInput);
   const [type, setType] = useState("");
   const [reason, setReason] = useState("");
+
+  const dotted = (items: { value: string; label: string; color: string | null }[]) =>
+    items.map(({ color, ...item }) => ({
+      ...item,
+      ...(color ? { icon: <span className={`size-2 shrink-0 rounded-full ${CHIP_DOT[hexToChipColor(color)]}`} /> } : {}),
+    }));
 
   const field = (label: string, control: ReactNode) => (
     <label className="flex flex-col gap-1.5 text-sm">
@@ -48,7 +55,7 @@ export function DismissDialog({
           t("employee.dismissType"),
           <Dropdown
             value={type}
-            items={types}
+            items={dotted(types)}
             placeholder={t("employee.dismissTypePick")}
             ariaLabel={t("employee.dismissType")}
             onChange={(next) => {
@@ -61,8 +68,11 @@ export function DismissDialog({
           t("employee.dismissReason"),
           <Dropdown
             value={reason}
-            items={reasons.filter((item) => item.type === type)}
+            items={dotted(reasons.filter((item) => item.type === type))}
             placeholder={t("employee.dismissReasonPick")}
+            /* Тип живёт только на причине (у сотрудника — `hr_dismissal_reasons_id`),
+               поэтому без причины уволить нельзя: её надо завести в настройках. */
+            emptyText={t("employee.dismissNoReasons")}
             ariaLabel={t("employee.dismissReason")}
             disabled={!type}
             onChange={setReason}

@@ -18,7 +18,7 @@ import {
 import { formatDate, todayInput } from "@/shared/lib/date-value";
 import { formatNumber } from "@/shared/lib/number-value";
 import { Button } from "@/shared/ui/button";
-import { CHIP_STYLES } from "@/shared/ui/chip";
+import { CHIP_DOT, CHIP_STYLES, hexToChipColor } from "@/shared/ui/chip";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { DatePicker } from "@/shared/ui/date-picker";
 import { Dropdown } from "@/shared/ui/dropdown";
@@ -313,26 +313,35 @@ function PayDialog({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t("comp.col.op")}>
+            <Tabs
+              variant="field"
+              activeId={draft.kind}
+              onSelect={(kind) =>
+                set({ kind: kind as PayDraft["kind"], ...(types.find((type) => type.id === draft.typeId)?.kind === kind ? {} : { typeId: "" }) })
+              }
+              tabs={[
+                { id: "accrual", label: t("comp.op.accrual") },
+                { id: "deduction", label: t("comp.op.deduction") },
+              ]}
+            />
+          </Field>
           <Field label={t("comp.col.date")}>
             <DatePicker value={draft.date} locale={i18n.language} onChange={(date) => set({ date })} />
           </Field>
           <Field label={t("comp.col.type")}>
             <Dropdown
               value={draft.typeId}
-              items={types.map((type) => ({ value: type.id, label: type.name }))}
+              /* Операция задаёт, какие типы годятся: тип — начисление или удержание. */
+              items={types
+                .filter((type) => type.kind === draft.kind)
+                .map((type) => ({
+                  value: type.id,
+                  label: type.name,
+                  ...(type.color ? { icon: <span className={`size-2 shrink-0 rounded-full ${CHIP_DOT[hexToChipColor(type.color)]}`} /> } : {}),
+                }))}
               placeholder={t("comp.pickType")}
-              onChange={(typeId) => set({ typeId, kind: types.find((type) => type.id === typeId)?.kind ?? draft.kind })}
-            />
-          </Field>
-          <Field label={t("comp.col.op")}>
-            <Tabs
-              variant="segment"
-              activeId={draft.kind}
-              onSelect={(kind) => set({ kind: kind as PayDraft["kind"] })}
-              tabs={[
-                { id: "accrual", label: t("comp.op.accrual") },
-                { id: "deduction", label: t("comp.op.deduction") },
-              ]}
+              onChange={(typeId) => set({ typeId })}
             />
           </Field>
           <Field label={t("comp.amountLabel")}>

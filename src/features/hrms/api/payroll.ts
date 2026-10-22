@@ -57,7 +57,7 @@ export type PayRecord = {
   createdAt: string;
 };
 
-export type PayType = { id: string; name: string; kind: "accrual" | "deduction" };
+export type PayType = { id: string; name: string; kind: "accrual" | "deduction"; color: string };
 
 const toRecord = (row: Item): PayRecord => ({
   id: text(row.guid),
@@ -87,7 +87,7 @@ export function useEmployeePay(employeeId: string, departmentId: string) {
     () =>
       types.page.rows
         .filter((row) => row.is_active !== false)
-        .map((row) => ({ id: text(row.guid), name: text(row.name), kind: row.kind === "deduction" ? "deduction" : "accrual" })),
+        .map((row) => ({ id: text(row.guid), name: text(row.name), kind: row.kind === "deduction" ? "deduction" : "accrual", color: text(row.color) })),
     [types.page.rows],
   );
 
