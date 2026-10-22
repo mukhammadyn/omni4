@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckIcon, EyeIcon, PlaneIcon, ShieldCheckIcon } from "lucide-react";
+import { CheckIcon, EyeIcon, PlaneIcon, ShieldCheckIcon, TriangleAlertIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
 import { CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { DynamicIcon } from "@/shared/ui/dynamic-icon";
@@ -195,6 +195,7 @@ export function Absences({
                         {route && progress && request.status !== "rejected" && (
                           <Chain name={route.name} done={progress.done} total={progress.total} />
                         )}
+                        <TenureWarning request={request} />
                       </span>
                     </td>
                     <td className={`${td} text-right`} onClick={(event) => event.stopPropagation()}>
@@ -261,6 +262,18 @@ export function Chain({ name, done, total }: { name: string; done: number; total
       <span className="tabular-nums">
         {done}/{total}
       </span>
+    </span>
+  );
+}
+
+/** Ждущая заявка раньше права по стажу — решающий видит это до «Одобрить». */
+export function TenureWarning({ request }: { request: AbsenceRequest }) {
+  const { t } = useTranslation();
+  if (request.status !== "pending" || !(request.from < request.eligibleFrom)) return null;
+  return (
+    <span className="flex items-center gap-1 text-xs text-warning">
+      <Icon as={TriangleAlertIcon} size={12} className="shrink-0" />
+      {t("employeeAbsences.notEligible", { date: request.eligibleFrom.split("-").reverse().join(".") })}
     </span>
   );
 }

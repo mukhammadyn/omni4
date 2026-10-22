@@ -2968,5 +2968,12 @@
   "holiday.wholeCompany": "Butun kompaniya",
   "holiday.workDays": "Ish kunlari",
   "holiday.year": "Yil",
-  "holiday.saved": "Saqlandi"
+  "holiday.saved": "Saqlandi",
+  "dir.absenceCode": "Kod",
+  "dir.absencePaid": "Haq to‘lanadi",
+  "dir.absencePeriod": "Davr",
+  "dir.absenceDays": "Kunlar limiti",
+  "dir.absenceTenure": "Min. staj, oy",
+  "employeeAbsences.eligibleFrom": "{{date}} dan huquq — {{count}} oy staj kerak",
+  "employeeAbsences.notEligible": "Staj bu turga hali yetmagan — huquq {{date}} dan"
 }

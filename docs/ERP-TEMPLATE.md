@@ -591,7 +591,7 @@ TABLE у пункта удалён: карты правятся сводной �
 | `crm_legal_entities` | одна строка с `is_default: true` (только при CRM) | «Профиль компании» |
 | `hr_recruiting_pipelines` | одна воронка с `is_default: true` | новая вакансия берёт её |
 | `hr_recruiting_stages` | этапы этой воронки с `sort_order` | воронка, «Следующий этап» |
-| `hr_absence_types` | типы с `name`, `icon`, `color`, `limit_days`, `limit_period`, `sort_order` | табель, баланс, заявки |
+| `hr_absence_types` | типы с `name`, `icon`, `color`, `limit_days`, `limit_period`, `min_tenure_months`, `sort_order`; у вариантов `limit_period` цвета (год `#3B82F6`, месяц `#8B5CF6`, неделя `#F0842B`, без лимита `#9E9E9E`) — иначе теги «Политики отсутствий» серые | табель, баланс, заявки, «право с» по стажу |
 | `hr_shift_kinds` | «Дневная» (`lucide:sun`), «Ночная» (`lucide:moon`), «Удалённо» (`lucide:house`, `is_remote`) с цветом, временем и `sort_order` | график работы: смены, шаблоны |
 | `hr_rejection_reasons`, `hr_candidate_sources` | несколько активных | отказ / резерв, источник кандидата |
 | `crm_pipelines` + `crm_stages` | воронка с этапами (при CRM) | доска сделок |

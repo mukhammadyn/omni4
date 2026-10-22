@@ -2968,5 +2968,12 @@
   "holiday.wholeCompany": "Whole company",
   "holiday.workDays": "Working days",
   "holiday.year": "Year",
-  "holiday.saved": "Saved"
+  "holiday.saved": "Saved",
+  "dir.absenceCode": "Code",
+  "dir.absencePaid": "Paid",
+  "dir.absencePeriod": "Period",
+  "dir.absenceDays": "Day limit",
+  "dir.absenceTenure": "Min. tenure, mo",
+  "employeeAbsences.eligibleFrom": "Eligible from {{date}} — {{count}} mo of tenure required",
+  "employeeAbsences.notEligible": "Not eligible for this type yet by tenure — from {{date}}"
 }

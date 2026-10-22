@@ -65,8 +65,14 @@ export type Directory = {
   title?: string;
   /** Название — цветным тегом (`nm:'tag'` прототипа), а не точкой. */
   tag?: boolean;
+  /** Поле иконки в теге (`nmIcon` прототипа): имя Iconify или файла CDN. */
+  iconField?: string;
   /** Колонки после названия, слагами. */
   columns: string[];
+  /** Короткие заголовки колонок (`th` прототипа) вместо подписей полей схемы. */
+  headers?: Record<string, TranslationKey>;
+  /** Колонка пуста («—»), когда другое поле строки равно значению: лимит при «Без лимита». */
+  blankIf?: Record<string, { field: string; value: string }>;
   /** Ссылка на себя — справочник рисуется деревом (`.ot` прототипа). */
   parent?: string;
   /** Сколько уровней у дерева: 2 — «группа → элемент», вкладывать только в корень. */
@@ -442,7 +448,17 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             titleKey: "dir.absence",
             hintKey: "dir.absenceHint",
             icon: PlaneIcon,
-            columns: ["code", "is_paid", "limit_days", "limit_period", "is_active"],
+            tag: true,
+            iconField: "icon",
+            columns: ["code", "is_paid", "limit_period", "limit_days", "min_tenure_months", "is_active"],
+            headers: {
+              code: "dir.absenceCode",
+              is_paid: "dir.absencePaid",
+              limit_period: "dir.absencePeriod",
+              limit_days: "dir.absenceDays",
+              min_tenure_months: "dir.absenceTenure",
+            },
+            blankIf: { limit_days: { field: "limit_period", value: "none" } },
             sort: ["sort_order"],
           },
           {

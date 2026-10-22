@@ -49,9 +49,12 @@ export function DirectoryCreateDialog({
   defaults,
   parent,
   note,
+  iconSlug,
   onDelete,
   onClose,
 }: {
+  /** Текстовое поле с именем иконки (`Directory.iconField`) — правится пикером, как поле ICON. */
+  iconSlug?: string | undefined;
   table: string;
   /** Запись на правку; нет — новая. */
   row?: Item | undefined;
@@ -108,8 +111,8 @@ export function DirectoryCreateDialog({
   };
 
   // Иконка — слева от названия, как у пункта меню (MenuFormDialog): это часть имени, а не отдельное поле.
-  const iconField = fields.find((field) => cellKind(field.type) === "icon");
-  const titleField = fields.find((field) => cellKind(field.type) === "text");
+  const iconField = fields.find((field) => cellKind(field.type) === "icon" || field.slug === iconSlug);
+  const titleField = fields.find((field) => cellKind(field.type) === "text" && field !== iconField);
   const iconPicker = (field: Field) => (
     <IconPicker value={typeof draft[field.slug] === "string" ? String(draft[field.slug]) : ""} type="ICON" onChange={(icon) => set(field.slug, icon || null)} />
   );
@@ -126,6 +129,7 @@ export function DirectoryCreateDialog({
         />
       );
     }
+    if (field === iconField) return iconPicker(field);
     switch (cellKind(field.type)) {
       case "text":
       case "link": {

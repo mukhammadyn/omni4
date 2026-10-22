@@ -472,7 +472,7 @@ export function EmployeePage({
             onOpenSurvey={(survey) => void navigate({ to: "/surveys/$itemId", params: { itemId: survey }, search: { menu: "" } })}
           />
         ) : own === ABSENCES_TAB ? (
-          <EmployeeAbsences employeeId={guid} />
+          <EmployeeAbsences employeeId={guid} hireDate={String(row.hire_date ?? "").slice(0, 10)} />
         ) : tab?.tableSlug === PAYROLL_LINES && tab.direction === "incoming" ? (
           <EmployeeCompensation employeeId={guid} departmentId={String(row.hr_departments_id ?? "")} />
         ) : tab?.tableSlug === JOB_HISTORY && tab.direction === "incoming" ? (

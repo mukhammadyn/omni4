@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { MAX_LIMIT, PEOPLE, useCreateItem, useItems, useUpdateItem, type Item } from "@/features/item";
 import { session } from "@/shared/api/session";
-import type { AbsenceType } from "../model/absence-balance";
+import { eligibleFrom, type AbsenceType } from "../model/absence-balance";
 import { decisionWrites, type Decision, type Progress, type Route } from "../model/approval";
 import { plusDays } from "../model/timesheet";
 import { related, text } from "./org";
@@ -33,6 +33,8 @@ export type AbsenceRequest = {
   from: string;
   to: string;
   days: number | null;
+  /** С какого дня у сотрудника право на этот тип по стажу; пусто — право есть всегда. */
+  eligibleFrom: string;
   /** Вариант STATUS: pending, approved, rejected, cancelled. */
   status: string;
   reason: string;
@@ -59,6 +61,7 @@ const toRequest = (row: Item): AbsenceRequest => {
     from,
     to: text(row.date_to).slice(0, 10) || from,
     days: typeof row.days === "number" ? row.days : null,
+    eligibleFrom: eligibleFrom(text(person.hire_date), typeof kind.min_tenure_months === "number" ? kind.min_tenure_months : 0),
     status: text(row.status),
     reason: text(row.reason),
   };
@@ -112,6 +115,7 @@ export function useAbsenceTypes(): AbsenceType[] {
           color: text(row.color),
           limit: typeof row.limit_days === "number" && text(row.limit_period) !== "none" ? row.limit_days : null,
           period: text(row.limit_period),
+          minMonths: typeof row.min_tenure_months === "number" ? row.min_tenure_months : 0,
         })),
     [query.page.rows],
   );
