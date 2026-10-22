@@ -428,16 +428,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             sort: ["sort_order"],
           },
           { id: "hr-fines", titleKey: "dir.penalties", icon: AlarmClockIcon, screen: true },
-          {
-            id: "hr-salary",
-            table: "hr_salary_bands",
-            titleKey: "dir.salaryBands",
-            hintKey: "dir.salaryBandsHint",
-            icon: ChartColumnIcon,
-            /* Названия у вилки нет: строка — это должность × грейд. */
-            title: "hr_positions_id",
-            columns: ["hr_grades_id", "salary_min", "salary_max", "currency", "effective_from", "is_active"],
-          },
+          { id: "hr-salary", titleKey: "dir.salaryBands", icon: ChartColumnIcon, screen: true },
           NORMS,
         ],
       },

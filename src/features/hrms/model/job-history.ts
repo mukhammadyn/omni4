@@ -1,8 +1,9 @@
 import { toDateValue } from "@/shared/lib/date-value";
 
 /**
- * Строка матрицы грейдов (`hr_salary_bands`): какой грейд допустим
- * для должности и потолок оклада на нём.
+ * Ячейка матрицы грейдов (`hr_grade_matrix_cells`): какой грейд допустим
+ * для должности и потолок оклада его ступени. `from` — «Действует с»
+ * версии матрицы.
  */
 export type Band = {
   positionId: string;
@@ -16,8 +17,8 @@ export type Band = {
 
 /**
  * Чем запись истории расходится с матрицей — плашка «Не по матрице
- * грейдов» прототипа. Матрица сохранение не блокирует (erp.dbml,
- * hr_salary_bands), она только подсвечивает.
+ * грейдов» прототипа. Матрица сохранение не блокирует, она только
+ * подсвечивает.
  */
 export type GradeIssue =
   | { kind: "noGrade"; allowed: string[] }
@@ -32,20 +33,22 @@ export type GradeIssue =
  * в прототипе.
  */
 export function gradeIssue(
-  entry: { positionId: string; gradeId: string; salary: number | null },
+  entry: { positionId: string; gradeId: string; salary: number | null; date?: string },
   bands: Band[],
 ): GradeIssue | null {
-  const own = bands.filter((band) => band.positionId === entry.positionId);
+  /* Версия матрицы — действовавшая на дату записи; записи раньше всех версий
+     и записи без даты сверяются с последней. */
+  const versions = [...new Set(bands.map((band) => band.from))].sort();
+  const version = versions.filter((from) => entry.date && from <= entry.date).at(-1) ?? versions.at(-1);
+  const own = bands.filter((band) => band.positionId === entry.positionId && band.from === version);
   if (!own.length) return null;
 
   if (!entry.gradeId) {
     return { kind: "noGrade", allowed: [...new Set(own.map((band) => band.gradeName))] };
   }
 
-  // ponytail: последняя версия матрицы, а не действовавшая на дату записи; валюта не сверяется.
-  const band = own
-    .filter((item) => item.gradeId === entry.gradeId)
-    .sort((a, b) => b.from.localeCompare(a.from))[0];
+  // ponytail: валюта не сверяется — потолки матрицы в UZS.
+  const band = own.find((item) => item.gradeId === entry.gradeId);
   if (!band) return { kind: "notAllowed" };
 
   if (entry.salary !== null && band.max !== null && entry.salary > band.max) {

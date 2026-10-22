@@ -11,8 +11,12 @@ test("должности нет в матрице — сверять не с ч�
   expect(gradeIssue({ positionId: "cto", gradeId: "", salary: 50_000_000 }, bands)).toBeNull();
 });
 
-test("грейд не указан — называем допустимые", () => {
+test("грейд не указан — называем допустимые в версии матрицы", () => {
   expect(gradeIssue({ positionId: "dev", gradeId: "", salary: null }, bands)).toEqual({
+    kind: "noGrade",
+    allowed: ["D2"],
+  });
+  expect(gradeIssue({ positionId: "dev", gradeId: "", salary: null, date: "2024-06-01" }, bands)).toEqual({
     kind: "noGrade",
     allowed: ["D1", "D2"],
   });
@@ -22,6 +26,15 @@ test("грейда нет в матрице для должности", () => {
   expect(gradeIssue({ positionId: "dev", gradeId: "d5", salary: null }, bands)).toEqual({
     kind: "notAllowed",
   });
+});
+
+test("версия — действовавшая на дату записи", () => {
+  expect(gradeIssue({ positionId: "dev", gradeId: "d2", salary: 13_000_000, date: "2024-06-01" }, bands)).toEqual({
+    kind: "overCeiling",
+    ceiling: 12_000_000,
+  });
+  // В версии 2025 года D1 у разработчика нет.
+  expect(gradeIssue({ positionId: "dev", gradeId: "d1", salary: null, date: "2025-03-01" }, bands)).toEqual({ kind: "notAllowed" });
 });
 
 test("оклад выше потолка последней версии матрицы", () => {

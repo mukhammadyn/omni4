@@ -289,7 +289,7 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 - `CRM / Служебные`: `crm_deal_items`, `crm_deal_stage_history`,
   `crm_messages`;
 - `HRMS` (прямо в папке): `hr_work_schedules` (Шаблоны графиков, 📐 `1f4d0`);
-- `HRMS / Система`: `hr_documents`, `hr_assets`, `hr_salary_bands`,
+- `HRMS / Система`: `hr_documents`, `hr_assets`, `hr_grade_matrices`,
   `hr_dismissal_reasons`, `hr_document_folders`, `hr_document_templates`,
   `hr_holidays`, `hr_absence_types`, `hr_approval_routes`,
   `hr_penalty_policies`, `hr_penalty_rules`, `hr_recruiting_pipelines`,
@@ -300,7 +300,30 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
   `hr_candidate_stage_history`, `hr_candidate_evaluations`,
   `hr_training_materials`, `hr_training_participants`,
   `hr_survey_participants`, `hr_survey_responses`, `hr_budget_amounts`,
-  `hr_kpi_results`.
+  `hr_kpi_results`, `hr_grade_matrix_columns`, `hr_grade_matrix_rows`,
+  `hr_grade_matrix_cells`.
+
+**Матрица грейдов (2026-10-22, только omni4).** Четыре таблицы вместо
+`hr_salary_bands`, которая матрицу не выражала (SYSTEM-TABLES-AUDIT):
+
+- `hr_grade_matrices` — версия: `name`, `is_active` (опубликована;
+  черновик в сверке не участвует), `effective_from`, `usd_rate`
+  (USD-потолок считается по курсу, не хранится), `sort_order`;
+- `hr_grade_matrix_columns` — ступень: → матрица, `label`,
+  `min_tenure_months`, `max_salary` (UZS), `sort_order`;
+- `hr_grade_matrix_rows` — направление или должность: → матрица,
+  → `hr_grade_matrix_rows` (родитель; есть — строка должности),
+  → `hr_departments` (у направления), `name` (своё название
+  направления, пусто — отдела), → `hr_positions` (у должности),
+  `sort_order`;
+- `hr_grade_matrix_cells` — строка × ступень: → строка, → ступень,
+  → `hr_grades` (грейд должности), → `hr_positions` (рост в должность),
+  `text` (критерий направления). Объединения не хранятся — экран сливает
+  соседние ячейки с одной должностью роста.
+
+Каскада у ucode нет — удаляет фронт (`features/hrms/api/grade-matrix`).
+`hr_salary_bands` в omni4 осталась с 6 строками и не читается; удалить
+после проверки матрицы.
 
 Какие из них где во вкладках настроек — `src/features/settings/ui/directories.ts`.
 
