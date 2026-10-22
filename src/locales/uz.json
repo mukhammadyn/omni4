@@ -768,7 +768,7 @@
   "dir.salaryBands": "Grejdlar boʻyicha maoshlar",
   "dir.salaryBandsHint": "Staj va maosh chegarasi bilan o‘sish bosqichlari, mezonli yo‘nalishlar va lavozim greydlari. Ish tarixi e’lon qilingan matritsa bo‘yicha tekshiriladi.",
   "dir.schedules": "Ish jadvali shablonlari",
-  "dir.schedulesHint": "Xodimlar va smenalarga tayinlanadigan jadvallar.",
+  "dir.schedulesHint": "Xodimlarga biriktiriladigan va davomat hisobida ishlatiladigan takrorlanuvchi jadvallar.",
   "dir.shiftKinds": "Smena turlari",
   "dir.shiftKindsHint": "Ertalab, kunduzi, kechasi, masofaviy — ish jadvalida tanlanadigan turlar. Vaqti yangi smenaga qo‘yiladi.",
   "dir.sources": "Lid manbalari",

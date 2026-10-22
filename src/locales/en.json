@@ -768,7 +768,7 @@
   "dir.salaryBands": "Salary bands",
   "dir.salaryBandsHint": "Growth levels with tenure and salary cap, directions with criteria and position grades. Job history is checked against the published matrix.",
   "dir.schedules": "Work schedule templates",
-  "dir.schedulesHint": "Schedules assigned to employees and shifts.",
+  "dir.schedulesHint": "Recurring schedules assigned to employees and used in attendance tracking.",
   "dir.shiftKinds": "Shift kinds",
   "dir.shiftKindsHint": "Morning, day, night, remote — what the work schedule offers. Its time fills a new shift.",
   "dir.sources": "Lead sources",
