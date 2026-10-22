@@ -461,14 +461,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             blankIf: { limit_days: { field: "limit_period", value: "none" } },
             sort: ["sort_order"],
           },
-          {
-            id: "hr-sched",
-            table: "hr_work_schedules",
-            titleKey: "dir.schedules",
-            hintKey: "dir.schedulesHint",
-            icon: CalendarClockIcon,
-            columns: ["type", "is_active"],
-          },
+          { id: "hr-sched", titleKey: "dir.schedules", icon: CalendarClockIcon, screen: true },
           {
             id: "hr-shift-kinds",
             table: "hr_shift_kinds",
