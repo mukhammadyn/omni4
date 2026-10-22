@@ -109,6 +109,8 @@ export type Timesheet = {
   employees: SheetEmployee[];
   /** Вход строки табеля по сотруднику. */
   inputOf: (employee: SheetEmployee) => RowInput;
+  /** Праздники компании за период: дата → название. Шапке дня. */
+  holidays: ReadonlyMap<string, string>;
   /** Типы отсутствий — для обозначений. */
   absenceTypes: { title: string; code: string; icon: string; color: string }[];
   loading: boolean;
@@ -235,6 +237,8 @@ export function useTimesheet({
         leaves: leaveIndex.get(employee.id) ?? [],
         holidays: daysOff.of(employee.locationId),
       }),
+      /** Праздники компании — шапке дня; у сотрудника свои, по филиалу (`inputOf`). */
+      holidays: daysOff.of(""),
       absenceTypes: types.rows
         .filter((row) => row.is_active !== false)
         .map((row) => ({ title: text(row.name), code: text(row.code), icon: text(row.icon), color: text(row.color) })),

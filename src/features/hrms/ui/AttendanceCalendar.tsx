@@ -25,7 +25,7 @@ import {
   SHEET_PAGE,
   STATUS_DOT,
   StatusChips,
-  GroupedRows, useAttendance,
+  GroupedRows, useAttendance, dayTone,
   useDayHead,
   useStatusFilter,
   type OpenDay,
@@ -80,8 +80,9 @@ export function AttendanceCalendar({ viewId, search, onOpenEmployee }: { viewId:
                 <th
                   key={date}
                   className={`${headCell} z-20 px-1 font-medium ${width} ${month ? "text-center" : "text-left"} ${
-                    date === today ? "bg-accent-subtle text-accent-text" : isWeekend(date) ? "text-danger" : "text-fg-muted"
+                    dayTone(date, today, sheet.holidays)
                   }`}
+                  title={sheet.holidays.get(date)}
                 >
                   {month ? (
                     <>
