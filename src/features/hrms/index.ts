@@ -45,3 +45,4 @@ export { AssetPage } from "./ui/AssetPage";
 export { AssetForm } from "./ui/AssetForm";
 export { AssetGallery } from "./ui/AssetGallery";
 export { AssetTotal } from "./ui/AssetTotal";
+export { PenaltySettings } from "./ui/PenaltySettings";

@@ -16,6 +16,7 @@ import { EndpointSettings } from "./EndpointSettings";
 import { LocaleSettings } from "./LocaleSettings";
 import { ProfileSettings } from "./ProfileSettings";
 import { HrFilesSettings } from "./HrFilesSettings";
+import { HrFinesSettings } from "./HrFinesSettings";
 import { OptionsSettings } from "./OptionsSettings";
 import { RecordSettings } from "./RecordSettings";
 import { RoleSettings } from "./RoleSettings";
@@ -58,6 +59,7 @@ const CONTENT: Record<string, () => React.JSX.Element> = {
   resources: ResourceSettings,
   activity: ActivityLog,
   "hr-files": HrFilesSettings,
+  "hr-fines": HrFinesSettings,
 };
 
 /**

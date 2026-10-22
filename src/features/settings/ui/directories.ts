@@ -427,14 +427,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             columns: ["kind", "code", "is_active"],
             sort: ["sort_order"],
           },
-          {
-            id: "hr-fines",
-            table: "hr_penalty_policies",
-            titleKey: "dir.penalties",
-            hintKey: "dir.penaltiesHint",
-            icon: AlarmClockIcon,
-            columns: ["description", "is_active"],
-          },
+          { id: "hr-fines", titleKey: "dir.penalties", icon: AlarmClockIcon, screen: true },
           {
             id: "hr-salary",
             table: "hr_salary_bands",
