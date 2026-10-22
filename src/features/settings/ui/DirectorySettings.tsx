@@ -29,6 +29,7 @@ import {
 } from "@/features/item";
 import { collapseLanguages, localized, useTableSchema, type Field } from "@/features/table";
 import { useDataLanguages } from "@/features/workspace";
+import { todayInput } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { CHIP_DOT, Chip, hexToChipColor } from "@/shared/ui/chip";
@@ -203,7 +204,16 @@ export function DirectorySettings({
    * у бэкенда нет (backend-notes, «Группировка»). Сотрудников станет
    * больше тысячи — счёт будет неполным; тогда нужна функция-агрегат.
    */
-  const counted = useItems(directory.counts?.table, { limit: MAX_LIMIT, page: 1, relations: false });
+  const counts = directory.counts;
+  const counted = useItems(counts?.table, {
+    limit: MAX_LIMIT,
+    page: 1,
+    relations: false,
+    filters: {
+      ...counts?.filters,
+      ...(counts?.lastYear ? { [counts.lastYear]: { op: "after" as const, values: [yearAgo()] } } : {}),
+    },
+  });
   const own = useMemo(() => {
     const out = new Map<string, number>();
     const key = directory.counts?.field ?? "";
@@ -741,4 +751,10 @@ const ROW_BUTTON =
 
 function isGuid(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
+}
+
+/** Дата год назад — нижняя граница счётчика «за год». */
+function yearAgo() {
+  const today = todayInput();
+  return `${Number(today.slice(0, 4)) - 1}${today.slice(4)}`;
 }

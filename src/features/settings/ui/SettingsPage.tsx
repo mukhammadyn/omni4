@@ -20,6 +20,8 @@ import { HrFinesSettings } from "./HrFinesSettings";
 import { HrSalarySettings } from "./HrSalarySettings";
 import { HrHolidaySettings } from "./HrHolidaySettings";
 import { HrScheduleSettings } from "./HrScheduleSettings";
+import { HrPipelineSettings } from "./HrPipelineSettings";
+import { HrCareerSettings } from "./HrCareerSettings";
 import { OptionsSettings } from "./OptionsSettings";
 import { RecordSettings } from "./RecordSettings";
 import { RoleSettings } from "./RoleSettings";
@@ -66,6 +68,8 @@ const CONTENT: Record<string, () => React.JSX.Element> = {
   "hr-salary": HrSalarySettings,
   "hr-holidays": HrHolidaySettings,
   "hr-sched": HrScheduleSettings,
+  "hr-rec-pipe": HrPipelineSettings,
+  "hr-career": HrCareerSettings,
 };
 
 /**

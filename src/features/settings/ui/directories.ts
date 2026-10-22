@@ -15,6 +15,7 @@ import {
   FolderKanbanIcon,
   FolderOpenIcon,
   GitBranchIcon,
+  GlobeIcon,
   HandshakeIcon,
   IdCardIcon,
   LayersIcon,
@@ -35,6 +36,7 @@ import {
   UsersRoundIcon,
   RepeatIcon,
 } from "lucide-react";
+import type { Filters } from "@/features/item";
 import type { TranslationKey } from "@/shared/lib/i18n";
 
 /**
@@ -94,7 +96,17 @@ export type Directory = {
    * у отдела. `totalKey` — ещё колонка суммы по всем вложенным;
    * `rollup` — та же сумма в самой колонке (у группы грейдов своих людей нет).
    */
-  counts?: { table: string; field: string; labelKey: TranslationKey; totalKey?: TranslationKey; rollup?: boolean };
+  counts?: {
+    table: string;
+    field: string;
+    labelKey: TranslationKey;
+    totalKey?: TranslationKey;
+    rollup?: boolean;
+    /** Считать только такие строки: «Нанят» у источника, «Отказ» у причины. */
+    filters?: Filters;
+    /** Поле даты — считать только за последние 12 месяцев (`… за год` прототипа). */
+    lastYear?: string;
+  };
 };
 
 /**
@@ -476,23 +488,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
       {
         titleKey: "dir.groupRecruiting",
         items: [
-          {
-            id: "hr-rec-pipe",
-            table: "hr_recruiting_pipelines",
-            titleKey: "dir.recPipelines",
-            hintKey: "dir.recPipelinesHint",
-            icon: GitBranchIcon,
-            columns: ["sla_days", "is_default", "is_active"],
-          },
-          {
-            id: "hr-rec-stages",
-            table: "hr_recruiting_stages",
-            titleKey: "dir.recStages",
-            hintKey: "dir.recStagesHint",
-            icon: ListOrderedIcon,
-            columns: ["hr_recruiting_pipelines_id", "container", "sla_days", "notify_candidate"],
-            sort: ["hr_recruiting_pipelines_id", "sort_order"],
-          },
+          { id: "hr-rec-pipe", titleKey: "dir.recPipelines", icon: GitBranchIcon, screen: true },
           {
             id: "hr-rec-reject",
             table: "hr_rejection_reasons",
@@ -500,6 +496,14 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             hintKey: "dir.rejectionHint",
             icon: CircleXIcon,
             columns: ["side", "add_to_reserve", "is_active"],
+            headers: { side: "dir.rejectionSide", add_to_reserve: "dir.rejectionReserve" },
+            counts: {
+              table: "hr_candidates",
+              field: "hr_rejection_reasons_id",
+              labelKey: "dir.rejectionCount",
+              filters: { status: { op: "any", values: ["rejected"] } },
+              lastYear: "stage_changed_at",
+            },
           },
           {
             id: "hr-rec-src",
@@ -508,7 +512,16 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             hintKey: "dir.candidateSourcesHint",
             icon: RadioTowerIcon,
             columns: ["type", "monthly_cost", "currency", "is_active"],
+            headers: { monthly_cost: "dir.sourceCost", currency: "dir.sourceCurrency" },
+            counts: {
+              table: "hr_candidates",
+              field: "hr_candidate_sources_id",
+              labelKey: "dir.sourceHires",
+              filters: { status: { op: "any", values: ["hired"] } },
+              lastYear: "hired_at",
+            },
           },
+          { id: "hr-career", titleKey: "career.title", icon: GlobeIcon, screen: true },
         ],
       },
     ],

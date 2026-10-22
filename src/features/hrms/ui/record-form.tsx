@@ -255,12 +255,26 @@ export function FormField({
 }
 
 /** `.switch` прототипа: «Показывать в объявлении». `hint` — пояснение после подписи. */
-export function Switch({ on, label, hint, onToggle }: { on: boolean; label: string; hint?: string; onToggle: () => void }) {
+export function Switch({
+  on,
+  label,
+  hint,
+  ariaLabel,
+  onToggle,
+}: {
+  on: boolean;
+  label: string;
+  hint?: string;
+  /** Имя для скринридера, когда подписи рядом нет (переключатель в строке таблицы). */
+  ariaLabel?: string;
+  onToggle: () => void;
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
+      aria-label={ariaLabel}
       onClick={onToggle}
       className="group flex h-(--spacing-input) items-center gap-2 self-start text-sm"
     >
