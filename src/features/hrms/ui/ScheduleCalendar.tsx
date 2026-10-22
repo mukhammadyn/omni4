@@ -152,7 +152,8 @@ export function ScheduleCalendar({
     if (!all.length) {
       return month ? null : (
         <div className="flex h-11 items-center justify-center rounded-md border border-dashed border-border-strong text-xs font-medium text-fg-subtle group-hover/cell:border-accent group-hover/cell:text-accent-text">
-          {data.holidays.has(date) ? t("schedule.holiday") : t("schedule.dayOff")}
+          {/* Строка одного сотрудника — праздники его филиала; шапка и заливка — общие. */}
+          {(row.employees.length === 1 ? data.holidaysOf(row.employees[0]!.locationId) : data.holidays).has(date) ? t("schedule.holiday") : t("schedule.dayOff")}
         </div>
       );
     }

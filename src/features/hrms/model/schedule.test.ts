@@ -18,7 +18,7 @@ import {
   type ShiftForm,
 } from "./schedule";
 
-const none = new Set<string>();
+const none = () => new Set<string>();
 
 test("time: overnight span, break only on long shifts, hours mode", () => {
   expect(plannedOf("20:00", "08:00", 60)).toBe(660);
@@ -29,14 +29,14 @@ test("time: overnight span, break only on long shifts, hours mode", () => {
 
 test("weekly template: working days, skips holidays; hours per week", () => {
   const template = blankTemplate();
-  const days = expandTemplate(template, ["a"], { from: "2026-10-12", to: "2026-10-18", holidays: new Set(["2026-10-14"]), offset: false });
+  const days = expandTemplate(template, ["a"], { from: "2026-10-12", to: "2026-10-18", holidays: () => new Set(["2026-10-14"]), offset: false });
   expect(days.map((d) => d.date)).toEqual(["2026-10-12", "2026-10-13", "2026-10-15", "2026-10-16"]);
   expect(weekMinutesOf(template)).toBe(5 * 480);
 });
 
 test("cycle template: 2 on 2 off, offset staggers employees, ignores holidays", () => {
   const template = { ...blankTemplate(), type: "cycle" as const };
-  const days = expandTemplate(template, ["a", "b"], { from: "2026-10-01", to: "2026-10-06", holidays: new Set(["2026-10-01"]), offset: true });
+  const days = expandTemplate(template, ["a", "b"], { from: "2026-10-01", to: "2026-10-06", holidays: () => new Set(["2026-10-01"]), offset: true });
   const of = (id: string) => days.filter((d) => d.employeeId === id).map((d) => d.date.slice(8));
   expect(of("a")).toEqual(["01", "02", "05", "06"]);
   expect(of("b")).toEqual(["03", "04"]);
@@ -61,10 +61,15 @@ const form = (patch: Partial<ShiftForm> = {}): ShiftForm => ({
 });
 
 test("series: one day ignores weekdays; a range takes its weekdays per employee", () => {
-  expect(datesOfForm(form({ to: "2026-10-12", weekdays: [] }), none)).toEqual(["2026-10-12"]);
+  expect(datesOfForm(form({ to: "2026-10-12", weekdays: [] }))).toEqual(["2026-10-12"]);
   const drafts = draftsOfForm(form(), "s", none);
   expect(drafts.map((d) => `${d.employeeId}${d.date.slice(8)}`)).toEqual(["a12", "b12", "a14", "b14"]);
   expect(drafts[0]).toMatchObject({ seriesId: "s", plannedMinutes: 480, breakMinutes: 60 });
+});
+
+test("series: holidays are per employee (branch calendar)", () => {
+  const drafts = draftsOfForm(form(), "s", (id) => new Set(id === "a" ? ["2026-10-14"] : []));
+  expect(drafts.map((d) => `${d.employeeId}${d.date.slice(8)}`)).toEqual(["a12", "b12", "b14"]);
 });
 
 const shift = (date: string, id = date): Shift => ({

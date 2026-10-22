@@ -16,7 +16,7 @@ import { Popover } from "@/shared/ui/popover";
 import {
   SHIFTS,
   useBusyShifts,
-  useHolidays,
+  useEmployeeDaysOff,
   useEmployeeSearch,
   useEmployeesById,
   useScheduleDirectory,
@@ -134,7 +134,7 @@ function ShiftForm({
       comment: "",
     };
   });
-  const { dates: holidays, loading: holidaysLoading } = useHolidays(form.from, form.to);
+  const { of: holidays, loading: holidaysLoading } = useEmployeeDaysOff(form.employeeIds, form.from, form.to);
   /** Шаг подтверждения правки или удаления серии: какие дни и кому. */
   const [confirm, setConfirm] = useState<"save" | "delete" | null>(null);
   const [scope, setScope] = useState<SeriesScope>({ days: "all", people: "all" });

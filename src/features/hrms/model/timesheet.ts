@@ -105,7 +105,7 @@ export type RowInput = {
   /** Одобренные и ждущие; отклонённые уже отброшены. */
   leaves: Leave[];
   /** Праздники компании: дата → название. */
-  holidays: Map<string, string>;
+  holidays: ReadonlyMap<string, string>;
 };
 
 /** Переработка дня: сверх смены, короче порога — ноль. */

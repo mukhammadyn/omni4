@@ -435,15 +435,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
       {
         titleKey: "dir.groupAttendance",
         items: [
-          {
-            id: "hr-holidays",
-            table: "hr_holidays",
-            titleKey: "dir.holidays",
-            hintKey: "dir.holidaysHint",
-            icon: CalendarHeartIcon,
-            columns: ["date", "type", "hr_locations_id"],
-            sort: ["date"],
-          },
+          { id: "hr-holidays", titleKey: "dir.holidays", icon: CalendarHeartIcon, screen: true },
           {
             id: "hr-absence",
             table: "hr_absence_types",

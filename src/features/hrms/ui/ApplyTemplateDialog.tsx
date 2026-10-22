@@ -9,7 +9,7 @@ import { DatePicker } from "@/shared/ui/date-picker";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Modal } from "@/shared/ui/modal";
-import { useApplyTemplate, useHolidays, useEmployeesById, useScheduleDirectory, useTemplates, type ScheduleEmployee } from "../api/schedule";
+import { useApplyTemplate, useEmployeeDaysOff, useEmployeesById, useScheduleDirectory, useTemplates, type ScheduleEmployee } from "../api/schedule";
 import { draftsOfTemplate, expandTemplate, weekMinutesOf } from "../model/schedule";
 import { plusDays } from "../model/timesheet";
 import { DialogLoading, Row, TemplatePreview, templateDot, useDuration, useTemplateSummary } from "./schedule-parts";
@@ -50,7 +50,7 @@ function ApplyForm({ templateId, employeeIds = [], first, onClose }: Props & { f
   });
   const set = (patch: Partial<typeof form>) => setForm((prev) => ({ ...prev, ...patch }));
   const template = templates.find((item) => item.id === form.templateId) ?? templates[0];
-  const { dates: holidays, loading: holidaysLoading } = useHolidays(form.from, form.to);
+  const { of: holidays, loading: holidaysLoading } = useEmployeeDaysOff(form.employeeIds, form.from, form.to);
   // Должность каждого — в его смены; только выбранные, а не вся компания.
   const chosen = useEmployeesById(form.employeeIds);
   const weeks = Math.max(1, Math.round((Date.parse(form.to) - Date.parse(form.from)) / 864e5 / 7));
