@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { Field, Relation } from "@/features/table";
-import { autoFilterValues, relationSelection, selfDefaults } from "./relation";
+import { autoFilterValues, relationSelection, relationTree, selfDefaults, withoutPrefix } from "./relation";
 
 /** Связь с настроенным автофильтром: город отбирается по региону строки. */
 function relationWith(autoFilters: unknown): Relation {
@@ -111,4 +111,23 @@ test("цвет связанной записи едет вместе с подп
   expect(
     relationSelection({ stage_id_data: { guid: "s2", name: "Без", color: "" } }, field, fields),
   ).toEqual([{ guid: "s2", label: "Без" }]);
+});
+
+test("relation options as a tree: group header, its children under it, orphan to the root", () => {
+  const items = [
+    { guid: "dev", name: "DEV" },
+    { guid: "d1", name: "DEV D1", hr_grades_id: "dev" },
+    { guid: "pm", name: "PM" },
+    { guid: "x", name: "Lost", hr_grades_id: "gone" },
+    { guid: "d2", name: "DEV D2", hr_grades_id: "dev" },
+  ];
+  expect(relationTree(items, "hr_grades_id").map((o) => `${o.depth}${o.header ? "H" : ""}:${String(o.item.guid)}`)).toEqual([
+    "0H:dev",
+    "1:d1",
+    "1:d2",
+    "0:pm",
+    "0:x",
+  ]);
+  expect(withoutPrefix("DEV D3", "DEV")).toBe("D3");
+  expect(withoutPrefix("DEVOPS", "DEV")).toBe("DEVOPS");
 });

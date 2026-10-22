@@ -195,3 +195,38 @@ export function selfDefaults(relations: Relation[], me: SelfIdentity): Item {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+export type TreeOption = { item: Item; depth: 0 | 1; header: boolean };
+
+/**
+ * Варианты связи деревом — как справочник в настройках («Грейды»:
+ * группа → грейды). Дерево — когда у строк есть ссылка на свою же
+ * таблицу (`parentKey`, `hr_grades` → `hr_grades_id`). Родитель с детьми
+ * в списке — заголовок, выбирают его детей; родителя нет в списке
+ * (отсеял поиск) — ребёнок стоит в корне. Два уровня, как в настройках.
+ */
+export function relationTree(items: Item[], parentKey: string): TreeOption[] {
+  const ids = new Set(items.map((item) => String(item["guid"] ?? "")));
+  const parentOf = (item: Item) => {
+    const parent = item[parentKey];
+    return typeof parent === "string" && ids.has(parent) ? parent : "";
+  };
+  const children = new Map<string, Item[]>();
+  for (const item of items) {
+    const parent = parentOf(item);
+    if (parent) children.set(parent, [...(children.get(parent) ?? []), item]);
+  }
+  return items
+    .filter((item) => !parentOf(item))
+    .flatMap((root) => {
+      const kids = children.get(String(root["guid"] ?? "")) ?? [];
+      return [
+        { item: root, depth: 0 as const, header: kids.length > 0 },
+        ...kids.map((item) => ({ item, depth: 1 as const, header: false })),
+      ];
+    });
+}
+
+/** «DEV D3» под заголовком «DEV» — «D3»: группа уже видна строкой выше. */
+export const withoutPrefix = (label: string, prefix: string) =>
+  prefix && label.startsWith(`${prefix} `) ? label.slice(prefix.length + 1) : label;

@@ -117,9 +117,14 @@ export function Anchored({
        */}
       <div aria-hidden className="fixed inset-0 z-50" onPointerDown={onClose} onWheel={onClose} />
 
+      {/*
+       * Блок не уже ячейки (minWidth ниже), а карточка редактора бывает
+       * уже — пустая полоса блока сбоку перехватывала клик мимо, и он не
+       * доходил до подложки. Клики ловит только содержимое.
+       */}
       <div
         ref={box}
-        className="fixed z-50"
+        className="pointer-events-none fixed z-50 *:pointer-events-auto"
         style={{
           left: placed?.left ?? anchor.left,
           top: placed?.top ?? anchor.top,

@@ -28,7 +28,7 @@ import {
   type Relation,
 } from "@/features/table";
 import { Anchored } from "@/shared/ui/anchored";
-import { Chip } from "@/shared/ui/chip";
+import { CHIP_DOT, Chip, hexToChipColor } from "@/shared/ui/chip";
 import { openPreview } from "@/shared/ui/file-preview";
 import { Icon } from "@/shared/ui/icon";
 import { todayInput } from "@/shared/lib/date-value";
@@ -52,7 +52,7 @@ import {
   toTimeInput,
   type DateKind,
 } from "../model/cell-value";
-import { autoFilterValues, isLinkable, relationLabel, relationSelection } from "../model/relation";
+import { autoFilterValues, COLOR, isLinkable, relationLabel, relationSelection, relationTree, withoutPrefix } from "../model/relation";
 import type { Item } from "../model/types";
 import { cellError } from "../model/validate";
 import { Cell, isStage, optionColor, optionLabel } from "./Cell";
@@ -977,6 +977,10 @@ function RelationEditor({
   const visible = needle
     ? items.filter((item) => relationLabel(item, slugs, language).toLowerCase().includes(needle))
     : items;
+  /* Ссылка строки на свою таблицу — варианты деревом (model/relation, relationTree).
+     В каскаде не нужно: там шаги и есть уровни. */
+  const parentKey = `${listSlug}_id`;
+  const options = steps.length ? visible.map((item) => ({ item, depth: 0 as const, header: false })) : relationTree(visible, parentKey);
   const link = useLinkRelation(tableSlug);
   const create = useCreateItem(relation.toSlug);
 
@@ -1067,7 +1071,7 @@ function RelationEditor({
         <div className="m-1.5 flex min-h-7.5 flex-wrap items-center gap-1 rounded-md border border-border bg-input px-2 py-1">
           {selected.map((item) => (
             <span key={item.guid} className="inline-flex min-w-0 items-center gap-0.5">
-              <Chip onRemove={() => write(null)} removeLabel={t("cell.remove")}>
+              <Chip color={item.color ? hexToChipColor(item.color) : "gray"} onRemove={() => write(null)} removeLabel={t("cell.remove")}>
                 {item.label || item.guid}
               </Chip>
 
@@ -1105,18 +1109,31 @@ function RelationEditor({
           )}
 
           <>
-            {visible.map((item) => {
+            {options.map(({ item, depth, header }) => {
                 const guid = String(item["guid"] ?? "");
-                const label = relationLabel(item, slugs, language);
+                const own = relationLabel(item, slugs, language);
+                const parent = depth ? visible.find((one) => one["guid"] === item[parentKey]) : undefined;
+                const label = parent ? withoutPrefix(own, relationLabel(parent, slugs, language)) : own;
+                const color = typeof item[COLOR] === "string" && item[COLOR] ? hexToChipColor(item[COLOR]) : null;
+
+                // Группа с детьми — подпись, а не вариант: выбирают её грейды, как в настройках.
+                if (header) {
+                  return (
+                    <div key={guid} className="flex h-7 items-center gap-2 px-2.5 pt-1 text-xs font-medium text-fg-muted">
+                      {color && <span className={`size-2 rounded-full ${CHIP_DOT[color]}`} />}
+                      <span className="truncate">{label || guid}</span>
+                    </div>
+                  );
+                }
 
                 return (
                   <button
                     key={guid}
                     type="button"
                     onClick={() => pick(item)}
-                    className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-surface-hover"
+                    className={`flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-surface-hover ${depth ? "pl-6" : ""}`}
                   >
-                    <span className="truncate">{label || guid}</span>
+                    {color ? <Chip color={color}>{label || guid}</Chip> : <span className="truncate">{label || guid}</span>}
                     {selectedGuids.has(guid) && (
                       <Icon as={CheckIcon} size={14} className="ml-auto text-accent-text" />
                     )}
