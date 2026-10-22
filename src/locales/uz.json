@@ -2599,6 +2599,8 @@
   "doc.moveToFolder": "Papkaga ko‘chirish",
   "doc.copyLink": "Havolani nusxalash",
   "doc.linkCopied": "Havola nusxalandi",
+  "doc.template": "Shablon",
+  "doc.noTemplate": "Shablonsiz",
   "doc.number": "Raqam",
   "doc.numberHint": "Masalan: 125-K",
   "doc.validUntil": "Amal qiladi",

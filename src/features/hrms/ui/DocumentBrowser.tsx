@@ -119,6 +119,7 @@ function Expiry({ doc, locale, quiet }: { doc: Doc; locale: string; quiet?: bool
  * и список; загрузка, новая папка, перенос и удаление. Сделан под
  * `hr_documents` (FIXED_VIEW_TYPES).
  *
+ * Шаблон при загрузке только помечает документ (`hr_document_templates_id`).
  * Нет из прототипа: «Сгенерировать» по `hr_document_templates`
  * (шаблоны — .docx, подстановка нужна на сервере), подписи E-IMZO.
  */
@@ -577,11 +578,13 @@ export function UploadDialog({
   const [employee, setEmployee] = useState(employeeId);
   const [folder, setFolder] = useState(initialFolder);
   const [files, setFiles] = useState<File[]>([]);
+  const [template, setTemplate] = useState("");
   const [number, setNumber] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [search, setSearch] = useState("");
   const [over, setOver] = useState(false);
   const people = useItems(fixedEmployee ? undefined : EMPLOYEES, { ...ALL, relations: false }).page.rows;
+  const templates = useItems("hr_document_templates", { ...ALL, relations: false }).page.rows;
   const upload = useUploadFiles();
   const add = useAddDocuments();
   const busy = upload.isPending || add.isPending;
@@ -597,7 +600,7 @@ export function UploadDialog({
 
   const submit = async () => {
     const urls = await upload.mutateAsync({ files, folder: "Media" });
-    await add.mutateAsync({ employee, folder, number: number.trim(), validUntil, files: urls.map((url, i) => ({ url, name: files[i]?.name ?? fileName(url) })) });
+    await add.mutateAsync({ employee, folder, template, number: number.trim(), validUntil, files: urls.map((url, i) => ({ url, name: files[i]?.name ?? fileName(url) })) });
     toast.success(t("doc.uploaded", { count: urls.length }));
     onClose();
   };
@@ -632,6 +635,20 @@ export function UploadDialog({
                 onChange={setFolder}
               />
             </div>
+          </div>
+          <div>
+            <span className={label}>{t("doc.template")}</span>
+            {/* Папка шаблона подставляется, если у шаблона она есть. */}
+            <Dropdown
+              value={template}
+              placeholder={t("doc.noTemplate")}
+              items={[{ value: "", label: t("doc.noTemplate") }, ...templates.filter((row) => row.is_active !== false).map((row) => ({ value: text(row.guid), label: text(row.name) }))]}
+              onChange={(guid) => {
+                setTemplate(guid);
+                const own = text(templates.find((row) => text(row.guid) === guid)?.hr_document_folders_id);
+                if (own) setFolder(own);
+              }}
+            />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label>

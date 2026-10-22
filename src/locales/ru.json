@@ -2599,6 +2599,8 @@
   "doc.moveToFolder": "Переместить в папку",
   "doc.copyLink": "Копировать ссылку",
   "doc.linkCopied": "Ссылка скопирована",
+  "doc.template": "Шаблон",
+  "doc.noTemplate": "Без шаблона",
   "doc.number": "Номер",
   "doc.numberHint": "Например: 125-К",
   "doc.validUntil": "Действует до",
