@@ -1758,6 +1758,7 @@
   "employee.work.deleteHint": "Запись исчезнет из истории работы. Поля сотрудника она не меняет: их обновляет функция смены назначения.",
   "employee.work.noGrade": "Грейд не указан, а для должности «{{position}}» в матрице грейдов заданы: {{grades}}.",
   "employee.work.notAllowed": "Грейда «{{grade}}» нет в матрице для должности «{{position}}».",
+  "employee.work.otherCurrency": "Оклад в валюте «{{currency}}» — потолки матрицы в UZS, с ними он не сверяется.",
   "employee.work.overCeiling": "Оклад {{salary}} выше потолка грейда {{grade}} — {{ceiling}}.",
   "vacancy.funnel": "Воронка",
   "vacancy.candidates": "Кандидаты",

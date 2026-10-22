@@ -1758,6 +1758,7 @@
   "employee.work.deleteHint": "The record will disappear from the work history. It doesn't change the employee's fields: the assignment function updates them.",
   "employee.work.noGrade": "No grade set, while the grade matrix allows for “{{position}}”: {{grades}}.",
   "employee.work.notAllowed": "Grade “{{grade}}” isn't in the matrix for “{{position}}”.",
+  "employee.work.otherCurrency": "Salary in «{{currency}}» — matrix caps are in UZS, so it isn’t checked against them.",
   "employee.work.overCeiling": "Salary {{salary}} is above the {{grade}} ceiling of {{ceiling}}.",
   "vacancy.funnel": "Pipeline",
   "vacancy.candidates": "Candidates",

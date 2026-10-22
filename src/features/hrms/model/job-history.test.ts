@@ -49,3 +49,13 @@ test("неполный месяц не считается", () => {
   expect(monthsBetween(new Date(2023, 10, 24), new Date(2026, 9, 7))).toBe(34);
   expect(monthsBetween(new Date(2026, 9, 7), new Date(2026, 9, 1))).toBe(0);
 });
+
+test("оклад не в UZS с потолком не сверяется — заметка, а не нарушение", () => {
+  expect(gradeIssue({ positionId: "dev", gradeId: "d2", salary: 5_000, currency: "USD" }, bands)).toEqual({ kind: "otherCurrency" });
+  expect(gradeIssue({ positionId: "dev", gradeId: "d2", salary: 15_000_000, currency: "UZS" }, bands)).toEqual({
+    kind: "overCeiling",
+    ceiling: 14_000_000,
+  });
+  // Грейд вне матрицы — нарушение при любой валюте.
+  expect(gradeIssue({ positionId: "dev", gradeId: "d5", salary: 5_000, currency: "USD" }, bands)).toEqual({ kind: "notAllowed" });
+});
