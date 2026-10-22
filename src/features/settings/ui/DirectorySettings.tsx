@@ -33,6 +33,7 @@ import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { CHIP_DOT, Chip, hexToChipColor } from "@/shared/ui/chip";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
+import { DynamicIcon } from "@/shared/ui/dynamic-icon";
 import { useSaveFieldOptions, type OptionDraft } from "../api/field-options";
 import { DirectoryCreateDialog } from "./DirectoryCreateDialog";
 import { OptionDialog } from "./OptionsSettings";
@@ -256,6 +257,11 @@ export function DirectorySettings({
   const openRow = page.rows.find((row) => row.guid === openGuid);
   const rowOf = (guid: string) => treeRows.find((row) => row.guid === guid);
   const nameOf = (row: Item | undefined) => String(row?.[titleSlug] ?? "");
+  // PICK_LIST приходит и строкой, и массивом из одного значения.
+  const blank = (row: Item, slug: string) => {
+    const rule = directory.blankIf?.[slug];
+    return rule ? [row[rule.field]].flat().includes(rule.value) : false;
+  };
   const groupOf = (guid: string) => groupOptions.find((one) => GROUP + one.value === guid);
   const kidsOf = (guid: string) => treeRows.filter((row) => row[parentKey] === guid);
 
@@ -391,7 +397,9 @@ export function DirectorySettings({
               <tr>
                 <Th>{titleField ? label(titleField) : t("dir.name")}</Th>
                 {columns.map((field) => (
-                  <Th key={field.slug} className="whitespace-nowrap">{label(field)}</Th>
+                  <Th key={field.slug} className="whitespace-nowrap">
+                    {directory.headers?.[field.slug] ? t(directory.headers[field.slug]!) : label(field)}
+                  </Th>
                 ))}
                 {directory.counts && <Th className="text-right whitespace-nowrap">{t(directory.counts.labelKey)}</Th>}
                 {directory.counts?.totalKey && parentKey && <Th className="text-right whitespace-nowrap">{t(directory.counts.totalKey)}</Th>}
@@ -448,7 +456,16 @@ export function DirectorySettings({
 
                         <span className="min-w-0 truncate">
                           {directory.tag ? (
-                            <Chip color={color ? hexToChipColor(color) : "gray"}>{nameOf(row)}</Chip>
+                            <Chip color={color ? hexToChipColor(color) : "gray"}>
+                              {directory.iconField && typeof row[directory.iconField] === "string" && row[directory.iconField] ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <DynamicIcon name={row[directory.iconField] as string} size={13} fallback={null} />
+                                  {nameOf(row)}
+                                </span>
+                              ) : (
+                                nameOf(row)
+                              )}
+                            </Chip>
                           ) : titleField ? (
                             <Cell
                               field={titleField}
@@ -473,7 +490,9 @@ export function DirectorySettings({
 
                     {columns.map((field) => (
                       <Td key={field.slug} className="max-w-60 truncate text-fg-muted">
-                        {group ? null : PEOPLE.some((slug) => field.slug.startsWith(slug)) ? (
+                        {group ? null : blank(row, field.slug) ? (
+                          "—"
+                        ) : PEOPLE.some((slug) => field.slug.startsWith(slug)) ? (
                           <Person row={row} slug={field.slug} />
                         ) : field.slug === "hr_departments_id" ? (
                           <Dotted row={row} slug={field.slug} />
@@ -611,6 +630,7 @@ export function DirectorySettings({
           table={directory.table}
           title={`${t("dir.edit")}: ${t(directory.titleKey)}`}
           fields={drawerFields}
+          iconSlug={directory.iconField}
           relations={schema.relations}
           language={language}
           row={openRow}
@@ -632,6 +652,7 @@ export function DirectorySettings({
               : `${t("dir.add")}: ${t(directory.titleKey)}`
           }
           fields={drawerFields}
+          iconSlug={directory.iconField}
           relations={schema.relations}
           language={language}
           // Вложенный наследует цвет родителя, как в прототипе.

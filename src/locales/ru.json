@@ -2968,5 +2968,12 @@
   "holiday.wholeCompany": "Вся компания",
   "holiday.workDays": "Рабочих дней",
   "holiday.year": "Год",
-  "holiday.saved": "Сохранено"
+  "holiday.saved": "Сохранено",
+  "dir.absenceCode": "Код",
+  "dir.absencePaid": "Оплачиваемый",
+  "dir.absencePeriod": "Период",
+  "dir.absenceDays": "Лимит дней",
+  "dir.absenceTenure": "Мин. стаж, мес",
+  "employeeAbsences.eligibleFrom": "Право с {{date}} — нужен стаж {{count}} мес.",
+  "employeeAbsences.notEligible": "Стаж не дорос до права на этот вид — право с {{date}}"
 }
