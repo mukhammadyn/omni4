@@ -33,6 +33,7 @@ import {
   SparklesIcon,
   SunMoonIcon,
   UsersRoundIcon,
+  RepeatIcon,
 } from "lucide-react";
 import type { TranslationKey } from "@/shared/lib/i18n";
 
@@ -403,6 +404,14 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             groupBy: "dismissal_type",
             depth: 2,
             columns: ["rehire_allowed"],
+          },
+          {
+            id: "hr-change",
+            titleKey: "dir.changeReasons",
+            hintKey: "dir.changeReasonsHint",
+            icon: RepeatIcon,
+            field: "change_reason",
+            tables: ["hr_job_history"],
           },
         ],
       },

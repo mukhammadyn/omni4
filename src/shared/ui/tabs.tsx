@@ -45,6 +45,9 @@ export type TabItem = {
  * у календаря и таймлайна (`.seg`). Навигацией он не является, и
  * подчёркнутым рядом с поиском и кнопками читался бы как вторая полоса
  * вкладок.
+ *
+ * field — тот же segment как поле формы: высота поля ввода, вкладки
+ * делят ширину колонки поровну.
  */
 const STYLES = {
   module: {
@@ -64,6 +67,12 @@ const STYLES = {
   segment: {
     track: "flex w-fit min-w-0 max-w-full items-center overflow-x-auto rounded-md bg-surface-hover p-0.5",
     tab: "inline-flex h-6 shrink-0 items-center rounded-[5px] px-2.5 text-xs transition-colors",
+    active: "bg-surface text-fg shadow-raised",
+    idle: "text-fg-muted hover:text-fg",
+  },
+  field: {
+    track: "flex h-(--spacing-input) w-full min-w-0 items-stretch rounded-md bg-surface-hover p-0.5",
+    tab: "inline-flex flex-1 items-center justify-center rounded-[5px] px-2.5 text-sm transition-colors",
     active: "bg-surface text-fg shadow-raised",
     idle: "text-fg-muted hover:text-fg",
   },

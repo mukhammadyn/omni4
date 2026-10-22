@@ -159,10 +159,15 @@ export function useDismissalReasons(language: string) {
       types: [...(options ?? new Map()).entries()].map(([value, option]) => ({
         value,
         label: localized(option.labels, language, option.label || value),
+        color: option.color,
       })),
+      /* Своего цвета у причины нет — берёт цвет типа, как в настройках. */
       reasons: page.rows
         .filter((row) => row.is_active !== false)
-        .map((row) => ({ value: text(row.guid), label: text(row.name), type: firstText(row.dismissal_type) })),
+        .map((row) => {
+          const type = firstText(row.dismissal_type);
+          return { value: text(row.guid), label: text(row.name), type, color: options?.get(type)?.color ?? null };
+        }),
     }),
     [options, page.rows, language],
   );
