@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, PanelRightOpenIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, LoaderCircleIcon, PanelRightOpenIcon, RefreshCwIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
 import { todayInput } from "@/shared/lib/date-value";
+import { toast } from "@/shared/lib/toast";
+import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
 import { useLastPayMonth, usePayMonth } from "../api/payroll";
+import { useSyncPenalties } from "../api/penalty";
 import { useScheduleSettings } from "./schedule-settings";
 import { buildPayPivot, compactSum, type PayPivot } from "../model/payroll";
 
@@ -50,6 +53,7 @@ export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: strin
             со строками за месяц, скрывать нечего. Вернуть вместе со всеми
             сотрудниками из hr_employees (нулевые строки, как в прототипе). */}
         <span className="flex-1" />
+        <SyncPenalties month={month} title={title} />
         <button
           type="button"
           onClick={() =>
@@ -150,6 +154,67 @@ export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: strin
         <p className="py-3 text-xs text-fg-subtle">{t("payroll.hint")}</p>
       </div>
     </div>
+  );
+}
+
+/** «Пересчитать штрафы» за месяц — строки удержаний из посещаемости и политик. */
+function SyncPenalties({ month, title }: { month: string; title: string }) {
+  const { t, i18n } = useTranslation();
+  const sync = useSyncPenalties(month);
+  const [asking, setAsking] = useState(false);
+
+  /* Окно закрывается сразу: ход пересчёта виден на кнопке. */
+  const run = () => {
+    setAsking(false);
+    return sync
+      .run((violation, minutes) => t(`fine.line.${violation}`, { n: minutes }))
+      .then(({ count, total }) =>
+        toast.success(count ? t("fine.synced", { count, total: total.toLocaleString(i18n.language) }) : t("fine.syncedNone")),
+      )
+      .catch(() => toast.error(t("fine.syncFailed")));
+  };
+  const { progress } = sync;
+  const label = !progress
+    ? t("fine.sync")
+    : progress.total
+      ? t("fine.syncWriting", { done: progress.done, total: progress.total })
+      : t("fine.syncCounting");
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={!sync.ready || sync.busy}
+        aria-busy={sync.busy}
+        title={sync.ready ? undefined : t("common.loading")}
+        onClick={() => setAsking(true)}
+        className="relative inline-flex h-7 items-center gap-1.5 overflow-hidden rounded-md border border-border px-2.5 text-[13px] text-fg-muted tabular-nums transition-colors hover:bg-surface-hover hover:text-fg disabled:cursor-default disabled:hover:bg-transparent"
+      >
+        {/* Полоса хода — под текстом, по доле записанных строк. */}
+        {progress && progress.total > 0 && (
+          <span
+            className="absolute inset-y-0 left-0 bg-accent-subtle transition-[width]"
+            style={{ width: `${(progress.done / progress.total) * 100}%` }}
+          />
+        )}
+        <Icon
+          as={sync.busy || !sync.ready ? LoaderCircleIcon : RefreshCwIcon}
+          size={14}
+          className={`relative ${sync.busy || !sync.ready ? "animate-spin" : ""}`}
+        />
+        <span className={`relative ${sync.busy ? "text-fg" : ""}`}>{label}</span>
+      </button>
+      {asking && (
+        <ConfirmDialog
+          title={t("fine.syncTitle", { month: title })}
+          description={t("fine.syncHint")}
+          confirmLabel={t("fine.sync")}
+          busy={false}
+          onClose={() => setAsking(false)}
+          onConfirm={() => void run()}
+        />
+      )}
+    </>
   );
 }
 
