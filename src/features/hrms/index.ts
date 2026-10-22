@@ -46,3 +46,4 @@ export { AssetForm } from "./ui/AssetForm";
 export { AssetGallery } from "./ui/AssetGallery";
 export { AssetTotal } from "./ui/AssetTotal";
 export { PenaltySettings } from "./ui/PenaltySettings";
+export { GradeMatrix } from "./ui/GradeMatrix";

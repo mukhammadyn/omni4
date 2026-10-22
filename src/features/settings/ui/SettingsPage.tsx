@@ -17,6 +17,7 @@ import { LocaleSettings } from "./LocaleSettings";
 import { ProfileSettings } from "./ProfileSettings";
 import { HrFilesSettings } from "./HrFilesSettings";
 import { HrFinesSettings } from "./HrFinesSettings";
+import { HrSalarySettings } from "./HrSalarySettings";
 import { OptionsSettings } from "./OptionsSettings";
 import { RecordSettings } from "./RecordSettings";
 import { RoleSettings } from "./RoleSettings";
@@ -60,6 +61,7 @@ const CONTENT: Record<string, () => React.JSX.Element> = {
   activity: ActivityLog,
   "hr-files": HrFilesSettings,
   "hr-fines": HrFinesSettings,
+  "hr-salary": HrSalarySettings,
 };
 
 /**

@@ -4,7 +4,6 @@ import { todayInput } from "@/shared/lib/date-value";
 import { reportError } from "@/shared/lib/toast";
 import { useTablePermission } from "@/features/auth";
 import {
-  MAX_LIMIT,
   applyRights,
   orderColumns,
   useCreateItem,
@@ -15,8 +14,9 @@ import {
   type Item,
 } from "@/features/item";
 import { localized, optionOf, useTableSchema, type Field } from "@/features/table";
-import { gradeIssue, type Band, type GradeIssue } from "../model/job-history";
+import { gradeIssue, type GradeIssue } from "../model/job-history";
 import { EMPLOYEES } from "./employee";
+import { useMatrixBands } from "./grade-matrix";
 import { firstText, related, text } from "./org";
 
 /** История назначений (`erp.dbml`, hr_job_history): приём, переводы, повышения, оклад. */
@@ -70,7 +70,6 @@ async function currentSnap(employee: string, link: string): Promise<Item | null>
 }
 
 const SORT = [{ field: "date_from", direction: "desc" as const }];
-const ALL = { limit: MAX_LIMIT, page: 1 };
 
 /**
  * Всё для вкладки «Работа»: записи истории сотрудника, матрица грейдов
@@ -101,7 +100,7 @@ export function useJobHistory({
     // `contains` — голое значение рядом со слагом, то есть равенство (см. toCondition).
     filters: { [link]: { op: "contains", values: [employee] } },
   });
-  const bandRows = useItems("hr_salary_bands", ALL);
+  const bands = useMatrixBands();
   const create = useCreateItem(JOB_HISTORY);
   const update = useUpdateItem(JOB_HISTORY);
   const remove = useDeleteItems(JOB_HISTORY);
@@ -127,21 +126,6 @@ export function useJobHistory({
     [schema.fields, layout.rights],
   );
 
-  const bands = useMemo(
-    () =>
-      bandRows.page.rows
-        .filter((row) => row.is_active !== false)
-        .map(
-          (row): Band => ({
-            positionId: text(row.hr_positions_id),
-            gradeId: text(row.hr_grades_id),
-            gradeName: text(related(row, "hr_grades_id").name),
-            max: typeof row.salary_max === "number" ? row.salary_max : null,
-            from: text(row.effective_from),
-          }),
-        ),
-    [bandRows.page.rows],
-  );
 
   const entries = useMemo(() => {
     const bySlug = new Map(fields.map((field) => [field.slug, field]));
@@ -177,7 +161,7 @@ export function useJobHistory({
       return {
         ...entry,
         issue: gradeIssue(
-          { positionId: text(row.hr_positions_id), gradeId: text(row.hr_grades_id), salary },
+          { positionId: text(row.hr_positions_id), gradeId: text(row.hr_grades_id), salary, date: text(row.date_from).slice(0, 10) },
           bands,
         ),
       };
