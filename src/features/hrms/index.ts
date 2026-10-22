@@ -47,3 +47,4 @@ export { AssetGallery } from "./ui/AssetGallery";
 export { AssetTotal } from "./ui/AssetTotal";
 export { PenaltySettings } from "./ui/PenaltySettings";
 export { GradeMatrix } from "./ui/GradeMatrix";
+export { HolidayCalendars } from "./ui/HolidayCalendars";

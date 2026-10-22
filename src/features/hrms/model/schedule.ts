@@ -128,19 +128,23 @@ export type PlannedDay = { employeeId: string; date: string; start: string; end:
  * сменная линия работает и в праздник. `offset` сдвигает цикл каждого
  * следующего сотрудника на его рабочие дни — смены перекрывают друг друга.
  */
+/** Нерабочие дни сотрудника — по календарю его филиала (`api/holiday`). */
+export type DaysOffOf = (employeeId: string) => { has: (date: string) => boolean };
+
 export const expandTemplate = (
   template: Pick<Template, "type" | "days" | "cycle">,
   employeeIds: string[],
-  { from, to, holidays, offset }: { from: string; to: string; holidays: ReadonlySet<string>; offset: boolean },
+  { from, to, holidays, offset }: { from: string; to: string; holidays: DaysOffOf; offset: boolean },
 ): PlannedDay[] => {
   const dates = datesOf({ from, to });
   if (template.type === "weekly")
-    return employeeIds.flatMap((employeeId) =>
-      dates.flatMap((date) => {
+    return employeeIds.flatMap((employeeId) => {
+      const off = holidays(employeeId);
+      return dates.flatMap((date) => {
         const day = template.days[weekdayOf(date)];
-        return day?.working && !holidays.has(date) ? [{ employeeId, date, start: day.start, end: day.end, kind: day.kind }] : [];
-      }),
-    );
+        return day?.working && !off.has(date) ? [{ employeeId, date, start: day.start, end: day.end, kind: day.kind }] : [];
+      });
+    });
   const { work, off, start, end, kind } = template.cycle;
   const length = Math.max(1, work + off);
   return employeeIds.flatMap((employeeId, index) =>
@@ -181,7 +185,7 @@ export const startOf = (form: Pick<ShiftForm, "mode" | "start">) => (form.mode =
 export const endOf = (form: Pick<ShiftForm, "mode" | "end">) => (form.mode === "hours" ? "" : form.end);
 
 /** Даты серии: один день — он сам; иначе дни недели периода без праздников. */
-export const datesOfForm = (form: Pick<ShiftForm, "from" | "to" | "weekdays">, holidays: ReadonlySet<string>) =>
+export const datesOfForm = (form: Pick<ShiftForm, "from" | "to" | "weekdays">, holidays: { has: (date: string) => boolean } = new Set()) =>
   form.from === form.to
     ? [form.from]
     : datesOf({ from: form.from, to: form.to }).filter((date) => form.weekdays.includes(weekdayOf(date)) && !holidays.has(date));
@@ -189,13 +193,15 @@ export const datesOfForm = (form: Pick<ShiftForm, "from" | "to" | "weekdays">, h
 /** Строка смены без guid — её даёт запись. */
 export type ShiftDraft = Omit<Shift, "id">;
 
-export const draftsOfForm = (form: ShiftForm, seriesId: string, holidays: ReadonlySet<string>): ShiftDraft[] => {
+export const draftsOfForm = (form: ShiftForm, seriesId: string, holidays: DaysOffOf): ShiftDraft[] => {
   const start = startOf(form);
   const end = endOf(form);
   const breakMinutes = start && spanOf(start, end) > 300 ? DEFAULT_BREAK : 0;
   const plannedMinutes = start ? plannedOf(start, end, breakMinutes) : form.hours * 60;
-  return datesOfForm(form, holidays).flatMap((date) =>
-    form.employeeIds.map((employeeId) => ({
+  // Праздники у каждого свои (филиал); один день ставится и на праздник.
+  const one = form.from === form.to;
+  return datesOfForm(form).flatMap((date) =>
+    form.employeeIds.filter((employeeId) => one || !holidays(employeeId).has(date)).map((employeeId) => ({
       employeeId,
       date,
       start,
@@ -305,7 +311,7 @@ export const editSeries = (
     holidays,
     oneDate = isOneDate(rows),
     fillGaps = false,
-  }: { today: string; holidays: ReadonlySet<string>; oneDate?: boolean; fillGaps?: boolean },
+  }: { today: string; holidays: DaysOffOf; oneDate?: boolean; fillGaps?: boolean },
 ) => {
   const target = scopedRows(rows, anchor, form, scope, oneDate);
   const start = startOf(form);

@@ -4,6 +4,7 @@ import { toDateValue, wallClock } from "@/shared/lib/date-value";
 import { plusDays, type AttendanceDay, type Leave, type RowInput } from "../model/timesheet";
 import { EMPLOYEES } from "./employee";
 import { related, text } from "./org";
+import { useDaysOff } from "./holiday";
 
 /** Табель — дни посещаемости, посчитанные сервером (`ucode/erp/erp.dbml`). */
 export const ATTENDANCE_DAYS = "hr_attendance_days";
@@ -180,10 +181,10 @@ export function useTimesheet({
     date_to: { op: "after", values: [plusDays(from, -1)] },
   });
   const types = useAll("hr_absence_types", {});
-  const holidays = useAll("hr_holidays", range);
+  const daysOff = useDaysOff(from, to);
 
   const loading =
-    peopleQuery.isLoading || (!pageSize && (peopleMore || peopleQuery.loadingMore)) || days.loading || shifts.loading || requests.loading || types.loading;
+    peopleQuery.isLoading || (!pageSize && (peopleMore || peopleQuery.loadingMore)) || days.loading || shifts.loading || requests.loading || types.loading || daysOff.loading;
   // Догрузка порции — не обновление: прежние строки не приглушаются.
   const loadingMore = peopleQuery.loadingMore;
   const fetching = (peopleQuery.isFetching && !loadingMore) || days.fetching || shifts.fetching || requests.fetching;
@@ -221,13 +222,6 @@ export function useTimesheet({
       leaveIndex.set(employee, [...(leaveIndex.get(employee) ?? []), leave]);
     }
 
-    // ponytail: праздник общий на всех; у `hr_holidays` есть `hr_locations_id`,
-    // делить по филиалам — когда праздники филиалов разойдутся.
-    const holidayIndex = new Map(
-      holidays.rows
-        .filter((row) => text(row.type) !== "working_weekend")
-        .map((row) => [text(row.date).slice(0, 10), text(row.name)]),
-    );
 
     return {
       employees,
@@ -239,7 +233,7 @@ export function useTimesheet({
         planByDate: planIndex.get(employee.id) ?? new Map(),
         dayByDate: dayIndex.get(employee.id) ?? new Map(),
         leaves: leaveIndex.get(employee.id) ?? [],
-        holidays: holidayIndex,
+        holidays: daysOff.of(employee.locationId),
       }),
       absenceTypes: types.rows
         .filter((row) => row.is_active !== false)
@@ -251,7 +245,7 @@ export function useTimesheet({
       loadMore: peopleNext,
       total: peopleQuery.page.count,
     };
-  }, [peopleQuery.page.count, peopleQuery.page.rows, hasMore, loadingMore, peopleNext, days.rows, shifts.rows, requests.rows, types.rows, holidays.rows, from, to, dates, today, loading, fetching]);
+  }, [peopleQuery.page.count, peopleQuery.page.rows, hasMore, loadingMore, peopleNext, days.rows, shifts.rows, requests.rows, types.rows, daysOff.of, from, to, dates, today, loading, fetching]);
 }
 
 /** Отметки сотрудника за день — окну дня. */
