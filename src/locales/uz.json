@@ -1758,6 +1758,7 @@
   "employee.work.deleteHint": "Yozuv ish tarixidan o‘chadi. Xodim maydonlarini o‘zgartirmaydi: ularni tayinlov funksiyasi yangilaydi.",
   "employee.work.noGrade": "Grejd ko‘rsatilmagan, «{{position}}» lavozimi uchun matritsada: {{grades}}.",
   "employee.work.notAllowed": "«{{grade}}» grejdi «{{position}}» lavozimi matritsasida yo‘q.",
+  "employee.work.otherCurrency": "Maosh «{{currency}}» valyutasida — matritsa chegaralari UZS da, u bilan solishtirilmaydi.",
   "employee.work.overCeiling": "Maosh {{salary}} {{grade}} grejdi chegarasidan yuqori — {{ceiling}}.",
   "vacancy.funnel": "Voronka",
   "vacancy.candidates": "Nomzodlar",

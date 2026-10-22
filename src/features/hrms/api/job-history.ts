@@ -161,7 +161,7 @@ export function useJobHistory({
       return {
         ...entry,
         issue: gradeIssue(
-          { positionId: text(row.hr_positions_id), gradeId: text(row.hr_grades_id), salary, date: text(row.date_from).slice(0, 10) },
+          { positionId: text(row.hr_positions_id), gradeId: text(row.hr_grades_id), salary, date: text(row.date_from).slice(0, 10), currency: firstText(row.currency) },
           bands,
         ),
       };

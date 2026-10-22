@@ -23,7 +23,9 @@ export type Band = {
 export type GradeIssue =
   | { kind: "noGrade"; allowed: string[] }
   | { kind: "notAllowed" }
-  | { kind: "overCeiling"; ceiling: number };
+  | { kind: "overCeiling"; ceiling: number }
+  /** Оклад не в UZS: потолки матрицы в UZS, сравнивать не с чем. Не нарушение — заметка. */
+  | { kind: "otherCurrency" };
 
 /**
  * Сверка записи с матрицей.
@@ -33,7 +35,7 @@ export type GradeIssue =
  * в прототипе.
  */
 export function gradeIssue(
-  entry: { positionId: string; gradeId: string; salary: number | null; date?: string },
+  entry: { positionId: string; gradeId: string; salary: number | null; date?: string; currency?: string },
   bands: Band[],
 ): GradeIssue | null {
   /* Версия матрицы — действовавшая на дату записи; записи раньше всех версий
@@ -47,10 +49,12 @@ export function gradeIssue(
     return { kind: "noGrade", allowed: [...new Set(own.map((band) => band.gradeName))] };
   }
 
-  // ponytail: валюта не сверяется — потолки матрицы в UZS.
   const band = own.find((item) => item.gradeId === entry.gradeId);
   if (!band) return { kind: "notAllowed" };
 
+  /* Как в старом HRMS: там оклад всегда в сумах. Другую валюту с потолком
+     не сравниваем — 5 000 USD «меньше» 12 000 000 UZS только как число. */
+  if (entry.salary !== null && entry.currency && entry.currency !== "UZS") return { kind: "otherCurrency" };
   if (entry.salary !== null && band.max !== null && entry.salary > band.max) {
     return { kind: "overCeiling", ceiling: band.max };
   }

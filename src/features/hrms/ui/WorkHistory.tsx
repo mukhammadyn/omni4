@@ -8,6 +8,7 @@ import {
   PencilIcon,
   PlusIcon,
   Trash2Icon,
+  InfoIcon,
   TriangleAlertIcon,
   WalletIcon,
 } from "lucide-react";
@@ -223,7 +224,7 @@ function Entry({
               <b className="mr-1 text-[17px] font-semibold">{entry.position || "—"}</b>
               {entry.current && <Chip color="green">{t("employee.work.current")}</Chip>}
               {entry.employment && <Chip color="blue">{entry.employment.label}</Chip>}
-              {entry.issue && (
+              {entry.issue && entry.issue.kind !== "otherCurrency" && (
                 <Chip color="orange">
                   <span className="inline-flex items-center gap-1">
                     <Icon as={TriangleAlertIcon} size={12} />
@@ -238,12 +239,18 @@ function Entry({
               </div>
             )}
             {meta && <div className="text-[13.5px] text-fg-subtle">{meta}</div>}
-            {entry.issue && (
-              <div className="mt-2 flex items-start gap-2 rounded-lg bg-warning-subtle px-3 py-2.25 text-[13.5px] leading-[1.45] text-warning">
-                <Icon as={TriangleAlertIcon} size={15} className="mt-0.5 shrink-0" />
-                <span>{issueText(entry, entry.issue, locale, t)}</span>
-              </div>
-            )}
+            {entry.issue &&
+              (entry.issue.kind === "otherCurrency" ? (
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-surface-hover px-3 py-2.25 text-[13.5px] leading-[1.45] text-fg-muted">
+                  <Icon as={InfoIcon} size={15} className="mt-0.5 shrink-0" />
+                  <span>{issueText(entry, entry.issue, locale, t)}</span>
+                </div>
+              ) : (
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-warning-subtle px-3 py-2.25 text-[13.5px] leading-[1.45] text-warning">
+                  <Icon as={TriangleAlertIcon} size={15} className="mt-0.5 shrink-0" />
+                  <span>{issueText(entry, entry.issue, locale, t)}</span>
+                </div>
+              ))}
           </div>
           {(onEdit || onCopy || onDelete) && (
             <Popover
@@ -337,6 +344,8 @@ function issueText(entry: JobEntry, issue: GradeIssue, locale: string, t: TFunct
       return t("employee.work.noGrade", { position: entry.position, grades: issue.allowed.join(", ") });
     case "notAllowed":
       return t("employee.work.notAllowed", { grade: entry.grade, position: entry.position });
+    case "otherCurrency":
+      return t("employee.work.otherCurrency", { currency: entry.currency });
     case "overCeiling":
       return t("employee.work.overCeiling", {
         salary: new Intl.NumberFormat(locale).format(entry.salary ?? 0),
