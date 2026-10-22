@@ -99,12 +99,14 @@ export function useAddDocuments() {
       files,
       employee,
       folder,
+      template = "",
       number = "",
       validUntil = "",
     }: {
       files: { url: string; name: string }[];
       employee: string;
       folder: string;
+      template?: string;
       number?: string;
       validUntil?: string;
     }) => {
@@ -119,6 +121,7 @@ export function useAddDocuments() {
             signature_status: "not_required",
             hr_employees_id: employee,
             hr_document_folders_id: folder || null,
+            hr_document_templates_id: template || null,
             number: number || null,
             valid_until: validUntil || null,
             core_users_id: session.getObjectIds()[PEOPLE] ?? null,

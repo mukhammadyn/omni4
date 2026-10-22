@@ -2599,6 +2599,8 @@
   "doc.moveToFolder": "Move to folder",
   "doc.copyLink": "Copy link",
   "doc.linkCopied": "Link copied",
+  "doc.template": "Template",
+  "doc.noTemplate": "No template",
   "doc.number": "Number",
   "doc.numberHint": "E.g. 125-K",
   "doc.validUntil": "Valid until",
