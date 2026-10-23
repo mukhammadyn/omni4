@@ -310,6 +310,12 @@ export function DirectorySettings({
       }));
   };
 
+  /**
+   * Единственный корень (`singleRoot`): новая запись — только под ним.
+   * Существующую можно поднять наверх — корень сменится (DirectoryCreateDialog).
+   */
+  const root = directory.singleRoot ? page.rows.find((row) => !row[parentKey]) : undefined;
+
   /*
    * Порядок — у тех, кто сортируется по sort_order. Соседи
    * перенумеровываются заново: у заведённых руками номера пустые
@@ -668,7 +674,7 @@ export function DirectorySettings({
           language={language}
           row={openRow}
           readOnly={!can.update}
-          parent={directory.parent ? { slug: parentKey, options: parentOptions(openGuid) } : undefined}
+          parent={directory.parent ? { slug: parentKey, options: parentOptions(openGuid), root: root && String(root.guid) } : undefined}
           note={kidsOf(openGuid).length ? t("dir.childrenNote", { count: kidsOf(openGuid).length }) : undefined}
           onDelete={can.delete ? () => setDeleting(openGuid) : undefined}
           onClose={() => setOpenGuid("")}
@@ -693,12 +699,12 @@ export function DirectorySettings({
           // Вложенный наследует цвет родителя, как в прототипе.
           defaults={
             !creating
-              ? undefined
+              ? root && { [parentKey]: String(root.guid) }
               : groupField
                 ? { [groupField.slug]: creating.slice(GROUP.length) }
                 : { [parentKey]: creating, ...(hasColor ? { color: rowOf(creating)?.color } : {}) }
           }
-          parent={directory.parent ? { slug: parentKey, options: parentOptions("") } : undefined}
+          parent={directory.parent ? { slug: parentKey, options: parentOptions(""), topLevel: !root } : undefined}
           onClose={() => setCreating(null)}
         />
       )}

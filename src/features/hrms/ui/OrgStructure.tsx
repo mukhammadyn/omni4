@@ -201,7 +201,11 @@ export function OrgStructure({
     if (units.error) return <Failed bar={bar} error={units.error} onRetry={units.refetch} />;
     const perLocation = new Map<string, number>();
     for (const person of people) perLocation.set(person.locationId, (perLocation.get(person.locationId) ?? 0) + 1);
-    const count = (ids: string[]) => ids.reduce((sum, id) => sum + (perLocation.get(id) ?? 0), 0);
+    const perUnit = new Map<string, number>();
+    for (const row of rows) for (const id of units.unitsOfPerson(row)) perUnit.set(id, (perUnit.get(id) ?? 0) + 1);
+    // Юнит — как в справочнике (свои люди), регион и локация — по локациям.
+    const count = (data: UnitNode) =>
+      data.unitId ? (perUnit.get(data.unitId) ?? 0) : data.locationIds.reduce((sum, id) => sum + (perLocation.get(id) ?? 0), 0);
     const toneOf = (data: UnitNode) => (data.color ? hexToChipColor(data.color) : UNIT_KIND[data.kind].tone);
 
     return (
@@ -225,7 +229,7 @@ export function OrgStructure({
               {head(data) ?? <span />}
               <span className="inline-flex items-center gap-1">
                 <Icon as={UsersIcon} size={12} />
-                {count(data.locationIds)}
+                {count(data)}
               </span>
             </Meta>
           </>
