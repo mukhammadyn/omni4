@@ -114,6 +114,8 @@ export type Directory = {
      */
     via?: { link: string; table: string; field: string };
   };
+  /** Окно записи по секциям — у справочника с длинной формой (DirectoryCreateDialog, `layout`). */
+  form?: { titleKey: TranslationKey; fields: string[]; half?: string[] }[];
 };
 
 /**
@@ -260,6 +262,18 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             hintKey: "dir.locationsHint",
             icon: MapPinIcon,
             columns: ["type", "core_regions_id", "core_business_units_ids", "address", "is_active"],
+            form: [
+              {
+                titleKey: "dir.formMain",
+                fields: ["name", "type", "core_regions_id", "core_business_units_ids", "address", "phone", "is_active", "color"],
+                half: ["type", "core_regions_id", "phone"],
+              },
+              {
+                titleKey: "dir.formCheckIn",
+                fields: ["timezone", "geofence_radius_m", "coordinates", "allowed_wifi_macs", "telegram_chat_id"],
+                half: ["timezone", "geofence_radius_m"],
+              },
+            ],
           },
           {
             id: "org-legal",
