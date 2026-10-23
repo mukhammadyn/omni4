@@ -100,6 +100,7 @@ const toLeave = (row: Item): Leave | null => {
     icon: text(kind.icon),
     color: text(kind.color),
     status,
+    paid: kind.is_paid === true,
     from,
     to: text(row.date_to).slice(0, 10) || from,
   };
