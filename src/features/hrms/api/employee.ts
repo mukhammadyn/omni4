@@ -28,10 +28,11 @@ export function useEmployee(menuId: string, guid: string, language: string) {
   const { viewRights } = useTableDetails(EMPLOYEES);
   const permissionOf = useTablePermissions();
   const update = useUpdateItem(EMPLOYEES);
-  /* Регион — PICK_LIST локации: в записи ключ варианта, подпись — в схеме. */
   /* Регион — у локации сотрудника, связью на справочник `core_regions`. */
   const locationId = record.item ? firstText(record.item.hr_locations_id) : "";
   const location = useItem("hr_locations", locationId || undefined, Boolean(locationId));
+  /* Юниты локации (Many2Many — без `_data`): подпись и цвет из справочника. */
+  const units = useItems(locationId ? "core_business_units" : undefined, { limit: MAX_LIMIT, page: 1, relations: false });
   /* Пользователь этого сотрудника: бот и последний вход — его. Может не быть. */
   const user = useItems(PEOPLE, {
     limit: 1,
@@ -76,6 +77,19 @@ export function useEmployee(menuId: string, guid: string, language: string) {
     row: record.item,
     user: user.page.rows[0],
     region: location.item ? text(related(location.item, "core_regions_id").name) : "",
+    /**
+     * Юниты локации. Пока своих у сотрудника нет, единственный юнит локации —
+     * его юнит по умолчанию (CONTEXT, Business unit); у локации их несколько —
+     * угадывать нельзя, `defaultUnit` пуст. Вычисляется, а не пишется
+     * в сотрудника: поменяют юнит офиса — у людей поменяется сам.
+     */
+    locationUnits: Array.isArray(location.item?.core_business_units_ids) ? location.item.core_business_units_ids.length : 0,
+    defaultUnit: (() => {
+      const ids = location.item?.core_business_units_ids;
+      if (!Array.isArray(ids) || ids.length !== 1) return null;
+      const unit = units.page.rows.find((row) => row.guid === ids[0]);
+      return unit ? { name: text(unit.name), color: text(unit.color) } : null;
+    })(),
     isLoading: record.isLoading || schemaLoading,
     error: record.error,
     fields: schema.fields,

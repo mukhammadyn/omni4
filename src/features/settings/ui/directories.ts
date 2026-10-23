@@ -108,6 +108,11 @@ export type Directory = {
     filters?: Filters;
     /** Поле даты — считать только за последние 12 месяцев (`… за год` прототипа). */
     lastYear?: string;
+    /**
+     * Своего значения у строки нет — взять его у связанной записи: сотрудник
+     * без юнитов считается в юните локации, если он там один.
+     */
+    via?: { link: string; table: string; field: string };
   };
 };
 
@@ -230,7 +235,12 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             hintKey: "dir.businessUnitsHint",
             icon: BriefcaseBusinessIcon,
             columns: ["hr_employees_id", "crm_legal_entities_id", "is_active"],
-            counts: { table: "hr_employees", field: "core_business_units_ids", labelKey: "dir.employees" },
+            counts: {
+              table: "hr_employees",
+              field: "core_business_units_ids",
+              labelKey: "dir.employees",
+              via: { link: "hr_locations_id", table: "hr_locations", field: "core_business_units_ids" },
+            },
           },
           {
             id: "org-regions",
@@ -249,7 +259,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             titleKey: "dir.locations",
             hintKey: "dir.locationsHint",
             icon: MapPinIcon,
-            columns: ["type", "core_regions_id", "core_business_units_id", "address", "is_active"],
+            columns: ["type", "core_regions_id", "core_business_units_ids", "address", "is_active"],
           },
           {
             id: "org-legal",
