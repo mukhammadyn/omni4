@@ -20,13 +20,14 @@ const num = (value: unknown) => (typeof value === "number" ? value : Number(valu
 /** «Оклад» — по коду или по названию, как `isSalaryTitle` HRMS. */
 const isSalary = (row: Item) => text(row.code) === "salary" || /оклад|salary|зарплат|maosh/i.test(text(row.name).replace(/ё/g, "е"));
 
-const byOrder = (a: Item, b: Item) => num(a.sort_order) - num(b.sort_order) || text(a.name).localeCompare(text(b.name), "ru");
+/* По названию, как `ORDER BY title` HRMS: латиница раньше кириллицы. */
+const byName = (a: Item, b: Item) => (text(a.name) < text(b.name) ? -1 : text(a.name) > text(b.name) ? 1 : 0);
 
 /** Виды начислений: «Оклад» отдельно, остальные — колонками; вид штрафов — только для чтения. */
 export function usePayTypes() {
   const { rows, loading } = useAll("hr_pay_types", {}, false);
   return useMemo(() => {
-    const active = rows.filter((row) => row.is_active !== false).sort(byOrder);
+    const active = rows.filter((row) => row.is_active !== false).sort(byName);
     const salary = rows.find(isSalary);
     const column = (row: Item): PayTypeColumn => ({ id: text(row.guid), name: text(row.name) });
     return {
@@ -49,7 +50,7 @@ export function usePayrollTemplate(month: string, where: Filters) {
   const { from, to } = rangeOf("month", `${month}-01`);
   const wide = { from: rangeOf("week", from).from, to: rangeOf("week", to).to };
   const dates = useMemo(() => datesOf(wide), [wide.from, wide.to]);
-  const sheet = useTimesheet({ ...wide, dates, today: todayInput(), search: "", where });
+  const sheet = useTimesheet({ ...wide, dates, today: todayInput(), search: "", where, dismissed: true });
   const jobs = useAll(JOB_HISTORY, { date_from: { op: "before", values: [plusDays(to, 1)] } }, false);
   const lines = useAll(PAYROLL_LINES, { period: { op: "between", values: [from, to] } }, false);
   const types = usePayTypes();
@@ -73,14 +74,14 @@ export function usePayrollTemplate(month: string, where: Filters) {
     }
     return sheet.employees.flatMap((employee) => {
       const work = job.get(employee.id);
-      // Табель взят с неделями по краям — принятые и уволенные в них месяцу чужие.
-      if (!work || (employee.hireDate && employee.hireDate > to) || (employee.dismissalDate && employee.dismissalDate < from)) return [];
+      // Кто в ведомости, решает назначение, а не даты карточки — как в HRMS.
+      if (!work) return [];
       const input = sheet.inputOf(employee);
       const unit = firstText(work.pay_unit);
       return [
         {
           id: employee.id,
-          name: employee.name,
+          name: employee.legalName || employee.name,
           salary: num(work.salary),
           unit: (UNITS.includes(unit) ? unit : "month") as PayUnit,
           cells: buildRow(input).cells,

@@ -6,7 +6,8 @@ import { toast } from "@/shared/lib/toast";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { useImportPayroll, usePayrollTemplate, usePayTypes } from "../api/payroll-excel";
-import type { TemplateLabels, TemplateMode } from "../model/payroll-excel";
+import type { PayPivot } from "../model/payroll";
+import type { PivotLabels, TemplateLabels, TemplateMode } from "../model/payroll-excel";
 
 /* exceljs весит под мегабайт — грузится по первому нажатию, а не со сводной. */
 const excel = () => import("../model/payroll-excel");
@@ -18,6 +19,12 @@ const download = (data: ArrayBuffer, name: string) => {
   link.click();
   URL.revokeObjectURL(link.href);
 };
+
+/** «Экспорт в Excel»: сводная месяца как на экране, .xlsx с числами. */
+export async function exportPivot(pivot: PayPivot, title: string, labels: PivotLabels) {
+  const { buildPivotXlsx } = await excel();
+  download(await buildPivotXlsx(pivot, labels), `${title}.xlsx`);
+}
 
 /**
  * «…» сводной — «Скачать шаблон» (дневной, часовой) и «Загрузить Excel»,
@@ -121,6 +128,7 @@ function TemplateJob({ month, title, where, mode, onDone }: { month: string; tit
     if (data.loading || started.current) return;
     started.current = true;
     const labels: TemplateLabels = {
+      sheet: t("payroll.xlsx.sheet"),
       title: t("payroll.xlsx.title"),
       period: t("payroll.xlsx.period", { period: title }),
       index: "№",
@@ -137,8 +145,8 @@ function TemplateJob({ month, title, where, mode, onDone }: { month: string; tit
       accruals: t("payroll.xlsx.accruals"),
       salary: t("payroll.xlsx.salary"),
       deductions: t("payroll.deductions"),
-      accrued: t("payroll.accrued"),
-      deducted: t("payroll.deducted"),
+      accrued: t("payroll.xlsx.accrued"),
+      deducted: t("payroll.xlsx.deducted"),
       net: t("payroll.net"),
       total: t("payroll.xlsx.total"),
       daily: t("payroll.xlsx.daily"),
