@@ -653,6 +653,7 @@ export function DirectorySettings({
           title={`${t("dir.edit")}: ${t(directory.titleKey)}`}
           fields={drawerFields}
           iconSlug={directory.iconField}
+          layout={directory.form?.map((section) => ({ ...section, title: t(section.titleKey) }))}
           relations={schema.relations}
           language={language}
           row={openRow}
@@ -675,6 +676,7 @@ export function DirectorySettings({
           }
           fields={drawerFields}
           iconSlug={directory.iconField}
+          layout={directory.form?.map((section) => ({ ...section, title: t(section.titleKey) }))}
           relations={schema.relations}
           language={language}
           // Вложенный наследует цвет родителя, как в прототипе.

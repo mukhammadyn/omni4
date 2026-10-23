@@ -594,6 +594,8 @@
   "dir.regions": "Hududlar",
   "dir.regionsHint": "Mamlakatlar, viloyatlar, shaharlar va tumanlar — joylashuvlar, bitimlar va hisobotlarda ishlatiladi.",
   "dir.locationsCount": "Joylashuvlar",
+  "dir.formMain": "Asosiy",
+  "dir.formCheckIn": "Belgilash va vaqt",
   "dir.legal": "Yuridik shaxslar",
   "dir.legalHint": "Hisob-fakturalar va shartnomalar nomidan tuziladigan tashkilotlar.",
   "dir.locations": "Joylashuvlar",

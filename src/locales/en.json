@@ -594,6 +594,8 @@
   "dir.regions": "Regions",
   "dir.regionsHint": "Countries, regions, cities and districts of presence — used in locations, deals and reports.",
   "dir.locationsCount": "Locations",
+  "dir.formMain": "General",
+  "dir.formCheckIn": "Check-in and time",
   "dir.legal": "Legal entities",
   "dir.legalHint": "Organizations that issue invoices and sign contracts.",
   "dir.locations": "Locations",

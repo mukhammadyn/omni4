@@ -50,9 +50,16 @@ export function DirectoryCreateDialog({
   parent,
   note,
   iconSlug,
+  layout,
   onDelete,
   onClose,
 }: {
+  /**
+   * Раскладка по секциям (`Directory.form`): подзаголовок, порядок полей,
+   * какие встают парой. Нет — все поля подряд в порядке схемы. Поле,
+   * которого нет ни в одной секции, уходит в последнюю.
+   */
+  layout?: { title: string; fields: string[]; half?: string[] }[] | undefined;
   /** Текстовое поле с именем иконки (`Directory.iconField`) — правится пикером, как поле ICON. */
   iconSlug?: string | undefined;
   table: string;
@@ -208,16 +215,26 @@ export function DirectoryCreateDialog({
     </span>
   );
 
+  const shown = fields
+    .filter((field) => !(field === iconField && titleField))
+    .filter((field) => cellKind(field.type) !== "label" && cellKind(field.type) !== "button" && cellKind(field.type) !== "formula");
+
   return (
     <Modal onClose={onClose}>
       <div className="flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
         <h2 className="px-5 pt-4 pb-3 text-xl font-semibold">{title}</h2>
 
-        <div className="grid grid-cols-2 gap-x-3 gap-y-3.5 overflow-auto px-5 pb-4">
-          {fields
-            .filter((field) => !(field === iconField && titleField))
-            .filter((field) => cellKind(field.type) !== "label" && cellKind(field.type) !== "button" && cellKind(field.type) !== "formula")
-            .map((field) =>
+        <div className="grid grid-cols-2 items-end gap-x-3 gap-y-3.5 overflow-auto px-5 pb-4">
+          {(layout ? sectioned(shown, layout) : [{ title: "", fields: shown, half: undefined }]).map((section, index) => [
+            section.title && (
+              <h3
+                key={`h-${section.title}`}
+                className={`col-span-2 text-xs font-medium tracking-wide text-fg-subtle uppercase ${index ? "mt-2 border-t border-border pt-4" : ""}`}
+              >
+                {section.title}
+              </h3>
+            ),
+            ...section.fields.map((field) =>
               cellKind(field.type) === "boolean" ? (
                 // Флажок — подписью справа, как «Заменить существующие смены»: рамка поля ему ни к чему.
                 <label key={field.slug} className="flex h-(--spacing-input) cursor-pointer items-center gap-2.5 self-end text-sm text-fg">
@@ -225,7 +242,10 @@ export function DirectoryCreateDialog({
                   {localized(field.labels, language, field.label)}
                 </label>
               ) : (
-                <div key={field.slug} className={`flex flex-col gap-1.5 ${HALF.has(cellKind(field.type)) ? "" : "col-span-2"}`}>
+                <div
+                  key={field.slug}
+                  className={`flex flex-col gap-1.5 ${(section.half ? section.half.includes(field.slug) : HALF.has(cellKind(field.type))) ? "" : "col-span-2"}`}
+                >
                   {label(field)}
                   {control(field)}
                   {showErrors && errors.has(field.slug) && (
@@ -233,7 +253,8 @@ export function DirectoryCreateDialog({
                   )}
                 </div>
               ),
-            )}
+            ),
+          ])}
           {note && (
             <p className="col-span-2 flex items-center gap-1.5 text-[13px] text-fg-subtle">
               <Icon as={GitForkIcon} size={14} />
@@ -282,4 +303,18 @@ export function DirectoryCreateDialog({
       )}
     </Modal>
   );
+}
+
+/** Поля по секциям раскладки; не попавшие ни в одну — в конец последней. */
+function sectioned(fields: Field[], layout: { title: string; fields: string[]; half?: string[] }[]) {
+  const bySlug = new Map(fields.map((field) => [field.slug, field]));
+  const placed = new Set(layout.flatMap((section) => section.fields));
+  const rest = fields.filter((field) => !placed.has(field.slug));
+  return layout
+    .map((section, index) => ({
+      title: section.title,
+      half: section.half,
+      fields: [...section.fields.flatMap((slug) => bySlug.get(slug) ?? []), ...(index === layout.length - 1 ? rest : [])],
+    }))
+    .filter((section) => section.fields.length);
 }
