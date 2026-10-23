@@ -81,7 +81,12 @@ export function DirectoryCreateDialog({
    * Ссылка на себя — списком дерева, а не поиском связи: в нём нет
    * самой записи и её потомков, и цикл из окна не собрать.
    */
-  parent?: { slug: string; options: DropdownItem[] } | undefined;
+  /**
+   * `topLevel: false` — родитель обязателен: корень дерева уже есть.
+   * `root` — guid единственного корня: запись, поднятая наверх, встаёт
+   * на его место, а он сам уходит под неё.
+   */
+  parent?: { slug: string; options: DropdownItem[]; topLevel?: boolean; root?: string | undefined } | undefined;
   /** Строка под полями: «Вложенных элементов: 3». */
   note?: string | undefined;
   onDelete?: (() => void) | undefined;
@@ -97,6 +102,7 @@ export function DirectoryCreateDialog({
   const [showErrors, setShowErrors] = useState(false);
   const [active, setActive] = useState<{ field: Field; anchor: DOMRect } | null>(null);
   const errors = rowErrors(fields, draft);
+  if (parent?.topLevel === false && !draft[parent.slug]) errors.set(parent.slug, { kind: "required", message: "" });
   const byId = new Map(relations.map((relation) => [relation.id, relation]));
   const set = (slug: string, value: unknown) => setDraft((current) => ({ ...current, [slug]: value }));
 
@@ -106,14 +112,15 @@ export function DirectoryCreateDialog({
       // Уезжает только изменённое: PUT с полной строкой перезаписал бы и то, что правили рядом.
       const values = Object.fromEntries(fields.filter((field) => draft[field.slug] !== row[field.slug]).map((field) => [field.slug, draft[field.slug] ?? null]));
       if (!Object.keys(values).length) return onClose();
+      const guid = String(row["guid"]);
+      const done = () => {
+        toast.success(t("settings.saved"));
+        onClose();
+      };
+      const oldRoot = parent?.root && parent.root !== guid && parent.slug in values && !draft[parent.slug] ? parent.root : "";
       return update.mutate(
-        { guid: String(row["guid"]), values },
-        {
-          onSuccess: () => {
-            toast.success(t("settings.saved"));
-            onClose();
-          },
-        },
+        { guid, values },
+        { onSuccess: () => (oldRoot ? update.mutate({ guid: oldRoot, values: { [parent!.slug]: guid } }, { onSuccess: done }) : done()) },
       );
     }
     create.mutate(draft, {
@@ -138,7 +145,7 @@ export function DirectoryCreateDialog({
       return (
         <Dropdown
           value={text}
-          items={[{ value: "", label: t("dir.topLevel") }, ...parent.options]}
+          items={parent.topLevel === false ? parent.options : [{ value: "", label: t("dir.topLevel") }, ...parent.options]}
           onChange={(guid) => setDraft((current) => ({ ...current, [field.slug]: guid || null, [relationDataKey(field.slug)]: undefined }))}
         />
       );

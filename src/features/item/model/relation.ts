@@ -223,7 +223,13 @@ export type TreeOption = { item: Item; depth: 0 | 1; header: boolean };
  * таблицу (`parentKey`, `hr_grades` → `hr_grades_id`). Родитель с детьми
  * в списке — заголовок, выбирают его детей; родителя нет в списке
  * (отсеял поиск) — ребёнок стоит в корне. Два уровня, как в настройках.
+ *
+ * Заголовок — только там, где родитель лишь группа (группа грейдов —
+ * не грейд). Юнит, отдел, должность с детьми — сами по себе вариант:
+ * головной юнит Udevs выбирают наравне с дочерними.
  */
+const GROUP_ONLY = new Set(["hr_grades_id"]);
+
 export function relationTree(items: Item[], parentKey: string): TreeOption[] {
   const ids = new Set(items.map((item) => String(item["guid"] ?? "")));
   const parentOf = (item: Item) => {
@@ -240,7 +246,7 @@ export function relationTree(items: Item[], parentKey: string): TreeOption[] {
     .flatMap((root) => {
       const kids = children.get(String(root["guid"] ?? "")) ?? [];
       return [
-        { item: root, depth: 0 as const, header: kids.length > 0 },
+        { item: root, depth: 0 as const, header: kids.length > 0 && GROUP_ONLY.has(parentKey) },
         ...kids.map((item) => ({ item, depth: 1 as const, header: false })),
       ];
     });

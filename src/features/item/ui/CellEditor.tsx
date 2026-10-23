@@ -1131,7 +1131,7 @@ function RelationEditor({
                 const label = parent ? withoutPrefix(own, relationLabel(parent, slugs, language)) : own;
                 const color = typeof item[COLOR] === "string" && item[COLOR] ? hexToChipColor(item[COLOR]) : null;
 
-                // Группа с детьми — подпись, а не вариант: выбирают её грейды, как в настройках.
+                // Группа грейдов — подпись, а не вариант: выбирают её грейды (relationTree, GROUP_ONLY).
                 if (header) {
                   return (
                     <div key={guid} className="flex h-7 items-center gap-2 px-2.5 pt-1 text-xs font-medium text-fg-muted">

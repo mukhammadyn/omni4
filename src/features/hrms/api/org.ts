@@ -177,6 +177,8 @@ export type UnitNode = {
   headName: string;
   headPhoto: string;
   color: string;
+  /** Guid юнита — у `kind: "unit"`; люди юнита считаются по нему, а не по локациям. */
+  unitId?: string;
   locationIds: string[];
 };
 
@@ -184,8 +186,8 @@ export type UnitNode = {
  * Дерево «Организация»: бизнес-юнит → дочерние юниты (`core_business_units_id`,
  * родитель) → регион → локация. Регион — свой
  * у локации (`core_regions_id`), без вложенности регионов; локация
- * с несколькими юнитами стоит под каждым. Локации без юнита — отдельный
- * корень «Без юнита».
+ * с несколькими юнитами стоит под каждым. Локации без юнита — под
+ * головным юнитом, если корень один; иначе отдельный корень «Без юнита».
  */
 export function useOrgUnits(enabled: boolean) {
   const units = useItems(enabled ? "core_business_units" : undefined, ALL);
@@ -203,22 +205,24 @@ export function useOrgUnits(enabled: boolean) {
         const region = text(row.core_regions_id);
         byRegion.set(region, [...(byRegion.get(region) ?? []), row]);
       }
-      return [...byRegion].map(([regionId, list]) => {
-        const kids = list.map((row) =>
-          node(`${unitId}:${text(row.guid)}`, {
-            kind: "location",
-            name: text(row.name),
-            sub: text(row.address),
-            color: text(row.color),
-            locationIds: [text(row.guid)],
-          }),
-        );
-        return node(`${unitId}:r:${regionId}`, {
+      const leaf = (row: Item) =>
+        node(`${unitId}:${text(row.guid)}`, {
+          kind: "location",
+          name: text(row.name),
+          sub: text(row.address),
+          color: text(row.color),
+          locationIds: [text(row.guid)],
+        });
+      // Локация без региона — прямо под юнитом, без карточки «Без региона».
+      return [...byRegion].flatMap(([regionId, list]) => {
+        if (!regionId) return list.map(leaf);
+        const kids = list.map(leaf);
+        return [node(`${unitId}:r:${regionId}`, {
           kind: "region",
           name: text(related(list[0]!, "core_regions_id").name),
           sub: "",
           locationIds: kids.flatMap((kid) => kid.data.locationIds),
-        }, kids);
+        }, kids)];
       });
     };
     const unitsOf = (row: Item) => (Array.isArray(row.core_business_units_ids) ? row.core_business_units_ids.map(String) : []);
@@ -227,14 +231,18 @@ export function useOrgUnits(enabled: boolean) {
       const parent = text(rows.get(id)?.core_business_units_id);
       return parent !== id && rows.has(parent) ? parent : "";
     };
+    const orphans = locations.page.rows.filter((loc) => !unitsOf(loc).length);
+    const tops = [...rows.keys()].filter((id) => !parentOf(id));
+    const home = tops.length === 1 ? tops[0] : "";
     const build = (id: string, seen: Set<string>): OrgNode<UnitNode> => {
       const row = rows.get(id)!;
       const childUnits = [...rows.keys()]
         .filter((kid) => parentOf(kid) === id && !seen.has(kid))
         .map((kid) => build(kid, new Set(seen).add(kid)));
-      const regions = branch(id, locations.page.rows.filter((loc) => unitsOf(loc).includes(id)));
+      const regions = branch(id, locations.page.rows.filter((loc) => unitsOf(loc).includes(id) || (id === home && !unitsOf(loc).length)));
       return node(id, {
         kind: "unit",
+        unitId: id,
         name: text(row.name),
         sub: text(related(row, "crm_legal_entities_id").name) || text(row.description),
         headId: text(row.hr_employees_id),
@@ -246,17 +254,33 @@ export function useOrgUnits(enabled: boolean) {
       }, [...childUnits, ...regions]);
     };
     // Корни — юниты без родителя; цикл в данных (A → B → A) обрывается на повторе.
-    const result = [...rows.keys()].filter((id) => !parentOf(id)).map((id) => build(id, new Set([id])));
-    const orphans = locations.page.rows.filter((loc) => !unitsOf(loc).length);
-    if (orphans.length) {
+    const result = tops.map((id) => build(id, new Set([id])));
+    if (orphans.length && !home) {
       const kids = branch("none", orphans);
       result.push(node("none", { kind: "unit", name: "", sub: "", locationIds: kids.flatMap((kid) => kid.data.locationIds) }, kids));
     }
     return result;
   }, [units.page.rows, locations.page.rows]);
 
+  /*
+   * Юнит сотрудника — как в справочнике юнитов (counts.via): свои
+   * `core_business_units_ids`, а нет — юнит его локации, если он там один.
+   */
+  const unitsOfPerson = useMemo(() => {
+    const owner = new Map<string, string>();
+    for (const loc of locations.page.rows) {
+      const list = Array.isArray(loc.core_business_units_ids) ? loc.core_business_units_ids.map(String) : [];
+      if (list.length === 1) owner.set(text(loc.guid), list[0]!);
+    }
+    return (row: Item) => {
+      const own = Array.isArray(row.core_business_units_ids) ? row.core_business_units_ids.map(String) : [];
+      return own.length ? own : [owner.get(text(row.hr_locations_id)) ?? ""].filter(Boolean);
+    };
+  }, [locations.page.rows]);
+
   return {
     roots,
+    unitsOfPerson,
     isLoading: units.isLoading || locations.isLoading,
     error: units.error ?? locations.error ?? null,
     refetch: () => {

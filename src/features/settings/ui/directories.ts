@@ -79,6 +79,8 @@ export type Directory = {
   blankIf?: Record<string, { field: string; value: string }>;
   /** Ссылка на себя — справочник рисуется деревом (`.ot` прототипа). */
   parent?: string;
+  /** Корень у дерева один (головной юнит): «Верхний уровень» — только ему. */
+  singleRoot?: boolean;
   /** Сколько уровней у дерева: 2 — «группа → элемент», вкладывать только в корень. */
   depth?: number;
   /**
@@ -238,6 +240,8 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             titleKey: "dir.businessUnits",
             hintKey: "dir.businessUnitsHint",
             icon: BriefcaseBusinessIcon,
+            parent: "core_business_units_id",
+            singleRoot: true,
             columns: ["hr_employees_id", "crm_legal_entities_id", "is_active"],
             counts: {
               table: "hr_employees",
