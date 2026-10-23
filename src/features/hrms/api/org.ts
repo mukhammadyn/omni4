@@ -181,7 +181,8 @@ export type UnitNode = {
 };
 
 /**
- * Дерево «Организация»: бизнес-юнит → регион → локация. Регион — свой
+ * Дерево «Организация»: бизнес-юнит → дочерние юниты (`core_business_units_id`,
+ * родитель) → регион → локация. Регион — свой
  * у локации (`core_regions_id`), без вложенности регионов; локация
  * с несколькими юнитами стоит под каждым. Локации без юнита — отдельный
  * корень «Без юнита».
@@ -221,9 +222,17 @@ export function useOrgUnits(enabled: boolean) {
       });
     };
     const unitsOf = (row: Item) => (Array.isArray(row.core_business_units_ids) ? row.core_business_units_ids.map(String) : []);
-    const result = units.page.rows.map((row) => {
-      const id = text(row.guid);
-      const kids = branch(id, locations.page.rows.filter((loc) => unitsOf(loc).includes(id)));
+    const rows = new Map(units.page.rows.map((row) => [text(row.guid), row]));
+    const parentOf = (id: string) => {
+      const parent = text(rows.get(id)?.core_business_units_id);
+      return parent !== id && rows.has(parent) ? parent : "";
+    };
+    const build = (id: string, seen: Set<string>): OrgNode<UnitNode> => {
+      const row = rows.get(id)!;
+      const childUnits = [...rows.keys()]
+        .filter((kid) => parentOf(kid) === id && !seen.has(kid))
+        .map((kid) => build(kid, new Set(seen).add(kid)));
+      const regions = branch(id, locations.page.rows.filter((loc) => unitsOf(loc).includes(id)));
       return node(id, {
         kind: "unit",
         name: text(row.name),
@@ -232,9 +241,12 @@ export function useOrgUnits(enabled: boolean) {
         headName: who(row, "hr_employees_id").name,
         headPhoto: who(row, "hr_employees_id").photo,
         color: text(row.color),
-        locationIds: kids.flatMap((kid) => kid.data.locationIds),
-      }, kids);
-    });
+        // Юнит считает и людей дочерних: локацию под двумя юнитами — один раз.
+        locationIds: [...new Set([...childUnits, ...regions].flatMap((kid) => kid.data.locationIds))],
+      }, [...childUnits, ...regions]);
+    };
+    // Корни — юниты без родителя; цикл в данных (A → B → A) обрывается на повторе.
+    const result = [...rows.keys()].filter((id) => !parentOf(id)).map((id) => build(id, new Set([id])));
     const orphans = locations.page.rows.filter((loc) => !unitsOf(loc).length);
     if (orphans.length) {
       const kids = branch("none", orphans);

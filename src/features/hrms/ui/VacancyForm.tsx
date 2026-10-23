@@ -48,7 +48,7 @@ const SECTIONS: Section[] = [
     icon: WalletIcon,
     title: "vacancy.page.card.terms",
     hint: "vacancy.form.termsHint",
-    slugs: ["hr_locations_id", "work_format", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
+    slugs: ["hr_locations_id", "hr_shift_kinds_id", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
   },
   {
     id: "dates",
@@ -200,7 +200,7 @@ export function VacancyForm({
                   creating={creating}
                   required={field.slug === "title"}
                   {...(FULL.has(field.slug) ? { wide: true } : {})}
-                  {...(field.slug === "skills" ? { placeholder: t("vacancy.form.tagHint") } : {})}
+                  dropdown
                   onChange={(value, extra) => {
                     set(field.slug, value, extra);
                     /* Сменили должность — грейд чужой группы снимаем (своим set: сохраняются только изменённые). */

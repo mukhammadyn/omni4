@@ -6,6 +6,7 @@ import {
   Cell,
   blankItem,
   cellKind,
+  isMany,
   type CellKind,
   relationDataKey,
   rowErrors,
@@ -89,7 +90,10 @@ export function DirectoryCreateDialog({
   const { t, i18n } = useTranslation();
   const create = useCreateItem(table);
   const update = useUpdateItem(table);
-  const [draft, setDraft] = useState<Item>(() => row ?? { ...blankItem(fields), ...defaults });
+  // Новая запись справочника — активной, как `def:1` прототипа: выключенную не предлагают в выборе.
+  const [draft, setDraft] = useState<Item>(
+    () => row ?? { ...blankItem(fields), ...(fields.some((f) => f.slug === "is_active") ? { is_active: true } : {}), ...defaults },
+  );
   const [showErrors, setShowErrors] = useState(false);
   const [active, setActive] = useState<{ field: Field; anchor: DOMRect } | null>(null);
   const errors = rowErrors(fields, draft);
@@ -230,6 +234,15 @@ export function DirectoryCreateDialog({
 
   const shown = fields
     .filter((field) => !(field === iconField && titleField))
+    /* Чужая сторона Many2Many (`hr_employees_ids` у юнита): бэкенд её не
+       обновляет (backend-notes, Many2Many), правится она со своей стороны. */
+    .filter((field) => {
+      // relation_id у такого поля бэкенд не отдаёт — тогда по имени: `<чужая таблица>_ids`.
+      const relation =
+        (field.relationId ? byId.get(field.relationId) : undefined) ??
+        relations.find((one) => `${one.toSlug}_ids` === field.slug);
+      return !(relation && isMany(relation.type) && relation.direction === "incoming");
+    })
     .filter((field) => cellKind(field.type) !== "label" && cellKind(field.type) !== "button" && cellKind(field.type) !== "formula");
 
   return (

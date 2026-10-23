@@ -55,7 +55,7 @@ const SIDE: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
   {
     icon: WalletIcon,
     title: "vacancy.page.card.terms",
-    slugs: ["hr_locations_id", "work_format", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
+    slugs: ["hr_locations_id", "hr_shift_kinds_id", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
   },
   {
     icon: CalendarIcon,
@@ -113,11 +113,7 @@ export function VacancyPage({
 
   const today = todayInput();
   const label = (field: Field) => localized(field.labels, language, field.label);
-  const option = (slug: string) => {
-    const field = bySlug.get(slug);
-    const found = field && optionOf(field, text(row[slug]));
-    return found ? localized(found.labels, language, found.label || found.value) : text(row[slug]);
-  };
+
   const cell = (field: Field, values: Item = row) => (
     <Cell field={field} row={values} tableSlug={VACANCIES} relations={relations} locale={locale} language={language} wrap />
   );
@@ -177,7 +173,8 @@ export function VacancyPage({
             <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-fg-muted">
               <Meta icon={NetworkIcon} text={text(related(row, "hr_departments_id").name)} />
               <Meta icon={MapPinIcon} text={text(related(row, "hr_locations_id").name)} />
-              <Meta icon={HouseIcon} text={option("work_format")} />
+              {/* Формат — вид смены из настроек HRMS («Виды смен»). */}
+              <Meta icon={HouseIcon} text={text(related(row, "hr_shift_kinds_id").name)} />
               <Meta icon={CalendarIcon} text={opened === null ? "" : t("vacancy.openFor", { count: opened })} />
               <Meta icon={WalletIcon} text={salaryText(row, locale, t) ?? t("vacancy.salaryNegotiable")} />
             </div>

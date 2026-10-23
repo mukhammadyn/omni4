@@ -15,9 +15,10 @@ import type { TranslationKey } from "@/shared/lib/i18n";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { CHIP_STYLES } from "@/shared/ui/chip";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { useNewCandidate } from "../api/candidate-new";
-import { text } from "../api/org";
+import { text, useGradesFor } from "../api/org";
 import { CANDIDATES } from "../api/vacancy-page";
 import { blank, formError, FormBar, FormField, FormItem, FormSection, Pills } from "./record-form";
 
@@ -33,7 +34,7 @@ const SECTIONS: { icon: typeof UserIcon; title: TranslationKey; hint: Translatio
     hint: "candidate.new.personalHint",
     slugs: ["last_name", "first_name", "phone", "email", "telegram_username", "city"],
   },
-  { icon: AwardIcon, title: "candidate.new.profile", hint: "candidate.new.profileHint", slugs: ["level", "experience", "salary_expectation", "currency", "tags"] },
+  { icon: AwardIcon, title: "candidate.new.profile", hint: "candidate.new.profileHint", slugs: ["hr_grades_id", "experience", "salary_expectation", "currency", "tags"] },
   { icon: MessageSquareIcon, title: "candidate.new.comment", hint: "candidate.new.commentHint", slugs: ["notes"] },
 ];
 
@@ -55,7 +56,6 @@ const PLACEHOLDER: Record<string, TranslationKey> = {
 const fresh = (vacancy: string): Item => ({
   guid: crypto.randomUUID(),
   hr_vacancies_id: vacancy || null,
-  level: "middle",
   currency: "UZS",
 });
 
@@ -89,6 +89,10 @@ export function NewCandidate({
   const upload = useUploadFiles();
   const bySlug = new Map(form.fields.map((f) => [f.slug, f]));
   const set = (slug: string, value: unknown, extra: Item = {}) => setDraft((cur) => ({ ...cur, [slug]: value, ...extra }));
+  /* Грейд — группы должности выбранной вакансии (useGradesFor), как в форме вакансии. */
+  const grades = useGradesFor();
+  const chosen = draft[relationDataKey("hr_vacancies_id")] as Item | undefined;
+  const position = chosen?.hr_positions_id ?? form.vacancy?.hr_positions_id;
 
   /* Подпись вакансии из ссылки — пока связь не выбирали руками. */
   const row: Item =
@@ -107,6 +111,17 @@ export function NewCandidate({
     const f = bySlug.get(slug);
     if (!f) return null;
     const hint = PLACEHOLDER[f.slug];
+    if (f.slug === "hr_grades_id" && f.editable && !f.locked)
+      return (
+        <FormItem key={slug} label={localized(f.labels, language, f.label)}>
+          <Dropdown
+            value={text(draft.hr_grades_id)}
+            placeholder={t("form.pick")}
+            items={[{ value: "", label: "—" }, ...grades.of(position).map((g) => ({ value: text(g.guid), label: text(g.name) }))]}
+            onChange={(id) => set("hr_grades_id", id || null)}
+          />
+        </FormItem>
+      );
     return (
       <FormField
         key={slug}
@@ -120,6 +135,7 @@ export function NewCandidate({
         required={REQUIRED.has(f.slug) || f.slug === "hr_vacancies_id"}
         {...(f.slug === "hr_vacancies_id" ? { wide: true } : {})}
         {...(hint ? { placeholder: t(hint) } : {})}
+        dropdown
         onChange={(value, extra) => set(f.slug, value, extra)}
       />
     );
