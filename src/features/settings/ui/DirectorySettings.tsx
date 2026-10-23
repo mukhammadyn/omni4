@@ -218,8 +218,8 @@ export function DirectorySettings({
     const out = new Map<string, number>();
     const key = directory.counts?.field ?? "";
     for (const row of counted.page.rows) {
-      const guid = String(row[key] ?? "");
-      if (guid) out.set(guid, (out.get(guid) ?? 0) + 1);
+      // Many2Many (`…_ids`) — список: человек считается в каждом своём юните.
+      for (const guid of [row[key] ?? []].flat().map(String)) if (guid) out.set(guid, (out.get(guid) ?? 0) + 1);
     }
     return out;
   }, [counted.page.rows, directory.counts?.field]);

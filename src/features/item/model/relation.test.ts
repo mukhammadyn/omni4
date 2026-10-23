@@ -131,3 +131,14 @@ test("relation options as a tree: group header, its children under it, orphan to
   expect(withoutPrefix("DEV D3", "DEV")).toBe("D3");
   expect(withoutPrefix("DEVOPS", "DEV")).toBe("DEVOPS");
 });
+
+test("relationSelection: Many2Many — подписи из строк целевой таблицы, неизвестный uuid без подписи", () => {
+  const field = { slug: "core_business_units_ids" } as Field;
+  const fields = [{ slug: "name", type: "SINGLE_LINE" }];
+  const known = [{ guid: "u1", name: "Udevs" }, { guid: "u2", name: "Ucode" }];
+
+  expect(relationSelection({ core_business_units_ids: ["u2", "u9"] }, field, fields, "", known)).toEqual([
+    { guid: "u2", label: "Ucode" },
+    { guid: "u9", label: "" },
+  ]);
+});

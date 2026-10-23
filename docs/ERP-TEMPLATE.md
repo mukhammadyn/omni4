@@ -87,6 +87,39 @@ Id меню, view, полей и связей в каждом проекте с�
    смены цикла» у шаблона). Заменяет PICK_LIST `shift_kind` /
    `cycle_shift_kind` с зашитыми `day`/`night`/`remote`: экран читает
    только связь. Пункт меню не нужен — справочник в настройках HRMS.
+7. **`core_business_units`** — бизнес-юниты (added 2026-10-23, в v2 нет;
+   CONTEXT.md, Business unit). Поля: `name`, `color` (COLOR),
+   `description` (MULTI_LINE), `is_active` (SWITCH). Many2One с неё:
+   `hr_employees` («Руководитель» — любой сотрудник, не только с
+   учёткой), `crm_legal_entities` («Юрлицо»).
+   Many2One на неё — колонка `core_business_units_id`, подпись
+   «Бизнес-юнит»: `hr_locations`, `hr_projects`, `crm_pipelines`.
+   У `hr_employees` — **Many2Many** (`core_business_units_ids`,
+   «Бизнес-юниты»): человек бывает в нескольких юнитах. Список читается
+   и пишется только со стороны сотрудника (backend-notes, Many2Many).
+   Такой же Many2Many у `hr_job_history` (`core_business_units_ids`):
+   текущая запись истории копирует непустой список в сотрудника.
+8. **Поля-копии назначения у `hr_employees` — `attributes.disabled: true`**
+   (added 2026-10-23): `core_business_units_ids`, `hr_departments_id`,
+   `hr_positions_id`, `hr_grades_id`, `hr_locations_id`,
+   `hr_work_schedules_id`, `employment_type`, `work_format`. Источник —
+   `hr_job_history` (вкладка «Работа»), сотрудник держит копию текущей
+   записи (`api/job-history.ts`, SNAP). Правка копии в таблице терялась
+   при следующем сохранении истории, поэтому копия только читается;
+   при заведении сотрудника поля заполняются.
+   Исключение — «Рабочие данные» на странице сотрудника: правка там
+   исправляет текущую запись истории (`isAssignment`, EmployeePage), а не
+   поле сотрудника; копия приезжает следом.
+9. **`core_regions`** — регионы деревом (added 2026-10-23, в v2 нет).
+   Поля: `name`, `code`, `type` (PICK_LIST `country`/`region`/`city`/
+   `district`), `is_active` (SWITCH); Many2One на себя — `core_regions_id`
+   («Входит в»). У `hr_locations` Many2One `core_regions_id` («Регион»)
+   вместо PICK_LIST `region`: варианты старого поля заведены строками
+   под «Узбекистан», значения локаций перенесены. Старое поле `region`
+   больше не читается — удалить, когда в проекте не останется его
+   значений без пары. Пункт меню — в «Ядре»; справочник — Настройки →
+   Организация → Регионы. У сделок колонки нет — юнит у воронки. Пункт меню —
+   в «Ядре» (§3.4); справочник — Настройки → Организация.
 
 ## 2. Вход и права
 
@@ -269,7 +302,8 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 
 **«Ядро»** — общие таблицы: `core_settings` (Настройки организации),
 `core_currency_rates` (Курсы валют), `core_notifications` (Уведомления),
-`core_audit_log` (Журнал аудита), `core_users` (Пользователи).
+`core_audit_log` (Журнал аудита), `core_users` (Пользователи),
+`core_business_units` (Бизнес-юниты).
 Плюс дочерние таблицы модулей, которые в omni4 лежат здесь:
 `crm_legal_entities`, `crm_product_categories`, `crm_units`,
 `crm_invoice_items`, `crm_payments`, `hr_locations`, `hr_departments`,

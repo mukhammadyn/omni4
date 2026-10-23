@@ -1,6 +1,8 @@
 import { useState } from "react";
 import {
   BriefcaseIcon,
+  Building2Icon,
+  CalendarRangeIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CopyIcon,
@@ -14,8 +16,8 @@ import {
 } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { relationDataKey, type Item } from "@/features/item";
-import type { Field, Relation } from "@/features/table";
+import { relationDataKey, useItems, type Item } from "@/features/item";
+import { localized, type Field, type Relation } from "@/features/table";
 import { todayInput } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
@@ -26,7 +28,8 @@ import { Modal } from "@/shared/ui/modal";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { JOB_HISTORY, useJobHistory, type Choice, type JobEntry } from "../api/job-history";
 import { monthsBetween, toDay, type GradeIssue } from "../model/job-history";
-import { formError, FormField } from "./record-form";
+import { formError, FormField, FormItem, FormSection } from "./record-form";
+import { TemplateSelect } from "./schedule-parts";
 
 /**
  * Не переносятся в новую запись: её начало, конец и причина — то, чем
@@ -60,6 +63,7 @@ export function WorkHistory({
   const job = useJobHistory({ employee, link, menuId, language });
   const [open, setOpen] = useState(true);
   const [draft, setDraft] = useState<Item | null>(null);
+  const units = useItems(UNITS_TABLE, { limit: 200, page: 1, relations: false });
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -81,6 +85,9 @@ export function WorkHistory({
       const data = source[relationDataKey(field.slug)];
       if (data) copy[relationDataKey(field.slug)] = data;
     }
+    /* Выключенный юнит в новое назначение не переносим: его закрыли, а не выбрали. */
+    const off = new Set(units.page.rows.filter((row) => row.is_active === false).map((row) => String(row.guid)));
+    if (Array.isArray(copy[UNITS])) copy[UNITS] = copy[UNITS].filter((guid) => !off.has(String(guid)));
     setDraft({ ...copy, [link]: employee, date_from: todayInput() });
   };
 
@@ -377,26 +384,23 @@ function monthYear(date: Date, locale: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+const UNITS_TABLE = "core_business_units";
+const UNITS = `${UNITS_TABLE}_ids`;
+
 /*
- * Поля модалки — порядок `posModal` прототипа. Чего нет в схеме или
- * скрыто правами роли, того и в форме нет.
+ * Поля модалки по секциям: что за должность и почему сменилась, где
+ * человек работает, сколько получает, с какого по какое. Чего нет
+ * в схеме или скрыто правами роли, того и в форме нет; пустая секция
+ * не рисуется.
  */
-const JOB_FIELDS = [
-  "employment_type",
-  "hr_departments_id",
-  "hr_locations_id",
-  "hr_positions_id",
-  "hr_grades_id",
-  "work_format",
-  "change_reason",
-  "hr_work_schedules_id",
-  "salary",
-  "currency",
-  "date_from",
-  "date_to",
-  "comment",
-];
-const JOB_WIDE = new Set(["change_reason", "hr_work_schedules_id", "comment"]);
+const JOB_SECTIONS = [
+  { id: "role", icon: BriefcaseIcon, fields: ["hr_positions_id", "hr_grades_id", "employment_type", "change_reason", "comment"] },
+  { id: "place", icon: Building2Icon, fields: ["core_business_units_ids", "hr_departments_id", "hr_locations_id", "hr_work_schedules_id"] },
+  { id: "pay", icon: WalletIcon, fields: ["salary", "currency"] },
+  { id: "period", icon: CalendarRangeIcon, fields: ["date_from", "date_to"] },
+] as const;
+const JOB_FIELDS: string[] = JOB_SECTIONS.flatMap((section) => section.fields);
+const JOB_WIDE = new Set(["core_business_units_ids", "hr_work_schedules_id", "comment"]);
 const JOB_REQUIRED = new Set(["hr_positions_id", "date_from"]);
 
 /** «Добавить / Редактировать должность» — `posModal` прототипа. */
@@ -458,8 +462,35 @@ function JobDialog({
           </p>
         </div>
 
-        <div className="grid min-h-0 grid-cols-2 gap-x-4 gap-y-3.5 overflow-y-auto px-5 py-4 max-md:grid-cols-1">
-          {shown.map((field) => (
+        <div className="min-h-0 overflow-y-auto px-5 pt-4">
+          {JOB_SECTIONS.map((section) => {
+            const own = shown.filter((field) => (section.fields as readonly string[]).includes(field.slug));
+            if (!own.length) return null;
+            return (
+              <FormSection
+                key={section.id}
+                icon={section.icon}
+                title={t(`employee.work.sec.${section.id}`)}
+                hint={t(`employee.work.sec.${section.id}Hint`)}
+              >
+          {own.map((field) =>
+            /* График — со сводкой шаблона в каждой строке, а не одним названием. */
+            field.slug === "hr_work_schedules_id" && field.editable && !field.locked ? (
+              <FormItem key={field.slug} label={localized(field.labels, language, field.label)} wide>
+                <TemplateSelect
+                  value={typeof form.hr_work_schedules_id === "string" ? form.hr_work_schedules_id : ""}
+                  placeholder={t("form.pick")}
+                  onChange={(id, name) => {
+                    setError(null);
+                    setForm((prev) => ({
+                      ...prev,
+                      hr_work_schedules_id: id,
+                      [relationDataKey("hr_work_schedules_id")]: id ? { guid: id, name } : null,
+                    }));
+                  }}
+                />
+              </FormItem>
+            ) : (
             <FormField
               key={field.slug}
               field={field}
@@ -471,13 +502,19 @@ function JobDialog({
               creating={creating}
               required={JOB_REQUIRED.has(field.slug) || Boolean(field.required)}
               wide={JOB_WIDE.has(field.slug)}
+              dropdown={field.slug === "employment_type" || field.slug === "currency"}
+                    rows={field.slug === "comment" ? 2 : 4}
               {...(field.slug === "date_to" ? { placeholder: t("employee.work.toHint") } : {})}
               onChange={(value, extra) => {
                 setError(null);
                 setForm((prev) => ({ ...prev, [field.slug]: value, ...extra }));
               }}
             />
-          ))}
+            ),
+          )}
+              </FormSection>
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-2 border-t border-border px-5 py-3">

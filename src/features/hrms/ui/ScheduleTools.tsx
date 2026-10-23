@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Building2Icon, BriefcaseIcon, LayersIcon, ListFilterIcon, NetworkIcon, type LucideIcon } from "lucide-react";
+import { Building2Icon, BriefcaseIcon, LayersIcon, ListFilterIcon, MapIcon, NetworkIcon, type LucideIcon } from "lucide-react";
 import { Icon } from "@/shared/ui/icon";
-import { FilterBar } from "@/features/item";
+import { activeFilterCount, FilterBar, MAX_LIMIT, useItems, type Item } from "@/features/item";
 import { useTableSchema } from "@/features/table";
 import { Popover, PopoverItem } from "@/shared/ui/popover";
 import { ToolButton } from "@/shared/ui/tool-button";
@@ -29,9 +29,11 @@ export function ScheduleTools({ viewId, grouping = true }: { viewId: string; /**
         icon={ListFilterIcon}
         label={t("table.filter")}
         open={settings.open}
-        on={settings.active > 0}
+        on={activeFilterCount(settings.own) > 0}
         onClick={settings.toggleOpen}
       />
+
+      {grouping && <RegionButton viewId={viewId} />}
 
       {grouping && (
       <Popover
@@ -90,10 +92,78 @@ export function PeopleFilterBar({
       columns={schema.fields}
       relations={schema.relations}
       language={language}
-      filters={settings.where}
+      filters={settings.own}
       sorts={[]}
       onFilters={settings.setWhere}
       onSorts={() => {}}
     />
+  );
+}
+
+/**
+ * «Регион» — фильтр прототипа (`attendance.html`, `schedule.html`).
+ * Регион с вложенными: «Ташкент» отбирает и его районы.
+ */
+function RegionButton({ viewId }: { viewId: string }) {
+  const { t } = useTranslation();
+  const settings = useScheduleSettings(viewId);
+  const { page } = useItems("core_regions", { limit: MAX_LIMIT, page: 1, relations: false });
+  const rows = page.rows.filter((row) => row.is_active !== false || row.guid === settings.region);
+  const name = (row: Item | undefined) => String(row?.name ?? "");
+  const picked = rows.find((row) => row.guid === settings.region);
+
+  /* Деревом: корни, под каждым — его дети, с отступом по глубине. */
+  const tree: { row: Item; depth: number }[] = [];
+  const walk = (parent: string, depth: number) =>
+    rows
+      .filter((row) => String(row.core_regions_id ?? "") === parent)
+      .sort((a, b) => name(a).localeCompare(name(b)))
+      .forEach((row) => {
+        tree.push({ row, depth });
+        walk(String(row.guid), depth + 1);
+      });
+  walk("", 0);
+
+  if (!rows.length) return null;
+  return (
+    <Popover
+      align="end"
+      trigger={({ open, toggle }) => (
+        <ToolButton
+          icon={MapIcon}
+          label={t("schedule.region")}
+          {...(picked ? { text: name(picked) } : {})}
+          open={open}
+          on={Boolean(picked)}
+          onClick={toggle}
+        />
+      )}
+    >
+      {(close) => (
+        <div className="max-h-80 overflow-y-auto">
+          <PopoverItem
+            active={!settings.region}
+            onClick={() => {
+              settings.setRegion("");
+              close();
+            }}
+          >
+            {t("schedule.allRegions")}
+          </PopoverItem>
+          {tree.map(({ row, depth }) => (
+            <PopoverItem
+              key={String(row.guid)}
+              active={row.guid === settings.region}
+              onClick={() => {
+                settings.setRegion(String(row.guid));
+                close();
+              }}
+            >
+              <span style={{ paddingLeft: depth * 14 }}>{name(row)}</span>
+            </PopoverItem>
+          ))}
+        </div>
+      )}
+    </Popover>
   );
 }
