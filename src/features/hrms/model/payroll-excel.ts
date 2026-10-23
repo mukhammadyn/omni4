@@ -15,6 +15,7 @@
  *   из main_settings нет — у omni4 нет этих настроек.
  */
 import ExcelJS from "exceljs";
+import type { PayPivot } from "./payroll";
 import type { SheetCell } from "./timesheet";
 
 export type PayUnit = "month" | "week" | "day" | "hour";
@@ -63,8 +64,8 @@ const ddmm = (date: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}`;
 /**
  * Дни → норма и засчитанное, правила `fetchEmployeesWithSalary` HRMS:
  * засчитан день с приходом или оплачиваемым отсутствием. Ставке за месяц
- * и неделю работа без смены не засчитывается, ставке за день и час —
- * засчитывается, а отсутствие без смены — нет.
+ * и неделю не засчитан день «вне графика», ставке за день и час —
+ * засчитан, а отсутствие без смены — нет.
  */
 export function salaryRow(input: SalaryInput): SalaryRow {
   const byUnit = input.unit === "day" || input.unit === "hour";
@@ -74,9 +75,11 @@ export function salaryRow(input: SalaryInput): SalaryRow {
     const plan = (input.planByDate.get(cell.date) ?? 0) / 60;
     const shift = plan > 0 && cell.kind !== "outside";
     const inMonth = cell.date >= input.from && cell.date <= input.to;
-    const worked = WORKED.has(cell.kind) && cell.counted;
+    // «Вне графика» месяцу и неделе не засчитан; день без смены и без этой
+    // пометки — засчитан, как в HRMS (source_type off_schedule).
+    const worked = WORKED.has(cell.kind) && cell.counted && (byUnit || cell.day?.status !== "off_schedule");
     const paidLeave = cell.kind === "leave" && cell.leave?.paid === true;
-    const credited = inMonth && ((worked && (shift || byUnit)) || (paidLeave && (shift || !byUnit)));
+    const credited = inMonth && (worked || (paidLeave && (shift || !byUnit)));
 
     const week = weeks.get(monday(cell.date)) ?? { credited: 0, shifts: 0, unitShifts: 0 };
     weeks.set(monday(cell.date), week);
@@ -92,8 +95,8 @@ export function salaryRow(input: SalaryInput): SalaryRow {
     week.credited += 1;
     row.creditedDays += 1;
     row.paidHours += worked && cell.workedMinutes != null ? cell.workedMinutes / 60 : plan;
-    if (worked && cell.workedMinutes == null && shift) row.noCheckout.push(ddmm(cell.date));
-    if (worked && !shift) row.offShift.push(ddmm(cell.date));
+    if (worked && cell.workedMinutes == null && (shift || !byUnit)) row.noCheckout.push(ddmm(cell.date));
+    if (worked && !shift && byUnit) row.offShift.push(ddmm(cell.date));
   }
   row.weeks = [...weeks.values()].filter((week) => week.unitShifts > 0);
   row.normHours = round2(row.normHours);
@@ -165,6 +168,7 @@ export function accrual(salary: number, unit: PayUnit, mode: TemplateMode, row: 
 export type PayTypeColumn = { id: string; name: string };
 
 export type TemplateLabels = {
+  sheet: string;
   title: string;
   period: string;
   index: string;
@@ -254,7 +258,7 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   const { labels, mode, employees, accruals, deductions } = input;
   const book = new ExcelJS.Workbook();
   book.creator = "omni4";
-  const sheet = book.addWorksheet(labels.title.slice(0, 31), { views: [{ state: "frozen", ySplit: 5 }] });
+  const sheet = book.addWorksheet(labels.sheet, { views: [{ state: "frozen", ySplit: 5 }] });
 
   const col = { accrualType: 4, payUnit: 5, rate: 6, price: 7, norm: 8, worked: 9, late: 10, salary: 11 };
   const accrualsFrom = col.salary + 1;
@@ -490,4 +494,74 @@ export async function parseImport(
     }
   }
   return result;
+}
+
+/* ---------- выгрузка сводной ---------- */
+
+export type PivotLabels = Record<"sheet" | "employee" | "dept" | "accruals" | "deductions" | "accrued" | "deducted" | "net" | "total", string>;
+
+/** Сводная месяца как на экране — числами, без формул; удержания со знаком минус. */
+export async function buildPivotXlsx(pivot: PayPivot, labels: PivotLabels): Promise<ArrayBuffer> {
+  const book = new ExcelJS.Workbook();
+  book.creator = "omni4";
+  const sheet = book.addWorksheet(labels.sheet, { views: [{ state: "frozen", ySplit: 2, xSplit: 1 }] });
+  const columns = [...pivot.accruals, ...pivot.deductions];
+  const deduction = new Set(pivot.deductions.map((c) => c.id));
+  const signed = (id: string, value: number) => (deduction.has(id) ? -value : value);
+  const last = columns.length + 5;
+
+  const head = (row: number, column: number, value: string) => {
+    const cell = sheet.getCell(row, column);
+    cell.value = value;
+    cell.font = { bold: true };
+    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    fill(cell, "FFE5ECF7");
+  };
+  const tall = (column: number, value: string) => {
+    sheet.mergeCells(1, column, 2, column);
+    head(1, column, value);
+  };
+  tall(1, labels.employee);
+  tall(2, labels.dept);
+  if (pivot.accruals.length) {
+    sheet.mergeCells(1, 3, 1, 2 + pivot.accruals.length);
+    head(1, 3, labels.accruals);
+  }
+  if (pivot.deductions.length) {
+    sheet.mergeCells(1, 3 + pivot.accruals.length, 1, 2 + columns.length);
+    head(1, 3 + pivot.accruals.length, labels.deductions);
+  }
+  columns.forEach((column, i) => head(2, 3 + i, column.name));
+  tall(last - 2, labels.accrued);
+  tall(last - 1, labels.deducted);
+  tall(last, labels.net);
+
+  pivot.rows.forEach((row) =>
+    sheet.addRow([
+      row.name,
+      row.dept,
+      ...columns.map((column) => signed(column.id, row.cells[column.id] ?? 0)),
+      row.accrued,
+      -row.deducted,
+      row.accrued - row.deducted,
+    ]),
+  );
+  const total = sheet.addRow([
+    labels.total,
+    "",
+    ...columns.map((column) => signed(column.id, pivot.total.cells[column.id] ?? 0)),
+    pivot.total.accrued,
+    -pivot.total.deducted,
+    pivot.total.accrued - pivot.total.deducted,
+  ]);
+  total.font = { bold: true };
+
+  sheet.getColumn(1).width = 36;
+  sheet.getColumn(2).width = 20;
+  for (let column = 3; column <= last; column += 1) {
+    sheet.getColumn(column).width = 16;
+    sheet.getColumn(column).numFmt = "#,##0";
+  }
+  for (let row = 1; row <= sheet.rowCount; row += 1) borders(sheet, row, last);
+  return book.xlsx.writeBuffer() as Promise<ArrayBuffer>;
 }

@@ -8,9 +8,9 @@ import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
 import { useLastPayMonth, usePayMonth } from "../api/payroll";
 import { useSyncPenalties } from "../api/penalty";
-import { PayrollExcel } from "./PayrollExcel";
+import { exportPivot, PayrollExcel } from "./PayrollExcel";
 import { useScheduleSettings } from "./schedule-settings";
-import { buildPayPivot, compactSum, type PayPivot } from "../model/payroll";
+import { buildPayPivot, compactSum } from "../model/payroll";
 
 const th = "h-9 border-b border-border px-2 text-[13px] font-normal text-fg-muted whitespace-nowrap";
 const td = "h-row border-b border-border px-2 tabular-nums";
@@ -58,7 +58,8 @@ export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: strin
         <button
           type="button"
           onClick={() =>
-            exportCsv(pivot, title, {
+            void exportPivot(pivot, title, {
+              sheet: t("payroll.xlsx.sheet"),
               employee: t("payroll.employee"),
               dept: t("payroll.dept"),
               accruals: t("payroll.accruals"),
@@ -66,7 +67,8 @@ export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: strin
               accrued: t("payroll.accrued"),
               deducted: t("payroll.deducted"),
               net: t("payroll.net"),
-            })
+              total: t("payroll.total", { count: pivot.rows.length }),
+            }).catch(() => toast.error(t("payroll.xlsx.downloadFailed")))
           }
           className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 text-[13px] text-fg transition-colors hover:bg-surface-hover"
         >
@@ -232,32 +234,4 @@ function NavButton({ label, onClick, icon }: { label: string; onClick: () => voi
       <Icon as={icon} size={16} />
     </button>
   );
-}
-
-/** ponytail: CSV с BOM вместо .xlsx — Excel открывает его так же, а библиотека не нужна. */
-function exportCsv(pivot: PayPivot, title: string, label: Record<"employee" | "dept" | "accruals" | "deductions" | "accrued" | "deducted" | "net", string>) {
-  const head = [
-    label.employee,
-    label.dept,
-    ...pivot.accruals.map((c) => `${label.accruals}: ${c.name}`),
-    ...pivot.deductions.map((c) => `${label.deductions}: ${c.name}`),
-    label.accrued,
-    label.deducted,
-    label.net,
-  ];
-  const body = pivot.rows.map((row) => [
-    row.name,
-    row.dept,
-    ...pivot.accruals.map((c) => row.cells[c.id] ?? 0),
-    ...pivot.deductions.map((c) => -(row.cells[c.id] ?? 0)),
-    row.accrued,
-    -row.deducted,
-    row.accrued - row.deducted,
-  ]);
-  const csv = [head, ...body].map((r) => r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(";")).join("\r\n");
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
-  link.download = `${title}.csv`;
-  link.click();
-  URL.revokeObjectURL(link.href);
 }

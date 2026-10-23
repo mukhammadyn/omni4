@@ -32,7 +32,8 @@ const employee = (over: Partial<TemplateEmployee> = {}): TemplateEmployee => ({
     cell("2026-10-01", "worked", { lateMinutes: 12 }),
     cell("2026-10-02", "missing_mark"),
     cell("2026-10-03", "leave", { leave: { id: "l", title: "", code: "", icon: "", color: "", status: "approved", paid: true, from: "2026-10-03", to: "2026-10-03" } }),
-    cell("2026-10-04", "worked", { planMinutes: 0 }),
+    cell("2026-10-04", "worked", { planMinutes: 0, day: { status: "off_schedule" } as SheetCell["day"] }),
+    cell("2026-10-05", "worked", { planMinutes: 0, workedMinutes: 120 }),
     cell("2026-10-31", "absent"),
   ],
   planByDate: plan,
@@ -45,21 +46,23 @@ const employee = (over: Partial<TemplateEmployee> = {}): TemplateEmployee => ({
 describe("salaryRow", () => {
   it("засчитывает приход и оплачиваемое отсутствие, норма — смены месяца", () => {
     const row = salaryRow(employee());
-    expect(row).toMatchObject({ normDays: 4, normHours: 32, creditedDays: 3, paidHours: 25, lateMinutes: 12, noCheckout: ["02.10"], offShift: [] });
+    // 04.10 «вне графика» не засчитан, 05.10 без смены и без пометки — засчитан фактом.
+    expect(row).toMatchObject({ normDays: 4, normHours: 32, creditedDays: 4, paidHours: 27, lateMinutes: 12, noCheckout: ["02.10"], offShift: [] });
   });
 
   it("ставке за день засчитана и работа без смены", () => {
     const row = salaryRow(employee({ unit: "day" }));
-    expect(row).toMatchObject({ creditedDays: 4, offShift: ["04.10"] });
-    expect(accrual(100, "day", "daily", row).amount).toBe(400);
+    expect(row).toMatchObject({ creditedDays: 5, offShift: ["04.10", "05.10"] });
+    expect(accrual(100, "day", "daily", row).amount).toBe(500);
   });
 });
 
 describe("accrual", () => {
   it("месяц: ставка / смены × засчитанные; часовой — по часам", () => {
     const row = salaryRow(employee());
-    expect(accrual(4000, "month", "daily", row)).toMatchObject({ norm: 4, worked: 3, price: 1000, amount: 3000 });
-    expect(accrual(3200, "month", "hourly", row)).toMatchObject({ norm: 32, worked: 25, price: 100, amount: 2500 });
+    // Засчитано 4 из 4 смен — оклад целиком; часы — факт, 27 из 32.
+    expect(accrual(4000, "month", "daily", row)).toMatchObject({ norm: 4, worked: 4, price: 1000, amount: 4000 });
+    expect(accrual(3200, "month", "hourly", row)).toMatchObject({ norm: 32, worked: 27, price: 100, amount: 2700 });
   });
 
   it("неделя: каждая неделя по своим сменам, и вне месяца тоже", () => {
@@ -88,7 +91,8 @@ describe("шаблон и загрузка", () => {
     const book = new ExcelJS.Workbook();
     await book.xlsx.load(file);
     const sheet = book.worksheets[0]!;
-    expect(sheet.getCell(6, 11).value).toMatchObject({ result: 3000 });
+    expect(sheet.name).toBe("sheet");
+    expect(sheet.getCell(6, 11).value).toMatchObject({ result: 4000 });
     expect(sheet.getCell(6, 13).value).toBe(50);
     sheet.getCell(6, 12).value = "1 500,5";
 
@@ -102,7 +106,7 @@ describe("шаблон и загрузка", () => {
     });
     expect(parsed.records).toEqual([
       { employeeId: employee().id, typeId: types.accrual, kind: "accrual", amount: 1500.5 },
-      { employeeId: employee().id, typeId: types.salary, kind: "accrual", amount: 3000 },
+      { employeeId: employee().id, typeId: types.salary, kind: "accrual", amount: 4000 },
     ]);
     expect(parsed.skipped).toEqual({ invalidEmployee: 0, negative: 0, unknownType: 0 });
   });

@@ -52,6 +52,8 @@ export function useAll(tableSlug: string | undefined, filters: Filters, relation
 export type SheetEmployee = {
   id: string;
   name: string;
+  /** Фамилия, имя, отчество — для ведомости, как ФИО в HRMS. */
+  legalName?: string;
   photo: string;
   position: string;
   positionId: string;
@@ -64,6 +66,7 @@ export type SheetEmployee = {
 const toEmployee = (row: Item): SheetEmployee => ({
   id: text(row.guid),
   name: text(row.full_name) || [text(row.last_name), text(row.first_name)].filter(Boolean).join(" ") || "—",
+  legalName: [text(row.last_name), text(row.first_name), text(row.middle_name)].filter(Boolean).join(" ") || text(row.full_name) || "—",
   photo: text(row.photo),
   position: text(related(row, "hr_positions_id").name),
   positionId: text(row.hr_positions_id),
@@ -138,6 +141,7 @@ export function useTimesheet({
   employeeId,
   pageSize,
   where = {},
+  dismissed = false,
 }: {
   from: string;
   to: string;
@@ -150,6 +154,8 @@ export function useTimesheet({
   pageSize?: number;
   /** Отбор сотрудников полосой фильтров (PeopleFilterBar). */
   where?: Filters;
+  /** И уволенных — ведомости: уволенный в месяце за него получает. */
+  dismissed?: boolean;
 }): Timesheet {
   // Уволенных нет ни в каком периоде; свой фильтр по статусу человека важнее.
   const working = useNotDismissed();
@@ -159,7 +165,7 @@ export function useTimesheet({
     infinite: true,
     filters: employeeId
       ? { guid: { op: "any", values: [employeeId] } }
-      : { ...working, ...where },
+      : dismissed ? where : { ...working, ...where },
     search,
     // Порции идут по алфавиту — иначе новая порция вставала бы между строк.
     sorts: [{ field: "full_name", direction: "asc" }],
