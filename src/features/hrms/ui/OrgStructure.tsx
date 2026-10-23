@@ -219,7 +219,7 @@ export function OrgStructure({
           <>
             <div className="flex items-center gap-2.5">
               <Tile icon={UNIT_KIND[data.kind].icon} color={toneOf(data)} />
-              <Lines title={data.name || t("org.noUnit")} sub={data.sub || t(UNIT_KIND[data.kind].label)} />
+              <Lines title={data.name || t(data.kind === "region" ? "org.noRegion" : "org.noUnit")} sub={data.sub || t(UNIT_KIND[data.kind].label)} />
             </div>
             <Meta>
               {head(data) ?? <span />}

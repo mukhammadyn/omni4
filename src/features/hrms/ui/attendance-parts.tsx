@@ -203,11 +203,14 @@ export function EmployeeName({
   employee,
   until,
   avatar,
+  brief = false,
   onOpen,
 }: {
   employee: SheetEmployee;
   until: string;
   avatar: ReactNode;
+  /** Только имя, без должности: табель — плотная сетка, строка ниже. */
+  brief?: boolean;
   onOpen?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
@@ -230,11 +233,11 @@ export function EmployeeName({
         <div className="truncate text-[13px] font-medium text-fg group-hover/name:text-accent-text group-hover/name:underline">
           {employee.name}
         </div>
-        <div className="truncate text-2xs text-fg-subtle">
+        {!brief && <div className="truncate text-2xs text-fg-subtle">
           {employee.dismissalDate && employee.dismissalDate <= until
             ? t("timesheet.dismissedOn", { date: employee.dismissalDate.split("-").reverse().join(".") })
             : employee.position}
-        </div>
+        </div>}
       </div>
     </Tag>
   );

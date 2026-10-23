@@ -1647,6 +1647,7 @@
   "org.kind.region": "Регион",
   "org.kind.location": "Локация",
   "org.noUnit": "Без бизнес-юнита",
+  "org.noRegion": "Без региона",
   "org.legend.dept": "Клик по отделу — профиль руководителя",
   "org.people": "{{count}} сотр.",
   "org.vertical": "Вертикально",

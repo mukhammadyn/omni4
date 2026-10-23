@@ -239,10 +239,13 @@ export function toRelation(dto: RelationDto, tableSlug: string): Relation {
    * view_fields приходят объектами полей. Полезны только поля ЧУЖОЙ
    * таблицы: по ним читается связанная строка. Своё поле-связь бэкенд
    * кладёт туда у ненастроенной связи, и по нему в данных не найдётся
-   * ничего — показывать «пусто» честнее, чем uuid.
+   * ничего — показывать «пусто» честнее, чем uuid. У связи на саму
+   * себя (юнит → родительский юнит) чужая таблица — она же своя,
+   * и отсеивается только само поле-связь.
    */
-  const theirs = (dto.view_fields ?? []).filter(
-    (field) => !ours?.id || field.table_id !== ours.id,
+  const self = Boolean(from?.id) && from?.id === to?.id;
+  const theirs = (dto.view_fields ?? []).filter((field) =>
+    self ? field.relation_id !== dto.id : !ours?.id || field.table_id !== ours.id,
   );
 
   const viewFields = theirs

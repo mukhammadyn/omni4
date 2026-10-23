@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { BriefcaseIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { BriefcaseIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Cell, type Item } from "@/features/item";
 import { localized, optionOf, type Field } from "@/features/table";
 import { formatDate, todayInput } from "@/shared/lib/date-value";
@@ -43,7 +43,7 @@ const NO_RELATIONS = new Map();
 /**
  * «Планирование» найма — `planView` прототипа (vacancies.html): группы
  * (филиал по умолчанию) → вакансии, по месяцам «нанято / план», справа
- * «Нужно нанять». План, факт, наём и уходы — в подсказке ячейки месяца;
+ * только месяцы. План, факт, наём и уходы — в подсказке ячейки месяца;
  * отдельными колонками, сводкой и легендой не дублируются.
  *
  * Группировку, вид строки и высоту правят кнопки в строке вкладок
@@ -143,15 +143,6 @@ export function VacancyPlan({
           </td>
         );
       })}
-      <td className={`${td} ${tail}`}>
-        {plan.total.need ? (
-          <Pill color="orange">{plan.total.need}</Pill>
-        ) : (
-          <span className={`inline-grid size-5 place-items-center rounded-full ${CHIP_STYLES.green}`}>
-            <Icon as={CheckIcon} size={12} />
-          </span>
-        )}
-      </td>
     </>
   );
 
@@ -207,20 +198,19 @@ export function VacancyPlan({
                   </small>
                 </th>
               ))}
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.need")}</th>
             </tr>
           </thead>
 
           <tbody>
             {!plans ? (
               <tr>
-                <td colSpan={WINDOW + 2} className="py-8 text-center text-fg-subtle">
+                <td colSpan={WINDOW + 1} className="py-8 text-center text-fg-subtle">
                   {t("common.loading")}
                 </td>
               </tr>
             ) : !groups.length ? (
               <tr>
-                <td colSpan={WINDOW + 2} className="py-8 text-center text-fg-subtle">
+                <td colSpan={WINDOW + 1} className="py-8 text-center text-fg-subtle">
                   {t("table.noRows")}
                 </td>
               </tr>
@@ -314,7 +304,6 @@ export function VacancyPlan({
 const thBox = "h-12 border-b border-border px-2 text-[13px] leading-tight";
 const th = `${thBox} font-normal text-fg-muted`;
 const td = "border-b border-border px-2";
-const tail = "min-w-[64px] border-l border-border px-3 text-right tabular-nums";
 
 const capitalize = (value: string) => value.charAt(0).toLocaleUpperCase() + value.slice(1);
 
@@ -370,14 +359,4 @@ function NavButton({ label, onClick, children }: { label: string; onClick: () =>
   );
 }
 
-/** Бейдж `.pl-need` / `.pl-lv`: число в цветной капсуле. */
-function Pill({ color, children }: { color: "red" | "orange"; children: ReactNode }) {
-  return (
-    <span
-      className={`inline-grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-semibold ${CHIP_STYLES[color]}`}
-    >
-      {children}
-    </span>
-  );
-}
 

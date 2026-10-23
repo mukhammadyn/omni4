@@ -33,7 +33,6 @@ export function useNewVacancy() {
       status: "draft",
       priority: "medium",
       headcount: 1,
-      work_format: "office",
       employment_type: "full_time",
       experience: "y1_3",
       currency: "UZS",

@@ -1647,6 +1647,7 @@
   "org.kind.region": "Region",
   "org.kind.location": "Location",
   "org.noUnit": "No business unit",
+  "org.noRegion": "No region",
   "org.legend.dept": "Click a department to open its head",
   "org.people": "{{count}} people",
   "org.vertical": "Vertical",

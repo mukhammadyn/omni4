@@ -104,14 +104,15 @@ export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; 
                     <EmployeeName
                       employee={employee}
                       until={range.to}
-                      avatar={<Avatar name={employee.name} photo={employee.photo || undefined} size="lg" />}
+                      avatar={<Avatar name={employee.name} photo={employee.photo || undefined} size="md" />}
+                      brief
                       onOpen={() => onOpenEmployee(employee.id, ATTENDANCE_TAB)}
                     />
                   </td>
                   {cells.map((cell) => (
                     <td
                       key={cell.date}
-                      className={`${body} px-0.5 py-[3px] text-center ${cell.date === today ? "bg-accent-subtle/30" : ""}`}
+                      className={`${body} text-center ${scale === "week" ? "px-0.5 py-[3px]" : "px-0 py-0.5"} ${cell.date === today ? "bg-accent-subtle/30" : ""}`}
                     >
                       <CellView
                         cell={cell}
@@ -225,7 +226,7 @@ function CellView({
 }) {
   const { t } = useTranslation();
   const duration = useDuration();
-  if (cell.kind === "outside") return <div className={`rounded-[5px] bg-surface-soft ${whole ? "mx-auto size-6" : "h-[30px]"}`} />;
+  if (cell.kind === "outside") return <div className={`bg-surface-soft ${whole ? "mx-auto size-7 rounded-[4px]" : "h-[30px] rounded-[5px]"}`} />;
 
   let content: ReactNode = null;
   let style = "text-fg";
@@ -292,8 +293,8 @@ function CellView({
       <button
         type="button"
         onClick={onOpen}
-        /* Месяц — квадрат по ширине узкого дня; неделя — во всю ячейку. */
-        className={`relative flex items-center justify-center rounded-[5px] px-0.5 text-xs ${whole ? "mx-auto size-6" : "h-[30px] w-full"} tabular-nums outline-none transition hover:ring-1 hover:ring-accent hover:ring-inset focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${style}`}
+        /* Месяц — квадрат 28px по центру узкого дня; неделя — плашкой во всю ячейку. */
+        className={`relative flex items-center justify-center px-0.5 text-xs ${whole ? "mx-auto size-7 rounded-[4px]" : "h-[30px] w-full rounded-[5px]"} tabular-nums outline-none transition hover:ring-1 hover:ring-accent hover:ring-inset focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${style}`}
       >
         {content}
         {cell.pending.length > 0 && <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-warning" />}

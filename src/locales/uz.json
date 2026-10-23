@@ -1647,6 +1647,7 @@
   "org.kind.region": "Hudud",
   "org.kind.location": "Lokatsiya",
   "org.noUnit": "Biznes-birliksiz",
+  "org.noRegion": "Hududsiz",
   "org.legend.dept": "Bo‘limni bosing — rahbar profili",
   "org.people": "{{count}} xodim",
   "org.vertical": "Vertikal",

@@ -156,7 +156,7 @@ export function FormField({
   /** По умолчанию — по виду: тексты и списки во всю ширину. */
   wide?: boolean;
   placeholder?: string | undefined;
-  /** Выбор — выпадающим списком, даже когда вариантов мало для кнопок. */
+  /** Выбор и мультивыбор — выпадающим списком, а не кнопками-пилюлями. */
   dropdown?: boolean;
   /** Высота многострочного поля, в строках. */
   rows?: number;
@@ -216,7 +216,7 @@ export function FormField({
     if (kind === "status" && !dropdown && field.options.size <= CHOICE_MAX)
       return <Choice field={field} value={value} language={language} onPick={onChange} />;
     if (tags) return <Tags value={strings(value)} placeholder={placeholder ?? ""} onChange={onChange} />;
-    if (kind === "multiselect")
+    if (kind === "multiselect" && !dropdown)
       return (
         <Pills
           multi
@@ -237,7 +237,7 @@ export function FormField({
           {blank(value) ? <span className="text-fg-subtle">{placeholder ?? t("form.pick")}</span> : cell}
         </span>
         {/* Стрелка — у выбора из списка; дата и прочее открываются тем же поповером, но списком не являются. */}
-        {(kind === "relation" || kind === "status") && <Icon as={ChevronDownIcon} size={14} className="shrink-0 text-fg-subtle" />}
+        {(kind === "relation" || kind === "status" || kind === "multiselect") && <Icon as={ChevronDownIcon} size={14} className="shrink-0 text-fg-subtle" />}
       </button>
     );
   };
