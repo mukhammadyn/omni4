@@ -1,7 +1,7 @@
 import type { ReactNode, UIEvent } from "react";
 import { MailIcon, PhoneIcon, PlusIcon, SendIcon, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { Field, Relation } from "@/features/table";
+import { localized, type Field, type Relation } from "@/features/table";
 import { CHIP_COLORS, CHIP_STYLES } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
 import { cellKind } from "../model/cell-kind";
@@ -82,6 +82,9 @@ export function PeopleGallery({
    */
   const part = (field: Field, row: Item): ReactNode => {
     if (AS_TEXT.has(cellKind(field.type))) return text(field, row) || null;
+    /* Флаг — словом, когда включён («В учёте времени»); выключенный —
+       ничего: пустой квадратик в строке-фразе читался как мусор. */
+    if (cellKind(field.type) === "boolean") return row[field.slug] === true ? localized(field.labels, language, field.label) : null;
     if (isBlank(row[field.slug])) return null;
     return (
       <Cell

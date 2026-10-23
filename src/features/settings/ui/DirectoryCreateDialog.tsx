@@ -51,9 +51,12 @@ export function DirectoryCreateDialog({
   note,
   iconSlug,
   layout,
+  choices,
   onDelete,
   onClose,
 }: {
+  /** Связь выбирается из готового списка, а не поиском: группа грейдов — только корни дерева. */
+  choices?: Record<string, DropdownItem[]> | undefined;
   /**
    * Раскладка по секциям (`Directory.form`): подзаголовок, порядок полей,
    * какие встают парой. Нет — все поля подряд в порядке схемы. Поле,
@@ -132,6 +135,16 @@ export function DirectoryCreateDialog({
         <Dropdown
           value={text}
           items={[{ value: "", label: t("dir.topLevel") }, ...parent.options]}
+          onChange={(guid) => setDraft((current) => ({ ...current, [field.slug]: guid || null, [relationDataKey(field.slug)]: undefined }))}
+        />
+      );
+    }
+    const own = choices?.[field.slug];
+    if (own) {
+      return (
+        <Dropdown
+          value={text}
+          items={[{ value: "", label: "—" }, ...own]}
           onChange={(guid) => setDraft((current) => ({ ...current, [field.slug]: guid || null, [relationDataKey(field.slug)]: undefined }))}
         />
       );

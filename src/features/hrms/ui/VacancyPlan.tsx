@@ -43,7 +43,8 @@ const NO_RELATIONS = new Map();
 /**
  * «Планирование» найма — `planView` прототипа (vacancies.html): группы
  * (филиал по умолчанию) → вакансии, по месяцам «нанято / план», справа
- * «План · Работают · Нанято · Уходят · Нужно нанять», внизу «Итого».
+ * «Нужно нанять». План, факт, наём и уходы — в подсказке ячейки месяца;
+ * отдельными колонками, сводкой и легендой не дублируются.
  *
  * Группировку, вид строки и высоту правят кнопки в строке вкладок
  * (VacancyPlanTools), период — подшапка здесь же; всё помнится
@@ -100,8 +101,6 @@ export function VacancyPlan({
       .sort((a, b) => b.sum.total.need - a.sum.total.need || a.key.localeCompare(b.key));
   }, [plans, rows, group, fields, language]);
 
-  const all = useMemo(() => sumRows(groups.map((g) => g.sum)), [groups]);
-
   /** Подпись под названием: что включено в «Строке». Группа в ней не повторяется. */
   const details = (row: Item) =>
     [
@@ -114,13 +113,12 @@ export function VacancyPlan({
       .filter(Boolean)
       .join(" · ");
 
-  /** Ячейки месяцев и итоги строки. `strong` — строка группы и «Итого». */
+  /** Ячейки месяцев и итоги строки. `strong` — строка группы. */
   const cells = (plan: PlanRow, strong = false) => (
     <>
       {months.map((month) => {
         const f = monthFigures(plan, month);
         const state = cellState(f, month, now);
-        const need = f.plan - f.fact;
         return (
           <td
             key={month}
@@ -139,36 +137,12 @@ export function VacancyPlan({
               >
                 <span className="inline-flex items-center gap-1">
                   <Fraction state={state} fact={f.fact} plan={f.plan} strong={strong} />
-                  {need > 0 && month <= now && (
-                    <em className="text-2xs font-semibold text-danger not-italic">−{need}</em>
-                  )}
                 </span>
               </Tooltip>
             )}
           </td>
         );
       })}
-      <td className={`${td} ${tail} font-semibold`}>
-        <Tooltip label={t("vacancy.plan.planFormula", plan.total)}>
-          <span>{plan.total.plan}</span>
-        </Tooltip>
-      </td>
-      <td className={`${td} ${tail} font-semibold`}>
-        <Tooltip label={t("vacancy.plan.factFormula", plan.total)}>
-          <span>{plan.total.fact}</span>
-        </Tooltip>
-      </td>
-      <td className={`${td} ${tail}`}>{plan.total.staff}</td>
-      <td className={`${td} ${tail}`}>
-        {plan.total.hired ? (
-          <span className="font-medium text-success">{plan.total.hired}</span>
-        ) : (
-          <span className="text-fg-subtle">0</span>
-        )}
-      </td>
-      <td className={`${td} ${tail}`}>
-        {plan.total.leave ? <Pill color="red">{plan.total.leave}</Pill> : <span className="text-fg-subtle">0</span>}
-      </td>
       <td className={`${td} ${tail}`}>
         {plan.total.need ? (
           <Pill color="orange">{plan.total.need}</Pill>
@@ -208,17 +182,6 @@ export function VacancyPlan({
         >
           {t("vacancy.plan.today")}
         </button>
-
-        <span className="mx-2 h-4 w-px bg-border" />
-
-        <div className="flex flex-wrap items-center gap-4 text-[13px] text-fg-muted">
-          <Stat color="blue" label={t("vacancy.plan.plan")} value={all.total.plan} />
-          <Stat color="blue" label={t("vacancy.plan.fact")} value={all.total.fact} />
-          <Stat color="gray" label={t("vacancy.plan.working")} value={all.total.staff} />
-          <Stat color="green" label={t("vacancy.plan.hired")} value={all.total.hired} />
-          <Stat color="red" label={t("vacancy.plan.leaving")} value={all.total.leave} />
-          <Stat color="orange" label={t("vacancy.plan.need")} value={all.total.need} />
-        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6">
@@ -244,11 +207,6 @@ export function VacancyPlan({
                   </small>
                 </th>
               ))}
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.plan")}</th>
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.fact")}</th>
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.working")}</th>
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.hired")}</th>
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.leaving")}</th>
               <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.need")}</th>
             </tr>
           </thead>
@@ -256,13 +214,13 @@ export function VacancyPlan({
           <tbody>
             {!plans ? (
               <tr>
-                <td colSpan={WINDOW + 7} className="py-8 text-center text-fg-subtle">
+                <td colSpan={WINDOW + 2} className="py-8 text-center text-fg-subtle">
                   {t("common.loading")}
                 </td>
               </tr>
             ) : !groups.length ? (
               <tr>
-                <td colSpan={WINDOW + 7} className="py-8 text-center text-fg-subtle">
+                <td colSpan={WINDOW + 2} className="py-8 text-center text-fg-subtle">
                   {t("table.noRows")}
                 </td>
               </tr>
@@ -340,24 +298,9 @@ export function VacancyPlan({
             )}
           </tbody>
 
-          {plans && groups.length > 0 && (
-            <tfoot className="sticky bottom-0 z-10 bg-surface">
-              <tr className="h-row font-semibold [&>td]:border-t [&>td]:border-t-border-strong">
-                <td className={td}>{t("vacancy.plan.total")}</td>
-                {cells(all, true)}
-              </tr>
-            </tfoot>
-          )}
         </table>
 
-        <div className="flex flex-wrap items-center gap-4 py-3 text-xs text-fg-muted">
-          <Legend state="ok" label={t("vacancy.plan.legend.ok")} />
-          <Legend state="current" label={t("vacancy.plan.legend.current")} />
-          <Legend state="overdue" label={t("vacancy.plan.legend.overdue")} />
-          <Legend state="planned" label={t("vacancy.plan.legend.planned")} />
-          <span className="text-fg-subtle">{t("vacancy.plan.legend.hint")}</span>
-          {pending && <span className="text-warning">{t("vacancy.plan.partial", { count: rows.length })}</span>}
-        </div>
+        {pending && <p className="py-3 text-xs text-warning">{t("vacancy.plan.partial", { count: rows.length })}</p>}
       </div>
     </div>
   );
@@ -438,34 +381,3 @@ function Pill({ color, children }: { color: "red" | "orange"; children: ReactNod
   );
 }
 
-/*
- * Точка итога — смысловым цветом: `CHIP_DOT` в тёмной теме белый.
- * «Нанято» зелёное, как его числа и выполненные ячейки; «Работают» —
- * нейтральные, это не результат найма, а исходная численность.
- */
-const STAT_DOT = {
-  blue: "bg-accent",
-  gray: "bg-fg-subtle",
-  green: "bg-success",
-  red: "bg-danger",
-  orange: "bg-warning",
-};
-
-function Stat({ color, label, value }: { color: keyof typeof STAT_DOT; label: string; value: number }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <i className={`size-2 rounded-full ${STAT_DOT[color]}`} />
-      {label}
-      <b className="font-semibold text-fg tabular-nums">{value}</b>
-    </span>
-  );
-}
-
-function Legend({ state, label }: { state: CellState; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <Fraction state={state} fact={state === "ok" ? 2 : 0} plan={state === "ok" ? 2 : 1} />
-      {label}
-    </span>
-  );
-}

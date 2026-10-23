@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useTablePermissions } from "@/features/auth";
-import { MAX_LIMIT, PEOPLE, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
+import { MAX_LIMIT, PEOPLE, useItem, useItems, useUpdateItem, type Filters, type Item } from "@/features/item";
 import { ALL_VIEW_RIGHTS, localized, useTableDetails, useTableSchema, useTableSettings } from "@/features/table";
 import { useTableMenuId } from "@/features/sidebar";
 import { relationTabs, useMenuViews } from "@/features/view";
@@ -155,6 +155,21 @@ export function useNeighbours(guid: string) {
   const at = ids.indexOf(guid);
   if (at < 0 || ids.length < 2) return null;
   return { prev: ids[(at - 1 + ids.length) % ids.length]!, next: ids[(at + 1) % ids.length]! };
+}
+
+/**
+ * Отбор «не уволен»: статус — любой вариант, кроме `dismissed`. Положительным
+ * списком, потому что «не равно» бэкенд не умеет (`$ne`/`$nin` — ошибка SQL).
+ * Варианты из схемы: появится «Отпуск» — попадёт сам. Сотрудник без статуса
+ * в него не попадает.
+ */
+export function useNotDismissed(): Filters {
+  const { schema } = useTableSchema(EMPLOYEES);
+  return useMemo(() => {
+    const status = schema.fields.find((field) => field.slug === "status");
+    const values = [...(status?.options.keys() ?? [])].filter((value) => value !== "dismissed");
+    return values.length ? { status: { op: "any", values } } : {};
+  }, [schema.fields]);
 }
 
 const DISMISSAL_REASONS = "hr_dismissal_reasons";

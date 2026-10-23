@@ -116,6 +116,7 @@ import {
   DocumentBrowser,
   DOCUMENTS_VIEW,
   useKbActions,
+  useNotDismissed,
   type EmployeeTab,
 } from "@/features/hrms";
 import { MicrofrontendPage } from "@/features/microfrontend";
@@ -745,7 +746,7 @@ function MenuPage() {
    * таблицы, иначе настройка view. Значение из localStorage проверяется
    * — испорченное руками «0» оставило бы таблицу пустой навсегда.
    */
-  const { tableLimits, setTableLimit, tableFilters, setTableFilters, columnWidths, setColumnWidth } =
+  const { tableLimits, setTableLimit, tableFilters, setTableFilters, columnWidths, setColumnWidth, viewState, setViewState } =
     useUi();
   const rememberedLimit = view ? tableLimits[view.tableSlug] : undefined;
   const limit = boardView
@@ -866,17 +867,34 @@ function MenuPage() {
 
   /** Отбор, которым управляет человек: он в адресе, он же в подшапке.
       Слаги мультиязычных полей переезжают на активный язык — как у сортировки. */
+  /*
+   * Сотрудники открываются без уволенных — стартовым отбором, а не областью
+   * видимости: чип снимается, и снятый не возвращается (лежит в памяти).
+   */
+  const notDismissed = useNotDismissed();
+  const employeesSeed = view?.tableSlug === EMPLOYEES ? notDismissed : EMPTY_FILTERS;
+  /*
+   * Кто уже настраивал отбор сотрудников до появления этого правила — тому
+   * «не уволен» дописывается к сохранённому один раз; дальше снятый чип
+   * не возвращается (отметка в viewState).
+   */
+  const seedKey = `${filtersKey}:not-dismissed`;
+  useEffect(() => {
+    if (!employeesSeed.status || viewState[seedKey] || search.filters) return;
+    if (rememberedFilters && !rememberedFilters.status) setTableFilters(filtersKey, { ...rememberedFilters, ...employeesSeed });
+    setViewState(seedKey, true);
+  }, [employeesSeed, viewState, seedKey, search.filters, rememberedFilters, filtersKey, setTableFilters, setViewState]);
+
   const filters: Filters = useMemo(
     () =>
       localizeKeys(
         search.filters ??
-          rememberedFilters ??
-          seedFilters(view?.quickFilterIds ?? [], tableFields),
+          rememberedFilters ?? { ...seedFilters(view?.quickFilterIds ?? [], tableFields), ...employeesSeed },
         viewFields,
         codes,
         language,
       ),
-    [search.filters, rememberedFilters, view?.quickFilterIds, tableFields, viewFields, codes, language],
+    [search.filters, rememberedFilters, view?.quickFilterIds, tableFields, viewFields, codes, language, employeesSeed],
   );
 
   /*
@@ -910,7 +928,8 @@ function MenuPage() {
      у поля-связи в настройках лежит id связи, а не поля. */
   const boardLaneField = boardView ? subGroupField(view, tableFields) : undefined;
   /** Поле полосы значений. У доски его нет: значения там и так колонками. */
-  const chipsBy = boardView ? undefined : chipsField(view, tableFields);
+  /* У кандидатов полосы этапов нет: этап и так в колонке таблицы. */
+  const chipsBy = boardView || candidatesView ? undefined : chipsField(view, tableFields);
   /** Доску не по чему раскладывать: поле не выбрано в настройках view. */
   const boardNotReady = boardView && !boardField;
 
@@ -1610,7 +1629,9 @@ function MenuPage() {
         </div>
       )}
 
-      {supported && !chromeLoading && (tabs.length > 0 || (can.viewCreate && tableSlug)) && (
+      {/* База знаний — один экран со своим «Создать» в дереве: полоса
+          view над ней — лишняя строка. Скрыта, пока view у меню один. */}
+      {supported && !chromeLoading && (tabs.length > 0 || (can.viewCreate && tableSlug)) && !(tabs.length === 1 && view?.type === KB_VIEW) && (
         /* Строка вкладок — `.viewbar` прототипа: 46px, линия снизу;
            справа тулбар (`.view-actions`) с зазором 2px между кнопками.
            Поля 24px — `.page.full`: линия начинается там же, где таблица. */
@@ -2122,6 +2143,7 @@ function MenuPage() {
           {filtersVisible && !sheetView && (
             <FilterBar
               columns={columns}
+              hidden={tableFields}
               relations={schema.relations}
               language={language}
               filters={filters}

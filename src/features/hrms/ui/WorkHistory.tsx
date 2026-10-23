@@ -23,11 +23,13 @@ import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { Chip, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Modal } from "@/shared/ui/modal";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { JOB_HISTORY, useJobHistory, type Choice, type JobEntry } from "../api/job-history";
 import { monthsBetween, toDay, type GradeIssue } from "../model/job-history";
+import { useGradesFor } from "../api/org";
 import { formError, FormField, FormItem, FormSection } from "./record-form";
 import { TemplateSelect } from "./schedule-parts";
 
@@ -427,6 +429,9 @@ function JobDialog({
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState<Item>(row);
+  /* Грейды — по должности (useGradesFor): её группы или вышестоящей. */
+  const grades = useGradesFor();
+  const gradeOptions = grades.of;
   const [error, setError] = useState<string | null>(null);
   const bySlug = new Map(fields.map((field) => [field.slug, field]));
   const byId = new Map(relations.map((relation) => [relation.id, relation]));
@@ -474,7 +479,23 @@ function JobDialog({
                 hint={t(`employee.work.sec.${section.id}Hint`)}
               >
           {own.map((field) =>
-            /* График — со сводкой шаблона в каждой строке, а не одним названием. */
+            field.slug === "hr_grades_id" && field.editable && !field.locked ? (
+              <FormItem key={field.slug} label={localized(field.labels, language, field.label)}>
+                <Dropdown
+                  value={typeof form.hr_grades_id === "string" ? form.hr_grades_id : ""}
+                  placeholder={t("form.pick")}
+                  items={[
+                    { value: "", label: "—" },
+                    ...gradeOptions(form.hr_positions_id).map((g) => ({ value: String(g.guid), label: String(g.name ?? "") })),
+                  ]}
+                  onChange={(id) => {
+                    setError(null);
+                    const g = gradeOptions(form.hr_positions_id).find((one) => one.guid === id);
+                    setForm((prev) => ({ ...prev, hr_grades_id: id || null, [relationDataKey("hr_grades_id")]: g ?? null }));
+                  }}
+                />
+              </FormItem>
+            ) : /* График — со сводкой шаблона в каждой строке, а не одним названием. */
             field.slug === "hr_work_schedules_id" && field.editable && !field.locked ? (
               <FormItem key={field.slug} label={localized(field.labels, language, field.label)} wide>
                 <TemplateSelect
@@ -507,7 +528,15 @@ function JobDialog({
               {...(field.slug === "date_to" ? { placeholder: t("employee.work.toHint") } : {})}
               onChange={(value, extra) => {
                 setError(null);
-                setForm((prev) => ({ ...prev, [field.slug]: value, ...extra }));
+                setForm((prev) => {
+                  const next = { ...prev, [field.slug]: value, ...extra };
+                  /* Сменили должность — грейд чужой группы снимаем: его в выборе уже нет. */
+                  if (field.slug === "hr_positions_id" && !grades.fits(value, next.hr_grades_id)) {
+                    next.hr_grades_id = null;
+                    next[relationDataKey("hr_grades_id")] = null;
+                  }
+                  return next;
+                });
               }}
             />
             ),

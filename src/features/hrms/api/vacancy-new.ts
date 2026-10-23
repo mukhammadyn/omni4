@@ -32,7 +32,6 @@ export function useNewVacancy() {
       guid: crypto.randomUUID(),
       status: "draft",
       priority: "medium",
-      level: "middle",
       headcount: 1,
       work_format: "office",
       employment_type: "full_time",

@@ -20,7 +20,7 @@ export { KpiSheet } from "./ui/KpiSheet";
 export { AttendanceCalendar } from "./ui/AttendanceCalendar";
 export { AttendanceList } from "./ui/AttendanceList";
 export { Absences } from "./ui/Absences";
-export { useEmployeesMenuId } from "./api/employee";
+export { useEmployeesMenuId, useNotDismissed } from "./api/employee";
 export { ScheduleCalendar } from "./ui/ScheduleCalendar";
 export { PeopleFilterBar, ScheduleTools } from "./ui/ScheduleTools";
 

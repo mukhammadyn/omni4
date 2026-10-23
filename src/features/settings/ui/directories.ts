@@ -114,6 +114,8 @@ export type Directory = {
      */
     via?: { link: string; table: string; field: string };
   };
+  /** Связь на дерево, где выбирают только корень: должность → группа грейдов. */
+  roots?: { field: string; table: string; parent: string };
   /** Окно записи по секциям — у справочника с длинной формой (DirectoryCreateDialog, `layout`). */
   form?: { titleKey: TranslationKey; fields: string[]; half?: string[] }[];
 };
@@ -420,7 +422,8 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             hintKey: "dir.positionsHint",
             icon: IdCardIcon,
             parent: "hr_positions_id",
-            columns: ["hr_departments_id", "level"],
+            columns: ["hr_departments_id", "hr_grades_id", "level"],
+            roots: { field: "hr_grades_id", table: "hr_grades", parent: "hr_grades_id" },
             counts: { table: "hr_employees", field: "hr_positions_id", labelKey: "dir.employees" },
           },
         ],

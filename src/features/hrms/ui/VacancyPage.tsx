@@ -50,7 +50,7 @@ export type VacancyTab = "funnel" | "cands" | "info" | "edit";
  * схемы ERP; чего в схеме нет или роли не видно, того и в карточке нет.
  */
 const SIDE: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
-  { icon: BriefcaseIcon, title: "vacancy.page.card.position", slugs: ["title", "hr_positions_id", "level", "headcount"] },
+  { icon: BriefcaseIcon, title: "vacancy.page.card.position", slugs: ["title", "hr_positions_id", "hr_grades_id", "headcount"] },
   { icon: UsersIcon, title: "vacancy.page.card.team", slugs: ["core_users_id", "core_users_id_2"] },
   {
     icon: WalletIcon,
@@ -67,7 +67,7 @@ const SIDE: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
 ];
 
 /** Тексты объявления — левая колонка «Информации». */
-const TEXTS = ["description", "duties", "requirements", "conditions"];
+const TEXTS = ["description"];
 
 /**
  * Страница вакансии — `vacancy.html` прототипа: шапка с ходом найма

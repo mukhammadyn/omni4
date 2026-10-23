@@ -9,7 +9,6 @@ import { BrandSettings } from "./BrandSettings";
 import { ClientTypeSettings } from "./ClientTypeSettings";
 import { CodeSettings } from "./CodeSettings";
 import { CompanySettings } from "./CompanySettings";
-import { ConnectionSettings } from "./ConnectionSettings";
 import { DatabaseSettings } from "./DatabaseSettings";
 import { DirectorySettings } from "./DirectorySettings";
 import { EndpointSettings } from "./EndpointSettings";
@@ -58,7 +57,6 @@ const CONTENT: Record<string, () => React.JSX.Element> = {
   api: ApiSettings,
   endpoints: EndpointSettings,
   code: CodeSettings,
-  connections: ConnectionSettings,
   database: DatabaseSettings,
   billing: BillingSettings,
   resources: ResourceSettings,

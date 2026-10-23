@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { MAX_LIMIT, useItems, type Item } from "@/features/item";
+import { MAX_LIMIT, useItems, type Item, type OrgNode } from "@/features/item";
 import { hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 
 /*
@@ -166,4 +166,120 @@ export function departmentColors(departments: Department[], fallback: (name: str
   }
 
   return colors;
+}
+
+export type UnitNode = {
+  kind: "unit" | "region" | "location";
+  name: string;
+  sub: string;
+  /** Руководитель юнита — карточка сотрудника (`hr_employees_id`). */
+  headId: string;
+  headName: string;
+  headPhoto: string;
+  color: string;
+  locationIds: string[];
+};
+
+/**
+ * Дерево «Организация»: бизнес-юнит → регион → локация. Регион — свой
+ * у локации (`core_regions_id`), без вложенности регионов; локация
+ * с несколькими юнитами стоит под каждым. Локации без юнита — отдельный
+ * корень «Без юнита».
+ */
+export function useOrgUnits(enabled: boolean) {
+  const units = useItems(enabled ? "core_business_units" : undefined, ALL);
+  const locations = useItems(enabled ? "hr_locations" : undefined, ALL);
+
+  const roots = useMemo(() => {
+    const node = (id: string, data: Omit<UnitNode, "headId" | "headName" | "headPhoto" | "color"> & Partial<UnitNode>, kids: OrgNode<UnitNode>[] = []): OrgNode<UnitNode> => ({
+      id,
+      kids,
+      data: { headId: "", headName: "", headPhoto: "", color: "", ...data },
+    });
+    const branch = (unitId: string, rows: Item[]) => {
+      const byRegion = new Map<string, Item[]>();
+      for (const row of rows) {
+        const region = text(row.core_regions_id);
+        byRegion.set(region, [...(byRegion.get(region) ?? []), row]);
+      }
+      return [...byRegion].map(([regionId, list]) => {
+        const kids = list.map((row) =>
+          node(`${unitId}:${text(row.guid)}`, {
+            kind: "location",
+            name: text(row.name),
+            sub: text(row.address),
+            color: text(row.color),
+            locationIds: [text(row.guid)],
+          }),
+        );
+        return node(`${unitId}:r:${regionId}`, {
+          kind: "region",
+          name: text(related(list[0]!, "core_regions_id").name),
+          sub: "",
+          locationIds: kids.flatMap((kid) => kid.data.locationIds),
+        }, kids);
+      });
+    };
+    const unitsOf = (row: Item) => (Array.isArray(row.core_business_units_ids) ? row.core_business_units_ids.map(String) : []);
+    const result = units.page.rows.map((row) => {
+      const id = text(row.guid);
+      const kids = branch(id, locations.page.rows.filter((loc) => unitsOf(loc).includes(id)));
+      return node(id, {
+        kind: "unit",
+        name: text(row.name),
+        sub: text(related(row, "crm_legal_entities_id").name) || text(row.description),
+        headId: text(row.hr_employees_id),
+        headName: who(row, "hr_employees_id").name,
+        headPhoto: who(row, "hr_employees_id").photo,
+        color: text(row.color),
+        locationIds: kids.flatMap((kid) => kid.data.locationIds),
+      }, kids);
+    });
+    const orphans = locations.page.rows.filter((loc) => !unitsOf(loc).length);
+    if (orphans.length) {
+      const kids = branch("none", orphans);
+      result.push(node("none", { kind: "unit", name: "", sub: "", locationIds: kids.flatMap((kid) => kid.data.locationIds) }, kids));
+    }
+    return result;
+  }, [units.page.rows, locations.page.rows]);
+
+  return {
+    roots,
+    isLoading: units.isLoading || locations.isLoading,
+    error: units.error ?? locations.error ?? null,
+    refetch: () => {
+      void units.refetch();
+      void locations.refetch();
+    },
+  };
+}
+
+/**
+ * Грейды по должности: только группы, к которой отнесена должность
+ * («Должности» → «Группа грейдов»), а нет своей — ближайшей вышестоящей;
+ * нигде нет — все. Нужен модалке должности и форме вакансии.
+ */
+export function useGradesFor() {
+  const list = { limit: MAX_LIMIT, page: 1, relations: false } as const;
+  const positions = useItems("hr_positions", list);
+  const grades = useItems("hr_grades", list);
+  return useMemo(() => {
+    const groupOf = (position: unknown) => {
+      const seen = new Set<unknown>();
+      for (let id = position; id && !seen.has(id); ) {
+        seen.add(id);
+        const row = positions.page.rows.find((p) => p.guid === id);
+        if (row?.hr_grades_id) return String(row.hr_grades_id);
+        id = row?.hr_positions_id;
+      }
+      return "";
+    };
+    const of = (position: unknown): Item[] => {
+      const group = groupOf(position);
+      return grades.page.rows
+        .filter((g) => g.hr_grades_id && g.is_active !== false && (!group || g.hr_grades_id === group))
+        .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0) || String(a.name).localeCompare(String(b.name)));
+    };
+    return { of, fits: (position: unknown, grade: unknown) => !grade || of(position).some((g) => g.guid === grade) };
+  }, [positions.page.rows, grades.page.rows]);
 }

@@ -5,7 +5,7 @@ import { api } from "@/shared/api/client";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError } from "@/shared/lib/toast";
 import { WEEKDAYS, type DaysOffOf, type Shift, type ShiftDraft, type ShiftKindRow, type Template } from "../model/schedule";
-import { EMPLOYEES } from "./employee";
+import { EMPLOYEES, useNotDismissed } from "./employee";
 import { firstText, text } from "./org";
 import { useDaysOff } from "./holiday";
 import { useAll } from "./timesheet";
@@ -279,13 +279,15 @@ export function useSchedule({
   pageSize?: number;
 }) {
   const one = employeeId ? { hr_employees_id: { op: "any" as const, values: [employeeId] } } : {};
+  // Уволенных в графике нет; свой фильтр по статусу человека важнее.
+  const working = useNotDismissed();
   const peopleQuery = useItems(EMPLOYEES, {
     limit: pageSize ?? MAX_LIMIT,
     page: 1,
     infinite: true,
     filters: employeeId
       ? { guid: { op: "any", values: [employeeId] } }
-      : where,
+      : { ...working, ...where },
     search,
     // Порции идут по алфавиту — иначе новая порция вставала бы между строк.
     sorts: [{ field: "full_name", direction: "asc" }],

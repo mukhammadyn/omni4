@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { MAX_LIMIT, useItems, type Filters, type Item } from "@/features/item";
 import { toDateValue, wallClock } from "@/shared/lib/date-value";
 import { plusDays, type AttendanceDay, type Leave, type RowInput } from "../model/timesheet";
-import { EMPLOYEES } from "./employee";
+import { EMPLOYEES, useNotDismissed } from "./employee";
 import { related, text } from "./org";
 import { useDaysOff } from "./holiday";
 
@@ -150,13 +150,15 @@ export function useTimesheet({
   /** Отбор сотрудников полосой фильтров (PeopleFilterBar). */
   where?: Filters;
 }): Timesheet {
+  // Уволенных нет ни в каком периоде; свой фильтр по статусу человека важнее.
+  const working = useNotDismissed();
   const peopleQuery = useItems(EMPLOYEES, {
     limit: pageSize ?? MAX_LIMIT,
     page: 1,
     infinite: true,
     filters: employeeId
       ? { guid: { op: "any", values: [employeeId] } }
-      : where,
+      : { ...working, ...where },
     search,
     // Порции идут по алфавиту — иначе новая порция вставала бы между строк.
     sorts: [{ field: "full_name", direction: "asc" }],

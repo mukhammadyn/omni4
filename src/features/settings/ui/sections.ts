@@ -1,7 +1,6 @@
 import {
   BracesIcon,
   Building2Icon,
-  CableIcon,
   CreditCardIcon,
   DatabaseIcon,
   HistoryIcon,
@@ -138,9 +137,6 @@ const GROUPS: SettingsGroup[] = [
     right: "settings_button",
     items: [
       { id: "resources", labelKey: "resources.title", icon: PlugIcon, wide: true },
-      /* Не DatabaseIcon: он у раздела «База данных» — своей базы проекта.
-         Здесь — провод к чужой. */
-      { id: "connections", labelKey: "connections.title", icon: CableIcon, wide: true },
     ],
   },
   {

@@ -214,6 +214,15 @@ export function DirectorySettings({
       ...(counts?.lastYear ? { [counts.lastYear]: { op: "after" as const, values: [yearAgo()] } } : {}),
     },
   });
+  /* Корни дерева для `roots` — варианты выбора в окне записи. */
+  const rootRows = useItems(directory.roots?.table, { limit: MAX_LIMIT, page: 1, relations: false });
+  const choices = directory.roots
+    ? {
+        [directory.roots.field]: rootRows.page.rows
+          .filter((row) => !row[directory.roots!.parent])
+          .map((row) => ({ value: String(row.guid), label: String(row.name ?? "") })),
+      }
+    : undefined;
   const via = counts?.via;
   const viaRows = useItems(via?.table, { limit: MAX_LIMIT, page: 1, relations: false });
   const own = useMemo(() => {
@@ -654,6 +663,7 @@ export function DirectorySettings({
           fields={drawerFields}
           iconSlug={directory.iconField}
           layout={directory.form?.map((section) => ({ ...section, title: t(section.titleKey) }))}
+          choices={choices}
           relations={schema.relations}
           language={language}
           row={openRow}
@@ -677,6 +687,7 @@ export function DirectorySettings({
           fields={drawerFields}
           iconSlug={directory.iconField}
           layout={directory.form?.map((section) => ({ ...section, title: t(section.titleKey) }))}
+          choices={choices}
           relations={schema.relations}
           language={language}
           // Вложенный наследует цвет родителя, как в прототипе.

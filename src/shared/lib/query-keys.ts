@@ -81,7 +81,7 @@ export const keys = {
     loginTables: (projectId: string) => [...keys.settings.all, "login-tables", projectId] as const,
     /**
      * Таблицы аудитории: что приложение заказчика показывает этому типу
-     * клиента. Не путать с `connections` ниже — там внешние базы.
+     * клиента.
      */
     clientConnections: (projectId: string, clientTypeId: string) =>
       [...keys.settings.all, "client-connections", projectId, clientTypeId] as const,
@@ -173,13 +173,6 @@ export const keys = {
     /** Свои эндпоинты (`/x-api/...`): список на проект и окружение. */
     endpoints: (projectId: string, envId: string) =>
       [...keys.settings.all, "endpoints", projectId, envId] as const,
-    /**
-     * Внешние базы: подключения проекта и таблицы одного подключения.
-     * Окружение в ключе — подключение заводится в его ресурсе.
-     */
-    connections: (envId: string) => [...keys.settings.all, "connections", envId] as const,
-    connectionTables: (envId: string, connectionId: string) =>
-      [...keys.settings.connections(envId), connectionId] as const,
     /**
      * Сохранённые запросы SQL-консоли. Лежат в базе того же ресурса,
      * что и сами данные, — то есть у каждого окружения свои.

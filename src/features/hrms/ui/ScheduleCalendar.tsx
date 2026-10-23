@@ -77,28 +77,22 @@ export function ScheduleCalendar({
   const stats = useMemo(() => {
     const byKind = new Map<ShiftKind, number>();
     const count = (shift: Shift) => byKind.set(shift.kind, (byKind.get(shift.kind) ?? 0) + 1);
-    let off = 0;
     let minutes = 0;
     if (data.hasMore && !narrowed) {
-      const worked = new Set<string>();
       for (const shift of data.shifts) {
         count(shift);
         minutes += shift.plannedMinutes;
-        worked.add(`${shift.employeeId}|${shift.date}`);
       }
-      off = Math.max(0, data.total * dates.length - worked.size);
-      return { byKind, off, minutes, people: data.total };
+      return { byKind, minutes, people: data.total };
     }
     for (const employee of employees)
       for (const date of dates) {
-        const list = shiftsOf(employee.id, date);
-        if (!list.length) off += 1;
-        for (const shift of list) {
+        for (const shift of shiftsOf(employee.id, date)) {
           count(shift);
           minutes += shift.plannedMinutes;
         }
       }
-    return { byKind, off, minutes, people: employees.length };
+    return { byKind, minutes, people: employees.length };
   }, [employees, dates, shiftsOf, data.hasMore, data.shifts, data.total, narrowed]);
 
   /* Строки: сотрудники или должности, по группам. */
@@ -217,11 +211,6 @@ export function ScheduleCalendar({
               <b className="font-semibold text-fg tabular-nums">{stats.byKind.get(kind) ?? 0}</b>
             </button>
           ))}
-          <span className="inline-flex h-7 items-center gap-1.5 px-1.5 text-[13px] text-fg-muted">
-            <i className="size-2 rounded-full bg-fg-subtle/50" />
-            {t("schedule.dayOff")}
-            <b className="font-semibold text-fg tabular-nums">{stats.off}</b>
-          </span>
         </div>
       </PeriodBar>
 
