@@ -20,7 +20,17 @@ export { relationLabel };
  * строках, и «связать» там значит незаметно переписать чужую ячейку.
  */
 export function isLinkable(type: string): boolean {
-  return type.toLowerCase() === "many2one";
+  return type.toLowerCase() === "many2one" || isMany(type);
+}
+
+/**
+ * Many2Many правится только со СВОЕЙ стороны: список uuid лежит колонкой
+ * `<таблица>_ids` в строке, и обычный PUT его пишет. Вторую сторону бэкенд
+ * не обновляет (docs/backend-notes.md, «Many2Many пишется только при
+ * вставке»), поэтому читать такую связь можно только отсюда же.
+ */
+export function isMany(type: string): boolean {
+  return type.toLowerCase() === "many2many";
 }
 
 export type RelationEdit = {
@@ -57,10 +67,17 @@ export function relationSelection(
   fields: ViewField[] | undefined,
   /** Язык ДАННЫХ: им отбирается колонка мультиязычного поля показа. */
   language = "",
-): { guid: string; label: string; color?: string }[] {
+  /**
+   * Строки целевой таблицы — для Many2Many: бэкенд отдаёт в строке только
+   * список uuid, без `_data`, и подписи берутся отсюда.
+   */
+  known: Item[] = [],
+): { guid: string; label: string; color?: string; off?: true }[] {
   if (!fields?.length) return [];
 
-  const related = row[relationDataKey(field.slug)];
+  const own = row[field.slug];
+  const related = row[relationDataKey(field.slug)] ??
+    (Array.isArray(own) ? own.map((guid) => known.find((item) => item["guid"] === guid) ?? { guid }) : undefined);
 
   // Связанная строка бывает и списком: у поля-связи с той стороны,
   // где строк несколько, бэкенд отдаёт массив.
@@ -70,6 +87,8 @@ export function relationSelection(
       guid: String(item["guid"] ?? ""),
       label: relationLabel(item, fields, language),
       ...(typeof item[COLOR] === "string" && item[COLOR] ? { color: item[COLOR] } : {}),
+      // Выключенная запись справочника: показываем, но помечаем.
+      ...(item["is_active"] === false ? { off: true as const } : {}),
     }))
     .filter((item) => item.guid || item.label);
 }

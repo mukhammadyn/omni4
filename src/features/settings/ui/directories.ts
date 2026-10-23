@@ -2,6 +2,7 @@ import {
   AlarmClockIcon,
   AudioLinesIcon,
   BanknoteIcon,
+  BriefcaseBusinessIcon,
   BriefcaseIcon,
   BuildingIcon,
   CalendarClockIcon,
@@ -22,6 +23,7 @@ import {
   ListOrderedIcon,
   ListTodoIcon,
   LogOutIcon,
+  MapIcon,
   MapPinIcon,
   MessageSquareTextIcon,
   NetworkIcon,
@@ -48,7 +50,7 @@ import type { TranslationKey } from "@/shared/lib/i18n";
  * отличаются только таблицей и колонками, поэтому здесь данные,
  * а не компоненты.
  *
- * Разделы прототипа без таблицы (Регионы, Атрибуты, Группы товаров,
+ * Разделы прототипа без таблицы (Атрибуты, Группы товаров,
  * Файлы, Типы занятости, Навыки, вкладки Склад и Финансы) не заведены:
  * пункт, который ничего не открывает, — обещание. Что чем закрыто
  * и что нет — docs/SYSTEM-TABLES-AUDIT.md.
@@ -222,12 +224,32 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
         titleKey: "dir.groupOrg",
         items: [
           {
+            id: "org-bu",
+            table: "core_business_units",
+            titleKey: "dir.businessUnits",
+            hintKey: "dir.businessUnitsHint",
+            icon: BriefcaseBusinessIcon,
+            columns: ["hr_employees_id", "crm_legal_entities_id", "is_active"],
+            counts: { table: "hr_employees", field: "core_business_units_ids", labelKey: "dir.employees" },
+          },
+          {
+            id: "org-regions",
+            table: "core_regions",
+            titleKey: "dir.regions",
+            hintKey: "dir.regionsHint",
+            icon: MapIcon,
+            parent: "core_regions_id",
+            columns: ["code", "type", "is_active"],
+            sort: ["name"],
+            counts: { table: "hr_locations", field: "core_regions_id", labelKey: "dir.locationsCount", rollup: true },
+          },
+          {
             id: "org-locations",
             table: "hr_locations",
             titleKey: "dir.locations",
             hintKey: "dir.locationsHint",
             icon: MapPinIcon,
-            columns: ["type", "region", "address", "is_active"],
+            columns: ["type", "core_regions_id", "core_business_units_id", "address", "is_active"],
           },
           {
             id: "org-legal",
@@ -286,7 +308,7 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             titleKey: "dir.pipelines",
             hintKey: "dir.pipelinesHint",
             icon: GitBranchIcon,
-            columns: ["is_default", "is_active"],
+            columns: ["core_business_units_id", "is_default", "is_active"],
             sort: ["sort_order"],
           },
           {

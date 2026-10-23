@@ -11,6 +11,8 @@ import {
   WalletIcon,
   KeyRoundIcon,
   AwardIcon,
+  BriefcaseBusinessIcon,
+  CameraIcon,
   BriefcaseIcon,
   Building2Icon,
   CheckIcon,
@@ -36,7 +38,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ActiveCell, Avatar, Cell, PEOPLE } from "@/features/item";
+import { ActiveCell, Avatar, Cell, editorKind, PEOPLE, uploadFolder, useUploadFiles } from "@/features/item";
 import { session } from "@/shared/api/session";
 import { localized, type Field } from "@/features/table";
 import { UserDialog } from "@/features/settings";
@@ -49,7 +51,7 @@ import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
 import { EMPLOYEES, toProfile, useEmployee, useNeighbours, useReports } from "../api/employee";
-import { JOB_HISTORY } from "../api/job-history";
+import { isAssignment, JOB_HISTORY, useJobHistory } from "../api/job-history";
 import { PAYROLL_LINES } from "../api/payroll";
 import { SHIFTS } from "../api/schedule";
 
@@ -167,6 +169,7 @@ const WORK = [
   "work_format",
   "hr_positions_id",
   "hr_grades_id",
+  "core_business_units_ids",
   "hr_departments_id",
   "hr_locations_id",
   "hr_work_schedules_id",
@@ -224,6 +227,20 @@ export function EmployeePage({
   const [editing, setEditing] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [granting, setGranting] = useState(false);
+  // Выше раннего return: хуки — до любого выхода из рендера.
+  const upload = useUploadFiles();
+  /*
+   * Поля назначения (отдел, должность, юниты…) — копия текущей записи
+   * истории. Их правка здесь — ИСПРАВЛЕНИЕ этой записи, а не новое
+   * назначение: пишется в историю, оттуда копируется в карточку.
+   * Повышение и перевод — новой записью во вкладке «Работа».
+   */
+  const jobLink = employee.tabs.find((tab) => tab.tableSlug === JOB_HISTORY)?.fieldSlug ?? "hr_employees_id";
+  const job = useJobHistory({ employee: guid, link: jobLink, menuId, language });
+  const currentJob = job.entries.find((entry) => entry.current);
+  /** Поле, которое тут правится: своё — как есть, назначение — в обход «только чтения». */
+  const editable = (field: Field) =>
+    isAssignment(field.slug) && !field.locked ? { ...field, editable: true } : field;
   const bySlug = useMemo(
     () => new Map(employee.fields.map((field) => [field.slug, field])),
     [employee.fields],
@@ -245,6 +262,15 @@ export function EmployeePage({
   const person = toProfile(row, employee.user);
   const tab = employee.tabs.find((item) => item.id === tabId);
   const status = bySlug.get("status");
+  const units = bySlug.get("core_business_units_ids");
+  const photoField = bySlug.get("photo");
+  /* Новое фото — файлом в хранилище, в поле уходит его адрес. */
+  const changePhoto = (file: File | undefined) => {
+    if (!file || !photoField) return;
+    upload
+      .mutateAsync({ files: [file], folder: uploadFolder(photoField.attributes) })
+      .then((urls) => urls[0] && employee.edit("photo", urls[0]), () => undefined);
+  };
   const activeField = active ? bySlug.get(active.slug) : undefined;
 
   const cell = (field: Field) => (
@@ -259,9 +285,13 @@ export function EmployeePage({
     />
   );
 
-  /** Значение поля; в режиме правки — щелчок открывает редактор. */
+  /**
+   * Значение поля; в режиме правки — щелчок открывает редактор. Поле,
+   * которое править нельзя, полем ввода не рисуется: пустой список по
+   * щелчку читался как поломка.
+   */
   const value = (field: Field) =>
-    editing ? (
+    editing && editorKind(editable(field)) ? (
       <button
         type="button"
         onClick={(event) =>
@@ -320,13 +350,43 @@ export function EmployeePage({
 
         {/* `.emp-head`: аватар заходит на обложку, имя и кнопки — под ней. */}
         <header className="relative z-1 -mt-13 flex flex-wrap items-start gap-4.5 px-2 pb-3.5">
-          <Avatar name={person.name} photo={person.photo} size="2xl" />
+          {employee.can.write && photoField && !photoField.locked ? (
+            <label
+              title={t("employee.changePhoto")}
+              className="group/avatar relative shrink-0 cursor-pointer rounded-full focus-within:ring-2 focus-within:ring-accent"
+            >
+              <Avatar name={person.name} photo={person.photo} size="2xl" />
+              <span className="absolute inset-0 grid place-items-center rounded-full bg-overlay text-accent-fg opacity-0 transition-opacity group-hover/avatar:opacity-100">
+                <Icon as={CameraIcon} size={22} />
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                aria-label={t("employee.changePhoto")}
+                disabled={upload.isPending}
+                className="sr-only"
+                onChange={(event) => {
+                  changePhoto(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          ) : (
+            <Avatar name={person.name} photo={person.photo} size="2xl" />
+          )}
           <div className="min-w-60 flex-1 pt-15 max-md:pt-14">
             <h1 className="mb-1 text-3xl font-bold tracking-[-0.01em] max-md:text-2xl">
               {person.name || "—"}
             </h1>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13.5px] text-fg-muted">
               <Meta icon={BriefcaseIcon} text={person.position} />
+              {/* Юнитов бывает несколько — ячейкой связи, она и подписи берёт (Many2Many без `_data`). */}
+              {units && Array.isArray(row.core_business_units_ids) && row.core_business_units_ids.length > 0 && (
+                <span className="inline-flex min-w-0 items-center gap-1.25">
+                  <Icon as={BriefcaseBusinessIcon} size={14} className="text-fg-subtle" />
+                  {cell(units)}
+                </span>
+              )}
               <Meta icon={MapIcon} text={employee.region} />
               <Meta icon={NetworkIcon} text={person.department} />
               <Meta icon={Building2Icon} text={person.location} />
@@ -551,6 +611,7 @@ export function EmployeePage({
                     </SideProp>
                   ))}
                   <Tenure since={row.hire_date} />
+                  {editing && currentJob && <p className="text-xs text-fg-subtle">{t("employee.fixesCurrent")}</p>}
                 </div>
               </Card>
 
@@ -619,7 +680,7 @@ export function EmployeePage({
       {active && activeField && (
         <ActiveCell
           key={active.slug}
-          field={activeField}
+          field={editable(activeField)}
           row={row}
           guid={guid}
           tableSlug={EMPLOYEES}
@@ -627,7 +688,12 @@ export function EmployeePage({
           relations={relations}
           locale={locale}
           language={language}
-          onEdit={(next) => employee.edit(active.slug, next)}
+          onEdit={(next) =>
+            /* Нет действующей записи истории — правим карточку, как раньше. */
+            isAssignment(active.slug) && currentJob
+              ? job.edit(currentJob.id, active.slug, next)
+              : employee.edit(active.slug, next)
+          }
           onClose={() => setActive(null)}
         />
       )}

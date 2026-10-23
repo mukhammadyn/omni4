@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { CheckIcon, XIcon, type LucideIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, XIcon, type LucideIcon } from "lucide-react";
 import {
   ActiveCell,
   Cell,
@@ -140,6 +140,8 @@ export function FormField({
   required = false,
   wide,
   placeholder,
+  dropdown = false,
+  rows = 4,
   onChange,
 }: {
   field: Field;
@@ -154,9 +156,14 @@ export function FormField({
   /** По умолчанию — по виду: тексты и списки во всю ширину. */
   wide?: boolean;
   placeholder?: string | undefined;
+  /** Выбор — выпадающим списком, даже когда вариантов мало для кнопок. */
+  dropdown?: boolean;
+  /** Высота многострочного поля, в строках. */
+  rows?: number;
   /** `extra` — сопровождающие ключи: у связи это `<слаг>_data`. */
   onChange: (value: unknown, extra?: Item) => void;
 }) {
+  const { t } = useTranslation();
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const upload = useUploadFiles();
   const value = row[field.slug];
@@ -186,6 +193,7 @@ export function FormField({
           <RichText
             value={typeof value === "string" ? value : ""}
             placeholder={placeholder ?? ""}
+            compact={rows < 4}
             onChange={(html) => onChange(html)}
             onUpload={(file) =>
               upload.mutateAsync({ files: [file], folder: uploadFolder(field.attributes) }).then((urls) => urls[0] ?? "")
@@ -196,7 +204,7 @@ export function FormField({
     if (kind === "longtext")
       return (
         <textarea
-          rows={4}
+          rows={rows}
           value={typeof value === "string" ? value : ""}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
@@ -205,7 +213,7 @@ export function FormField({
       );
     if (kind === "boolean") return <Switch on={value === true} label={label} onToggle={() => onChange(value !== true)} />;
     /* Кнопками — пока варианты помещаются в строку; город из восьми — списком. */
-    if (kind === "status" && field.options.size <= CHOICE_MAX)
+    if (kind === "status" && !dropdown && field.options.size <= CHOICE_MAX)
       return <Choice field={field} value={value} language={language} onPick={onChange} />;
     if (tags) return <Tags value={strings(value)} placeholder={placeholder ?? ""} onChange={onChange} />;
     if (kind === "multiselect")
@@ -223,9 +231,13 @@ export function FormField({
       <button
         type="button"
         onClick={(event) => setAnchor(event.currentTarget.getBoundingClientRect())}
-        className="flex h-(--spacing-input) w-full min-w-0 items-center rounded-md border border-border-strong bg-input px-2.5 text-left text-sm transition-colors hover:border-fg-subtle"
+        className="flex h-(--spacing-input) w-full min-w-0 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-left text-sm transition-colors hover:border-fg-subtle"
       >
-        {blank(value) && placeholder ? <span className="text-fg-subtle">{placeholder}</span> : cell}
+        <span className="min-w-0 flex-1 truncate">
+          {blank(value) ? <span className="text-fg-subtle">{placeholder ?? t("form.pick")}</span> : cell}
+        </span>
+        {/* Стрелка — у выбора из списка; дата и прочее открываются тем же поповером, но списком не являются. */}
+        {(kind === "relation" || kind === "status") && <Icon as={ChevronDownIcon} size={14} className="shrink-0 text-fg-subtle" />}
       </button>
     );
   };

@@ -29,7 +29,9 @@ export function useEmployee(menuId: string, guid: string, language: string) {
   const permissionOf = useTablePermissions();
   const update = useUpdateItem(EMPLOYEES);
   /* Регион — PICK_LIST локации: в записи ключ варианта, подпись — в схеме. */
-  const { schema: locations } = useTableSchema("hr_locations");
+  /* Регион — у локации сотрудника, связью на справочник `core_regions`. */
+  const locationId = record.item ? firstText(record.item.hr_locations_id) : "";
+  const location = useItem("hr_locations", locationId || undefined, Boolean(locationId));
   /* Пользователь этого сотрудника: бот и последний вход — его. Может не быть. */
   const user = useItems(PEOPLE, {
     limit: 1,
@@ -69,13 +71,11 @@ export function useEmployee(menuId: string, guid: string, language: string) {
       );
   }, [views, schema.relations, users.relations, language, permissionOf, viewRights]);
 
-  const regionKey = record.item ? firstText(related(record.item, "hr_locations_id").region) : "";
-  const region = locations.fields.find((field) => field.slug === "region")?.options.get(regionKey);
 
   return {
     row: record.item,
     user: user.page.rows[0],
-    region: region ? localized(region.labels, language, region.label || regionKey) : regionKey,
+    region: location.item ? text(related(location.item, "core_regions_id").name) : "",
     isLoading: record.isLoading || schemaLoading,
     error: record.error,
     fields: schema.fields,

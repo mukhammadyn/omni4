@@ -48,6 +48,9 @@ export type JobEntry = {
 };
 
 /** Поля назначения, которые сотрудник держит у себя копией ([snap] в erp.dbml). */
+const UNITS = "core_business_units_ids";
+/** Поля назначения, которые можно исправить в текущей записи со страницы сотрудника. */
+export const isAssignment = (slug: string) => slug === UNITS || SNAP.includes(slug);
 const SNAP = ["hr_departments_id", "hr_positions_id", "hr_grades_id", "hr_locations_id", "hr_work_schedules_id", "employment_type", "work_format"];
 
 /**
@@ -58,15 +61,29 @@ const SNAP = ["hr_departments_id", "hr_positions_id", "hr_grades_id", "hr_locati
  * но её нет — без копии отдел и должность не доходят до KPI, графика,
  * зарплаты и списка. Появится функция — отсюда уходит.
  */
+/**
+ * Действует сегодня: уже началась и не закончилась. Одно правило и для
+ * метки «Текущая должность», и для копии в карточку — иначе запись с завтрашней
+ * датой помечена текущей, а в карточке ещё прежняя.
+ */
+function isCurrent(row: Item, today = todayInput()): boolean {
+  return text(row.date_from).slice(0, 10) <= today && (!row.date_to || text(row.date_to).slice(0, 10) >= today);
+}
+
 async function currentSnap(employee: string, link: string): Promise<Item | null> {
   /* Клиент API уже снял внешнюю обёртку: здесь `{ data: { count, response } }`. */
   type List = { data?: { response?: Item[] } };
-  const today = todayInput();
   const res = await api.post<List>(`/v2/object/get-list/${JOB_HISTORY}`, { data: { [link]: employee, limit: 100 } });
   const current = (res.data?.response ?? [])
-    .filter((r) => text(r.date_from).slice(0, 10) <= today && (!r.date_to || text(r.date_to).slice(0, 10) >= today))
+    .filter((r) => isCurrent(r))
     .sort((a, b) => text(b.date_from).localeCompare(text(a.date_from)))[0];
-  return current ? Object.fromEntries(SNAP.map((slug) => [slug, current[slug] ?? null])) : null;
+  if (!current) return null;
+  const snap: Item = Object.fromEntries(SNAP.map((slug) => [slug, current[slug] ?? null]));
+  /* Юниты — только заданные: у старых записей их не задавали (`null`),
+     и копия стёрла бы юниты карточки. Пустой список — их очистили. */
+  const units = current[UNITS];
+  if (Array.isArray(units)) snap[UNITS] = units;
+  return snap;
 }
 
 const SORT = [{ field: "date_from", direction: "desc" as const }];
@@ -146,7 +163,7 @@ export function useJobHistory({
         row,
         from: text(row.date_from),
         to: text(row.date_to),
-        current: row.is_current === true || !row.date_to,
+        current: isCurrent(row),
         reason: choice("change_reason", row),
         employment: choice("employment_type", row),
         format: choice("work_format", row)?.label ?? "",

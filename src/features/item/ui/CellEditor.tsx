@@ -52,7 +52,7 @@ import {
   toTimeInput,
   type DateKind,
 } from "../model/cell-value";
-import { autoFilterValues, COLOR, isLinkable, relationLabel, relationSelection, relationTree, withoutPrefix } from "../model/relation";
+import { autoFilterValues, COLOR, isLinkable, isMany, relationLabel, relationSelection, relationTree, withoutPrefix } from "../model/relation";
 import type { Item } from "../model/types";
 import { cellError } from "../model/validate";
 import { Cell, isStage, optionColor, optionLabel } from "./Cell";
@@ -233,6 +233,7 @@ export function ActiveCell({
         anchor={anchor}
         language={language}
         onLink={onLink}
+        onEdit={edit}
         onClose={onClose}
       />
     );
@@ -888,6 +889,7 @@ function RelationEditor({
   anchor,
   language,
   onLink,
+  onEdit,
   onClose,
 }: {
   field: Field;
@@ -901,10 +903,13 @@ function RelationEditor({
   language: string;
   /** Есть — выбор не уезжает запросом, а отдаётся вызывающему. */
   onLink?: ((item: Item | null) => void) | undefined;
+  /** Many2Many: список uuid пишется обычной правкой поля (и в черновик, и запросом). */
+  onEdit: (value: unknown) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const many = isMany(relation.type);
   /*
    * Запрос отстаёт от ввода на один кадр: без этого каждая буква
    * порождает свой запрос к чужой таблице. useDeferredValue вместо
@@ -974,9 +979,12 @@ function RelationEditor({
    * пришедших строк отобрать нужные — одна строка кода.
    */
   const needle = search.trim().toLowerCase();
-  const visible = needle
-    ? items.filter((item) => relationLabel(item, slugs, language).toLowerCase().includes(needle))
-    : items;
+  /* Выключенную запись справочника (`is_active: false`) не предлагаем:
+     её выключают вместо удаления. Уже выбранная остаётся в ячейке.
+     ponytail: на клиенте — страница может прийти короче; фильтр на сервер, если начнёт мешать. */
+  const visible = items.filter(
+    (item) => item["is_active"] !== false && (!needle || relationLabel(item, slugs, language).toLowerCase().includes(needle)),
+  );
   /* Ссылка строки на свою таблицу — варианты деревом (model/relation, relationTree).
      В каскаде не нужно: там шаги и есть уровни. */
   const parentKey = `${listSlug}_id`;
@@ -984,8 +992,11 @@ function RelationEditor({
   const link = useLinkRelation(tableSlug);
   const create = useCreateItem(relation.toSlug);
 
-  const selected = relationSelection(row, field, slugs, language);
+  const selected = relationSelection(row, field, slugs, language, items);
   const selectedGuids = new Set(selected.map((item) => item.guid));
+  /** Many2Many: снять или добавить одно значение, остальные не трогая. */
+  const toggle = (guid: string) =>
+    onEdit(selectedGuids.has(guid) ? [...selectedGuids].filter((one) => one !== guid) : [...selectedGuids, guid]);
 
   /* Уезжает guid, но наружу отдаётся строка целиком: черновику нужна
      и связанная запись — из неё ячейка берёт, что показать. */
@@ -1009,6 +1020,9 @@ function RelationEditor({
       setQuery("");
       return;
     }
+
+    // Список остаётся открытым: выбирают несколько.
+    if (many) return toggle(guid);
 
     // Ссылка одна: повторный выбор того же значения снимает её.
     write(selectedGuids.has(guid) ? null : item);
@@ -1037,6 +1051,7 @@ function RelationEditor({
     const created: Item = { guid: crypto.randomUUID(), [first]: text };
     create.mutate(created, {
       onSuccess: () => {
+        if (many) return onEdit([...selectedGuids, String(created["guid"])]);
         write(created);
         onClose();
       },
@@ -1071,7 +1086,7 @@ function RelationEditor({
         <div className="m-1.5 flex min-h-7.5 flex-wrap items-center gap-1 rounded-md border border-border bg-input px-2 py-1">
           {selected.map((item) => (
             <span key={item.guid} className="inline-flex min-w-0 items-center gap-0.5">
-              <Chip color={item.color ? hexToChipColor(item.color) : "gray"} onRemove={() => write(null)} removeLabel={t("cell.remove")}>
+              <Chip color={item.color ? hexToChipColor(item.color) : "gray"} off={item.off} onRemove={() => (many ? toggle(item.guid) : write(null))} removeLabel={t("cell.remove")}>
                 {item.label || item.guid}
               </Chip>
 
