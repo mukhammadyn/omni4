@@ -48,6 +48,7 @@ import { formatDate } from "@/shared/lib/date-value";
 import type { TranslationKey } from "@/shared/lib/i18n";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
+import { Chip as Tag, hexToChipColor } from "@/shared/ui/chip";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
 import { EMPLOYEES, toProfile, useEmployee, useNeighbours, useReports } from "../api/employee";
@@ -263,6 +264,7 @@ export function EmployeePage({
   const tab = employee.tabs.find((item) => item.id === tabId);
   const status = bySlug.get("status");
   const units = bySlug.get("core_business_units_ids");
+  const ownUnits = Array.isArray(row.core_business_units_ids) && row.core_business_units_ids.length > 0;
   const photoField = bySlug.get("photo");
   /* Новое фото — файлом в хранилище, в поле уходит его адрес. */
   const changePhoto = (file: File | undefined) => {
@@ -381,11 +383,18 @@ export function EmployeePage({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13.5px] text-fg-muted">
               <Meta icon={BriefcaseIcon} text={person.position} />
               {/* Юнитов бывает несколько — ячейкой связи, она и подписи берёт (Many2Many без `_data`). */}
-              {units && Array.isArray(row.core_business_units_ids) && row.core_business_units_ids.length > 0 && (
+              {units && ownUnits ? (
                 <span className="inline-flex min-w-0 items-center gap-1.25">
                   <Icon as={BriefcaseBusinessIcon} size={14} className="text-fg-subtle" />
                   {cell(units)}
                 </span>
+              ) : (
+                employee.defaultUnit && (
+                  <span className="inline-flex min-w-0 items-center gap-1.25">
+                    <Icon as={BriefcaseBusinessIcon} size={14} className="text-fg-subtle" />
+                    <OwnerUnit unit={employee.defaultUnit} />
+                  </span>
+                )
               )}
               <Meta icon={MapIcon} text={employee.region} />
               <Meta icon={NetworkIcon} text={person.department} />
@@ -607,7 +616,15 @@ export function EmployeePage({
                 <div className="flex flex-col gap-3 pt-1">
                   {fieldsOf(WORK).map((field) => (
                     <SideProp key={field.id} label={label(field)}>
-                      {value(field)}
+                      {field.slug === "core_business_units_ids" && !ownUnits && !editing && employee.defaultUnit ? (
+                        <OwnerUnit unit={employee.defaultUnit} />
+                      ) : (
+                        value(field)
+                      )}
+                      {/* В локации несколько юнитов — свой не угадать, его нужно указать. */}
+                      {field.slug === "core_business_units_ids" && !ownUnits && employee.locationUnits > 1 && (
+                        <p className="mt-1 text-xs text-fg-subtle">{t("employee.unitPickOwn")}</p>
+                      )}
                     </SideProp>
                   ))}
                   <Tenure since={row.hire_date} />
@@ -826,5 +843,16 @@ function Tenure({ since }: { since: unknown }) {
     <SideProp label={t("employee.tenure")}>
       <div className="flex min-h-7 items-center">{spanText(monthsBetween(start, new Date()), t)}</div>
     </SideProp>
+  );
+}
+
+/** Юнит по умолчанию — единственный юнит локации: тот же чип, с пометкой, откуда он. */
+function OwnerUnit({ unit }: { unit: { name: string; color: string } }) {
+  const { t } = useTranslation();
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5" title={t("employee.unitByLocationHint")}>
+      <Tag color={unit.color ? hexToChipColor(unit.color) : "gray"}>{unit.name}</Tag>
+      <span className="text-xs text-fg-subtle">{t("employee.unitByLocation")}</span>
+    </span>
   );
 }

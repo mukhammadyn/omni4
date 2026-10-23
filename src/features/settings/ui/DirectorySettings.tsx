@@ -214,15 +214,27 @@ export function DirectorySettings({
       ...(counts?.lastYear ? { [counts.lastYear]: { op: "after" as const, values: [yearAgo()] } } : {}),
     },
   });
+  const via = counts?.via;
+  const viaRows = useItems(via?.table, { limit: MAX_LIMIT, page: 1, relations: false });
   const own = useMemo(() => {
     const out = new Map<string, number>();
     const key = directory.counts?.field ?? "";
+    /* Значение посредника — одно или список; годится только единственное: из нескольких не угадать. */
+    const ownerOf = new Map(
+      viaRows.page.rows.map((row) => {
+        const list = [row[via?.field ?? ""] ?? []].flat().map(String).filter(Boolean);
+        return [String(row.guid), list.length === 1 ? list[0]! : ""];
+      }),
+    );
     for (const row of counted.page.rows) {
       // Many2Many (`…_ids`) — список: человек считается в каждом своём юните.
-      for (const guid of [row[key] ?? []].flat().map(String)) if (guid) out.set(guid, (out.get(guid) ?? 0) + 1);
+      let guids = [row[key] ?? []].flat().map(String).filter(Boolean);
+      // Своих нет — берём через запись-посредника: единственный юнит локации.
+      if (!guids.length && via) guids = [ownerOf.get(String(row[via.link] ?? "")) ?? ""].filter(Boolean);
+      for (const guid of guids) out.set(guid, (out.get(guid) ?? 0) + 1);
     }
     return out;
-  }, [counted.page.rows, directory.counts?.field]);
+  }, [counted.page.rows, directory.counts?.field, viaRows.page.rows, via]);
   const total = (guid: string) => [...subtree(guid)].reduce((sum, one) => sum + (own.get(one) ?? 0), 0);
 
   const levels = 1 + Math.max(0, ...full.map((item) => item.depth));
