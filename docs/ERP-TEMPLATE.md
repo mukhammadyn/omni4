@@ -93,7 +93,8 @@ Id меню, view, полей и связей в каждом проекте с�
    `hr_employees` («Руководитель» — любой сотрудник, не только с
    учёткой), `crm_legal_entities` («Юрлицо»).
    Many2One на неё — колонка `core_business_units_id`, подпись
-   «Бизнес-юнит»: `hr_locations`, `hr_projects`, `crm_pipelines`.
+   «Бизнес-юнит»: `hr_projects`, `crm_pipelines`; у `hr_locations` та же
+   колонка с подписью «Юнит-владелец» — чей офис, а не кто в нём сидит.
    У `hr_employees` — **Many2Many** (`core_business_units_ids`,
    «Бизнес-юниты»): человек бывает в нескольких юнитах. Список читается
    и пишется только со стороны сотрудника (backend-notes, Many2Many).
