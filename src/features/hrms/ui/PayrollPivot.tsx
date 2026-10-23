@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
 import { useLastPayMonth, usePayMonth } from "../api/payroll";
 import { useSyncPenalties } from "../api/penalty";
+import { PayrollExcel } from "./PayrollExcel";
 import { useScheduleSettings } from "./schedule-settings";
 import { buildPayPivot, compactSum, type PayPivot } from "../model/payroll";
 
@@ -72,6 +73,7 @@ export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: strin
           <Icon as={DownloadIcon} size={14} />
           {t("payroll.export")}
         </button>
+        <PayrollExcel month={month} title={title} where={where} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6">

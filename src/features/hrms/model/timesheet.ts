@@ -37,6 +37,8 @@ export type Leave = {
   icon: string;
   color: string;
   status: "approved" | "pending";
+  /** Оплачиваемое (`is_paid` типа): зарплата засчитывает такой день. */
+  paid?: boolean;
   from: string;
   to: string;
 };

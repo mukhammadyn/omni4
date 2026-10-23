@@ -231,6 +231,10 @@ export function matchingPolicies(person: Target, assignments: PenaltyAssignment[
 /** Строки «Начислений», которые пишет пересчёт штрафов, — их и только их он переписывает. */
 export const FINES_SOURCE = "attendance_fines";
 
+/** Вид строк пересчёта — «Опоздания» (`code = late_fine`); нет — первое удержание. */
+export const finesType = (types: Item[]) =>
+  types.find((row) => text(row.code) === "late_fine") ?? types.find((row) => firstText(row.kind) === "deduction");
+
 /**
  * «Пересчитать штрафы» за месяц: дни посещаемости × действующая на
  * сотрудника политика → по строке удержания на нарушение. Прежние строки
@@ -256,8 +260,7 @@ export function useSyncPenalties(month: string) {
   /** Ход пересчёта: null — не идёт; total 0 — ещё считаем, дальше — записано из total. */
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
-  /* Вид для строк — «Опоздания» (`code = late_fine`); нет — первое удержание. */
-  const type = types.rows.find((row) => text(row.code) === "late_fine") ?? types.rows.find((row) => firstText(row.kind) === "deduction");
+  const type = finesType(types.rows);
   const ready = !penalties.loading && !days.loading && !lines.loading && !types.loading && targets.employee.length > 0;
 
   const run = async (describe: (violation: Violation, minutes: number) => string) => {
