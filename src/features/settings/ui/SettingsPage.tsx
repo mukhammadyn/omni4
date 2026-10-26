@@ -12,7 +12,6 @@ import { CompanySettings } from "./CompanySettings";
 import { DatabaseSettings } from "./DatabaseSettings";
 import { DirectorySettings } from "./DirectorySettings";
 import { EndpointSettings } from "./EndpointSettings";
-import { LocaleSettings } from "./LocaleSettings";
 import { ProfileSettings } from "./ProfileSettings";
 import { HrFilesSettings } from "./HrFilesSettings";
 import { HrFinesSettings } from "./HrFinesSettings";
@@ -50,7 +49,6 @@ const CONTENT: Record<string, () => React.JSX.Element> = {
   profile: ProfileSettings,
   company: CompanySettings,
   brand: BrandSettings,
-  locale: LocaleSettings,
   clientTypes: ClientTypeSettings,
   users: UserSettings,
   roles: RoleSettings,
