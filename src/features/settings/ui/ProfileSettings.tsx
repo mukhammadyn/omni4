@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { MonitorIcon, Trash2Icon } from "lucide-react";
+import { GlobeIcon, MonitorIcon, ShieldIcon, Trash2Icon, UserIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useGlobalRight } from "@/features/auth";
 import { useSession } from "@/shared/api/use-session";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
@@ -8,6 +9,7 @@ import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { PasswordInput } from "@/shared/ui/password-input";
+import { Tabs } from "@/shared/ui/tabs";
 import {
   useChangePassword,
   useDeleteSession,
@@ -20,16 +22,71 @@ import {
 } from "../api/profile";
 import { useClientTypes } from "../api/client-types";
 import { ImagePicker } from "./ImagePicker";
-import { GroupTitle, SectionHeader, SettingRow, formatDateTime } from "./parts";
+import { CompanyLocale, InterfaceLanguage } from "./LocaleSettings";
+import { SectionHeader, SettingRow, SubHeader, formatDateTime } from "./parts";
 
 /**
- * Профиль: имя, как человека зовут в интерфейсе, и способы входа.
+ * Профиль — три вкладки, чтобы не листать одну длинную стену:
+ * личные данные, язык и регион, безопасность (пароль и устройства).
+ *
+ * «Язык и регион» вобрал бывший раздел «Локализация»: сверху личное
+ * (язык интерфейса, пояс), ниже — форматы компании, только с правом
+ * `settings_button`, как было у раздела.
+ */
+export function ProfileSettings() {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState("personal");
+
+  return (
+    <>
+      <SectionHeader title={t("settings.profile")} hint={t("settings.profileHint")} />
+
+      <div className="mb-3 shrink-0">
+        <Tabs
+          variant="segment"
+          tabs={[
+            { id: "personal", label: t("settings.profileTabPersonal"), icon: UserIcon },
+            { id: "locale", label: t("settings.profileTabLocale"), icon: GlobeIcon },
+            { id: "security", label: t("settings.profileTabSecurity"), icon: ShieldIcon },
+          ]}
+          activeId={tab}
+          onSelect={setTab}
+        />
+      </div>
+
+      {tab === "personal" && <PersonalSection />}
+      {tab === "locale" && <LocaleSection />}
+      {tab === "security" && (
+        <>
+          <PasswordSection />
+          <SessionsSection />
+        </>
+      )}
+    </>
+  );
+}
+
+/** Язык и регион: личное сверху, форматы компании — тем, кому можно. */
+function LocaleSection() {
+  const canCompany = useGlobalRight("settings_button");
+
+  return (
+    <>
+      <InterfaceLanguage />
+      <TimezoneSection />
+      {canCompany && <CompanyLocale />}
+    </>
+  );
+}
+
+/**
+ * Личные данные: имя, как человека зовут в интерфейсе, и способы входа.
  *
  * Роль и тип клиента показаны, но не правятся: их выдаёт проект, а не
  * человек себе сам. Поле ввода, которое сервер всё равно перезапишет,
  * — это ложное обещание.
  */
-export function ProfileSettings() {
+function PersonalSection() {
   const { t } = useTranslation();
   const { profile, isLoading } = useProfile();
   const update = useUpdateProfile();
@@ -64,15 +121,8 @@ export function ProfileSettings() {
     });
   }, [profile]);
 
-  const header = <SectionHeader title={t("settings.profile")} hint={t("settings.profileHint")} />;
-
   if (isLoading || !profile) {
-    return (
-      <>
-        {header}
-        <p className="text-sm text-fg-subtle">{t("common.loading")}</p>
-      </>
-    );
+    return <p className="text-sm text-fg-subtle">{t("common.loading")}</p>;
   }
 
   const changed =
@@ -104,8 +154,6 @@ export function ProfileSettings() {
 
   return (
     <>
-      {header}
-
       <SettingRow label={t("settings.photo")} hint={t("settings.photoHint")}>
         <ImagePicker
           value={draft.photo}
@@ -142,10 +190,6 @@ export function ProfileSettings() {
           {t("action.save")}
         </Button>
       </div>
-
-      <TimezoneSection />
-      <PasswordSection />
-      <SessionsSection />
     </>
   );
 }
@@ -173,8 +217,7 @@ function TimezoneSection() {
 
   return (
     <>
-      <GroupTitle title={t("settings.timezone")} hint={t("settings.timezoneHint")} />
-      <SettingRow label={t("settings.timezone")}>
+      <SettingRow label={t("settings.timezone")} hint={t("settings.timezoneHint")}>
         <div className="w-full">
           <Dropdown
             value={timezone}
@@ -224,7 +267,7 @@ function PasswordSection() {
 
   return (
     <>
-      <GroupTitle title={t("settings.password")} />
+      <SubHeader title={t("settings.password")} />
 
       {/* Браузеру здесь подставлять нечего: это не форма входа,
           и подставленный им пароль человек примет за уже введённый. */}
@@ -296,7 +339,9 @@ function SessionsSection() {
 
   return (
     <>
-      <GroupTitle title={t("settings.sessions")} />
+      <div className="mt-6.5">
+        <SubHeader title={t("settings.sessions")} />
+      </div>
 
       {isLoading && <p className="py-3 text-sm text-fg-subtle">{t("common.loading")}</p>}
       {!isLoading && !sessions.length && (

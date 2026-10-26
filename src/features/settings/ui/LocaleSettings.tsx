@@ -16,48 +16,54 @@ import {
 } from "../api/project";
 import { CURRENCY_RATES } from "./directories";
 import { DirectorySettings } from "./DirectorySettings";
-import { GroupTitle, SectionHeader, SettingRow } from "./parts";
+import { GroupTitle, SettingRow } from "./parts";
 import { RecordFields } from "./RecordSettings";
 
 /**
- * Локализация — `#s-locale` прототипа: язык интерфейса, формат даты,
- * валюта, НДС. Ниже — языки данных проекта и курсы валют.
- *
- * Формат даты, валюта и НДС — из `core_settings` Ядра: это истина
- * компании, её читают функции расчёта. У проекта ucode валюта своя,
- * но с экрана убрана — два поля об одном расходились бы молча
- * (docs/STATUS.md). Часового пояса здесь нет: он личный и живёт
- * в «Профиле» (ADR-0014).
- *
  * Язык интерфейса — личный: он у каждого свой и на сервер не уезжает.
- * Стоит здесь, потому что здесь его ищут; тот же выбор — в меню
- * пространства.
+ * Тот же выбор — в меню пространства. Живёт во вкладке «Язык и регион»
+ * «Профиля», рядом с часовым поясом (ADR-0014).
  */
-export function LocaleSettings() {
+export function InterfaceLanguage() {
   const { t, i18n } = useTranslation();
-  const canProject = useGlobalRight("project_settings_button");
   const current = (LOCALES as readonly string[]).includes(i18n.language)
     ? (i18n.language as Locale)
     : LOCALES[0];
 
   return (
+    <SettingRow label={t("core.interfaceLanguage")} hint={t("core.interfaceLanguageHint")}>
+      <div className="w-full">
+        <Dropdown
+          value={current}
+          ariaLabel={t("core.interfaceLanguage")}
+          items={LOCALES.map((code) => ({ value: code, label: LOCALE_NAMES[code] }))}
+          onChange={(code) => setLocale(code as Locale)}
+        />
+      </div>
+    </SettingRow>
+  );
+}
+
+/**
+ * Форматы компании — бывший раздел «Локализация» (`#s-locale` прототипа):
+ * формат даты, валюта, языки данных проекта и курсы валют. НДС убран:
+ * его ничто не читало, ставка — у юрлица (`crm_legal_entities.vat_percent`).
+ *
+ * Формат даты и валюта — из `core_settings` Ядра: это истина
+ * компании, её читают функции расчёта. У проекта ucode валюта своя,
+ * но с экрана убрана — два поля об одном расходились бы молча
+ * (docs/STATUS.md). Показывается тем, у кого есть `settings_button`.
+ */
+export function CompanyLocale() {
+  const { t } = useTranslation();
+  const canProject = useGlobalRight("project_settings_button");
+
+  return (
     <>
-      <SectionHeader title={t("core.locale")} hint={t("core.localeHint")} />
-
-      <SettingRow label={t("core.interfaceLanguage")} hint={t("core.interfaceLanguageHint")}>
-        <div className="w-full">
-          <Dropdown
-            value={current}
-            ariaLabel={t("core.interfaceLanguage")}
-            items={LOCALES.map((code) => ({ value: code, label: LOCALE_NAMES[code] }))}
-            onChange={(code) => setLocale(code as Locale)}
-          />
-        </div>
-      </SettingRow>
-
+      <GroupTitle title={t("core.locale")} hint={t("core.localeHint")} />
       <RecordFields
         table="core_settings"
-        fields={["date_format", "base_currency", "vat_percent"]}
+        fields={["date_format", "base_currency"]}
       />
 
       {canProject && <DataLanguages />}

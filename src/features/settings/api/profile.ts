@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsSuperRole } from "@/features/auth";
 import { PEOPLE, useItems } from "@/features/item";
-import { authApi } from "@/shared/api/client";
+import { api, authApi } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { useSession } from "@/shared/api/use-session";
 import { setTimeZone } from "@/shared/lib/date-value";
@@ -133,14 +134,16 @@ const USERS = PEOPLE;
  * Пояс пользователя — [[User Timezone]], `core_users.timezone_id` своей строки.
  *
  * Строка ищется по `user_id_auth`, а не по `user_id` токена: так она
- * одна и та же при любом входе. У ADMIN строки в `core_users` нет —
- * `hasAccount: false`, и личного пояса у него нет (ADR-0014).
+ * одна и та же при любом входе. У DEFAULT ADMIN строки в `core_users`
+ * сперва нет — она заводится при первом выборе пояса (useUpdateTimezone),
+ * поэтому `hasAccount` у него всегда true.
  *
  * `GET /v2/user/{id}` пояс не отдаёт: из строки входа он берёт только
  * роль, тип клиента, `active` и имя (auth_service, user_service_v2.go:778).
  */
 export function useUserTimezone() {
   const authId = useSession().getAuthUserId();
+  const isAdmin = useIsSuperRole();
   const { page, isLoading } = useItems(authId ? USERS : undefined, {
     limit: 1,
     page: 1,
@@ -149,7 +152,8 @@ export function useUserTimezone() {
   const row = page.rows[0];
 
   return {
-    hasAccount: Boolean(row),
+    hasAccount: isAdmin || Boolean(row),
+    guid: typeof row?.guid === "string" ? row.guid : "",
     timezone: typeof row?.timezone_id === "string" ? row.timezone_id : "",
     isLoading,
   };
@@ -163,13 +167,40 @@ export function useUserTimezone() {
  *
  * Тело — поверх ответа профиля: без `company_id` ручка падает на пустом
  * uuid, а собранное заново обнулило бы роль и тип клиента.
+ *
+ * DEFAULT ADMIN — мимо `/v2/user`: его таблица входа — системная `user`
+ * (client_type.table_slug пуст), и ручка писала бы туда. Пояс живёт в его
+ * строке `core_users`: нет её — создаётся, есть — правится. Обе записи
+ * с `from_auth_service`, иначе object builder завёл бы второго
+ * пользователя в auth (storage/postgres/items.go:361, :693).
  */
 export function useUpdateTimezone() {
   const queryClient = useQueryClient();
   const { profile } = useProfile();
+  const store = useSession();
+  const { guid } = useUserTimezone();
+  const isAdmin = useIsSuperRole();
 
   return useMutation({
     mutationFn: (timezone: string) => {
+      if (isAdmin) {
+        const data = { timezone_id: timezone, from_auth_service: true };
+        return guid
+          ? api.put<unknown>(`/v2/items/${USERS}`, { data: { guid, ...data } })
+          : api.post<unknown>(`/v2/items/${USERS}`, {
+              /* Строка таблицы входа копируется в служебную `person`, где
+                 guid, роль и тип клиента — uuid: пустые падают с 22P02
+                 (object builder storage/postgres/items.go:151). */
+              data: {
+                ...data,
+                guid: crypto.randomUUID(),
+                user_id_auth: store.getAuthUserId(),
+                login: profile?.login ?? "",
+                role_id: profile?.raw["role_id"] ?? "",
+                client_type_id: store.getClientTypeId(),
+              },
+            });
+      }
       if (!profile) throw new Error("profile is not loaded");
       return authApi.put<unknown>("/v2/user", { ...profile.raw, id: profile.id, timezone_id: timezone });
     },

@@ -5,7 +5,6 @@ import {
   DatabaseIcon,
   HistoryIcon,
   IdCardIcon,
-  GlobeIcon,
   KeyRoundIcon,
   PaletteIcon,
   PlugIcon,
@@ -106,9 +105,7 @@ const GROUPS: SettingsGroup[] = [
          остальных узких — в нём таблица окружений. */
       { id: "company", labelKey: "core.company", icon: Building2Icon, medium: true },
       { id: "brand", labelKey: "core.brand", icon: PaletteIcon },
-      /* Пояс, формат даты, валюта и НДС — `core_settings` Ядра; ниже
-         языки данных проекта и курсы валют. */
-      { id: "locale", labelKey: "core.locale", icon: GlobeIcon },
+      /* «Локализация» живёт во вкладке «Язык и регион» «Профиля». */
       {
         id: "billing",
         labelKey: "billing.title",
