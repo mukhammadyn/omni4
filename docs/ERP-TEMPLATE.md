@@ -138,6 +138,32 @@ Id меню, view, полей и связей в каждом проекте с�
    Many2One на «Виды смен» вместо PICK_LIST `work_format` в форме и на
    странице вакансии; `office` перенесён в «Дневная». У сделок колонки нет — юнит у воронки. Пункт меню —
    в «Ядре» (§3.4); справочник — Настройки → Организация.
+12. **Личные данные `hr_employees`** (added 2026-10-27, в v2 нет) —
+   карточки «Личного» по прототипу. SINGLE_LINE: `employee_code`
+   («Код»), `nationality`, `birth_place`, `inn`, `inps`,
+   `id_doc_series`, `id_doc_issued_by`, `military_record`, `foreign_inn`.
+   DATE: `id_doc_issued_on`, `id_doc_valid_until`, `id_doc_valid_from`,
+   `citizenship_from`. PICK_LIST: `id_doc_kind` (`uz_passport`,
+   `uz_id_card`, `foreign_travel`, `residence_permit`,
+   `foreign_passport`), `citizenship_status` (`citizen`, `stateless`),
+   `citizenship_country` (`uz`, `kz`, `kg`, `tj`, `ru`, `tr`, `us`) —
+   экран сравнивает `stateless` и `uz` строкой. PHOTO `signature`,
+   CHECKBOX `no_inps`, MULTI_LINE `note`. Номер документа — прежний
+   `passport_number`, подпись «Номер документа».
+13. **`hr_employee_contacts`** — «Адреса и телефоны» сотрудника (added
+   2026-10-27, в v2 нет; вкладка `contacts` страницы сотрудника).
+   Поля: `kind` (PICK_LIST `address`/`contact`), `name` (PICK_LIST
+   `registration_address`, `home_address`, `postal_address`,
+   `personal_phone`, `work_phone`, `email`, `telegram`), `value`
+   (SINGLE_LINE). Экран делит названия по типу суффиксом `_address` —
+   новый адрес заводить с ним. Many2One на `hr_employees`
+   (`hr_employees_id`, «Сотрудник»). Пункт меню не нужен; вкладка связи
+   у пункта сотрудников — по желанию, своя вкладка встаёт на её место.
+14. **`hr_employee_family`** — «Состав семьи» сотрудника (added 2026-10-27,
+   в v2 нет; вкладка `family`). Поля: `relation` (PICK_LIST `spouse`,
+   `child`, `parent`, `sibling`), `full_name`, `phone` (SINGLE_LINE),
+   `birth_date` (DATE). Many2One на `hr_employees` (`hr_employees_id`).
+   Пункт меню не нужен.
 
 ## 2. Вход и права
 

@@ -99,6 +99,8 @@ export function useEmployee(menuId: string, guid: string, language: string) {
     orgViewId: views.find((view) => view.type === "ORG")?.id,
     can: permissionOf(EMPLOYEES),
     edit: (slug: string, value: unknown) => update.mutate({ guid, values: { [slug]: value } }),
+    /** Несколько полей одной записью: «Разобрать» ФИО, «Заполнить по ПИНФЛ». */
+    editMany: (values: Item, onSuccess?: () => void) => update.mutate({ guid, values }, { onSuccess: () => onSuccess?.() }),
     /** Увольнение: статус «Уволен», дата («ГГГГ-ММ-ДД», как пишет поле DATE) и причина. */
     dismiss: (date: string, reasonId: string) =>
       update.mutate({
