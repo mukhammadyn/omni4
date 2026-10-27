@@ -10,6 +10,7 @@ import type { Scale, SheetCell, SheetTotals } from "../model/timesheet";
 import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, GroupedRows, useAttendance, dayTone, useDayHead, type OpenDay, type OpenEmployee } from "./attendance-parts";
 import { ATTENDANCE_TAB } from "./employee-tabs";
 import { TimesheetDay } from "./TimesheetDay";
+import { TimesheetExport } from "./TimesheetFill";
 
 const SHEET_SCALES: readonly Scale[] = ["month", "week"];
 
@@ -36,7 +37,10 @@ export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PeriodBar view={view}>
-        <Legend types={sheet.absenceTypes} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Legend types={sheet.absenceTypes} />
+          <TimesheetExport kind={scale === "week" ? "week" : "month"} anchor={range.from} />
+        </div>
       </PeriodBar>
 
       {/* Поля — снаружи прокрутки: внутри неё ячейки заезжали бы
