@@ -146,18 +146,19 @@ export function DayEditor({
   const before = summary(row);
   const after = summary(draft);
   const minutes = (key: "late_minutes" | "early_minutes" | "worked_minutes", label: string, orig: number) => (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-fg-muted">
+    <label className="flex min-w-0 flex-col gap-1 text-sm">
+      {/* Подпись в одну строку, «было» — под полем: иначе поля разъезжаются по высоте. */}
+      <span className="truncate text-fg-muted" title={label}>
         {label}
-        {orig !== draft[key] && <span className="ml-1 text-xs text-fg-subtle">({t("timesheets.was", { value: orig })})</span>}
       </span>
       <input
         type="number"
         min={0}
         value={draft[key]}
         onChange={(event) => setDraft({ ...draft, [key]: Math.max(0, Number(event.target.value) || 0) })}
-        className={input}
+        className={`${input} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none`}
       />
+      <span className="h-4 text-xs text-fg-subtle">{orig !== draft[key] ? t("timesheets.was", { value: orig }) : ""}</span>
     </label>
   );
   const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${row.date}T00:00:00Z`));

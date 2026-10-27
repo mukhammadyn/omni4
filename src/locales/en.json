@@ -3222,5 +3222,6 @@
   "timesheets.earlyMin": "Left early, min",
   "timesheets.workedMin": "Worked, min",
   "timesheets.reason": "Reason",
-  "timesheets.resetDay": "As in attendance"
+  "timesheets.resetDay": "As in attendance",
+  "timesheets.export": "Create timesheets"
 }

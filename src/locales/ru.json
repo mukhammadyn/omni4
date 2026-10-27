@@ -3236,5 +3236,6 @@
   "timesheets.earlyMin": "Ранний уход, мин",
   "timesheets.workedMin": "Отработано, мин",
   "timesheets.reason": "Причина правки",
-  "timesheets.resetDay": "Как в посещаемости"
+  "timesheets.resetDay": "Как в посещаемости",
+  "timesheets.export": "Сформировать табели"
 }

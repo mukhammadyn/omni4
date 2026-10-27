@@ -5,6 +5,7 @@ import { useTablePermissions } from "@/features/auth";
 import { todayInput } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
+import { Icon } from "@/shared/ui/icon";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Modal } from "@/shared/ui/modal";
 import { ToolButton } from "@/shared/ui/tool-button";
@@ -39,13 +40,35 @@ export function TimesheetFill() {
   );
 }
 
-function FillDialog({ onClose }: { onClose: () => void }) {
+/**
+ * «Сформировать табели» в «Посещаемость» → «Табель»: тот же диалог, но
+ * с периодом, который сейчас на экране (месяц или неделя).
+ */
+export function TimesheetExport({ kind, anchor }: { kind: PeriodKind; anchor: string }) {
+  const { t } = useTranslation();
+  const can = useTablePermissions()(TIMESHEETS);
+  const [open, setOpen] = useState(false);
+  if (!can.write) return null;
+  return (
+    <>
+      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+        <Icon as={CalendarClockIcon} size={14} />
+        {t("timesheets.export")}
+      </Button>
+      {open && <FillDialog initial={{ kind, anchor }} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function FillDialog({ onClose, initial }: { onClose: () => void; initial?: { kind: PeriodKind; anchor: string } }) {
   const { t, i18n } = useTranslation();
+  const start = initial?.anchor.slice(0, 7);
   const months = recentMonths();
-  const [kind, setKind] = useState<PeriodKind>("month");
-  const [month, setMonth] = useState(months[0]!);
+  if (start && !months.includes(start)) months.unshift(start);
+  const [kind, setKind] = useState<PeriodKind>(initial?.kind ?? "month");
+  const [month, setMonth] = useState(start ?? months[0]!);
   // Неделя — пн–вс того дня, что выбран: ведомость HRMS тоже берёт неделю от даты.
-  const [day, setDay] = useState(todayInput());
+  const [day, setDay] = useState(initial?.anchor ?? todayInput());
   const period = kind === "month" ? `${month}-01` : rangeOf("week", day).from;
   const { loading, plan, fill, from } = useTimesheetFill(period, kind);
   const write = useWriteTimesheets();
