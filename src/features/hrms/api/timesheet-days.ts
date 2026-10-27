@@ -211,13 +211,13 @@ export function useFillDays(period: string, kind: PeriodKind) {
 export function useEditDay(timesheet: string, rows: DayRow[]) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ row, values, reason, before, after }: { row: DayRow; values: Edit; reason: string; before: string; after: string }) => {
+    mutationFn: async ({ row, label, values, reason, before, after }: { row: DayRow; label: string; values: Edit; reason: string; before: string; after: string }) => {
       await api.put<unknown>(`/v2/items/${TIMESHEET_DAYS}`, { data: { guid: row.guid, ...values, reason } });
       const sum = sheetTotals(rows.map((item) => (item.guid === row.guid ? { ...item, ...values } : item)));
       await api.put<unknown>(`/v2/items/${TIMESHEETS}`, {
         data: { guid: timesheet, worked_hours: hoursOf(sum.workedMinutes), overtime_hours: hoursOf(sum.overtimeMinutes), absence_days: sum.absences },
       });
-      await logEvent(timesheet, { action: "edited", field: row.date, before, after, ...(reason ? { comment: reason } : {}), dayId: row.guid });
+      await logEvent(timesheet, { action: "edited", field: label, before, after, ...(reason ? { comment: reason } : {}), dayId: row.guid });
     },
     onError: (error) => reportError(error, "common.saveFailed"),
     onSettled: () =>
