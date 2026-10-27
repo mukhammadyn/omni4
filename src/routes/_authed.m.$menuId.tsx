@@ -117,6 +117,8 @@ import {
   DOCUMENTS_VIEW,
   useKbActions,
   useNotDismissed,
+  TimesheetFill,
+  TIMESHEETS,
   type EmployeeTab,
 } from "@/features/hrms";
 import { MicrofrontendPage } from "@/features/microfrontend";
@@ -1140,6 +1142,11 @@ function MenuPage() {
       void navigate({ to: "/trainings/$itemId", params: { itemId: guid }, search: { menu: menuId } });
       return;
     }
+    /* Табель — тоже: итоги, утверждение и табель по дням (features/hrms, TimesheetDocPage). */
+    if (view?.tableSlug === TIMESHEETS) {
+      void navigate({ to: "/timesheets/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
     /* Имущество — тоже: действия, история и владелец (features/hrms, AssetPage). */
     if (view?.tableSlug === ASSETS) {
       void navigate({ to: "/assets/$itemId", params: { itemId: guid }, search: { menu: menuId } });
@@ -1735,6 +1742,8 @@ function MenuPage() {
                 />
               )}
               {vacancyPlanView && <VacancyPlanTools viewId={view.id} />}
+              {/* «Табели»: документы месяца по отделам — из посещаемости. */}
+              {view.tableSlug === TIMESHEETS && <TimesheetFill />}
               {sheetView && PEOPLE_VIEWS.has(view.type) && <ScheduleTools viewId={view.id} />}
               {sheetView && (SUMMARY_VIEWS.has(view.type) || view.type === "KPI") && <ScheduleTools viewId={view.id} grouping={false} />}
 

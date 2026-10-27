@@ -85,6 +85,7 @@ export const toAttendanceDay = (row: Item): AttendanceDay => ({
   lastOut: text(row.last_out),
   workedMinutes: num(row.worked_minutes),
   lateMinutes: num(row.late_minutes) ?? 0,
+  earlyMinutes: num(row.early_leave_minutes) ?? 0,
   requestId: text(row.hr_requests_id),
   comment: text(row.comment),
 });
@@ -98,6 +99,7 @@ const toLeave = (row: Item): Leave | null => {
   const kind = related(row, "hr_absence_types_id");
   return {
     id: text(row.guid),
+    typeId: text(row.hr_absence_types_id),
     title: text(kind.name),
     code: text(kind.code),
     icon: text(kind.icon),

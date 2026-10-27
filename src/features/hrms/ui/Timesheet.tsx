@@ -161,7 +161,7 @@ const headCell = "sticky top-0 h-11 border-b border-border bg-surface";
 const dayWidth = (days: number) => ({ width: `calc((100cqw - 212px) / ${days})` });
 const body = "border-b border-border";
 
-const TOTALS = ["plan", "hours", "late", "overtime", "days", "absences"] as const;
+export const TOTALS = ["plan", "hours", "late", "overtime", "days", "absences"] as const;
 /** Ширины итогов при месяце (раскладка fixed): длительностям «135ч 56м» — шире, счётчикам — уже. */
 /** Сумма ширин итогов ниже — таблица шире экрана ровно на них (раскладка fixed). */
 const TOTALS_PX = 72 + 84 + 76 + 76 + 48 + 68;
@@ -192,7 +192,7 @@ const hoursColor = ({ workedMinutes, planMinutes }: SheetTotals) => {
   return ratio >= 0.8 ? "text-success" : ratio >= 0.5 ? "text-warning" : "text-danger";
 };
 
-function TotalsCells({ totals }: { totals: SheetTotals }) {
+export function TotalsCells({ totals }: { totals: SheetTotals }) {
   const duration = useDuration();
   const cell = `${body} whitespace-nowrap px-2 text-right tabular-nums`;
   return (
@@ -212,7 +212,7 @@ function TotalsCells({ totals }: { totals: SheetTotals }) {
 /** Код отсутствия цветом его типа — через палитру чипов, не сырым hex. */
 const leaveStyle = (color: string) => CHIP_STYLES[hexToChipColor(color)];
 
-function CellView({
+export function CellView({
   cell,
   hours,
   whole = false,
@@ -307,7 +307,7 @@ function CellView({
 
 const CODE = "inline-flex h-[19px] min-w-6 shrink-0 items-center justify-center rounded px-1 text-2xs font-semibold tabular-nums ring-1 ring-border ring-inset";
 
-function Legend({ types }: { types: { title: string; code: string; color: string }[] }) {
+export function Legend({ types }: { types: { title: string; code: string; color: string }[] }) {
   const { t } = useTranslation();
   const items: { code: ReactNode; style: string; label: string; desc: string }[] = [
     { code: "8,0", style: "text-fg", label: t("timesheet.legend.worked"), desc: t("timesheet.legendDesc.worked") },

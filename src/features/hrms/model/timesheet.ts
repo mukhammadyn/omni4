@@ -25,6 +25,8 @@ export type AttendanceDay = {
   lastOut: string;
   workedMinutes: number | null;
   lateMinutes: number;
+  /** Ранний уход, минуты (`early_leave_minutes`). */
+  earlyMinutes: number;
   requestId: string;
   comment: string;
 };
@@ -32,6 +34,8 @@ export type AttendanceDay = {
 /** Заявка на отсутствие (`hr_requests`, тип absence) с типом из `hr_absence_types`. */
 export type Leave = {
   id: string;
+  /** Тип отсутствия (`hr_absence_types`). */
+  typeId: string;
   title: string;
   code: string;
   icon: string;

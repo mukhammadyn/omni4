@@ -10,6 +10,7 @@ const day = (date: string, patch: Partial<AttendanceDay> = {}): AttendanceDay =>
   lastOut: `${date}T13:00:00Z`,
   workedMinutes: 540,
   lateMinutes: 0,
+  earlyMinutes: 0,
   requestId: "",
   comment: "",
   ...patch,
@@ -63,7 +64,7 @@ test("totals: overtime is a balance, late eats it; absences counted", () => {
 });
 
 test("leave takes the day out of the norm; pending leave and mark are flagged", () => {
-  const leave: Leave = { id: "r1", title: "Отпуск", code: "О", icon: "", color: "", status: "approved", from: "2026-09-14", to: "2026-09-15" };
+  const leave: Leave = { id: "r1", typeId: "", title: "Отпуск", code: "О", icon: "", color: "", status: "approved", from: "2026-09-14", to: "2026-09-15" };
   const pending: Leave = { ...leave, id: "r2", status: "pending", from: "2026-09-17", to: "2026-09-17" };
   const { cells, totals } = buildRow(
     input({
@@ -97,7 +98,7 @@ test("period: month, week from Monday, steps", () => {
 });
 
 test("calendar: leave days merge into one run, pending leave too; statuses", () => {
-  const leave: Leave = { id: "r1", title: "Отпуск", code: "О", icon: "", color: "", status: "approved", from: "2026-09-14", to: "2026-09-15" };
+  const leave: Leave = { id: "r1", typeId: "", title: "Отпуск", code: "О", icon: "", color: "", status: "approved", from: "2026-09-14", to: "2026-09-15" };
   const pending: Leave = { ...leave, id: "r2", status: "pending", from: "2026-09-17", to: "2026-09-18" };
   const { cells } = buildRow(
     input({
