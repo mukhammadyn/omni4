@@ -219,7 +219,7 @@ export function DayEditor({
             </Button>
             <Button
               disabled={save.isPending || (before === after && reason === row.reason)}
-              onClick={() => save.mutate({ row, values: draft, reason: reason.trim(), before, after }, { onSuccess: onClose })}
+              onClick={() => save.mutate({ row, label: `${name}, ${date}`, values: draft, reason: reason.trim(), before, after }, { onSuccess: onClose })}
             >
               {t("action.save")}
             </Button>

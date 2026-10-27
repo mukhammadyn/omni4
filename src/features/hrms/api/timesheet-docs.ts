@@ -125,7 +125,10 @@ export function useWriteTimesheets() {
             core_users_id: session.getObjectIds()[PEOPLE] ?? null,
           },
         });
-        skipped += (await fill({ guid, departmentId })).skipped;
+        const result = await fill({ guid, departmentId });
+        skipped += result.skipped;
+        // Все дни отдела уже в других табелях — пустой документ не нужен.
+        if (!result.people) await api.delete<unknown>(`/v1/object/${TIMESHEETS}`, { data: { ids: [guid] } });
       }
       for (const target of plan.update) skipped += (await fill(target)).skipped;
       return { skipped };
