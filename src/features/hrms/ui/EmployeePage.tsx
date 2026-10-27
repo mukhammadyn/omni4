@@ -12,6 +12,12 @@ import {
   KeyRoundIcon,
   AwardIcon,
   BriefcaseBusinessIcon,
+  BookUserIcon,
+  GlobeIcon,
+  MessageSquareIcon,
+  ScanSearchIcon,
+  SplitIcon,
+  BadgeCheckIcon,
   CameraIcon,
   BriefcaseIcon,
   Building2Icon,
@@ -24,12 +30,14 @@ import {
   IdCardIcon,
   LanguagesIcon,
   MapIcon,
+  MapPinIcon,
   NetworkIcon,
   PencilIcon,
   PhoneIcon,
   PlaneIcon,
   SendIcon,
   ArrowLeftRightIcon,
+  ArrowDownUpIcon,
   UserIcon,
   UserRoundCheckIcon,
   UserXIcon,
@@ -52,14 +60,21 @@ import { Chip as Tag, hexToChipColor } from "@/shared/ui/chip";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
 import { EMPLOYEES, toProfile, useEmployee, useNeighbours, useReports } from "../api/employee";
+import { parsePinfl, splitFullName } from "../model/personal";
+import { applyOrder } from "../model/tab-order";
+import { TabOrder } from "./TabOrder";
+import { useUi } from "@/shared/lib/ui-store";
+import { toast } from "@/shared/lib/toast";
 import { isAssignment, JOB_HISTORY, useJobHistory } from "../api/job-history";
 import { PAYROLL_LINES } from "../api/payroll";
 import { SHIFTS } from "../api/schedule";
 
-import { text, toPerson } from "../api/org";
+import { firstText, text, toPerson } from "../api/org";
 import { monthsBetween, toDay } from "../model/job-history";
 import { Card, Meta, Row, SideProp } from "./page-parts";
-import { ABSENCES_TAB, ASSETS_TAB, ATTENDANCE_TAB, DOCS_TAB, SCHEDULE_TAB, SURVEYS_TAB, TRAININGS_TAB, KPI_TAB } from "./employee-tabs";
+import { ABSENCES_TAB, ASSETS_TAB, ATTENDANCE_TAB, DOCS_TAB, SCHEDULE_TAB, SURVEYS_TAB, TRAININGS_TAB, KPI_TAB, CONTACTS_TAB, FAMILY_TAB, EDUCATION_TAB } from "./employee-tabs";
+import { CONTACTS_GRID, EDUCATION_GRID, EmployeeGrid, FAMILY_GRID } from "./EmployeeGrid";
+import { CONTACTS, FAMILY, QUALIFICATIONS, useEmployeeRows } from "../api/employee-rows";
 import { EmployeeKpi } from "./EmployeeKpi";
 import { SCORECARDS } from "../api/kpi";
 import { EmployeeTrainings } from "./EmployeeTrainings";
@@ -89,6 +104,8 @@ const OWN_TABLES: Record<string, string> = {
   [SURVEYS_TAB]: SURVEY_PARTICIPANTS,
   [ASSETS_TAB]: ASSETS,
   [DOCS_TAB]: DOCUMENTS,
+  [CONTACTS_TAB]: CONTACTS,
+  [FAMILY_TAB]: FAMILY,
 };
 const OWN_TITLES: Record<string, TranslationKey> = {
   [ABSENCES_TAB]: "employeeAbsences.title",
@@ -99,8 +116,17 @@ const OWN_TITLES: Record<string, TranslationKey> = {
   [SURVEYS_TAB]: "survey.take.title",
   [ASSETS_TAB]: "asset.tab.title",
   [DOCS_TAB]: "doc.title",
+  [CONTACTS_TAB]: "employee.tab.contacts",
+  [FAMILY_TAB]: "employee.tab.family",
 };
-const OWN_TABS = new Set(Object.keys(OWN_TABLES));
+/** Вкладки-таблицы (`gridTab` прототипа). «Образование» — без места в OWN_TABLES, см. allTabs. */
+const GRIDS: Record<string, typeof CONTACTS_GRID> = {
+  [CONTACTS_TAB]: CONTACTS_GRID,
+  [FAMILY_TAB]: FAMILY_GRID,
+  [EDUCATION_TAB]: EDUCATION_GRID,
+};
+const CERTIFICATES = { type: "certificate" };
+const OWN_TABS = new Set([...Object.keys(OWN_TABLES), EDUCATION_TAB]);
 
 /** Значок вкладки в «Больше» — `MORE_IC` прототипа, по таблице вкладки. */
 const TAB_ICONS: Record<string, LucideIcon> = {
@@ -115,6 +141,8 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   hr_training_participants: GraduationCapIcon,
   hr_survey_participants: ClipboardListIcon,
   hr_qualifications: AwardIcon,
+  [CONTACTS]: MapPinIcon,
+  [FAMILY]: UsersIcon,
 };
 
 /*
@@ -126,7 +154,22 @@ const CARDS: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
   {
     icon: UserIcon,
     title: "employee.card.personal",
-    slugs: ["last_name", "first_name", "middle_name", "birth_date", "gender", "hikvision_id", "status"],
+    slugs: [
+      "full_name",
+      "last_name",
+      "first_name",
+      "middle_name",
+      "employee_code",
+      "birth_date",
+      "gender",
+      "nationality",
+      "birth_place",
+      "inn",
+      "inps",
+      "pinfl",
+      "hikvision_id",
+      "status",
+    ],
   },
   {
     icon: PhoneIcon,
@@ -136,9 +179,39 @@ const CARDS: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
   {
     icon: IdCardIcon,
     title: "employee.card.identity",
-    slugs: ["pinfl", "passport_number", "address", "emergency_contact"],
+    slugs: ["address", "emergency_contact"],
+  },
+  {
+    icon: BookUserIcon,
+    title: "employee.card.idDocument",
+    slugs: [
+      "id_doc_kind",
+      "id_doc_series",
+      "passport_number",
+      "id_doc_issued_by",
+      "id_doc_issued_on",
+      "id_doc_valid_until",
+      "id_doc_valid_from",
+      "military_record",
+    ],
+  },
+  {
+    icon: GlobeIcon,
+    title: "employee.card.citizenship",
+    slugs: ["citizenship_status", "citizenship_country", "foreign_inn", "no_inps", "citizenship_from"],
   },
 ];
+
+/**
+ * Строки гражданства, которые к человеку не относятся (`cit()` прототипа):
+ * у лица без гражданства нет страны, у гражданина Узбекистана — иностранного ИНН.
+ */
+const offRow = (slug: string, row: Record<string, unknown>) => {
+  const status = firstText(row.citizenship_status);
+  if (slug === "citizenship_country") return status === "stateless";
+  if (slug === "foreign_inn") return status !== "stateless" && firstText(row.citizenship_country) === "uz";
+  return false;
+};
 
 /** Метки — каждая своей карточкой со счётчиком, как «Интересы» и «Навыки» прототипа. */
 const TAGS: { icon: LucideIcon; slug: string }[] = [
@@ -223,11 +296,18 @@ export function EmployeePage({
   const employee = useEmployee(menuId, guid, language);
   const reports = useReports(guid);
   const neighbours = useNeighbours(guid);
+  /* «Лицензии и сертификаты» на «Личном»: образование из той же таблицы — своей вкладкой. */
+  const certificates = useEmployeeRows(QUALIFICATIONS, guid, CERTIFICATES).rows;
   const [active, setActive] = useState<{ slug: string; anchor: DOMRect } | null>(null);
   /** «Изменить»: поля правятся, только пока режим включён, — как в прототипе. */
   const [editing, setEditing] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [granting, setGranting] = useState(false);
+  /* «Порядок вкладок»: вкладки перетаскиваются, порядок — свой у каждого, в ui-store. */
+  const [arranging, setArranging] = useState(false);
+  const orderKey = `employee-tab-order:${menuId}`;
+  const savedOrder = useUi((s) => s.viewState[orderKey]);
+  const setViewState = useUi((s) => s.setViewState);
   // Выше раннего return: хуки — до любого выхода из рендера.
   const upload = useUploadFiles();
   /*
@@ -266,13 +346,81 @@ export function EmployeePage({
   const units = bySlug.get("core_business_units_ids");
   const ownUnits = Array.isArray(row.core_business_units_ids) && row.core_business_units_ids.length > 0;
   const photoField = bySlug.get("photo");
-  /* Новое фото — файлом в хранилище, в поле уходит его адрес. */
-  const changePhoto = (file: File | undefined) => {
-    if (!file || !photoField) return;
+  const label = (field: Field) => localized(field.labels, language, field.label);
+  /* Новое фото или подпись — файлом в хранилище, в поле уходит его адрес. */
+  const changeImage = (slug: string, file: File | undefined) => {
+    const field = bySlug.get(slug);
+    if (!file || !field) return;
     upload
-      .mutateAsync({ files: [file], folder: uploadFolder(photoField.attributes) })
-      .then((urls) => urls[0] && employee.edit("photo", urls[0]), () => undefined);
+      .mutateAsync({ files: [file], folder: uploadFolder(field.attributes) })
+      .then((urls) => urls[0] && employee.edit(slug, urls[0]), () => undefined);
   };
+  const changePhoto = (file: File | undefined) => changeImage("photo", file);
+  /* «Разобрать» и «Заполнить по ПИНФЛ» — только в режиме правки, как прочие правки. */
+  const tools = editing && employee.can.write;
+  const splitName = () => employee.editMany(splitFullName(text(row.full_name)));
+  const fillByPinfl = () => {
+    const parsed = parsePinfl(text(row.pinfl));
+    if (!parsed) return void toast.error(t("employee.pinflInvalid"));
+    employee.editMany({
+      birth_date: parsed.birth,
+      gender: parsed.gender,
+      ...(text(row.inps) ? {} : { inps: text(row.pinfl).replace(/\D/g, "") }),
+    }, () => toast.success(t("employee.pinflFilled")));
+  };
+  const toolFor: Record<string, ReactNode> = {
+    full_name: (
+      <Button type="button" size="sm" variant="secondary" onClick={splitName} title={t("employee.splitHint")}>
+        <Icon as={SplitIcon} size={14} />
+        {t("employee.split")}
+      </Button>
+    ),
+    pinfl: (
+      <Button type="button" size="sm" variant="secondary" onClick={fillByPinfl}>
+        <Icon as={ScanSearchIcon} size={14} />
+        {t("employee.fillByPinfl")}
+      </Button>
+    ),
+  };
+  /** Фото и подпись — маленькими плитками над полями, а не отдельной карточкой. */
+  const media = (["photo", "signature"] as const).flatMap((slug) => {
+    const field = bySlug.get(slug);
+    if (!field) return [];
+    const url = firstText(row[slug]);
+    const canEdit = employee.can.write && !field.locked;
+    const tile = (
+      <span className="grid size-14 place-items-center overflow-hidden rounded-lg border border-border bg-surface-soft text-fg-subtle">
+        {url ? (
+          <img src={url} alt="" className={`size-full ${slug === "photo" ? "object-cover" : "object-contain p-1"}`} />
+        ) : (
+          <Icon as={CameraIcon} size={16} />
+        )}
+      </span>
+    );
+    return [
+      <div key={slug} className="flex flex-col items-center gap-1 text-xs text-fg-muted">
+        {canEdit ? (
+          <label title={label(field)} className="cursor-pointer rounded-lg focus-within:ring-2 focus-within:ring-accent hover:opacity-80">
+            {tile}
+            <input
+              type="file"
+              accept="image/*"
+              aria-label={label(field)}
+              disabled={upload.isPending}
+              className="sr-only"
+              onChange={(event) => {
+                changeImage(slug, event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
+          </label>
+        ) : (
+          tile
+        )}
+        {label(field)}
+      </div>,
+    ];
+  });
   const activeField = active ? bySlug.get(active.slug) : undefined;
 
   const cell = (field: Field) => (
@@ -307,7 +455,6 @@ export function EmployeePage({
       <div className="flex min-h-7 min-w-0 items-center">{cell(field)}</div>
     );
 
-  const label = (field: Field) => localized(field.labels, language, field.label);
   /*
    * Свои вкладки встают НА МЕСТО вкладок связей своей таблицы: имя
    * и порядок по-прежнему задаёт админ, внутри — наш экран вместо таблицы
@@ -325,12 +472,25 @@ export function EmployeePage({
     .filter((id) => !relationTabs.some((item) => item.id === id))
     .map((id) => ({ id, label: t(OWN_TITLES[id]!), icon: TAB_ICONS[OWN_TABLES[id]!] ?? FolderIcon }));
   const work = linked.findIndex((item) => item.tableSlug === JOB_HISTORY);
-  const allTabs = [
-    { id: PERSONAL, label: t("employee.tab.personal") },
-    ...relationTabs.slice(0, work + 1),
-    ...missing,
-    ...relationTabs.slice(work + 1),
+  /*
+   * «Адреса и телефоны», «Состав семьи» и «Образование» — сразу за «Личным»,
+   * как в прототипе. «Образование» не встаёт на место вкладки связи
+   * `hr_qualifications`: там же и сертификаты, и её админ оставляет как есть.
+   */
+  const notContacts = (item: { id: string }) => item.id !== CONTACTS_TAB && item.id !== FAMILY_TAB;
+  const defaultTabs = [
+    { id: CONTACTS_TAB, label: t("employee.tab.contacts"), icon: MapPinIcon },
+    { id: FAMILY_TAB, label: t("employee.tab.family"), icon: UsersIcon },
+    { id: EDUCATION_TAB, label: t("employee.tab.education"), icon: GraduationCapIcon },
+    ...relationTabs.slice(0, work + 1).filter(notContacts),
+    ...missing.filter(notContacts),
+    ...relationTabs.slice(work + 1).filter(notContacts),
   ];
+  /* «Личное» всегда первое: это сама карточка, а не раздел. */
+  const order = Array.isArray(savedOrder) ? savedOrder.filter((id): id is string => typeof id === "string") : [];
+  const ordered = applyOrder(defaultTabs, order);
+  const allTabs = [{ id: PERSONAL, label: t("employee.tab.personal") }, ...ordered];
+
   const own = tabId && OWN_TABS.has(tabId) ? tabId : undefined;
   const activeTab = own ?? tab?.id ?? PERSONAL;
   const lastSeen = formatDate(person.lastActivity, "datetime", locale);
@@ -429,6 +589,10 @@ export function EmployeePage({
                 {t("employee.grantAccess")}
               </Button>
             )}
+            <Button variant={arranging ? "primary" : "secondary"} onClick={() => setArranging(!arranging)}>
+              <Icon as={arranging ? CheckIcon : ArrowDownUpIcon} size={15} />
+              {t(arranging ? "employee.done" : "employee.arrangeTabs")}
+            </Button>
             {employee.can.write && (
               /* Правка сохраняется сразу, по полю, поэтому выход
                  из режима — «Готово», а не «Сохранить». */
@@ -489,20 +653,40 @@ export function EmployeePage({
         </header>
 
         <div className="mb-4 flex border-b border-border">
-          <Tabs
-            activeId={activeTab}
-            onSelect={(id) => onTab(id === PERSONAL ? undefined : id)}
-            tabs={allTabs.slice(0, VISIBLE_TABS)}
-          />
-          <MoreTabs
-            tabs={allTabs.slice(VISIBLE_TABS)}
-            activeId={activeTab}
-            label={t("employee.more")}
-            onSelect={onTab}
-          />
+          {arranging ? (
+            /* Все вкладки разом, и спрятанные в «Больше»: переносить можно любую, кроме «Личного». */
+            <div className="flex flex-wrap items-center gap-1.5">
+              <TabOrder tabs={ordered} onOrder={(ids) => setViewState(orderKey, ids)} />
+              {order.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setViewState(orderKey, [])}
+                  className="rounded-md px-2 py-1 text-sm text-fg-muted hover:bg-surface-hover hover:text-fg"
+                >
+                  {t("employee.resetTabOrder")}
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <Tabs
+                activeId={activeTab}
+                onSelect={(id) => onTab(id === PERSONAL ? undefined : id)}
+                tabs={allTabs.slice(0, VISIBLE_TABS)}
+              />
+              <MoreTabs
+                tabs={allTabs.slice(VISIBLE_TABS)}
+                activeId={activeTab}
+                label={t("employee.more")}
+                onSelect={onTab}
+              />
+            </>
+          )}
         </div>
 
-        {own === ATTENDANCE_TAB ? (
+        {own && GRIDS[own] ? (
+          <EmployeeGrid key={own} grid={GRIDS[own]} employeeId={guid} language={language} />
+        ) : own === ATTENDANCE_TAB ? (
           <EmployeeAttendance employeeId={guid} />
         ) : own === SCHEDULE_TAB ? (
           <EmployeeSchedule employeeId={guid} />
@@ -580,10 +764,13 @@ export function EmployeePage({
           <div className="grid items-start gap-4 min-[1100px]:grid-cols-[minmax(0,1fr)_320px]">
             <div>
               {CARDS.map((card) => {
-                const fields = fieldsOf(card.slugs);
+                const fields = fieldsOf(card.slugs).filter((field) => !offRow(field.slug, row));
                 if (!fields.length) return null;
                 return (
                   <Card key={card.title} icon={card.icon} title={t(card.title)}>
+                    {card.title === "employee.card.personal" && media.length > 0 && (
+                      <div className="flex gap-4 border-b border-border pt-1 pb-3">{media}</div>
+                    )}
                     {card.title === "employee.card.personal" && (
                       <Row label={t("employee.id")}>
                         <code className="rounded bg-surface-hover px-1.5 py-0.5 font-mono text-[12.5px]">
@@ -593,7 +780,14 @@ export function EmployeePage({
                     )}
                     {fields.map((field) => (
                       <Row key={field.id} label={label(field)}>
-                        {value(field)}
+                        {tools && toolFor[field.slug] ? (
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1">{value(field)}</div>
+                            {toolFor[field.slug]}
+                          </div>
+                        ) : (
+                          value(field)
+                        )}
                       </Row>
                     ))}
                   </Card>
@@ -609,6 +803,36 @@ export function EmployeePage({
                   </Card>
                 );
               })}
+              <Card icon={BadgeCheckIcon} title={t("employee.card.certificates")} count={certificates.length}>
+                {certificates.length ? (
+                  <ul className="divide-y divide-border text-sm">
+                    {certificates.map((item) => (
+                      <li key={text(item.guid)} className="py-2">
+                        <b className="font-medium">{text(item.title) || "—"}</b>
+                        {text(item.institution) && <div className="text-fg-muted">{text(item.institution)}</div>}
+                        {(text(item.date_from) || text(item.valid_until)) && (
+                          <small className="text-fg-subtle">
+                            {[
+                              text(item.date_from) && formatDate(text(item.date_from), "date", locale),
+                              text(item.valid_until) &&
+                                t("employee.validUntil", { date: formatDate(text(item.valid_until), "date", locale) }),
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </small>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="py-2 text-sm text-fg-subtle">{t("employee.noCertificates")}</p>
+                )}
+              </Card>
+              {bySlug.get("note") && (
+                <Card icon={MessageSquareIcon} title={label(bySlug.get("note")!)}>
+                  {value(bySlug.get("note")!)}
+                </Card>
+              )}
             </div>
 
             <aside>
