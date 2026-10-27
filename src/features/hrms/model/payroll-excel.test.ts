@@ -31,7 +31,7 @@ const employee = (over: Partial<TemplateEmployee> = {}): TemplateEmployee => ({
     cell("2026-09-30", "worked"),
     cell("2026-10-01", "worked", { lateMinutes: 12 }),
     cell("2026-10-02", "missing_mark"),
-    cell("2026-10-03", "leave", { leave: { id: "l", title: "", code: "", icon: "", color: "", status: "approved", paid: true, from: "2026-10-03", to: "2026-10-03" } }),
+    cell("2026-10-03", "leave", { leave: { id: "l", typeId: "", title: "", code: "", icon: "", color: "", status: "approved", paid: true, from: "2026-10-03", to: "2026-10-03" } }),
     cell("2026-10-04", "worked", { planMinutes: 0, day: { status: "off_schedule" } as SheetCell["day"] }),
     cell("2026-10-05", "worked", { planMinutes: 0, workedMinutes: 120 }),
     cell("2026-10-31", "absent"),

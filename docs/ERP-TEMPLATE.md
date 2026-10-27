@@ -164,6 +164,61 @@ Id меню, view, полей и связей в каждом проекте с�
    `child`, `parent`, `sibling`), `full_name`, `phone` (SINGLE_LINE),
    `birth_date` (DATE). Many2One на `hr_employees` (`hr_employees_id`).
    Пункт меню не нужен.
+15. **`hr_timesheets`** — «Табели» (added 2026-10-27, в v2 нет; omni4
+   и omni5): документ «табель за месяц по отделу», `timesheets.html`
+   прототипа. Пункт меню — HRMS → Время, после «Графика работы».
+   Поля: `title`, `period` (DATE, первое число месяца), `people`,
+   `work_days`, `absence_days` (NUMBER), `worked_hours`,
+   `overtime_hours` (FLOAT), `status` (PICK_LIST `draft`/`review`/
+   `approved` — экран сравнивает `approved` строкой: утверждённый
+   «Заполнить из посещаемости» не трогает), `comment` (MULTI_LINE).
+   Many2One: `hr_departments_id` («Подразделение»), `core_users_id`
+   («Ответственный»). Доска по статусу — view BOARD, заводится в UI.
+   Колонки видов — в порядке прототипа, `title` первым: «Список» берёт
+   заголовком строки первую колонку. Список — `title`,
+   `hr_departments_id`, `worked_hours`, `status`; доска — `title`,
+   `hr_departments_id`, `people`, `worked_hours`.
+16. **`hr_timesheet_events`** — история табеля (added 2026-10-27, omni4
+   и omni5; вкладка «История» страницы табеля). Поля: `action` (PICK_LIST
+   `filled`, `approved`, `returned`, `edited`, `comment` — экран
+   сравнивает строкой), `field`, `before`, `after` (SINGLE_LINE, для
+   `edited` — подпись поля и значения текстом), `comment` (MULTI_LINE).
+   Many2One: `hr_timesheets_id` («Табель»), `core_users_id` («Кто»).
+   Пункт меню не нужен. Пишут только наши экраны — правка через общую
+   таблицу в историю не попадает.
+   Many2One `hr_timesheet_days_id` («День», added 2026-10-27, пока только
+   omni5) — у события `edited`: какой день правили.
+17. **`hr_timesheet_days`** — строки дня табеля, «сотрудник × день»
+   (added 2026-10-27, пока только omni5; ADR-0018). Копия табеля
+   посещаемости в момент «Заполнить», вход функции расчёта. Поля:
+   `date` (DATE), `outside_period` (CHECKBOX, «вне месяца» — день
+   соседнего месяца в неделе на стыке), `check_in`, `check_out`
+   (DATE_TIME, только чтение); ставка дня — `salary` (FLOAT), `currency`,
+   `pay_unit` (PICK_LIST `month`/`week`/`day`/`hour`); `plan_minutes`;
+   хранимые CHECKBOX `is_holiday`, `has_shift`, `is_remote`, `is_excused`,
+   `has_absence`, `absence_paid`, `off_schedule`, `outside_employment`,
+   `unconfirmed`; правимые `late_minutes`, `early_minutes`,
+   `worked_minutes` (NUMBER), `no_checkout` (CHECKBOX), `day_kind`
+   (PICK_LIST `worked`, `late`, `absent`, `leave`, `day_off`, `holiday`,
+   `missing_mark`, `empty`, `future`), `reason` (SINGLE_LINE); исходные
+   значения — `orig_late_minutes`, `orig_early_minutes`,
+   `orig_worked_minutes`, `orig_no_checkout`, `orig_day_kind`.
+   Many2One: `hr_timesheets_id`, `hr_employees_id`, `hr_absence_types_id`.
+   Пункт меню не нужен.
+18. **`hr_timesheet_norms`** — норма месяца по сотруднику для табеля
+   (added 2026-10-27, пока только omni5): `month` (DATE, первое число),
+   `shifts_in_month`, `minutes_per_day` (NUMBER). Many2One:
+   `hr_timesheets_id`, `hr_employees_id`. По строке на каждый задетый
+   периодом месяц.
+19. **Табель → «Зарплата»** (added 2026-10-27, пока только omni5):
+   у `hr_timesheets` — `period_kind` (PICK_LIST `month`/`week`; `period`
+   — первое число месяца или понедельник). У `hr_payroll_lines` —
+   вариант `timesheet` в `source`; Many2One `hr_timesheets_id`
+   («Табель»), `hr_penalty_policies_id` («Политика штрафов»); из чего
+   строка: `salary_rate`, `norm`, `worked`, `lateness_coefficient`
+   (FLOAT), `lateness_grace_minutes` (NUMBER), `pay_unit`, `calc_mode`
+   (PICK_LIST `daily`/`hourly`), `period_from`, `period_to` (DATE).
+   Оклад — строка на кусок периода с одной ставкой.
 
 ## 2. Вход и права
 
