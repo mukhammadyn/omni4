@@ -22,37 +22,27 @@ export const TIMESHEETS = "hr_timesheets";
 export const TIMESHEET_EVENTS = "hr_timesheet_events";
 
 /**
- * «Заполнить из посещаемости» на списке: по табелю на отдел за период
- * (месяц или неделя). Отдел без документа — создать черновиком, с
- * черновиком или «на проверке» — заполнить заново, утверждённый — не
- * трогать. Дни — useFillDays: принадлежность по истории назначений.
+ * «Заполнить из посещаемости»: один табель на компанию за период (месяц или
+ * неделю), как ведомость HRMS — все, у кого есть назначение в периоде, с
+ * отделом или без (ADR-0018, дополнение от 2026-10-28). Нет табеля — создать
+ * черновиком, черновик или «на проверке» — заполнить заново, утверждённый —
+ * не трогать. Табели отделов, заведённые раньше, план не трогает.
  */
 export function useTimesheetFill(period: string, kind: PeriodKind) {
   const days = useFillDays(period, kind);
-  const departments = useAll("hr_departments", {}, false);
   const existing = useAll(TIMESHEETS, { period: { op: "between", values: [days.from, days.from] } }, false);
-  const loading = days.loading || departments.loading || existing.loading;
+  const loading = days.loading || existing.loading;
 
   const plan = useMemo(() => {
     if (loading) return null;
-    const names = new Map(departments.rows.map((row) => [text(row.guid), text(row.name)]));
-    // Без отдела документ не завести: Many2One пустым — не «отдел».
-    const depts = [...days.departments].filter((id) => names.has(id));
-    const same = existing.rows.filter((row) => (firstText(row.period_kind) || "month") === kind);
-    const own = new Map(same.map((row) => [text(row.hr_departments_id), text(row.guid)]));
+    const company = existing.rows.filter((row) => (firstText(row.period_kind) || "month") === kind && !text(row.hr_departments_id));
     const base = planFill(
-      same.map((row) => ({ guid: text(row.guid), departmentId: text(row.hr_departments_id), status: firstText(row.status) })),
-      depts,
+      company.map((row) => ({ guid: text(row.guid), departmentId: "", status: firstText(row.status) })),
+      [""],
     );
-    // Дни, что уже лежат в других табелях (неделя поверх месяца), — предупреждение, не запрет.
-    const filled = [...base.create, ...base.update.map((target) => target.departmentId)];
-    return {
-      ...base,
-      overlap: filled.reduce((sum, id) => sum + days.overlap(id, own.get(id)), 0),
-      names,
-      unassigned: days.unassigned,
-    };
-  }, [loading, departments.rows, existing.rows, days.departments, days.unassigned, days.overlap, kind]);
+    // Дни, что уже лежат в других табелях (неделя поверх месяца, табели отделов), — предупреждение, не запрет.
+    return { ...base, overlap: base.locked.length ? 0 : days.overlap("", text(company[0]?.guid) || undefined) };
+  }, [loading, existing.rows, days.overlap, kind]);
 
   return { loading, plan, fill: days.fill, from: days.from };
 }
@@ -99,7 +89,7 @@ export function useLogEvent(guid: string) {
   });
 }
 
-/** Новые табели — черновиком, ответственный — вошедший; затем каждый заполняется днями. */
+/** Новый табель — черновиком, ответственный — вошедший; затем заполняется днями. */
 export function useWriteTimesheets() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -113,7 +103,7 @@ export function useWriteTimesheets() {
       plan: FillPlan;
       period: string;
       kind: PeriodKind;
-      title: (dept: string) => string;
+      title: string;
       fill: (target: FillTarget) => Promise<FillResult>;
     }) => {
       for (const departmentId of plan.create) {
@@ -121,16 +111,16 @@ export function useWriteTimesheets() {
         await api.post<unknown>(`/v2/items/${TIMESHEETS}`, {
           data: {
             guid,
-            title: title(plan.names.get(departmentId) ?? ""),
+            title,
             period,
             period_kind: kind,
-            hr_departments_id: departmentId,
+            hr_departments_id: departmentId || null,
             status: SHEET_STATUS.draft,
             core_users_id: session.getObjectIds()[PEOPLE] ?? null,
           },
         });
         const result = await fill({ guid, departmentId, fresh: true });
-        // Людей в отделе за период не нашлось — пустой документ не нужен.
+        // Людей за период не нашлось — пустой документ не нужен.
         if (!result.people) await api.delete<unknown>(`/v1/object/${TIMESHEETS}`, { data: { ids: [guid] } });
       }
       for (const target of plan.update) await fill(target);

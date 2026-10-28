@@ -26,7 +26,8 @@ const recentMonths = () => {
 
 /**
  * Кнопка «Заполнить из посещаемости» на списке «Табели» — шаблон
- * «Заполнить из системы учёта» прототипа: по табелю на отдел за месяц.
+ * «Заполнить из системы учёта» прототипа: один табель на компанию за период,
+ * как ведомость HRMS.
  */
 export function TimesheetFill() {
   const { t } = useTranslation();
@@ -86,16 +87,13 @@ function FillDialog({ onClose, initial }: { onClose: () => void; initial?: { kin
         plan.locked.length > 0 && (
           <li key="locked" className="text-fg-muted">{t("timesheets.planLocked", { count: plan.locked.length })}</li>
         ),
-        plan.unassigned > 0 && (
-          <li key="unassigned" className="text-fg-muted">{t("timesheets.planUnassigned", { count: plan.unassigned })}</li>
-        ),
       ].filter(Boolean)
     : [];
 
   const run = () => {
     if (!plan) return;
     write.mutate(
-      { plan, period: from, kind, fill, title: (dept) => `${t("timesheets.title")} · ${name} · ${dept}` },
+      { plan, period: from, kind, fill, title: `${t("timesheets.title")} · ${name}` },
       {
         onSuccess: () => {
           toast.success(t("timesheets.filled", { count: plan.create.length + plan.update.length }));

@@ -49,7 +49,8 @@ const GRID = "grid";
 const HISTORY = "history";
 
 /** Обязательные поля формы прототипа (`req:1`) — со звёздочкой. */
-const REQUIRED = new Set(["period", "hr_departments_id"]);
+// Отдел пуст у табеля компании (ADR-0018, дополнение от 2026-10-28).
+const REQUIRED = new Set(["period"]);
 
 /** Карточки «Обзора» — `form.layout` прототипа: поле и его значок. */
 const SHEET: [string, LucideIcon][] = [
@@ -121,7 +122,8 @@ export function TimesheetDocPage({
   const titleFor = (values: Record<string, unknown>) => {
     const period = text(values.period ?? row.period).slice(0, 7);
     const dept = departments.find((item) => item.id === text(values.hr_departments_id ?? row.hr_departments_id))?.name ?? "";
-    return period && dept ? `${t("timesheets.title")} · ${monthName(period, locale)} · ${dept}` : text(row.title);
+    if (!period) return text(row.title);
+    return [t("timesheets.title"), monthName(period, locale), dept].filter(Boolean).join(" · ");
   };
 
   /*
@@ -131,8 +133,9 @@ export function TimesheetDocPage({
    */
   const plain = (field: Field, source: Record<string, unknown> = row): string => {
     const raw = source[field.slug];
+    // Пустой отдел — табель компании (ADR-0018, дополнение от 2026-10-28).
     if (field.slug === "hr_departments_id")
-      return departments.find((item) => item.id === text(raw))?.name ?? text(related(source, field.slug).name);
+      return (departments.find((item) => item.id === text(raw))?.name ?? text(related(source, field.slug).name)) || t("timesheets.wholeCompany");
     // Логин не показываем: это учётные данные, а не имя.
     if (field.slug === "core_users_id") return doc.userNames.get(text(raw)) ?? "";
     if (field.type === "DATE") return formatDate(text(raw), "date", locale) ?? "";
