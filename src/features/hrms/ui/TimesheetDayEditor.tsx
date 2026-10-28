@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
+import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Modal } from "@/shared/ui/modal";
-import { useEditDay, useFillDays } from "../api/timesheet-days";
+import { useEditDay, useFillDays, useSheetPay } from "../api/timesheet-days";
 import { DAY_KINDS, isEdited, type DayKind, type DayRow, type Edit, type PeriodKind } from "../model/timesheet-days";
 
 const box = "flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-modal";
@@ -59,6 +60,28 @@ export function FillDoc({
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** «Вернуть на доработку»: строки «Зарплаты» табеля снимутся — окно говорит, на какую сумму. */
+export function ReturnDialog({ guid, busy, onReturn, onClose }: { guid: string; busy: boolean; onReturn: () => void; onClose: () => void }) {
+  const { t, i18n } = useTranslation();
+  const pay = useSheetPay(guid);
+  return (
+    <ConfirmDialog
+      title={t("timesheets.returnTitle")}
+      description={
+        pay.loading
+          ? t("common.loading")
+          : pay.count
+            ? t("timesheets.returnHint", { count: pay.count, total: pay.total.toLocaleString(i18n.language) })
+            : t("timesheets.returnHintEmpty")
+      }
+      confirmLabel={t("timesheets.return")}
+      busy={busy || pay.loading}
+      onConfirm={onReturn}
+      onClose={onClose}
+    />
   );
 }
 

@@ -37,7 +37,7 @@ import { firstText, related, text, useOrgDirectory } from "../api/org";
 import { TIMESHEETS, useLogEvent, useTimesheetDoc, useTimesheetNeighbours } from "../api/timesheet-docs";
 import { useDecideSheet } from "../api/timesheet-days";
 import { isEdited, type DayRow } from "../model/timesheet-days";
-import { ApproveDialog, DayEditor, FillDoc } from "./TimesheetDayEditor";
+import { ApproveDialog, DayEditor, FillDoc, ReturnDialog } from "./TimesheetDayEditor";
 import { TimesheetHistory } from "./TimesheetHistory";
 import { monthName, SHEET_STATUS } from "../model/timesheet-docs";
 import { useDayHead, dayTone } from "./attendance-parts";
@@ -97,7 +97,7 @@ export function TimesheetDocPage({
   const neighbours = useTimesheetNeighbours(guid);
   const log = useLogEvent(guid);
   const decide = useDecideSheet(guid);
-  const [dialog, setDialog] = useState<"fill" | "approve" | null>(null);
+  const [dialog, setDialog] = useState<"fill" | "approve" | "return" | null>(null);
   const [editing, setEditing] = useState<{ row: DayRow; name: string } | null>(null);
   const { departments } = useOrgDirectory();
   const head = useDayHead();
@@ -191,8 +191,6 @@ export function TimesheetDocPage({
     );
   };
 
-  const giveBack = () =>
-    decide.mutate({ decision: "return", mode: "daily" }, { onSuccess: () => toast.success(t("timesheets.returned")) });
   const status = bySlug.get("status");
   const note = bySlug.get("comment");
   const activeTab = tab === GRID || tab === HISTORY ? tab : OVERVIEW;
@@ -242,7 +240,7 @@ export function TimesheetDocPage({
                       icon={<Icon as={Undo2Icon} size={15} />}
                       onClick={() => {
                         close();
-                        giveBack();
+                        setDialog("return");
                       }}
                     >
                       {t("timesheets.return")}
@@ -414,6 +412,24 @@ export function TimesheetDocPage({
               {
                 onSuccess: () => {
                   toast.success(t("timesheets.approvedToast"));
+                  setDialog(null);
+                },
+              },
+            )
+          }
+        />
+      )}
+      {dialog === "return" && (
+        <ReturnDialog
+          guid={guid}
+          busy={decide.isPending}
+          onClose={() => setDialog(null)}
+          onReturn={() =>
+            decide.mutate(
+              { decision: "return", mode: "daily" },
+              {
+                onSuccess: () => {
+                  toast.success(t("timesheets.returned"));
                   setDialog(null);
                 },
               },

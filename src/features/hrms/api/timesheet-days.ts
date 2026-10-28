@@ -236,6 +236,21 @@ async function payrollFunctionId(): Promise<string> {
 export type SheetDecision = "approve" | "return";
 
 /**
+ * Строки «Зарплаты» табеля — что снимет «Вернуть на доработку»: сколько
+ * и сколько к выплате. Отбор ещё и здесь: в omni4 поля `hr_timesheets_id`
+ * у строк нет, а фильтр по чужому полю бэкенд молча пропускает и отдаёт всё.
+ */
+export function useSheetPay(guid: string) {
+  const { rows, loading } = useAll(PAYROLL_LINES, { hr_timesheets_id: { op: "is", values: [guid] } }, false);
+  const own = rows.filter((row) => text(row.hr_timesheets_id) === guid);
+  return {
+    loading,
+    count: own.length,
+    total: own.reduce((sum, row) => sum + (firstText(row.kind) === "deduction" ? -num(row.amount) : num(row.amount)), 0),
+  };
+}
+
+/**
  * «Утвердить» / «Вернуть» — метод функции (ADR-0018): строки «Зарплаты»
  * и статус табеля она пишет сама, одной транзакцией. Ответ функции шлюз
  * наружу не отдаёт, а таймаут у него 30 с, поэтому итог — статус табеля,
