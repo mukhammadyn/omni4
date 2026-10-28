@@ -51,13 +51,12 @@ test("день по истории назначений", () => {
     dates,
     from: "2026-10-01",
     to: "2026-10-31",
-    departmentOn: (date) => jobOn(jobs, date)?.departmentId ?? "",
-    department: "sales",
+    belongs: (date) => jobOn(jobs, date)?.departmentId === "sales",
   });
   expect(sales.inside).toEqual(["2026-10-01", "2026-10-14"]);
   // Неделя на стыке: дни сентября — «вне месяца».
   expect(sales.outside).toEqual(["2026-09-28", "2026-09-30"]);
-  const dev = ownDates({ dates, from: "2026-10-01", to: "2026-10-31", departmentOn: (date) => jobOn(jobs, date)?.departmentId ?? "", department: "dev" });
+  const dev = ownDates({ dates, from: "2026-10-01", to: "2026-10-31", belongs: (date) => jobOn(jobs, date)?.departmentId === "dev" });
   expect(dev.inside).toEqual(["2026-10-15", "2026-10-20"]);
 });
 

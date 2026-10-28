@@ -97,7 +97,19 @@ export function useTimesheetDays(guid: string) {
 const departmentOf = (own: Job[], employee: { departmentId: string }) => (date: string) =>
   own.length ? (jobOn(own, date)?.departmentId ?? "") : employee.departmentId;
 
-/** `fresh` — табель только что заведён: прежних норм у него нет, искать нечего. */
+/**
+ * Работает ли в этот день — для табеля компании: есть назначение, с отделом
+ * или без, как ведомость HRMS (`salary-attendance.js:34-55`). Без истории
+ * назначений — по отделу карточки, как и `departmentOf`.
+ */
+const worksOf = (own: Job[], employee: { departmentId: string }) => (date: string) =>
+  own.length ? Boolean(jobOn(own, date)) : Boolean(employee.departmentId);
+
+/**
+ * `departmentId` пуст — табель компании (все, у кого есть назначение);
+ * задан — табель отдела, заведённый до 2026-10-28. `fresh` — табель только
+ * что заведён: прежних норм у него нет, искать нечего.
+ */
 export type FillTarget = { guid: string; departmentId: string; fresh?: boolean };
 export type FillResult = { people: number };
 
@@ -153,8 +165,7 @@ export function useFillDays(period: string, kind: PeriodKind) {
         dates,
         from,
         to,
-        departmentOn,
-        department: target.departmentId,
+        belongs: target.departmentId ? (date) => departmentOn(date) === target.departmentId : worksOf(own, employee),
       });
       if (!picked.inside.length) continue;
       people += 1;
@@ -211,27 +222,22 @@ export function useFillDays(period: string, kind: PeriodKind) {
     );
 
   /*
-   * Отделы, у которых в периоде есть люди: по назначениям, без них — по карточке.
-   * «Без отдела» — только у кого назначение в периоде есть, а отдела в нём нет:
-   * без назначения нет ставки, в ведомость HRMS такие не попадали
-   * (`salary-attendance.js:34-55`), и считать их — шум.
-   * `cover` — дни периода «сотрудник:дата» по отделу, `holder` — в каких табелях
-   * день уже лежит: по ним окно предупреждает о пересечении.
+   * `cover` — дни периода «сотрудник:дата» табеля компании (ключ "") и отделов,
+   * `holder` — в каких табелях день уже лежит: по ним окно предупреждает
+   * о пересечении.
    */
-  const { departments, unassigned, cover, holder } = useMemo(() => {
-    const out = new Set<string>();
+  const { cover, holder } = useMemo(() => {
     const cover = new Map<string, string[]>();
-    let none = 0;
+    const add = (id: string, key: string) => (cover.get(id) ?? cover.set(id, []).get(id)!).push(key);
     for (const employee of sheet.employees) {
       const own = allJobs.filter((job) => job.employeeId === employee.id);
-      const inPeriod = own.filter((job) => job.from <= to && (!job.to || job.to >= from));
-      const ids = inPeriod.length ? inPeriod.map((job) => job.departmentId) : own.length ? [] : [employee.departmentId];
-      for (const id of ids) if (id) out.add(id);
-      if (inPeriod.length && !ids.some(Boolean)) none += 1;
       const departmentOn = departmentOf(own, employee);
+      const works = worksOf(own, employee);
       for (const date of dates) {
-        const id = date >= from && date <= to ? departmentOn(date) : "";
-        if (id) (cover.get(id) ?? cover.set(id, []).get(id)!).push(`${employee.id}:${date}`);
+        if (date < from || date > to || !works(date)) continue;
+        add("", `${employee.id}:${date}`);
+        const id = departmentOn(date);
+        if (id) add(id, `${employee.id}:${date}`);
       }
     }
     const holder = new Map<string, string[]>();
@@ -240,17 +246,17 @@ export function useFillDays(period: string, kind: PeriodKind) {
       const key = `${text(row.hr_employees_id)}:${text(row.date).slice(0, 10)}`;
       (holder.get(key) ?? holder.set(key, []).get(key)!).push(text(row.hr_timesheets_id));
     }
-    return { departments: out, unassigned: none, cover, holder };
+    return { cover, holder };
   }, [sheet.employees, allJobs, stored.rows, dates, from, to]);
 
-  /** Сколько дней отдела уже лежат в других табелях (`own` — его табель за этот период). */
+  /** Сколько дней табеля (компании — `""`, или отдела) уже лежат в других табелях; `own` — сам табель. */
   const overlap = useCallback(
     (departmentId: string, own?: string) =>
       (cover.get(departmentId) ?? []).filter((key) => (holder.get(key) ?? []).some((sheetId) => sheetId !== own)).length,
     [cover, holder],
   );
 
-  return { loading, fill, refresh, from, to, departments, unassigned, overlap };
+  return { loading, fill, refresh, from, to, overlap };
 }
 
 /**

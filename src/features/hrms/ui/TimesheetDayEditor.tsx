@@ -54,7 +54,7 @@ export function FillDoc({
           <Button variant="ghost" onClick={onClose}>
             {t("action.cancel")}
           </Button>
-          <Button disabled={data.loading || busy || !departmentId} onClick={run}>
+          <Button disabled={data.loading || busy} onClick={run}>
             {data.loading ? t("timesheets.counting") : t("timesheets.fillRun")}
           </Button>
         </div>

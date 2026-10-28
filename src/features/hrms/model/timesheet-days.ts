@@ -135,25 +135,24 @@ export function mergeDay(fresh: Omit<DayRow, "guid" | "hr_employees_id">, old: D
 }
 
 /**
- * Дни сотрудника в табеле отдела: в периоде — те, где он по истории
- * назначений в этом отделе; для недель на стыке — дни соседних месяцев
- * «вне месяца» (только для расчёта). Что день уже лежит в другом табеле,
- * не запрет, а предупреждение (ADR-0018, дополнение от 2026-10-28).
+ * Дни сотрудника в табеле: в периоде — те, что ему принадлежат (`belongs`:
+ * есть назначение — табель компании, или он в этот день в отделе табеля);
+ * для недель на стыке — дни соседних месяцев «вне месяца» (только для
+ * расчёта). Что день уже лежит в другом табеле, не запрет, а предупреждение
+ * (ADR-0018, дополнение от 2026-10-28).
  */
 export function ownDates({
   dates,
   from,
   to,
-  departmentOn,
-  department,
+  belongs,
 }: {
   dates: string[];
   from: string;
   to: string;
-  departmentOn: (date: string) => string;
-  department: string;
+  belongs: (date: string) => boolean;
 }): { inside: string[]; outside: string[] } {
-  const inside = dates.filter((date) => date >= from && date <= to && departmentOn(date) === department);
+  const inside = dates.filter((date) => date >= from && date <= to && belongs(date));
   if (!inside.length) return { inside, outside: [] };
   const weekFrom = rangeOf("week", from).from;
   const weekTo = plusDays(rangeOf("week", to).from, 6);
