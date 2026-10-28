@@ -2526,6 +2526,8 @@
   "payroll.xlsx.norm": "Norm",
   "payroll.xlsx.worked": "Worked",
   "payroll.xlsx.noTimesheet": "No approved timesheet for the period",
+  "payroll.xlsx.noShifts": "No shifts in the work schedule for the period — norm 0, no salary (as in HRMS)",
+  "payroll.xlsx.noCredited": "There are shifts, but no day is credited — salary 0",
   "payroll.xlsx.otherPeriod": "The template is for another period ({{period}}) — open that period in the pivot and upload again",
   "payroll.xlsx.accruals": "ACCRUALS (BONUSES)",
   "payroll.xlsx.salary": "Salary",

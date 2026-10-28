@@ -2523,6 +2523,8 @@
   "payroll.xlsx.norm": "Norma",
   "payroll.xlsx.worked": "Ishlangan",
   "payroll.xlsx.noTimesheet": "Davr uchun tasdiqlangan tabel yo‘q",
+  "payroll.xlsx.noShifts": "Ish jadvalida davr uchun smenalar yo‘q — norma 0, maosh hisoblanmadi (HRMS’dagidek)",
+  "payroll.xlsx.noCredited": "Smenalar bor, lekin birorta kun hisoblanmadi — maosh 0",
   "payroll.xlsx.otherPeriod": "Shablon boshqa davr uchun ({{period}}) — jamlanmada shu davrni oching va qayta yuklang",
   "payroll.xlsx.accruals": "HISOBLANMALAR (BONUSLAR)",
   "payroll.xlsx.salary": "Oklad",

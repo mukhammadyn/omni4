@@ -49,8 +49,10 @@ export type TemplateLabels = {
   daily: string;
   hourly: string;
   unit: Record<PayUnit, string>;
-  /** Примечание к пустому окладу. */
+  /** Примечание к пустому окладу — по причине (`TemplateEmployee.missing`). */
   noTimesheet: string;
+  noShifts: string;
+  noCredited: string;
 };
 
 export type TemplateEmployee = {
@@ -62,6 +64,12 @@ export type TemplateEmployee = {
   fines: number;
   /** Старая формула опозданий — при `legacy`, в колонку вида удержаний табеля, её читает загрузка. */
   lateness: number;
+  /**
+   * Почему оклада нет: нет утверждённого табеля; табель есть, но в «Графике
+   * работы» нет смен (норма 0 — начисления нет, как в HRMS); смены есть, но
+   * ни один день не засчитан.
+   */
+  missing?: "timesheet" | "shifts" | "credited";
 };
 
 export type TemplateInput = {
@@ -217,7 +225,7 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
     const salary = sheet.getCell(r, col.salary);
     if (!pieces.length) {
       fill(salary, "FFFFEB3B");
-      salary.note = labels.noTimesheet;
+      salary.note = employee.missing === "shifts" ? labels.noShifts : employee.missing === "credited" ? labels.noCredited : labels.noTimesheet;
     } else if (pieces.length > 1) {
       salary.note = pieces
         .map((p) => `${ddmm(p.from)}–${ddmm(p.to)} · ${p.rate.toLocaleString()} / ${labels.unit[p.unit]} · ${labels[p.mode]} · ${p.worked} / ${p.norm} · ${p.amount.toLocaleString()}`)
