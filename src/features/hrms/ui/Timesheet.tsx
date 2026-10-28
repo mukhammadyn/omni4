@@ -311,11 +311,12 @@ export function CellView({
 
 const CODE = "inline-flex h-[19px] min-w-6 shrink-0 items-center justify-center rounded px-1 text-2xs font-semibold tabular-nums ring-1 ring-border ring-inset";
 
-export function Legend({ types }: { types: { title: string; code: string; color: string }[] }) {
+/** `sample` — как в ячейках пишутся часы: «8,0» на «Посещаемости», «8:00» в табеле. */
+export function Legend({ types, sample = "8,0" }: { types: { title: string; code: string; color: string }[]; sample?: string }) {
   const { t } = useTranslation();
   const items: { code: ReactNode; style: string; label: string; desc: string }[] = [
-    { code: "8,0", style: "text-fg", label: t("timesheet.legend.worked"), desc: t("timesheet.legendDesc.worked") },
-    { code: "8,0", style: "text-warning", label: t("timesheet.legend.late"), desc: t("timesheet.legendDesc.late") },
+    { code: sample, style: "text-fg", label: t("timesheet.legend.worked"), desc: t("timesheet.legendDesc.worked") },
+    { code: sample, style: "text-warning", label: t("timesheet.legend.late"), desc: t("timesheet.legendDesc.late") },
     { code: <Icon as={XIcon} size={12} />, style: CHIP_STYLES.red, label: t("timesheet.legend.absent"), desc: t("timesheet.hint.absent") },
     { code: t("timesheet.dayOffShort"), style: "text-fg-subtle", label: t("timesheet.legend.dayOff"), desc: t("timesheet.hint.dayOff") },
     { code: t("timesheet.holidayShort"), style: CHIP_STYLES.pink, label: t("timesheet.legend.holiday"), desc: t("timesheet.legendDesc.holiday") },

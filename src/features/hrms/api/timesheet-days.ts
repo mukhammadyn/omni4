@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { patchRow, type Item } from "@/features/item";
+import { patchRow, type Filters, type Item } from "@/features/item";
 import { api } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { todayInput } from "@/shared/lib/date-value";
@@ -105,6 +105,14 @@ const departmentOf = (own: Job[], employee: { departmentId: string }) => (date: 
 const ofSheet = (row: Item) => Boolean(text(row.hr_timesheets_id));
 
 /**
+ * Те же сироты — мимо сервера: «не пусто» у фильтра нет, а `$gt` нулевого
+ * UUID — `a.hr_timesheets_id > $n` (`build_query.go:363`), NULL не проходит.
+ * В omni5 2026-10-28 за сентябрь их было 3 063 из 3 399 строк — 2,7 МБ
+ * и ~10 с порциями по очереди против 0,3 МБ и 1 с.
+ */
+const SHEET_SET: Filters = { hr_timesheets_id: { op: "after", values: ["00000000-0000-0000-0000-000000000000"] } };
+
+/**
  * День табеля компании, как ведомость HRMS (`salary-attendance.js:34-55`):
  * у кого есть назначение в периоде — его дни с назначением (с отделом или
  * без) и смены без назначения: их HRMS тоже считает в норме, но не засчитывает
@@ -127,9 +135,10 @@ const dayRow = (input: { planByDate: ReadonlyMap<string, number> }, cell: Parame
 /**
  * `departmentId` пуст — табель компании (все, у кого есть назначение);
  * задан — табель отдела, заведённый до 2026-10-28. `fresh` — табель только
- * что заведён: прежних норм у него нет, искать нечего.
+ * что заведён: прежних норм у него нет, искать нечего. `title` — новое
+ * название из окна «Заполнить»; без него название не трогается.
  */
-export type FillTarget = { guid: string; departmentId: string; fresh?: boolean };
+export type FillTarget = { guid: string; departmentId: string; fresh?: boolean; title?: string };
 export type FillResult = { people: number };
 
 /**
@@ -147,10 +156,11 @@ export function useFillDays(period: string, kind: PeriodKind) {
   const dates = useMemo(() => datesOf(wide), [wide.from, wide.to]);
   const sheet = useTimesheet({ ...wide, dates, today: todayInput(), search: "", dismissed: true });
   const jobs = useAll(JOB_HISTORY, { date_from: { op: "before", values: [wide.to] } }, false);
-  const stored = useAll(TIMESHEET_DAYS, { date: { op: "between", values: [wide.from, wide.to] } }, false);
+  const stored = useAll(TIMESHEET_DAYS, { ...SHEET_SET, date: { op: "between", values: [wide.from, wide.to] } }, false);
   const settings = useAll("core_settings", {}, false);
   const queryClient = useQueryClient();
-  const loading = sheet.loading || jobs.loading || stored.loading || settings.loading;
+  // stored.fetching — и фоновое перечитывание: после «Заполнить» дни в кэше лишь помечены устаревшими, а по старым fill не узнал бы свои строки и записал дубли.
+  const loading = sheet.loading || jobs.loading || stored.loading || stored.fetching || settings.loading;
 
   const allJobs = useMemo(() => jobs.rows.map(toJob), [jobs.rows]);
 
@@ -205,32 +215,43 @@ export function useFillDays(period: string, kind: PeriodKind) {
       }
     }
 
-    // ponytail: без транзакции — сбой посреди оставит часть строк; повтор «Заполнить» доделает.
-    for (let i = 0; i < rows.length; i += 1000) await upsert(TIMESHEET_DAYS, rows.slice(i, i + 1000));
+    /*
+     * Дни, удаление лишних, нормы и итоги друг от друга не зависят — параллельно;
+     * по очереди это были 5–7 запросов подряд. Событие — после: «заполнен»
+     * пишется, только если всё записалось.
+     * ponytail: без транзакции — сбой посреди оставит часть строк; повтор «Заполнить» доделает.
+     */
     const stale = [...old.values()].map((d) => d.guid);
-    if (stale.length) await api.delete<unknown>(`/v1/object/${TIMESHEET_DAYS}`, { data: { ids: stale } });
-    const oldNorms = target.fresh
-      ? null
-      : await api.post<{ data?: { response?: Item[] } }>(`/v2/object/get-list/${TIMESHEET_NORMS}`, {
-          data: { hr_timesheets_id: target.guid, limit: 1000 },
-        });
-    const normIds = (oldNorms?.data?.response ?? []).map((row) => text(row.guid));
-    if (normIds.length) await api.delete<unknown>(`/v1/object/${TIMESHEET_NORMS}`, { data: { ids: normIds } });
-    await upsert(TIMESHEET_NORMS, norms);
-
     const sum = sheetTotals(rows as unknown as DayRow[]);
-    await api.put<unknown>(`/v2/items/${TIMESHEETS}`, {
-      data: {
-        guid: target.guid,
-        period: from,
-        period_kind: kind,
-        people: sum.people,
-        work_days: workDaysOf(datesOf({ from, to }), sheet.holidays),
-        worked_hours: hoursOf(sum.workedMinutes),
-        overtime_hours: hoursOf(sum.overtimeMinutes),
-        absence_days: sum.absences,
-      },
-    });
+    const chunks = Array.from({ length: Math.ceil(rows.length / 1000) }, (_, i) => rows.slice(i * 1000, (i + 1) * 1000));
+    const writeNorms = async () => {
+      const oldNorms = target.fresh
+        ? null
+        : await api.post<{ data?: { response?: Item[] } }>(`/v2/object/get-list/${TIMESHEET_NORMS}`, {
+            data: { hr_timesheets_id: target.guid, limit: 1000 },
+          });
+      const normIds = (oldNorms?.data?.response ?? []).map((row) => text(row.guid));
+      if (normIds.length) await api.delete<unknown>(`/v1/object/${TIMESHEET_NORMS}`, { data: { ids: normIds } });
+      await upsert(TIMESHEET_NORMS, norms);
+    };
+    await Promise.all([
+      ...chunks.map((chunk) => upsert(TIMESHEET_DAYS, chunk)),
+      stale.length ? api.delete<unknown>(`/v1/object/${TIMESHEET_DAYS}`, { data: { ids: stale } }) : null,
+      writeNorms(),
+      api.put<unknown>(`/v2/items/${TIMESHEETS}`, {
+        data: {
+          guid: target.guid,
+          ...(target.title ? { title: target.title } : {}),
+          period: from,
+          period_kind: kind,
+          people: sum.people,
+          work_days: workDaysOf(datesOf({ from, to }), sheet.holidays),
+          worked_hours: hoursOf(sum.workedMinutes),
+          overtime_hours: hoursOf(sum.overtimeMinutes),
+          absence_days: sum.absences,
+        },
+      }),
+    ]);
     await logEvent(target.guid, { action: "filled" });
     return { people };
   };
@@ -365,6 +386,7 @@ export function useSheetOverlap(guid: string, days: DayRow[]) {
   const dates = days.map((day) => day.date).sort();
   // Только люди этого табеля за его даты, а не дни всей компании за месяц.
   const others = useAll(people.length ? TIMESHEET_DAYS : undefined, {
+    ...SHEET_SET,
     hr_employees_id: { op: "any", values: people },
     date: { op: "between", values: [dates[0] ?? "", dates.at(-1) ?? ""] },
   }, false);

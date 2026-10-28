@@ -37,7 +37,7 @@ import { Tabs } from "@/shared/ui/tabs";
 import { firstText, related, text, useOrgDirectory } from "../api/org";
 import { TIMESHEETS, useLogEvent, useTimesheetDoc, useTimesheetNeighbours } from "../api/timesheet-docs";
 import { useDecideSheet } from "../api/timesheet-days";
-import { isEdited, type DayRow } from "../model/timesheet-days";
+import { isEdited, toHours, type DayRow } from "../model/timesheet-days";
 import { ApproveDialog, DayEditor, FillDoc, ReturnDialog } from "./TimesheetDayEditor";
 import { TimesheetHistory } from "./TimesheetHistory";
 import { monthName, SHEET_STATUS } from "../model/timesheet-docs";
@@ -326,7 +326,7 @@ export function TimesheetDocPage({
         ) : (
           <section className="rounded-[10px] border border-border bg-surface">
             <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2.5">
-              <Legend types={doc.absenceTypes} />
+              <Legend types={doc.absenceTypes} sample="8:00" />
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-separate border-spacing-0 text-xs">
@@ -338,7 +338,7 @@ export function TimesheetDocPage({
                     {doc.dates.map((date) => (
                       <th
                         key={date}
-                        className={`min-w-7 border-b border-border px-0.5 py-2 text-center font-medium ${dayTone(date, today, doc.holidays)}`}
+                        className={`min-w-10 border-b border-border px-0.5 py-2 text-center font-medium ${dayTone(date, today, doc.holidays)}`}
                       >
                         {head.day(date)}
                       </th>
@@ -380,13 +380,13 @@ export function TimesheetDocPage({
                             <td
                               key={date}
                               title={day && isEdited(day) ? t("timesheets.editedHint") : undefined}
-                              className={`border-b border-border px-0 py-0.5 text-center ${day && isEdited(day) ? "ring-1 ring-accent ring-inset" : ""}`}
+                              className={`border-b border-border px-0.5 py-0.5 text-center ${day && isEdited(day) ? "ring-1 ring-accent ring-inset" : ""}`}
                             >
                               {sheetCell && (
                                 <CellView
                                   cell={sheetCell}
-                                  hours={(minutes) => String(Math.round(minutes / 6) / 10)}
-                                  whole
+                                  /* Часы с минутами — «8:30»: бухгалтер сверяет их с правкой дня, а она в минутах. */
+                                  hours={(minutes) => toHours(Math.round(minutes))}
                                   onOpen={() => (canEdit && day ? setEditing({ row: day, name: employee.name }) : onOpenEmployee(employee.id))}
                                 />
                               )}

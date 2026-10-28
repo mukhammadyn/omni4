@@ -39,6 +39,10 @@ const num = (value: unknown): number | null => (typeof value === "number" && Num
 /**
  * Все строки по отбору, порциями по MAX_LIMIT. Месяц табеля — это
  * сотрудники × дни, и в июне их уже было больше одной порции.
+ *
+ * Строки прежнего отбора (placeholderData у useItems) — тоже загрузка:
+ * иначе при смене периода расчёт шёл по строкам прошлого, и «Заполнить»
+ * успевало включиться с планом и днями чужого месяца.
  */
 export function useAll(tableSlug: string | undefined, filters: Filters, relations?: false) {
   const query = useItems(tableSlug, { limit: MAX_LIMIT, page: 1, infinite: true, filters, relations });
@@ -46,7 +50,7 @@ export function useAll(tableSlug: string | undefined, filters: Filters, relation
   useEffect(() => {
     if (hasMore) loadMore();
   }, [hasMore, loadMore]);
-  return { rows: query.page.rows, loading: query.isLoading || hasMore || query.loadingMore, fetching: query.isFetching };
+  return { rows: query.page.rows, loading: query.isLoading || query.isPlaceholderData || hasMore || query.loadingMore, fetching: query.isFetching };
 }
 
 export type SheetEmployee = {
