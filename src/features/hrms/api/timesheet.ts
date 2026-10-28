@@ -63,7 +63,7 @@ export type SheetEmployee = {
   dismissalDate: string;
 };
 
-const toEmployee = (row: Item): SheetEmployee => ({
+export const toEmployee = (row: Item): SheetEmployee => ({
   id: text(row.guid),
   name: text(row.full_name) || [text(row.last_name), text(row.first_name)].filter(Boolean).join(" ") || "—",
   legalName: [text(row.last_name), text(row.first_name), text(row.middle_name)].filter(Boolean).join(" ") || text(row.full_name) || "—",

@@ -24,18 +24,15 @@ const toLine = (row: Item): PayLine => {
   };
 };
 
-/** Последний расчётный месяц с данными («ГГГГ-ММ») — с него сводная открывается. */
-export function useLastPayMonth() {
-  const query = useItems(PAYROLL_LINES, { limit: 1, page: 1, relations: false, sorts: [{ field: "period", direction: "desc" }] });
-  return { month: text(query.page.rows[0]?.period).slice(0, 7), loading: query.isLoading };
-}
-
-/** Все строки за месяц. ponytail: валюта не учитывается — в проекте всё в UZS. */
-export function usePayMonth(month: string, search: string, where: Filters = {}) {
-  const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
-  const { rows, loading } = useAll(month ? PAYROLL_LINES : undefined, {
+/**
+ * Все строки за период: месяц — по расчётному месяцу (`period`), неделя —
+ * по дате строки, как ведомость HRMS. ponytail: валюта не учитывается —
+ * в проекте всё в UZS.
+ */
+export function usePayPeriod({ from, to }: { from: string; to: string }, week: boolean, search: string, where: Filters = {}) {
+  const { rows, loading } = useAll(PAYROLL_LINES, {
     ...where,
-    period: { op: "between", values: [`${month}-01`, `${month}-${last}`] },
+    [week ? "date" : "period"]: { op: "between", values: [from, to] },
   });
   const query = search.trim().toLowerCase();
   const lines = useMemo(

@@ -681,6 +681,9 @@ function MenuPage() {
   /** «Календарь», «Список», «Табель» посещаемости и «Отсутствия»
       (features/hrms): данные за период грузят сами, строки view им не нужны. */
   const sheetView = supportedView && Boolean(traitsOf(view?.type ?? "").selfLoading);
+  /** «Сводная» зарплаты: свой Excel (шаблон и загрузка за период) — общий
+      импорт и экспорт строк таблицы там лишние и обходят шаблон. */
+  const ownExcel = view?.type === "PAYROLL";
   /** Экраны, отбирающие строки по видимому диапазону дат. */
   const dateView = calendarView || timelineView;
   /** Режим: из адреса, иначе из настроек view, иначе месяц. */
@@ -1834,7 +1837,7 @@ function MenuPage() {
                               >
                                 {t("table.blankRecord")}
                               </PopoverItem>
-                              {can.excelMenu && (
+                              {can.excelMenu && !ownExcel && (
                                 <>
                                   <PopoverSeparator />
                                   <PopoverItem
@@ -1912,16 +1915,20 @@ function MenuPage() {
                           setFieldPanel({ field, anchor, back }),
                         onDeleteField: setDeletingField,
                       }),
-                  onImport: () => setImporting(true),
-                  // Выгружается то, что видно: колонки view и действующий
-                  // отбор — вместе с областью видимости view, иначе файл
-                  // содержал бы строки, которых на экране нет.
-                  onExport: () =>
-                    exportExcel.mutate({
-                      fieldIds: columns.map((field) => field.id),
-                      filters: effectiveFilters,
-                      search: searchText,
-                    }),
+                  ...(ownExcel
+                    ? {}
+                    : {
+                        onImport: () => setImporting(true),
+                        // Выгружается то, что видно: колонки view и действующий
+                        // отбор — вместе с областью видимости view, иначе файл
+                        // содержал бы строки, которых на экране нет.
+                        onExport: () =>
+                          exportExcel.mutate({
+                            fieldIds: columns.map((field) => field.id),
+                            filters: effectiveFilters,
+                            search: searchText,
+                          }),
+                      }),
                   // Удаляется любой view, включая последний: так же ведёт
                   // себя старая админка. Пункт меню без view не тупик —
                   // «+» в полосе вкладок остаётся на месте.

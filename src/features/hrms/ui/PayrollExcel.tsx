@@ -6,8 +6,10 @@ import { toast } from "@/shared/lib/toast";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { useImportPayroll, usePayrollTemplate, usePayTypes } from "../api/payroll-excel";
-import type { PayPivot } from "../model/payroll";
-import type { PivotLabels, TemplateLabels, TemplateMode } from "../model/payroll-excel";
+import type { TemplateLabels } from "../model/payroll-excel";
+
+type Range = { from: string; to: string };
+const ru = (date: string) => date.split("-").reverse().join(".");
 
 /* exceljs весит под мегабайт — грузится по первому нажатию, а не со сводной. */
 const excel = () => import("../model/payroll-excel");
@@ -20,24 +22,20 @@ const download = (data: ArrayBuffer, name: string) => {
   URL.revokeObjectURL(link.href);
 };
 
-/** «Экспорт в Excel»: сводная месяца как на экране, .xlsx с числами. */
-export async function exportPivot(pivot: PayPivot, title: string, labels: PivotLabels) {
-  const { buildPivotXlsx } = await excel();
-  download(await buildPivotXlsx(pivot, labels), `${title}.xlsx`);
-}
-
 /**
- * «…» сводной — «Скачать шаблон» (дневной, часовой) и «Загрузить Excel»,
- * как меню шаблона в «Зарплате» HRMS (udevs_hrms_admin, Finance/Salary).
+ * «…» сводной — «Скачать шаблон» и «Загрузить Excel» за открытый период
+ * (месяц или неделю), как меню шаблона в «Зарплате» HRMS (udevs_hrms_admin,
+ * Finance/Salary). Дневной или часовой — выбор при «Утвердить» табеля,
+ * у шаблона его нет (ADR-0018).
  */
-export function PayrollExcel({ month, title, where }: { month: string; title: string; where: Filters }) {
+export function PayrollExcel({ range, title, where }: { range: Range; title: string; where: Filters }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<TemplateMode | null>(null);
+  const [building, setBuilding] = useState(false);
   const [importing, setImporting] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const types = usePayTypes();
   const save = useImportPayroll();
-  const busy = mode !== null || importing;
+  const busy = building || importing;
 
   const upload = async (picked: File | undefined) => {
     if (!picked) return;
@@ -46,8 +44,12 @@ export function PayrollExcel({ month, title, where }: { month: string; title: st
     let mod: Awaited<ReturnType<typeof excel>> | undefined;
     try {
       mod = await excel();
-      const parsed = await mod.parseImport(await picked.arrayBuffer(), { types: types.kinds, salaryTypeId: types.salaryId });
-      const { inserted, unknownEmployee } = await save(month, parsed.records, t("payroll.xlsx.description", { period: title }));
+      const parsed = await mod.parseImport(await picked.arrayBuffer(), types.kinds);
+      // Файл другого периода записался бы в открытый — отказ, а не тихая запись не туда.
+      if (parsed.period && (parsed.period.from !== range.from || parsed.period.to !== range.to)) {
+        return toast.error(t("payroll.xlsx.otherPeriod", { period: `${ru(parsed.period.from)} – ${ru(parsed.period.to)}` }));
+      }
+      const { inserted, unknownEmployee } = await save(range, parsed.records, t("payroll.xlsx.description", { period: title }));
       const skipped = unknownEmployee + parsed.skipped.invalidEmployee + parsed.skipped.negative;
       if (inserted) toast.success(t("payroll.xlsx.imported", { count: inserted }) + (skipped ? ` ${t("payroll.xlsx.skipped", { count: skipped })}` : ""));
       else toast.success(t("payroll.xlsx.importedNone"));
@@ -78,18 +80,15 @@ export function PayrollExcel({ month, title, where }: { month: string; title: st
       >
         {(close) => (
           <div className="w-60">
-            {(["daily", "hourly"] as const).map((value) => (
-              <PopoverItem
-                key={value}
-                icon={<Icon as={DownloadIcon} size={16} />}
-                onClick={() => {
-                  close();
-                  setMode(value);
-                }}
-              >
-                {t(`payroll.xlsx.template.${value}`)}
-              </PopoverItem>
-            ))}
+            <PopoverItem
+              icon={<Icon as={DownloadIcon} size={16} />}
+              onClick={() => {
+                close();
+                setBuilding(true);
+              }}
+            >
+              {t("payroll.xlsx.template")}
+            </PopoverItem>
             <PopoverSeparator />
             <PopoverItem
               icon={<Icon as={UploadIcon} size={16} />}
@@ -114,14 +113,14 @@ export function PayrollExcel({ month, title, where }: { month: string; title: st
         }}
       />
       {/* Данные шаблона грузятся, только пока он собирается. */}
-      {mode && <TemplateJob month={month} title={title} where={where} mode={mode} onDone={() => setMode(null)} />}
+      {building && <TemplateJob range={range} title={title} where={where} onDone={() => setBuilding(false)} />}
     </>
   );
 }
 
-function TemplateJob({ month, title, where, mode, onDone }: { month: string; title: string; where: Filters; mode: TemplateMode; onDone: () => void }) {
+function TemplateJob({ range, title, where, onDone }: { range: Range; title: string; where: Filters; onDone: () => void }) {
   const { t } = useTranslation();
-  const data = usePayrollTemplate(month, where);
+  const data = usePayrollTemplate(range, where);
   const started = useRef(false);
 
   useEffect(() => {
@@ -138,10 +137,8 @@ function TemplateJob({ month, title, where, mode, onDone }: { month: string; tit
       payUnit: t("payroll.xlsx.payUnit"),
       salaryGroup: t("payroll.xlsx.salaryGroup"),
       rate: t("payroll.xlsx.rate"),
-      price: t("payroll.xlsx.price"),
       norm: t("payroll.xlsx.norm"),
       worked: t("payroll.xlsx.worked"),
-      lateMinutes: t("payroll.xlsx.lateMinutes"),
       accruals: t("payroll.xlsx.accruals"),
       salary: t("payroll.xlsx.salary"),
       deductions: t("payroll.deductions"),
@@ -157,13 +154,12 @@ function TemplateJob({ month, title, where, mode, onDone }: { month: string; tit
         day: t("payroll.xlsx.unit.day"),
         hour: t("payroll.xlsx.unit.hour"),
       },
-      noCheckout: (dates, hourly) => t(hourly ? "payroll.xlsx.noCheckoutHours" : "payroll.xlsx.noCheckoutDays", { dates }),
-      offShift: (dates) => t("payroll.xlsx.offShift", { dates }),
+      noTimesheet: t("payroll.xlsx.noTimesheet"),
     };
     void excel()
       .then(({ buildTemplate }) =>
         buildTemplate({
-          mode,
+          period: range,
           labels,
           employees: data.employees,
           accruals: data.types.accruals,
@@ -172,12 +168,12 @@ function TemplateJob({ month, title, where, mode, onDone }: { month: string; tit
         }),
       )
       .then((file) => {
-        download(file, `salary-template-${mode === "hourly" ? "hourly-" : ""}${month}.xlsx`);
+        download(file, `salary-template-${range.from}_${range.to}.xlsx`);
         toast.success(t("payroll.xlsx.downloaded"));
       })
       .catch(() => toast.error(t("payroll.xlsx.downloadFailed")))
       .finally(onDone);
-  }, [data, mode, month, title, t, onDone]);
+  }, [data, range, title, t, onDone]);
 
   return null;
 }

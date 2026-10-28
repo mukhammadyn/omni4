@@ -215,7 +215,8 @@ export function ViewOptions({
    * Панель может оказаться пустой целиком: роль без единого права
    * не должна видеть кнопку, которая открывает пустоту.
    */
-  const anything = can.settings || can.columns || can.fixColumn || can.excelMenu;
+  // Excel — только если экран его даёт: у «Сводной» зарплаты свой (PayrollExcel).
+  const anything = can.settings || can.columns || can.fixColumn || (can.excelMenu && Boolean(handlers.onImport && handlers.onExport));
   // Кнопка между ними от прав на настройки не зависит.
   if (!anything) return <>{beforeMenu}</>;
 

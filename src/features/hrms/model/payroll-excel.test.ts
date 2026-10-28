@@ -1,88 +1,43 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
-import { accrual, buildTemplate, parseImport, salaryRow, type TemplateEmployee, type TemplateLabels } from "./payroll-excel";
-import type { SheetCell } from "./timesheet";
+import { timesheetPay, type SalaryPiece } from "./payroll";
+import { buildTemplate, parseImport, type TemplateEmployee, type TemplateLabels } from "./payroll-excel";
 
-const cell = (date: string, kind: SheetCell["kind"], over: Partial<SheetCell> = {}): SheetCell => ({
-  date,
-  kind,
-  counted: true,
-  workedMinutes: kind === "worked" ? 540 : null,
-  planMinutes: 480,
-  lateMinutes: 0,
-  overtimeMinutes: 0,
-  remote: false,
-  day: null,
-  leave: null,
-  holiday: "",
-  pending: [],
-  pendingLeave: null,
-  ...over,
-});
-
-/* Октябрь: 4 смены по 8 ч — 1, 2, 3 и 31-е; 30.09 — смена той же недели вне месяца. */
-const plan = new Map(["2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-31"].map((d) => [d, 480]));
-const employee = (over: Partial<TemplateEmployee> = {}): TemplateEmployee => ({
-  id: "0b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d",
-  name: "Алиев",
-  salary: 4000,
-  unit: "month",
-  cells: [
-    cell("2026-09-30", "worked"),
-    cell("2026-10-01", "worked", { lateMinutes: 12 }),
-    cell("2026-10-02", "missing_mark"),
-    cell("2026-10-03", "leave", { leave: { id: "l", typeId: "", title: "", code: "", icon: "", color: "", status: "approved", paid: true, from: "2026-10-03", to: "2026-10-03" } }),
-    cell("2026-10-04", "worked", { planMinutes: 0, day: { status: "off_schedule" } as SheetCell["day"] }),
-    cell("2026-10-05", "worked", { planMinutes: 0, workedMinutes: 120 }),
-    cell("2026-10-31", "absent"),
-  ],
-  planByDate: plan,
+const piece = (over: Partial<SalaryPiece> = {}): SalaryPiece => ({
   from: "2026-10-01",
   to: "2026-10-31",
-  fines: 0,
+  rate: 4000,
+  unit: "month",
+  mode: "daily",
+  norm: 22,
+  worked: 20,
+  amount: 3636,
   ...over,
 });
-
-describe("salaryRow", () => {
-  it("засчитывает приход и оплачиваемое отсутствие, норма — смены месяца", () => {
-    const row = salaryRow(employee());
-    // 04.10 «вне графика» не засчитан, 05.10 без смены и без пометки — засчитан фактом.
-    expect(row).toMatchObject({ normDays: 4, normHours: 32, creditedDays: 4, paidHours: 27, lateMinutes: 12, noCheckout: ["02.10"], offShift: [] });
-  });
-
-  it("ставке за день засчитана и работа без смены", () => {
-    const row = salaryRow(employee({ unit: "day" }));
-    expect(row).toMatchObject({ creditedDays: 5, offShift: ["04.10", "05.10"] });
-    expect(accrual(100, "day", "daily", row).amount).toBe(500);
-  });
-});
-
-describe("accrual", () => {
-  it("месяц: ставка / смены × засчитанные; часовой — по часам", () => {
-    const row = salaryRow(employee());
-    // Засчитано 4 из 4 смен — оклад целиком; часы — факт, 27 из 32.
-    expect(accrual(4000, "month", "daily", row)).toMatchObject({ norm: 4, worked: 4, price: 1000, amount: 4000 });
-    expect(accrual(3200, "month", "hourly", row)).toMatchObject({ norm: 32, worked: 27, price: 100, amount: 2700 });
-  });
-
-  it("неделя: каждая неделя по своим сменам, и вне месяца тоже", () => {
-    // Неделя 28.09–04.10: 4 смены, в октябре 3, засчитано 3; неделя 26.10–01.11: 1 смена, прогул.
-    const pay = accrual(400, "week", "daily", salaryRow(employee({ unit: "week" })));
-    expect(pay).toMatchObject({ worked: 3, amount: 300 });
-  });
-});
+const employee = (id: string, over: Partial<TemplateEmployee> = {}): TemplateEmployee => ({ id, name: id, pieces: [piece()], fines: 0, ...over });
 
 const labels = new Proxy({} as TemplateLabels, {
-  get: (_, key) => (key === "unit" ? { month: "м", week: "н", day: "д", hour: "ч" } : key === "noCheckout" || key === "offShift" ? () => "" : String(key)),
+  get: (_, key) => (key === "unit" ? { month: "м", week: "н", day: "д", hour: "ч" } : String(key)),
 });
 
+const ids = {
+  one: "0b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d",
+  none: "1b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d",
+  two: "2b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d",
+};
+const types = { accrual: "11111111-1111-4111-8111-111111111111", fine: "22222222-2222-4222-8222-222222222222" };
+
 describe("шаблон и загрузка", () => {
-  it("загрузка читает суммы, заполненные в шаблоне, колонку штрафов — нет", async () => {
-    const types = { accrual: "11111111-1111-4111-8111-111111111111", fine: "22222222-2222-4222-8222-222222222222", salary: "33333333-3333-4333-8333-333333333333" };
+  it("оклад и штрафы — из табеля и только для чтения, загрузка берёт премии", async () => {
     const file = await buildTemplate({
-      mode: "daily",
+      period: { from: "2026-10-01", to: "2026-10-31" },
       labels,
-      employees: [employee({ fines: 50 })],
+      employees: [
+        employee(ids.one, { fines: 50 }),
+        employee(ids.none, { pieces: [] }),
+        // Новая ставка с 20-го: два куска одной единицы.
+        employee(ids.two, { pieces: [piece({ to: "2026-10-19", worked: 13, amount: 2364 }), piece({ from: "2026-10-20", rate: 5000, worked: 8, amount: 1818 })] }),
+      ],
       accruals: [{ id: types.accrual, name: "KPI" }],
       deductions: [{ id: types.fine, name: "Опоздания" }],
       autoDeductionId: types.fine,
@@ -91,23 +46,43 @@ describe("шаблон и загрузка", () => {
     const book = new ExcelJS.Workbook();
     await book.xlsx.load(file);
     const sheet = book.worksheets[0]!;
-    expect(sheet.name).toBe("sheet");
-    expect(sheet.getCell(6, 11).value).toMatchObject({ result: 4000 });
-    expect(sheet.getCell(6, 13).value).toBe(50);
-    sheet.getCell(6, 12).value = "1 500,5";
+    // Колонки: 6 ставка, 7 норма, 8 отработано, 9 оклад, 10 KPI, 11 штрафы.
+    expect([6, 7, 8, 9, 11].map((c) => sheet.getCell(6, c).value)).toEqual([4000, 22, 20, 3636, 50]);
+    expect(sheet.getCell(7, 9).value).toBeNull();
+    expect(sheet.getCell(7, 9).note).toBe("noTimesheet");
+    // Разные ставки — клетка пуста, норма и отработано — в примечании по кускам.
+    expect([5, 6, 7, 8, 9].map((c) => sheet.getCell(8, c).value)).toEqual(["м", null, null, null, 4182]);
+    expect(String(sheet.getCell(8, 9).note)).toContain("20.10–31.10");
 
-    const parsed = await parseImport(await book.xlsx.writeBuffer(), {
-      types: new Map([
+    sheet.getCell(6, 10).value = "1 500,5";
+    sheet.getCell(6, 9).value = 9999;
+    const parsed = await parseImport(
+      await book.xlsx.writeBuffer(),
+      new Map([
         [types.accrual, { id: types.accrual, kind: "accrual" as const }],
         [types.fine, { id: types.fine, kind: "deduction" as const }],
-        [types.salary, { id: types.salary, kind: "accrual" as const }],
       ]),
-      salaryTypeId: types.salary,
-    });
-    expect(parsed.records).toEqual([
-      { employeeId: employee().id, typeId: types.accrual, kind: "accrual", amount: 1500.5 },
-      { employeeId: employee().id, typeId: types.salary, kind: "accrual", amount: 4000 },
-    ]);
+    );
+    expect(parsed.period).toEqual({ from: "2026-10-01", to: "2026-10-31" });
+    expect(parsed.records).toEqual([{ employeeId: ids.one, typeId: types.accrual, kind: "accrual", amount: 1500.5 }]);
     expect(parsed.skipped).toEqual({ invalidEmployee: 0, negative: 0, unknownType: 0 });
+  });
+});
+
+describe("timesheetPay", () => {
+  const line = (from: string, to: string, amount: number, kind: "accrual" | "deduction" = "accrual") => ({ ...piece({ from, to, amount }), employeeId: "e", kind });
+
+  it("неделя на стыке — обе части, месячный табель в неделю не попадает", () => {
+    const lines = [
+      line("2026-10-01", "2026-10-04", 400), // октябрьская часть недели 28.09–04.10
+      line("2026-09-28", "2026-09-30", 300), // сентябрьская
+      line("2026-10-02", "2026-10-02", 50, "deduction"),
+      line("2026-09-01", "2026-09-30", 4000), // месячный табель сентября
+    ];
+    const week = timesheetPay(lines, { from: "2026-09-28", to: "2026-10-04" }).get("e")!;
+    expect(week.pieces.map((p) => p.amount)).toEqual([300, 400]);
+    expect(week.fines).toBe(50);
+    const october = timesheetPay(lines, { from: "2026-10-01", to: "2026-10-31" }).get("e")!;
+    expect(october.pieces.map((p) => p.amount)).toEqual([400]);
   });
 });

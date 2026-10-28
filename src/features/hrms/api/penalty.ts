@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useCreateItem, useDeleteItems, useUpdateItem, type Item } from "@/features/item";
 import { todayInput } from "@/shared/lib/date-value";
-import { dayFines, type PolicyRules, type Violation } from "../model/penalty";
-import { PAYROLL_LINES } from "./payroll";
+import type { PolicyRules, Violation } from "../model/penalty";
 import { EMPLOYEES } from "./employee";
 import { firstText, related, text } from "./org";
-import { ATTENDANCE_DAYS, useAll } from "./timesheet";
+import { useAll } from "./timesheet";
 
 /**
  * Штрафы за посещаемость — `fnRoot` прототипа (settings.html#hr-fines):
@@ -226,98 +225,4 @@ export function matchingPolicies(person: Target, assignments: PenaltyAssignment[
         !a.excluded.includes(person.id),
     ),
   );
-}
-
-/** Строки «Начислений», которые пишет пересчёт штрафов, — их и только их он переписывает. */
-export const FINES_SOURCE = "attendance_fines";
-
-/** Вид строк пересчёта — «Опоздания» (`code = late_fine`); нет — первое удержание. */
-export const finesType = (types: Item[]) =>
-  types.find((row) => text(row.code) === "late_fine") ?? types.find((row) => firstText(row.kind) === "deduction");
-
-/**
- * «Пересчитать штрафы» за месяц: дни посещаемости × действующая на
- * сотрудника политика → по строке удержания на нарушение. Прежние строки
- * пересчёта за месяц (`attendance_fines` с `fine_key` вида
- * сотрудник:дата:вид) удаляются; ручные и импортированные не трогаются.
- *
- * ponytail: считает фронт, как временная замена функции
- * `attendance_penalties_sync` старого HRMS (udevs_hrms_admin,
- * `api/services/reports.service.ts:37`). Строки пишутся по одной —
- * на месяц компании это сотни запросов; перенести в функцию проекта,
- * кнопка тогда будет звать её.
- */
-export function useSyncPenalties(month: string) {
-  const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
-  const range = { op: "between" as const, values: [`${month}-01`, `${month}-${last}`] };
-  const penalties = usePenalties();
-  const targets = usePenaltyTargets();
-  const days = useAll(ATTENDANCE_DAYS, { date: range }, false);
-  const lines = useAll(PAYROLL_LINES, { period: range }, false);
-  const types = useAll("hr_pay_types", {}, false);
-  const create = useCreateItem(PAYROLL_LINES);
-  const remove = useDeleteItems(PAYROLL_LINES);
-  /** Ход пересчёта: null — не идёт; total 0 — ещё считаем, дальше — записано из total. */
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-
-  const type = finesType(types.rows);
-  const ready = !penalties.loading && !days.loading && !lines.loading && !types.loading && targets.employee.length > 0;
-
-  const run = async (describe: (violation: Violation, minutes: number) => string) => {
-    if (!type) throw new Error("no deduction pay type");
-    setProgress({ done: 0, total: 0 });
-    try {
-      const today = todayInput();
-      const people = new Map(targets.employee.map((e) => [e.id, e]));
-      const rows: Item[] = [];
-      for (const row of days.rows) {
-        const person = people.get(text(row.hr_employees_id));
-        if (!person) continue;
-        const hit = matchingPolicies(person, penalties.assignments, text(row.date).slice(0, 10))[0];
-        const policy = hit && penalties.policies.find((p) => p.id === hit.policyId);
-        if (!policy) continue;
-        const fines = dayFines(
-          {
-            date: text(row.date).slice(0, 10),
-            status: firstText(row.status),
-            lateMinutes: number(row.late_minutes),
-            earlyMinutes: number(row.early_leave_minutes),
-            firstIn: text(row.first_in),
-            lastOut: text(row.last_out),
-          },
-          policy.rules,
-          today,
-        );
-        for (const fine of fines)
-          rows.push({
-            guid: crypto.randomUUID(),
-            hr_employees_id: person.id,
-            hr_departments_id: person.departmentId || null,
-            hr_pay_types_id: text(type.guid),
-            kind: "deduction",
-            amount: fine.amount,
-            currency: "UZS",
-            date: fine.date,
-            period: `${month}-01`,
-            source: FINES_SOURCE,
-            fine_key: `${person.id}:${fine.date}:${fine.violation}`,
-            description: `${describe(fine.violation, fine.minutes)} · ${policy.name}`,
-          });
-      }
-      /* Только свои строки: с тем же источником лежат и импортированные
-         из Excel штрафы прошлых месяцев — у них `fine_key` пуст. */
-      const stale = lines.rows.filter((row) => firstText(row.source) === FINES_SOURCE && text(row.fine_key)).map((row) => text(row.guid));
-      if (stale.length) await remove.mutateAsync(stale);
-      setProgress({ done: 0, total: rows.length });
-      for (const [i, row] of rows.entries()) {
-        await create.mutateAsync(row);
-        setProgress({ done: i + 1, total: rows.length });
-      }
-      return { count: rows.length, total: rows.reduce((sum, row) => sum + number(row.amount), 0) };
-    } finally {
-      setProgress(null);
-    }
-  };
-
-  return { ready, busy: progress !== null, progress, run };
 }

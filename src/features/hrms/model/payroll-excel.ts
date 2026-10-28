@@ -7,161 +7,19 @@
  * `__base_salary`, `income:<вид>`, `deduction:<вид>`), с 6-й — сотрудники.
  * Загрузка читает только ключи, поэтому подписи можно переводить.
  *
- * Отличия от HRMS:
- * - Период — месяц (сводная помесячная), недельной ведомости нет.
- * - Опоздания удерживают штрафы по политикам («Пересчитать штрафы»), их
- *   колонка — сумма уже посчитанных строк, загрузкой не читается (как
- *   `__auto_attendance_penalty`). Старой формулы опозданий с коэффициентом
- *   из main_settings нет — у omni4 нет этих настроек.
+ * Отличия от HRMS (ADR-0018):
+ * - Оклад и штрафы шаблон не считает: это строки «Зарплаты» утверждённых
+ *   табелей (`source = timesheet`), их пишет функция. В шаблоне они только
+ *   читаются — загрузка берёт премии и удержания, оклад и штрафы не трогает.
+ * - Период ведомости — месяц или неделя пн–вс, тот, что открыт в сводной
+ *   (в HRMS — так же, `salary-excel-common.js:36-55`). Он записан в файл
+ *   (`__period:<с>:<по>`), и загрузка отказывает файлу другого периода.
  */
 import ExcelJS from "exceljs";
-import type { PayPivot } from "./payroll";
-import type { SheetCell } from "./timesheet";
+import type { SalaryPiece } from "./payroll";
+import type { PayUnit } from "./timesheet-days";
 
-export type PayUnit = "month" | "week" | "day" | "hour";
-export type TemplateMode = "daily" | "hourly";
-export const PAY_UNITS: readonly PayUnit[] = ["month", "week", "day", "hour"];
-
-const WORKED: ReadonlySet<SheetCell["kind"]> = new Set(["worked", "late", "at_work", "missing_mark"]);
-
-export type SalaryInput = {
-  id: string;
-  name: string;
-  salary: number;
-  unit: PayUnit;
-  /** Дни месяца и задетых им недель (пн–вс): недельной ставке нужна неделя целиком. */
-  cells: SheetCell[];
-  /** Длина смен по дате, минуты, — до того, как табель снял её отсутствием. */
-  planByDate: ReadonlyMap<string, number>;
-  /** Границы месяца «ГГГГ-ММ-ДД». */
-  from: string;
-  to: string;
-};
-
-/** Кусок недельной ставки: засчитано в месяце, смен недели в месяце и всего. */
-type Segment = { credited: number; shifts: number; unitShifts: number };
-
-export type SalaryRow = {
-  /** Смен в месяце и их часы. */
-  normDays: number;
-  normHours: number;
-  creditedDays: number;
-  /** Факт засчитанных дней; без ухода и оплачиваемое отсутствие — по смене. */
-  paidHours: number;
-  lateMinutes: number;
-  noCheckout: string[];
-  offShift: string[];
-  weeks: Segment[];
-};
-
-const monday = (date: string) => {
-  const day = new Date(`${date}T00:00:00Z`);
-  day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
-  return day.toISOString().slice(0, 10);
-};
 const ddmm = (date: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}`;
-
-/**
- * Дни → норма и засчитанное, правила `fetchEmployeesWithSalary` HRMS:
- * засчитан день с приходом или оплачиваемым отсутствием. Ставке за месяц
- * и неделю не засчитан день «вне графика», ставке за день и час —
- * засчитан, а отсутствие без смены — нет.
- */
-export function salaryRow(input: SalaryInput): SalaryRow {
-  const byUnit = input.unit === "day" || input.unit === "hour";
-  const row: SalaryRow = { normDays: 0, normHours: 0, creditedDays: 0, paidHours: 0, lateMinutes: 0, noCheckout: [], offShift: [], weeks: [] };
-  const weeks = new Map<string, Segment>();
-  for (const cell of input.cells) {
-    const plan = (input.planByDate.get(cell.date) ?? 0) / 60;
-    const shift = plan > 0 && cell.kind !== "outside";
-    const inMonth = cell.date >= input.from && cell.date <= input.to;
-    // «Вне графика» месяцу и неделе не засчитан; день без смены и без этой
-    // пометки — засчитан, как в HRMS (source_type off_schedule).
-    const worked = WORKED.has(cell.kind) && cell.counted && (byUnit || cell.day?.status !== "off_schedule");
-    const paidLeave = cell.kind === "leave" && cell.leave?.paid === true;
-    const credited = inMonth && (worked || (paidLeave && (shift || !byUnit)));
-
-    const week = weeks.get(monday(cell.date)) ?? { credited: 0, shifts: 0, unitShifts: 0 };
-    weeks.set(monday(cell.date), week);
-    if (shift) week.unitShifts += 1;
-    if (!inMonth) continue;
-    if (shift) {
-      week.shifts += 1;
-      row.normDays += 1;
-      row.normHours += plan;
-    }
-    if (worked) row.lateMinutes += cell.lateMinutes;
-    if (!credited) continue;
-    week.credited += 1;
-    row.creditedDays += 1;
-    row.paidHours += worked && cell.workedMinutes != null ? cell.workedMinutes / 60 : plan;
-    if (worked && cell.workedMinutes == null && (shift || !byUnit)) row.noCheckout.push(ddmm(cell.date));
-    if (worked && !shift && byUnit) row.offShift.push(ddmm(cell.date));
-  }
-  row.weeks = [...weeks.values()].filter((week) => week.unitShifts > 0);
-  row.normHours = round2(row.normHours);
-  row.paidHours = round2(row.paidHours);
-  return row;
-}
-
-const round2 = (value: number) => Math.round(Math.max(0, value) * 100) / 100;
-
-/** Шаблон строки: ставка за час — всегда часовой, остальные — выбранный. */
-export const rowMode = (unit: PayUnit, mode: TemplateMode): TemplateMode => (unit === "hour" ? "hourly" : mode);
-
-/** Множитель ставки к месяцу в часовом шаблоне: день × смены, неделя × 4. */
-const hourlyFactor = (unit: PayUnit, row: SalaryRow) =>
-  unit === "day" ? { k: row.normDays, excel: `*${row.normDays}` } : unit === "week" ? { k: 4, excel: "*4" } : { k: 1, excel: "" };
-
-export type Accrual = {
-  norm: number;
-  worked: number;
-  price: number;
-  amount: number;
-  /** Формула цены от клеток строки: правка ставки в Excel пересчитает оклад. */
-  priceFormula: (cells: { salary: string; norm: string; worked: string }) => string;
-};
-
-/** Начисленный оклад за месяц — `accruedSalary` HRMS для месячного периода. */
-export function accrual(salary: number, unit: PayUnit, mode: TemplateMode, row: SalaryRow): Accrual {
-  if (rowMode(unit, mode) === "hourly") {
-    if (unit === "hour") {
-      return { norm: row.normHours, worked: row.paidHours, price: salary, amount: Math.round(salary * row.paidHours), priceFormula: (c) => c.salary };
-    }
-    const { k, excel } = hourlyFactor(unit, row);
-    const norm = row.normHours;
-    const price = norm > 0 ? (salary * k) / norm : 0;
-    // k = 1 — тем же порядком действий, что HRMS: на ровно .5 иначе ±1.
-    const amount = norm > 0 ? Math.round(k === 1 ? salary * (row.paidHours / norm) : price * row.paidHours) : 0;
-    return { norm, worked: row.paidHours, price, amount, priceFormula: (c) => `IF(${c.norm}>0,${c.salary}${excel}/${c.norm},0)` };
-  }
-  if (unit === "day") {
-    return { norm: row.normDays, worked: row.creditedDays, price: salary, amount: Math.round(salary * row.creditedDays), priceFormula: (c) => c.salary };
-  }
-  if (unit === "month") {
-    const norm = row.normDays;
-    const worked = norm > 0 ? Math.min(row.creditedDays, norm) : row.creditedDays;
-    return {
-      norm,
-      worked,
-      price: norm > 0 ? salary / norm : 0,
-      amount: norm > 0 ? Math.round(salary * (worked / norm)) : 0,
-      priceFormula: (c) => `IF(${c.norm}>0,${c.salary}/${c.norm},0)`,
-    };
-  }
-  // Неделя: каждая неделя по цене своих смен (пн–вс, и вне месяца тоже).
-  const shares = row.weeks.map((week) => [Math.min(week.credited, week.shifts), week.unitShifts] as const);
-  const worked = shares.reduce((sum, [credited]) => sum + credited, 0);
-  const share = shares.reduce((sum, [credited, shifts]) => sum + credited / shifts, 0);
-  const formula = shares.map(([credited, shifts]) => `${credited}/${shifts}`).join("+") || "0";
-  return {
-    norm: row.normDays,
-    worked,
-    price: worked > 0 ? (salary * share) / worked : 0,
-    amount: Math.round(salary * share),
-    priceFormula: (c) => `IF(${c.worked}>0,${c.salary}*(${formula})/${c.worked},0)`,
-  };
-}
 
 /* ---------- шаблон ---------- */
 
@@ -178,10 +36,8 @@ export type TemplateLabels = {
   payUnit: string;
   salaryGroup: string;
   rate: string;
-  price: string;
   norm: string;
   worked: string;
-  lateMinutes: string;
   accruals: string;
   salary: string;
   deductions: string;
@@ -192,28 +48,32 @@ export type TemplateLabels = {
   daily: string;
   hourly: string;
   unit: Record<PayUnit, string>;
-  noCheckout: (dates: string, hourly: boolean) => string;
-  offShift: (dates: string) => string;
+  /** Примечание к пустому окладу. */
+  noTimesheet: string;
 };
 
-export type TemplateEmployee = SalaryInput & {
-  /** Уже посчитанные штрафы месяца — в колонку `auto`. */
+export type TemplateEmployee = {
+  id: string;
+  name: string;
+  /** Оклад месяца по кускам; пусто — нет утверждённого табеля. */
+  pieces: SalaryPiece[];
+  /** Удержания утверждённых табелей (штрафы, опоздания) — в колонку `auto`. */
   fines: number;
 };
 
 export type TemplateInput = {
-  mode: TemplateMode;
+  period: { from: string; to: string };
   labels: TemplateLabels;
   employees: TemplateEmployee[];
   /** Виды без «Оклада»: он своей колонкой. */
   accruals: PayTypeColumn[];
   deductions: PayTypeColumn[];
-  /** Вид, который пишет пересчёт штрафов: колонка только для чтения. */
+  /** Вид удержаний табеля: колонка только для чтения. */
   autoDeductionId: string;
 };
 
 /** Ключи строки 5: по ним загрузка находит колонки. */
-export const META = { guid: "__user_guid", salary: "__base_salary", auto: "__auto_attendance_penalty" } as const;
+export const META = { guid: "__user_guid", salary: "__base_salary", auto: "__auto_attendance_penalty", period: "__period:" } as const;
 const META_ROW = 5;
 const DATA_ROW = 6;
 
@@ -255,12 +115,12 @@ const formula = (expression: string, result?: number): ExcelJS.CellValue =>
 
 /** Ведомость за месяц — раскладка и оформление шаблона HRMS. */
 export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> {
-  const { labels, mode, employees, accruals, deductions } = input;
+  const { labels, employees, accruals, deductions } = input;
   const book = new ExcelJS.Workbook();
   book.creator = "omni4";
   const sheet = book.addWorksheet(labels.sheet, { views: [{ state: "frozen", ySplit: 5 }] });
 
-  const col = { accrualType: 4, payUnit: 5, rate: 6, price: 7, norm: 8, worked: 9, late: 10, salary: 11 };
+  const col = { accrualType: 4, payUnit: 5, rate: 6, norm: 7, worked: 8, salary: 9 };
   const accrualsFrom = col.salary + 1;
   const deductionsFrom = accrualsFrom + accruals.length;
   const accruedCol = deductionsFrom + deductions.length;
@@ -269,7 +129,7 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   const last = netCol;
   const autoCol = deductions.findIndex((type) => type.id === input.autoDeductionId);
 
-  [6, 40, 34, 18, 16, 20, 20, 22, 20, 22].forEach((width, i) => (sheet.getColumn(i + 1).width = width));
+  [6, 40, 34, 18, 16, 20, 20, 20].forEach((width, i) => (sheet.getColumn(i + 1).width = width));
   for (let column = col.salary; column <= last; column += 1) sheet.getColumn(column).width = 18;
 
   sheet.mergeCells(1, 1, 1, last);
@@ -292,8 +152,7 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   [labels.index, labels.guid, labels.employee, labels.accrualType, labels.payUnit].forEach((value, i) => tall(i + 1, value, NAVY));
   sheet.mergeCells(3, col.rate, 3, col.worked);
   header(sheet.getCell(3, col.rate), labels.salaryGroup, NAVY);
-  [labels.rate, labels.price, labels.norm, labels.worked].forEach((value, i) => header(sheet.getCell(4, col.rate + i), value, NAVY, 11));
-  tall(col.late, labels.lateMinutes, RED, 11);
+  [labels.rate, labels.norm, labels.worked].forEach((value, i) => header(sheet.getCell(4, col.rate + i), value, NAVY, 11));
   sheet.mergeCells(3, col.salary, 3, deductionsFrom - 1);
   header(sheet.getCell(3, col.salary), labels.accruals, GREEN);
   header(sheet.getCell(4, col.salary), labels.salary, GREEN, 11);
@@ -311,61 +170,56 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   sheet.getRow(3).height = 34;
   sheet.getRow(4).height = 34;
 
-  const meta = ["__index", META.guid, "__employee_name", "__accrual_type", "__pay_unit", "__salary_rate", "__unit_price", "__norm", "__worked", "__lateness_minutes", META.salary];
+  const meta = ["__index", META.guid, "__employee_name", "__accrual_type", "__pay_unit", "__salary_rate", "__norm", "__worked", META.salary];
   meta.forEach((key, i) => (sheet.getCell(META_ROW, i + 1).value = key));
   accruals.forEach((type, i) => (sheet.getCell(META_ROW, accrualsFrom + i).value = `income:${type.id}`));
   deductions.forEach((type, i) => (sheet.getCell(META_ROW, deductionsFrom + i).value = i === autoCol ? META.auto : `deduction:${type.id}`));
   sheet.getCell(META_ROW, accruedCol).value = "__total_accrued";
   sheet.getCell(META_ROW, deductedCol).value = "__total_deducted";
   sheet.getCell(META_ROW, netCol).value = "__net_payable";
+  sheet.getCell(META_ROW, last + 1).value = `${META.period}${input.period.from}:${input.period.to}`;
   sheet.getRow(META_ROW).hidden = true;
 
-  const kinds = new Set<string>();
   const hourlyRows: boolean[] = [];
   employees.forEach((employee, index) => {
     const r = DATA_ROW + index;
-    const row = salaryRow(employee);
-    const hourly = rowMode(employee.unit, mode) === "hourly";
-    const pay = accrual(employee.salary, employee.unit, mode, row);
-    kinds.add(`${employee.unit}:${hourly}`);
-    hourlyRows.push(hourly);
-    const ref = { salary: `${letter(col.rate)}${r}`, norm: `${letter(col.norm)}${r}`, worked: `${letter(col.worked)}${r}` };
+    const { pieces } = employee;
+    // Общее для всех кусков — в клетку; разное — пусто, куски в примечании.
+    const same = <T,>(get: (piece: SalaryPiece) => T) =>
+      pieces.length > 0 && pieces.every((piece) => get(piece) === get(pieces[0]!)) ? get(pieces[0]!) : undefined;
+    const mode = same((piece) => piece.mode);
+    const unit = same((piece) => piece.unit);
+    const one = pieces.length === 1 ? pieces[0] : undefined;
+    hourlyRows.push(mode === "hourly" || unit === "hour");
 
     sheet.getCell(r, 1).value = index + 1;
     sheet.getCell(r, 2).value = employee.id;
     sheet.getCell(r, 3).value = employee.name;
-    sheet.getCell(r, col.accrualType).value = hourly ? labels.hourly : labels.daily;
-    sheet.getCell(r, col.payUnit).value = labels.unit[employee.unit];
-    sheet.getCell(r, col.rate).value = employee.salary;
-    sheet.getCell(r, col.price).value = formula(pay.priceFormula(ref), pay.price);
-    sheet.getCell(r, col.norm).value = pay.norm;
-    sheet.getCell(r, col.worked).value = pay.worked;
-    sheet.getCell(r, col.late).value = row.lateMinutes;
-    sheet.getCell(r, col.salary).value = formula(`ROUND(${letter(col.price)}${r}*${ref.worked},0)`, pay.amount);
+    sheet.getCell(r, col.accrualType).value = mode ? labels[mode] : null;
+    sheet.getCell(r, col.payUnit).value = unit ? labels.unit[unit] : null;
+    sheet.getCell(r, col.rate).value = same((piece) => piece.rate) ?? null;
+    sheet.getCell(r, col.norm).value = one?.norm ?? null;
+    sheet.getCell(r, col.worked).value = one?.worked ?? null;
+    sheet.getCell(r, col.salary).value = pieces.length ? pieces.reduce((sum, piece) => sum + piece.amount, 0) : null;
     for (let column = accrualsFrom; column < accruedCol; column += 1) sheet.getCell(r, column).value = 0;
     if (autoCol >= 0) sheet.getCell(r, deductionsFrom + autoCol).value = employee.fines;
     sheet.getCell(r, accruedCol).value = formula(`SUM(${letter(col.salary)}${r}:${letter(deductionsFrom - 1)}${r})`);
     sheet.getCell(r, deductedCol).value = formula(deductions.length ? `SUM(${letter(deductionsFrom)}${r}:${letter(accruedCol - 1)}${r})` : "0");
     sheet.getCell(r, netCol).value = formula(`${letter(accruedCol)}${r}-${letter(deductedCol)}${r}`);
 
-    // Нет ухода — день засчитан по смене; без смены — засчитан ставке за день и час.
-    const notes = [
-      row.noCheckout.length > 0 && labels.noCheckout(row.noCheckout.join(", "), hourly),
-      row.offShift.length > 0 && labels.offShift(row.offShift.join(", ")),
-    ].filter(Boolean);
-    const flagged = notes.length > 0;
-    // Без смен в месяце нормы нет — оклад не начислен, минуты опозданий не к чему приложить.
-    const noShifts = row.normDays === 0;
-    if (flagged) {
-      const cell = sheet.getCell(r, col.worked);
-      fill(cell, "FFFFEB3B");
-      cell.note = notes.join("\n");
+    const salary = sheet.getCell(r, col.salary);
+    if (!pieces.length) {
+      fill(salary, "FFFFEB3B");
+      salary.note = labels.noTimesheet;
+    } else if (pieces.length > 1) {
+      salary.note = pieces
+        .map((p) => `${ddmm(p.from)}–${ddmm(p.to)} · ${p.rate.toLocaleString()} / ${labels.unit[p.unit]} · ${labels[p.mode]} · ${p.worked} / ${p.norm} · ${p.amount.toLocaleString()}`)
+        .join("\n");
     }
-    if (noShifts) fill(sheet.getCell(r, col.late), "FFFF0000");
     borders(sheet, r, last);
     if (index % 2 === 0) {
       for (let column = 1; column <= last; column += 1) {
-        if ((column === col.worked && flagged) || (column === col.late && noShifts)) continue;
+        if (column === col.salary && !pieces.length) continue;
         fill(sheet.getCell(r, column), "FFF8FAFC");
       }
     }
@@ -373,21 +227,16 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
 
   const end = Math.max(DATA_ROW, DATA_ROW + employees.length - 1);
   const total = end + 1;
-  sheet.mergeCells(total, 1, total, col.payUnit);
+  // Ставки, нормы и отработанное разных единиц не складываются — итог с оклада.
+  sheet.mergeCells(total, 1, total, col.worked);
   const label = sheet.getCell(total, 1);
   label.value = labels.total;
   label.font = { bold: true, size: 12, color: { argb: "FF1F3562" } };
   label.alignment = { horizontal: "right", vertical: "middle" };
   fill(label, "FFE5ECF7");
-  for (let column = col.rate; column <= last; column += 1) {
+  for (let column = col.salary; column <= last; column += 1) {
     const cell = sheet.getCell(total, column);
-    // Ставки, дни и часы разных единиц не складываются.
-    cell.value =
-      kinds.size > 1 && column <= col.worked
-        ? null
-        : employees.length
-          ? formula(`SUM(${letter(column)}${DATA_ROW}:${letter(column)}${end})`)
-          : 0;
+    cell.value = employees.length ? formula(`SUM(${letter(column)}${DATA_ROW}:${letter(column)}${end})`) : 0;
     cell.font = { bold: true, color: { argb: "FF2B3D63" } };
     fill(cell, "FFE5ECF7");
   }
@@ -395,10 +244,10 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   sheet.getRow(total).height = 30;
 
   for (let r = DATA_ROW; r <= total; r += 1) {
-    const hours = r === total ? hourlyRows[0] : hourlyRows[r - DATA_ROW];
+    const hours = hourlyRows[r - DATA_ROW] ?? false;
     for (let column = col.rate; column <= last; column += 1) {
       const cell = sheet.getCell(r, column);
-      cell.numFmt = column === col.price || (hours && (column === col.norm || column === col.worked)) ? "#,##0.00" : "#,##0";
+      cell.numFmt = hours && (column === col.norm || column === col.worked) ? "#,##0.00" : "#,##0";
       cell.alignment = { horizontal: "right", vertical: "middle" };
     }
     sheet.getCell(r, 1).alignment = { horizontal: "center", vertical: "middle" };
@@ -414,6 +263,8 @@ export type ImportType = { id: string; kind: "accrual" | "deduction" };
 export type ImportRecord = { employeeId: string; typeId: string; kind: "accrual" | "deduction"; amount: number };
 
 export type ImportResult = {
+  /** Период файла; нет — файл старый или из HRMS, сверять не с чем. */
+  period?: { from: string; to: string } | undefined;
   records: ImportRecord[];
   skipped: { invalidEmployee: number; negative: number; unknownType: number };
 };
@@ -442,41 +293,37 @@ export class TemplateError extends Error {}
 
 /**
  * Файл → строки начислений, правила `importSalaryExcel` HRMS: по строке на
- * сотрудника × вид с суммой больше нуля; «Оклад» — видом `salaryTypeId`,
- * если его нет среди колонок видов. Колонка штрафов (`__auto_…`) не читается.
+ * сотрудника × вид с суммой больше нуля. Оклад (`__base_salary`) и штрафы
+ * (`__auto_…`) не читаются — они из утверждённого табеля (ADR-0018).
  * Есть ли такие сотрудники, проверяет вызывающий (`unknownEmployee`).
  */
-export async function parseImport(
-  file: ArrayBuffer,
-  { types, salaryTypeId }: { types: ReadonlyMap<string, ImportType>; salaryTypeId: string },
-): Promise<ImportResult> {
+export async function parseImport(file: ArrayBuffer, types: ReadonlyMap<string, ImportType>): Promise<ImportResult> {
   const book = new ExcelJS.Workbook();
   await book.xlsx.load(file);
   const sheet = book.worksheets[0];
   if (!sheet) throw new TemplateError("no sheet");
 
   let guidCol = 0;
-  let salaryCol = 0;
-  const typeCols: { column: number; typeId: string }[] = [];
+  const columns: { column: number; typeId: string }[] = [];
+  let period: ImportResult["period"];
   const meta = sheet.getRow(META_ROW);
   let unknownType = 0;
   for (let column = 1; column <= Math.max(meta.cellCount, sheet.columnCount); column += 1) {
     const key = cellText(meta.getCell(column).value);
+    const dates = key.startsWith(META.period) ? /^(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})$/.exec(key.slice(META.period.length)) : null;
     if (key === META.guid) guidCol = column;
-    else if (key === META.salary) salaryCol = column;
+    else if (dates) period = { from: dates[1]!, to: dates[2]! };
     else {
       const id = /^(?:income|deduction):(.+)$/.exec(key)?.[1]?.trim();
       if (!id || !UUID.test(id)) continue;
-      if (types.has(id)) typeCols.push({ column, typeId: id });
+      if (types.has(id)) columns.push({ column, typeId: id });
       else unknownType += 1;
     }
   }
   if (!guidCol) throw new TemplateError("no guid column");
-  const salaryType = salaryCol && salaryTypeId && !typeCols.some((c) => c.typeId === salaryTypeId) ? types.get(salaryTypeId) : undefined;
-  const columns = [...typeCols, ...(salaryType ? [{ column: salaryCol, typeId: salaryTypeId }] : [])];
   if (!columns.length) throw new TemplateError("no pay type columns");
 
-  const result: ImportResult = { records: [], skipped: { invalidEmployee: 0, negative: 0, unknownType } };
+  const result: ImportResult = { period, records: [], skipped: { invalidEmployee: 0, negative: 0, unknownType } };
   for (let r = DATA_ROW; r <= sheet.rowCount; r += 1) {
     const row = sheet.getRow(r);
     const employeeId = cellText(row.getCell(guidCol).value);
@@ -494,74 +341,4 @@ export async function parseImport(
     }
   }
   return result;
-}
-
-/* ---------- выгрузка сводной ---------- */
-
-export type PivotLabels = Record<"sheet" | "employee" | "dept" | "accruals" | "deductions" | "accrued" | "deducted" | "net" | "total", string>;
-
-/** Сводная месяца как на экране — числами, без формул; удержания со знаком минус. */
-export async function buildPivotXlsx(pivot: PayPivot, labels: PivotLabels): Promise<ArrayBuffer> {
-  const book = new ExcelJS.Workbook();
-  book.creator = "omni4";
-  const sheet = book.addWorksheet(labels.sheet, { views: [{ state: "frozen", ySplit: 2, xSplit: 1 }] });
-  const columns = [...pivot.accruals, ...pivot.deductions];
-  const deduction = new Set(pivot.deductions.map((c) => c.id));
-  const signed = (id: string, value: number) => (deduction.has(id) ? -value : value);
-  const last = columns.length + 5;
-
-  const head = (row: number, column: number, value: string) => {
-    const cell = sheet.getCell(row, column);
-    cell.value = value;
-    cell.font = { bold: true };
-    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-    fill(cell, "FFE5ECF7");
-  };
-  const tall = (column: number, value: string) => {
-    sheet.mergeCells(1, column, 2, column);
-    head(1, column, value);
-  };
-  tall(1, labels.employee);
-  tall(2, labels.dept);
-  if (pivot.accruals.length) {
-    sheet.mergeCells(1, 3, 1, 2 + pivot.accruals.length);
-    head(1, 3, labels.accruals);
-  }
-  if (pivot.deductions.length) {
-    sheet.mergeCells(1, 3 + pivot.accruals.length, 1, 2 + columns.length);
-    head(1, 3 + pivot.accruals.length, labels.deductions);
-  }
-  columns.forEach((column, i) => head(2, 3 + i, column.name));
-  tall(last - 2, labels.accrued);
-  tall(last - 1, labels.deducted);
-  tall(last, labels.net);
-
-  pivot.rows.forEach((row) =>
-    sheet.addRow([
-      row.name,
-      row.dept,
-      ...columns.map((column) => signed(column.id, row.cells[column.id] ?? 0)),
-      row.accrued,
-      -row.deducted,
-      row.accrued - row.deducted,
-    ]),
-  );
-  const total = sheet.addRow([
-    labels.total,
-    "",
-    ...columns.map((column) => signed(column.id, pivot.total.cells[column.id] ?? 0)),
-    pivot.total.accrued,
-    -pivot.total.deducted,
-    pivot.total.accrued - pivot.total.deducted,
-  ]);
-  total.font = { bold: true };
-
-  sheet.getColumn(1).width = 36;
-  sheet.getColumn(2).width = 20;
-  for (let column = 3; column <= last; column += 1) {
-    sheet.getColumn(column).width = 16;
-    sheet.getColumn(column).numFmt = "#,##0";
-  }
-  for (let row = 1; row <= sheet.rowCount; row += 1) borders(sheet, row, last);
-  return book.xlsx.writeBuffer() as Promise<ArrayBuffer>;
 }
