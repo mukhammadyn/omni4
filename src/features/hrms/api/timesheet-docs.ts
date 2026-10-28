@@ -14,7 +14,7 @@ import { planFill, SHEET_STATUS, type SheetEvent } from "../model/timesheet-docs
 import { EMPLOYEES } from "./employee";
 import { firstText, text } from "./org";
 import { useAll } from "./timesheet";
-import { useFillDays, useTimesheetDays, type FillResult, type FillTarget } from "./timesheet-days";
+import { TIMESHEET_DAYS, useFillDays, useTimesheetDays, type FillResult, type FillTarget } from "./timesheet-days";
 
 /** «Табели» — документ «табель за месяц по отделу» (`timesheets.html` прототипа). */
 export const TIMESHEETS = "hr_timesheets";
@@ -39,15 +39,20 @@ export function useTimesheetFill(period: string, kind: PeriodKind) {
     // Без отдела документ не завести: Many2One пустым — не «отдел».
     const depts = [...days.departments].filter((id) => names.has(id));
     const same = existing.rows.filter((row) => (firstText(row.period_kind) || "month") === kind);
+    const own = new Map(same.map((row) => [text(row.hr_departments_id), text(row.guid)]));
+    const base = planFill(
+      same.map((row) => ({ guid: text(row.guid), departmentId: text(row.hr_departments_id), status: firstText(row.status) })),
+      depts,
+    );
+    // Дни, что уже лежат в других табелях (неделя поверх месяца), — предупреждение, не запрет.
+    const filled = [...base.create, ...base.update.map((target) => target.departmentId)];
     return {
-      ...planFill(
-        same.map((row) => ({ guid: text(row.guid), departmentId: text(row.hr_departments_id), status: firstText(row.status) })),
-        depts,
-      ),
+      ...base,
+      overlap: filled.reduce((sum, id) => sum + days.overlap(id, own.get(id)), 0),
       names,
       unassigned: days.unassigned,
     };
-  }, [loading, departments.rows, existing.rows, days.departments, days.unassigned, kind]);
+  }, [loading, departments.rows, existing.rows, days.departments, days.unassigned, days.overlap, kind]);
 
   return { loading, plan, fill: days.fill, from: days.from };
 }
@@ -111,7 +116,6 @@ export function useWriteTimesheets() {
       title: (dept: string) => string;
       fill: (target: FillTarget) => Promise<FillResult>;
     }) => {
-      let skipped = 0;
       for (const departmentId of plan.create) {
         const guid = crypto.randomUUID();
         await api.post<unknown>(`/v2/items/${TIMESHEETS}`, {
@@ -125,18 +129,17 @@ export function useWriteTimesheets() {
             core_users_id: session.getObjectIds()[PEOPLE] ?? null,
           },
         });
-        const result = await fill({ guid, departmentId });
-        skipped += result.skipped;
-        // Все дни отдела уже в других табелях — пустой документ не нужен.
+        const result = await fill({ guid, departmentId, fresh: true });
+        // Людей в отделе за период не нашлось — пустой документ не нужен.
         if (!result.people) await api.delete<unknown>(`/v1/object/${TIMESHEETS}`, { data: { ids: [guid] } });
       }
-      for (const target of plan.update) skipped += (await fill(target)).skipped;
-      return { skipped };
+      for (const target of plan.update) await fill(target);
     },
     onError: (error) => reportError(error, "common.saveFailed"),
+    // Один раз на весь пакет: fill кэш не трогает.
     onSettled: () =>
       Promise.all(
-        [TIMESHEETS, TIMESHEET_EVENTS].map((slug) => queryClient.invalidateQueries({ queryKey: keys.items.table(slug) })),
+        [TIMESHEETS, TIMESHEET_DAYS, TIMESHEET_EVENTS].map((slug) => queryClient.invalidateQueries({ queryKey: keys.items.table(slug) })),
       ),
   });
 }
