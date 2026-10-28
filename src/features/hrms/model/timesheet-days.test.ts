@@ -44,7 +44,7 @@ test("повторное «Заполнить»: правка остаётся, 
   expect(mergeDay(fresh, first).late_minutes).toBe(45);
 });
 
-test("день по истории назначений и «один день — один табель»", () => {
+test("день по истории назначений", () => {
   const jobs: Job[] = [job, { ...job, departmentId: "dev", from: "2026-10-15" }];
   const dates = ["2026-09-28", "2026-09-30", "2026-10-01", "2026-10-14", "2026-10-15", "2026-10-20"];
   const sales = ownDates({
@@ -53,13 +53,11 @@ test("день по истории назначений и «один день �
     to: "2026-10-31",
     departmentOn: (date) => jobOn(jobs, date)?.departmentId ?? "",
     department: "sales",
-    taken: (date) => date === "2026-10-14",
   });
-  expect(sales.inside).toEqual(["2026-10-01"]);
-  expect(sales.skipped).toBe(1);
+  expect(sales.inside).toEqual(["2026-10-01", "2026-10-14"]);
   // Неделя на стыке: дни сентября — «вне месяца».
   expect(sales.outside).toEqual(["2026-09-28", "2026-09-30"]);
-  const dev = ownDates({ dates, from: "2026-10-01", to: "2026-10-31", departmentOn: (date) => jobOn(jobs, date)?.departmentId ?? "", department: "dev", taken: () => false });
+  const dev = ownDates({ dates, from: "2026-10-01", to: "2026-10-31", departmentOn: (date) => jobOn(jobs, date)?.departmentId ?? "", department: "dev" });
   expect(dev.inside).toEqual(["2026-10-15", "2026-10-20"]);
 });
 

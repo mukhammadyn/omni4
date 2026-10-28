@@ -402,8 +402,8 @@ export function TimesheetDocPage({
       )}
       {dialog === "approve" && (
         <ApproveDialog
-          unconfirmed={doc.days.filter((day) => !day.outside_period && day.unconfirmed).length}
-          empty={!doc.days.length}
+          guid={guid}
+          days={doc.days}
           busy={decide.isPending}
           onClose={() => setDialog(null)}
           onApprove={(mode) =>

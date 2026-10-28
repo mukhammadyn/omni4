@@ -5,6 +5,7 @@ import { useTablePermissions } from "@/features/auth";
 import { todayInput } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
+import { DatePicker } from "@/shared/ui/date-picker";
 import { Icon } from "@/shared/ui/icon";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Modal } from "@/shared/ui/modal";
@@ -67,23 +68,37 @@ function FillDialog({ onClose, initial }: { onClose: () => void; initial?: { kin
   if (start && !months.includes(start)) months.unshift(start);
   const [kind, setKind] = useState<PeriodKind>(initial?.kind ?? "month");
   const [month, setMonth] = useState(start ?? months[0]!);
-  // Неделя — пн–вс того дня, что выбран: ведомость HRMS тоже берёт неделю от даты.
-  const [day, setDay] = useState(initial?.anchor ?? todayInput());
-  const period = kind === "month" ? `${month}-01` : rangeOf("week", day).from;
+  // Неделя — пн–вс выбранного дня, как ведомость HRMS; в поле — её понедельник.
+  const [monday, setMonday] = useState(rangeOf("week", initial?.anchor ?? todayInput()).from);
+  const period = kind === "month" ? `${month}-01` : monday;
   const { loading, plan, fill, from } = useTimesheetFill(period, kind);
   const write = useWriteTimesheets();
   const name = kind === "month" ? monthName(month, i18n.language) : weekName(from, i18n.language);
   const nothing = plan !== null && !plan.create.length && !plan.update.length;
+  // В сводке — только то, что есть: «Создать 0» и «Пересчитать 0» не показываются.
+  const lines = plan
+    ? [
+        plan.create.length > 0 && <li key="create">{t("timesheets.planCreate", { count: plan.create.length })}</li>,
+        plan.update.length > 0 && <li key="update">{t("timesheets.planUpdate", { count: plan.update.length })}</li>,
+        plan.overlap > 0 && (
+          <li key="overlap" className="text-warning">{t("timesheets.planOverlap", { count: plan.overlap })}</li>
+        ),
+        plan.locked.length > 0 && (
+          <li key="locked" className="text-fg-muted">{t("timesheets.planLocked", { count: plan.locked.length })}</li>
+        ),
+        plan.unassigned > 0 && (
+          <li key="unassigned" className="text-fg-muted">{t("timesheets.planUnassigned", { count: plan.unassigned })}</li>
+        ),
+      ].filter(Boolean)
+    : [];
 
   const run = () => {
     if (!plan) return;
     write.mutate(
       { plan, period: from, kind, fill, title: (dept) => `${t("timesheets.title")} · ${name} · ${dept}` },
       {
-        onSuccess: ({ skipped }) => {
-          const done = t("timesheets.filled", { count: plan.create.length + plan.update.length });
-          // Дни, занятые другим табелем, пропущены — человек должен это знать (ADR-0018).
-          toast.success(skipped ? `${done}. ${t("timesheets.skippedDays", { count: skipped })}` : done);
+        onSuccess: () => {
+          toast.success(t("timesheets.filled", { count: plan.create.length + plan.update.length }));
           onClose();
         },
       },
@@ -93,10 +108,7 @@ function FillDialog({ onClose, initial }: { onClose: () => void; initial?: { kin
   return (
     <Modal onClose={onClose}>
       <div className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-modal">
-        <div className="flex flex-col gap-1.5">
-          <h2 className="text-lg font-semibold">{t("timesheets.fill")}</h2>
-          <p className="text-sm text-fg-muted">{t("timesheets.fillHint")}</p>
-        </div>
+        <h2 className="text-lg font-semibold">{t("timesheets.fill")}</h2>
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="text-fg-muted">{t("timesheets.periodKind")}</span>
           <Dropdown
@@ -117,33 +129,28 @@ function FillDialog({ onClose, initial }: { onClose: () => void; initial?: { kin
             />
           </label>
         ) : (
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-fg-muted">{t("timesheets.week")}</span>
-            <input
-              type="date"
-              value={day}
-              onChange={(event) => event.target.value && setDay(event.target.value)}
-              className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-accent"
+          <div className="flex flex-col gap-1.5 text-sm">
+            <span className="flex justify-between text-fg-muted">
+              {t("timesheets.week")}
+              <span className="text-fg-subtle tabular-nums">{name}</span>
+            </span>
+            <DatePicker
+              value={monday}
+              locale={i18n.language}
+              ariaLabel={t("timesheets.week")}
+              onChange={(value) => value && setMonday(rangeOf("week", value).from)}
             />
-            <span className="text-xs text-fg-subtle">{name}</span>
-          </label>
+          </div>
         )}
-        <div className="rounded-lg bg-surface-soft px-3 py-2.5 text-sm">
-          {loading || !plan ? (
-            <span className="text-fg-subtle">{t("timesheets.counting")}</span>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              <li>{t("timesheets.planCreate", { count: plan.create.length })}</li>
-              <li>{t("timesheets.planUpdate", { count: plan.update.length })}</li>
-              {plan.locked.length > 0 && (
-                <li className="text-fg-muted">{t("timesheets.planLocked", { count: plan.locked.length })}</li>
-              )}
-              {plan.unassigned > 0 && (
-                <li className="text-fg-muted">{t("timesheets.planUnassigned", { count: plan.unassigned })}</li>
-              )}
-            </ul>
-          )}
-        </div>
+        {(loading || !plan || lines.length > 0) && (
+          <div className="rounded-lg bg-surface-soft px-3 py-2.5 text-sm">
+            {loading || !plan ? (
+              <span className="text-fg-subtle">{t("timesheets.counting")}</span>
+            ) : (
+              <ul className="flex flex-col gap-1">{lines}</ul>
+            )}
+          </div>
+        )}
         <div className="mt-1 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             {t("action.cancel")}

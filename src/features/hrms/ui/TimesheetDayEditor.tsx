@@ -5,7 +5,7 @@ import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Modal } from "@/shared/ui/modal";
-import { useEditDay, useFillDays, useSheetPay } from "../api/timesheet-days";
+import { useEditDay, useFillDays, useSheetOverlap, useSheetPay } from "../api/timesheet-days";
 import { DAY_KINDS, isEdited, type DayKind, type DayRow, type Edit, type PeriodKind } from "../model/timesheet-days";
 
 const box = "flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-modal";
@@ -35,9 +35,9 @@ export function FillDoc({
   const run = async () => {
     setBusy(true);
     try {
-      const { people, skipped } = await data.fill({ guid, departmentId });
-      const done = t("timesheets.refilledPeople", { count: people });
-      toast.success(skipped ? `${done}. ${t("timesheets.skippedDays", { count: skipped })}` : done);
+      const { people } = await data.fill({ guid, departmentId });
+      await data.refresh();
+      toast.success(t("timesheets.refilledPeople", { count: people }));
       onClose();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.saveFailed"));
@@ -87,20 +87,24 @@ export function ReturnDialog({ guid, busy, onReturn, onClose }: { guid: string; 
 
 /** «Утвердить»: режим расчёта и предупреждение о неподтверждённых днях. */
 export function ApproveDialog({
-  unconfirmed,
-  empty,
+  guid,
+  days,
   busy,
   onApprove,
   onClose,
 }: {
-  unconfirmed: number;
-  empty: boolean;
+  guid: string;
+  days: DayRow[];
   busy: boolean;
   onApprove: (mode: "daily" | "hourly") => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<"daily" | "hourly">("daily");
+  const unconfirmed = days.filter((day) => !day.outside_period && day.unconfirmed).length;
+  const empty = !days.length;
+  // Пересечение с другими табелями — не запрет, а предупреждение (ADR-0018, дополнение от 2026-10-28).
+  const overlap = useSheetOverlap(guid, days);
   return (
     <Modal onClose={onClose}>
       <div className={box}>
@@ -119,11 +123,18 @@ export function ApproveDialog({
         {unconfirmed > 0 && (
           <p className="rounded-lg bg-warning-subtle px-3 py-2 text-sm text-warning">{t("timesheets.unconfirmed", { count: unconfirmed })}</p>
         )}
+        {overlap.paid > 0 ? (
+          <p className="rounded-lg bg-danger-subtle px-3 py-2 text-sm text-danger">{t("timesheets.overlapPaid", { count: overlap.paid })}</p>
+        ) : (
+          overlap.total > 0 && (
+            <p className="rounded-lg bg-warning-subtle px-3 py-2 text-sm text-warning">{t("timesheets.overlap", { count: overlap.total })}</p>
+          )
+        )}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             {t("action.cancel")}
           </Button>
-          <Button disabled={busy || empty} onClick={() => onApprove(mode)}>
+          <Button disabled={busy || empty || overlap.loading} onClick={() => onApprove(mode)}>
             {t("timesheets.approve")}
           </Button>
         </div>

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type Item } from "@/features/item";
 import { api } from "@/shared/api/client";
@@ -8,6 +8,7 @@ import { keys } from "@/shared/lib/query-keys";
 import { reportError } from "@/shared/lib/toast";
 import { buildCell, datesOf } from "../model/timesheet";
 import {
+  isEdited,
   jobOn,
   loadRange,
   mergeDay,
@@ -92,8 +93,13 @@ export function useTimesheetDays(guid: string) {
   return { rows, loading: query.loading };
 }
 
-export type FillTarget = { guid: string; departmentId: string };
-export type FillResult = { people: number; skipped: number };
+/** Отдел сотрудника на дату. ponytail: без истории назначений — отдел карточки; заведут историю — уйдёт само. */
+const departmentOf = (own: Job[], employee: { departmentId: string }) => (date: string) =>
+  own.length ? (jobOn(own, date)?.departmentId ?? "") : employee.departmentId;
+
+/** `fresh` — табель только что заведён: прежних норм у него нет, искать нечего. */
+export type FillTarget = { guid: string; departmentId: string; fresh?: boolean };
+export type FillResult = { people: number };
 
 /**
  * «Заполнить» в строки дня (ADR-0018): табель посещаемости компании за
@@ -115,30 +121,41 @@ export function useFillDays(period: string, kind: PeriodKind) {
   const queryClient = useQueryClient();
   const loading = sheet.loading || jobs.loading || stored.loading || settings.loading;
 
+  const allJobs = useMemo(() => jobs.rows.map(toJob), [jobs.rows]);
+
+  /**
+   * Без кэша: после «Заполнить» перечитать табели, дни и историю — делает
+   * вызывающий, один раз. Пакет по отделам иначе на каждом отделе тянул бы
+   * дни всего периода заново (~1 МБ за месяц).
+   */
   const fill = async (target: FillTarget): Promise<FillResult> => {
-    const allJobs = jobs.rows.map(toJob);
     const days = stored.rows.map((row) => ({ ...toStoredDay(row), sheet: text(row.hr_timesheets_id) }));
-    const taken = new Set(days.filter((d) => d.sheet !== target.guid && !d.outside_period).map((d) => `${d.hr_employees_id}:${d.date}`));
     const old = new Map(days.filter((d) => d.sheet === target.guid).map((d) => [`${d.hr_employees_id}:${d.date}`, d]));
+    /*
+     * Правка того же дня в другом табеле (месячный черновик → недельная копия):
+     * без неё копия взяла бы сырую посещаемость, и правку пришлось бы повторять.
+     * ponytail: правлен в нескольких табелях — берётся первый попавшийся.
+     */
+    const foreign = new Map<string, DayRow>();
+    for (const d of days) {
+      const key = `${d.hr_employees_id}:${d.date}`;
+      if (d.sheet !== target.guid && !d.outside_period && isEdited(d) && !foreign.has(key)) foreign.set(key, d);
+    }
     const maxHours = num(settings.rows[0]?.max_hours_per_day) || 8;
 
     const rows: Record<string, unknown>[] = [];
     const norms: Record<string, unknown>[] = [];
-    let skipped = 0;
     let people = 0;
     for (const employee of sheet.employees) {
       const own = allJobs.filter((job) => job.employeeId === employee.id);
-      // ponytail: без истории назначений — отдел карточки; заведут историю — уйдёт само.
-      const departmentOn = (date: string) => (own.length ? (jobOn(own, date)?.departmentId ?? "") : employee.departmentId);
+      const departmentOn = departmentOf(own, employee);
       const picked = ownDates({
         dates,
         from,
         to,
         departmentOn,
         department: target.departmentId,
-        taken: (date) => taken.has(`${employee.id}:${date}`),
       });
-      skipped += picked.skipped;
       if (!picked.inside.length) continue;
       people += 1;
       const input = sheet.inputOf(employee);
@@ -148,7 +165,9 @@ export function useFillDays(period: string, kind: PeriodKind) {
           const fresh = toDayRow(buildCell(input, date), input.planByDate.get(date) ?? 0, jobOn(own, date), outside);
           const prev = old.get(key);
           old.delete(key);
-          rows.push({ guid: prev?.guid ?? crypto.randomUUID(), hr_timesheets_id: target.guid, hr_employees_id: employee.id, ...mergeDay(fresh, prev) });
+          // Своя правка важнее чужой; guid — всегда своей строки, чужую не забираем.
+          const edits = prev && isEdited(prev) ? prev : (foreign.get(key) ?? prev);
+          rows.push({ guid: prev?.guid ?? crypto.randomUUID(), hr_timesheets_id: target.guid, hr_employees_id: employee.id, ...mergeDay(fresh, edits) });
         }
       }
       for (const month of monthsOf(from, to)) {
@@ -160,10 +179,12 @@ export function useFillDays(period: string, kind: PeriodKind) {
     for (let i = 0; i < rows.length; i += 1000) await upsert(TIMESHEET_DAYS, rows.slice(i, i + 1000));
     const stale = [...old.values()].map((d) => d.guid);
     if (stale.length) await api.delete<unknown>(`/v1/object/${TIMESHEET_DAYS}`, { data: { ids: stale } });
-    const oldNorms = await api.post<{ data?: { response?: Item[] } }>(`/v2/object/get-list/${TIMESHEET_NORMS}`, {
-      data: { hr_timesheets_id: target.guid, limit: 1000 },
-    });
-    const normIds = (oldNorms.data?.response ?? []).map((row) => text(row.guid));
+    const oldNorms = target.fresh
+      ? null
+      : await api.post<{ data?: { response?: Item[] } }>(`/v2/object/get-list/${TIMESHEET_NORMS}`, {
+          data: { hr_timesheets_id: target.guid, limit: 1000 },
+        });
+    const normIds = (oldNorms?.data?.response ?? []).map((row) => text(row.guid));
     if (normIds.length) await api.delete<unknown>(`/v1/object/${TIMESHEET_NORMS}`, { data: { ids: normIds } });
     await upsert(TIMESHEET_NORMS, norms);
 
@@ -181,27 +202,55 @@ export function useFillDays(period: string, kind: PeriodKind) {
       },
     });
     await logEvent(target.guid, { action: "filled" });
-    await Promise.all(
-      [TIMESHEETS, TIMESHEET_DAYS, TIMESHEET_EVENTS].map((slug) => queryClient.invalidateQueries({ queryKey: keys.items.table(slug) })),
-    );
-    return { people, skipped };
+    return { people };
   };
 
-  // Отделы, у которых в периоде есть люди: по назначениям, без них — по карточке.
-  const { departments, unassigned } = useMemo(() => {
-    const out = new Set<string>();
-    let none = 0;
-    const allJobs = jobs.rows.map(toJob);
-    for (const employee of sheet.employees) {
-      const own = allJobs.filter((job) => job.employeeId === employee.id && job.from <= to && (!job.to || job.to >= from));
-      const ids = own.length ? own.map((job) => job.departmentId) : [employee.departmentId];
-      for (const id of ids) if (id) out.add(id);
-      if (!ids.some(Boolean)) none += 1;
-    }
-    return { departments: out, unassigned: none };
-  }, [sheet.employees, jobs.rows, from, to]);
+  const refresh = () =>
+    Promise.all(
+      [TIMESHEETS, TIMESHEET_DAYS, TIMESHEET_EVENTS].map((slug) => queryClient.invalidateQueries({ queryKey: keys.items.table(slug) })),
+    );
 
-  return { loading, fill, from, to, departments, unassigned };
+  /*
+   * Отделы, у которых в периоде есть люди: по назначениям, без них — по карточке.
+   * «Без отдела» — только у кого назначение в периоде есть, а отдела в нём нет:
+   * без назначения нет ставки, в ведомость HRMS такие не попадали
+   * (`salary-attendance.js:34-55`), и считать их — шум.
+   * `cover` — дни периода «сотрудник:дата» по отделу, `holder` — в каких табелях
+   * день уже лежит: по ним окно предупреждает о пересечении.
+   */
+  const { departments, unassigned, cover, holder } = useMemo(() => {
+    const out = new Set<string>();
+    const cover = new Map<string, string[]>();
+    let none = 0;
+    for (const employee of sheet.employees) {
+      const own = allJobs.filter((job) => job.employeeId === employee.id);
+      const inPeriod = own.filter((job) => job.from <= to && (!job.to || job.to >= from));
+      const ids = inPeriod.length ? inPeriod.map((job) => job.departmentId) : own.length ? [] : [employee.departmentId];
+      for (const id of ids) if (id) out.add(id);
+      if (inPeriod.length && !ids.some(Boolean)) none += 1;
+      const departmentOn = departmentOf(own, employee);
+      for (const date of dates) {
+        const id = date >= from && date <= to ? departmentOn(date) : "";
+        if (id) (cover.get(id) ?? cover.set(id, []).get(id)!).push(`${employee.id}:${date}`);
+      }
+    }
+    const holder = new Map<string, string[]>();
+    for (const row of stored.rows) {
+      if (row.outside_period) continue;
+      const key = `${text(row.hr_employees_id)}:${text(row.date).slice(0, 10)}`;
+      (holder.get(key) ?? holder.set(key, []).get(key)!).push(text(row.hr_timesheets_id));
+    }
+    return { departments: out, unassigned: none, cover, holder };
+  }, [sheet.employees, allJobs, stored.rows, dates, from, to]);
+
+  /** Сколько дней отдела уже лежат в других табелях (`own` — его табель за этот период). */
+  const overlap = useCallback(
+    (departmentId: string, own?: string) =>
+      (cover.get(departmentId) ?? []).filter((key) => (holder.get(key) ?? []).some((sheetId) => sheetId !== own)).length,
+    [cover, holder],
+  );
+
+  return { loading, fill, refresh, from, to, departments, unassigned, overlap };
 }
 
 /**
@@ -234,6 +283,36 @@ async function payrollFunctionId(): Promise<string> {
 }
 
 export type SheetDecision = "approve" | "return";
+
+/**
+ * Дни табеля, которые лежат и в других табелях, — для предупреждения при
+ * «Утвердить»: `paid` — из них в утверждённых, за них зарплата уже записана.
+ */
+export function useSheetOverlap(guid: string, days: DayRow[]) {
+  const mine = useMemo(() => new Set(days.filter((day) => !day.outside_period).map((day) => `${day.hr_employees_id}:${day.date}`)), [days]);
+  const people = useMemo(() => [...new Set(days.map((day) => day.hr_employees_id))], [days]);
+  const dates = days.map((day) => day.date).sort();
+  // Только люди этого табеля за его даты, а не дни всей компании за месяц.
+  const others = useAll(people.length ? TIMESHEET_DAYS : undefined, {
+    hr_employees_id: { op: "any", values: people },
+    date: { op: "between", values: [dates[0] ?? "", dates.at(-1) ?? ""] },
+  }, false);
+  // Статусы — только тех табелей, где нашлись те же дни.
+  const ids = useMemo(() => [...new Set(others.rows.map((row) => text(row.hr_timesheets_id)))].filter((id) => id && id !== guid), [others.rows, guid]);
+  const sheets = useAll(ids.length ? TIMESHEETS : undefined, { guid: { op: "any", values: ids } }, false);
+  return useMemo(() => {
+    const approved = new Set(sheets.rows.filter((row) => firstText(row.status) === "approved").map((row) => text(row.guid)));
+    let total = 0;
+    let paid = 0;
+    for (const row of others.rows) {
+      const sheet = text(row.hr_timesheets_id);
+      if (row.outside_period || sheet === guid || !mine.has(`${text(row.hr_employees_id)}:${text(row.date).slice(0, 10)}`)) continue;
+      total += 1;
+      if (approved.has(sheet)) paid += 1;
+    }
+    return { loading: others.loading || sheets.loading, total, paid };
+  }, [others.rows, others.loading, sheets.rows, sheets.loading, mine, guid]);
+}
 
 /**
  * Строки «Зарплаты» табеля — что снимет «Вернуть на доработку»: сколько
