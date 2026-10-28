@@ -31,6 +31,7 @@ import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { CHIP_DOT, CHIP_STYLES, hexToChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
+import { Input } from "@/shared/ui/input";
 import { Popover, PopoverItem } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
 import { firstText, related, text, useOrgDirectory } from "../api/org";
@@ -166,8 +167,17 @@ export function TimesheetDocPage({
         {canEdit && tail && <Icon as={tail} size={15} className="shrink-0 text-fg-muted" />}
       </>
     );
-    // Статус меняют только «Утвердить» и «Вернуть» (ADR-0018).
-    return canEdit && field.slug !== "status" && editorKind(field) ? (
+    /*
+     * Ответственный — свой список по именам: у связи табеля с пользователями
+     * не заданы поля показа, и общий редактор связи показал бы id.
+     */
+    if (canEdit && field.slug === "core_users_id") {
+      const items = [{ value: "", label: "—" }, ...[...doc.userNames].map(([id, name]) => ({ value: id, label: name || id })).sort((a, b) => a.label.localeCompare(b.label))];
+      return <PickValue content={content} items={items} placeholder={t("table.searchPlaceholder")} onPick={(next) => edit(field.slug, next || null)} />;
+    }
+    // Статус меняют только «Утвердить» и «Вернуть» (ADR-0018). Отдел — только чтение:
+    // табель компании не должен одним щелчком стать табелем отдела (дополнение ADR-0018).
+    return canEdit && field.slug !== "status" && field.slug !== "hr_departments_id" && editorKind(field) ? (
       <button
         type="button"
         onClick={(event) => setActive({ slug: field.slug, anchor: event.currentTarget.getBoundingClientRect() })}
@@ -458,6 +468,58 @@ export function TimesheetDocPage({
         />
       )}
     </div>
+  );
+}
+
+/** Значение поля, по щелчку — список с поиском по подписи. */
+function PickValue({
+  content,
+  items,
+  placeholder,
+  onPick,
+}: {
+  content: ReactNode;
+  items: { value: string; label: string }[];
+  placeholder: string;
+  onPick: (value: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? items.filter((item) => item.label.toLowerCase().includes(needle)) : items;
+  return (
+    <Popover
+      className="block"
+      trigger={({ open, toggle }) => (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          className="-mx-1.5 flex min-h-8 w-[calc(100%+12px)] min-w-0 items-center gap-2 rounded-[5px] px-1.5 text-left hover:bg-surface-hover"
+        >
+          {content}
+        </button>
+      )}
+    >
+      {(close) => (
+        <div className="flex w-72 flex-col gap-1">
+          <Input autoFocus value={query} placeholder={placeholder} onChange={(event) => setQuery(event.target.value)} />
+          <div className="max-h-72 overflow-auto">
+            {shown.map((item) => (
+              <PopoverItem
+                key={item.value}
+                onClick={() => {
+                  close();
+                  setQuery("");
+                  onPick(item.value);
+                }}
+              >
+                {item.label}
+              </PopoverItem>
+            ))}
+          </div>
+        </div>
+      )}
+    </Popover>
   );
 }
 

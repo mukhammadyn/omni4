@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Modal } from "@/shared/ui/modal";
 import { useEditDay, useFillDays, useSheetOverlap, useSheetPay } from "../api/timesheet-days";
-import { DAY_KINDS, isEdited, type DayKind, type DayRow, type Edit, type PeriodKind } from "../model/timesheet-days";
+import { DAY_KINDS, isEdited, parseHours, toHours, type DayKind, type DayRow, type Edit, type PeriodKind } from "../model/timesheet-days";
 
 const box = "flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-modal";
 const input =
@@ -108,7 +108,6 @@ export function ApproveDialog({
     <Modal onClose={onClose}>
       <div className={box}>
         <h2 className="text-lg font-semibold">{t("timesheets.approve")}</h2>
-        <p className="text-sm text-fg-muted">{t("timesheets.approveHint")}</p>
         {empty && <p className="rounded-lg bg-danger-subtle px-3 py-2 text-sm text-danger">{t("timesheets.notFilled")}</p>}
         {unconfirmed > 0 && (
           <p className="rounded-lg bg-warning-subtle px-3 py-2 text-sm text-warning">{t("timesheets.unconfirmed", { count: unconfirmed })}</p>
@@ -162,14 +161,17 @@ export function DayEditor({
     no_checkout: row.no_checkout,
   });
   const [reason, setReason] = useState(row.reason);
+  // Отработанное — в часах («5», «5,5», «5:30»): минуты неудобно считать в уме. Хранится в минутах.
+  const [workedText, setWorkedText] = useState(toHours(row.worked_minutes));
+  const workedValid = parseHours(workedText) !== null;
   const kind = (value: DayKind) => t(`timesheets.dayKind.${value}`);
   const summary = (value: Edit) =>
-    [kind(value.day_kind), `${t("timesheets.late")} ${value.late_minutes}`, `${t("timesheets.early")} ${value.early_minutes}`, `${t("timesheets.worked")} ${value.worked_minutes}`, value.no_checkout ? t("timesheets.noCheckout") : ""]
+    [kind(value.day_kind), `${t("timesheets.late")} ${value.late_minutes}`, `${t("timesheets.early")} ${value.early_minutes}`, `${t("timesheets.worked")} ${toHours(value.worked_minutes)}`, value.no_checkout ? t("timesheets.noCheckout") : ""]
       .filter(Boolean)
       .join(" · ");
   const before = summary(row);
   const after = summary(draft);
-  const minutes = (key: "late_minutes" | "early_minutes" | "worked_minutes", label: string, orig: number) => (
+  const minutes = (key: "late_minutes" | "early_minutes", label: string, orig: number) => (
     <label className="flex min-w-0 flex-col gap-1 text-sm">
       {/* Подпись в одну строку, «было» — под полем: иначе поля разъезжаются по высоте. */}
       <span className="truncate text-fg-muted" title={label}>
@@ -209,7 +211,27 @@ export function DayEditor({
         <div className="grid grid-cols-3 gap-3">
           {minutes("late_minutes", t("timesheets.lateMin"), row.orig_late_minutes)}
           {minutes("early_minutes", t("timesheets.earlyMin"), row.orig_early_minutes)}
-          {minutes("worked_minutes", t("timesheets.workedMin"), row.orig_worked_minutes)}
+          <label className="flex min-w-0 flex-col gap-1 text-sm">
+            <span className="truncate text-fg-muted" title={t("timesheets.workedHours")}>
+              {t("timesheets.workedHours")}
+            </span>
+            <input
+              inputMode="decimal"
+              value={workedText}
+              placeholder={t("timesheets.hoursPlaceholder")}
+              aria-invalid={!workedValid}
+              onChange={(event) => {
+                setWorkedText(event.target.value);
+                const next = parseHours(event.target.value);
+                if (next !== null) setDraft({ ...draft, worked_minutes: next });
+              }}
+              onBlur={() => workedValid && setWorkedText(toHours(draft.worked_minutes))}
+              className={`${input} ${workedValid ? "" : "border-danger"}`}
+            />
+            <span className="h-4 text-xs text-fg-subtle">
+              {row.orig_worked_minutes !== draft.worked_minutes ? t("timesheets.was", { value: toHours(row.orig_worked_minutes) }) : ""}
+            </span>
+          </label>
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={draft.no_checkout} onChange={(event) => setDraft({ ...draft, no_checkout: event.target.checked })} />
@@ -223,15 +245,16 @@ export function DayEditor({
           {isEdited(row) ? (
             <Button
               variant="ghost"
-              onClick={() =>
+              onClick={() => {
                 setDraft({
                   day_kind: row.orig_day_kind,
                   late_minutes: row.orig_late_minutes,
                   early_minutes: row.orig_early_minutes,
                   worked_minutes: row.orig_worked_minutes,
                   no_checkout: row.orig_no_checkout,
-                })
-              }
+                });
+                setWorkedText(toHours(row.orig_worked_minutes));
+              }}
             >
               {t("timesheets.resetDay")}
             </Button>
@@ -243,8 +266,12 @@ export function DayEditor({
               {t("action.cancel")}
             </Button>
             <Button
-              disabled={save.isPending || (before === after && reason === row.reason)}
-              onClick={() => save.mutate({ row, label: `${name}, ${date}`, values: draft, reason: reason.trim(), before, after }, { onSuccess: onClose })}
+              disabled={save.isPending || !workedValid || (before === after && reason === row.reason)}
+              onClick={() => {
+                // Строка в сетке уже новая (useEditDay правит кэш сразу); отказ вернёт её и скажет об этом.
+                save.mutate({ row, label: `${name}, ${date}`, values: draft, reason: reason.trim(), before, after });
+                onClose();
+              }}
             >
               {t("action.save")}
             </Button>

@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type Item } from "@/features/item";
+import { patchRow, type Item } from "@/features/item";
 import { api } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { todayInput } from "@/shared/lib/date-value";
@@ -105,12 +105,24 @@ const departmentOf = (own: Job[], employee: { departmentId: string }) => (date: 
 const ofSheet = (row: Item) => Boolean(text(row.hr_timesheets_id));
 
 /**
- * Работает ли в этот день — для табеля компании: есть назначение, с отделом
- * или без, как ведомость HRMS (`salary-attendance.js:34-55`). Без истории
- * назначений — по отделу карточки, как и `departmentOf`.
+ * День табеля компании, как ведомость HRMS (`salary-attendance.js:34-55`):
+ * у кого есть назначение в периоде — его дни с назначением (с отделом или
+ * без) и смены без назначения: их HRMS тоже считает в норме, но не засчитывает
+ * (`unit_work_days`), — такие строки копируются «вне работы» (`noJob`). Без
+ * истории назначений — по отделу карточки, как и `departmentOf`.
  */
-const worksOf = (own: Job[], employee: { departmentId: string }) => (date: string) =>
-  own.length ? Boolean(jobOn(own, date)) : Boolean(employee.departmentId);
+const worksOf = (own: Job[], employee: { departmentId: string }, plan: ReadonlyMap<string, number>, from: string, to: string) => {
+  if (!own.length) return () => Boolean(employee.departmentId);
+  const employed = own.some((job) => job.from <= to && (!job.to || job.to >= from));
+  return (date: string) => Boolean(jobOn(own, date)) || (employed && (plan.get(date) ?? 0) > 0);
+};
+
+/** Строка дня из посещаемости; смена без назначения — «вне работы»: в норме, не засчитана. */
+const dayRow = (input: { planByDate: ReadonlyMap<string, number> }, cell: Parameters<typeof toDayRow>[0], own: Job[], outside: boolean) => {
+  const job = jobOn(own, cell.date);
+  const row = toDayRow(cell, input.planByDate.get(cell.date) ?? 0, job, outside);
+  return own.length && !job ? { ...row, outside_employment: true } : row;
+};
 
 /**
  * `departmentId` пуст — табель компании (все, у кого есть назначение);
@@ -172,7 +184,7 @@ export function useFillDays(period: string, kind: PeriodKind) {
         dates,
         from,
         to,
-        belongs: target.departmentId ? (date) => departmentOn(date) === target.departmentId : worksOf(own, employee),
+        belongs: target.departmentId ? (date) => departmentOn(date) === target.departmentId : worksOf(own, employee, sheet.inputOf(employee).planByDate, from, to),
       });
       if (!picked.inside.length) continue;
       people += 1;
@@ -180,7 +192,7 @@ export function useFillDays(period: string, kind: PeriodKind) {
       for (const [list, outside] of [[picked.inside, false], [picked.outside, true]] as const) {
         for (const date of list) {
           const key = `${employee.id}:${date}`;
-          const fresh = toDayRow(buildCell(input, date), input.planByDate.get(date) ?? 0, jobOn(own, date), outside);
+          const fresh = dayRow(input, buildCell(input, date), own, outside);
           const prev = old.get(key);
           old.delete(key);
           // Своя правка важнее чужой; guid — всегда своей строки, чужую не забираем.
@@ -239,7 +251,7 @@ export function useFillDays(period: string, kind: PeriodKind) {
     for (const employee of sheet.employees) {
       const own = allJobs.filter((job) => job.employeeId === employee.id);
       const departmentOn = departmentOf(own, employee);
-      const works = worksOf(own, employee);
+      const works = worksOf(own, employee, sheet.inputOf(employee).planByDate, from, to);
       for (const date of dates) {
         if (date < from || date > to || !works(date)) continue;
         add("", `${employee.id}:${date}`);
@@ -263,29 +275,75 @@ export function useFillDays(period: string, kind: PeriodKind) {
     [cover, holder],
   );
 
-  return { loading, fill, refresh, from, to, overlap };
+  /**
+   * Табель компании в памяти — тот же расчёт дней и норм, что у «Заполнить»,
+   * без записи. Нужен шаблону Excel «Зарплаты» там, где утверждённого табеля
+   * за период нет: как в HRMS, цифры тогда из посещаемости, с предупреждением.
+   */
+  const draft = useCallback(() => {
+    const maxHours = num(settings.rows[0]?.max_hours_per_day) || 8;
+    const out = new Map<string, { days: Omit<DayRow, "guid" | "hr_employees_id">[]; norms: Map<string, { shifts: number; minutesPerDay: number }> }>();
+    for (const employee of sheet.employees) {
+      const own = allJobs.filter((job) => job.employeeId === employee.id);
+      const input = sheet.inputOf(employee);
+      const picked = ownDates({ dates, from, to, belongs: worksOf(own, employee, input.planByDate, from, to) });
+      if (!picked.inside.length) continue;
+      const days = [...picked.inside.map((date) => [date, false] as const), ...picked.outside.map((date) => [date, true] as const)].map(([date, outside]) =>
+        dayRow(input, buildCell(input, date), own, outside),
+      );
+      const norms = new Map(
+        monthsOf(from, to).map((month) => {
+          const norm = monthNorm(input.planByDate, month, maxHours);
+          return [`${month}-01`, { shifts: norm.shifts_in_month, minutesPerDay: norm.minutes_per_day }] as const;
+        }),
+      );
+      out.set(employee.id, { days, norms });
+    }
+    return out;
+  }, [sheet, allJobs, dates, from, to, settings.rows]);
+
+  return { loading, fill, refresh, draft, stored: stored.rows, from, to, overlap };
 }
 
 /**
  * Правка дня бухгалтером: значения и причина в строку, событие — в историю
  * табеля с ссылкой на день. Итоги документа — заново из строк.
+ *
+ * Строка дня меняется в кэше сразу, а три записи идут параллельно: дни
+ * табеля компании за месяц — ~1 700 строк, ~3 МБ, и перечитывать их ради
+ * одной ячейки значило ждать каждую правку по 4–6 с. Перечитываются
+ * только сам табель (итоги) и история.
  */
 export function useEditDay(timesheet: string, rows: DayRow[]) {
   const queryClient = useQueryClient();
+  const refresh = (slugs: string[]) => Promise.all(slugs.map((slug) => queryClient.invalidateQueries({ queryKey: keys.items.table(slug) })));
   return useMutation({
+    // Правки одного табеля — по очереди: окно закрывается сразу, и две быстрые правки
+    // иначе гонялись бы (итоги табеля последней правки могли прийти раньше).
+    scope: { id: `timesheet-day-edit:${timesheet}` },
     mutationFn: async ({ row, label, values, reason, before, after }: { row: DayRow; label: string; values: Edit; reason: string; before: string; after: string }) => {
-      await api.put<unknown>(`/v2/items/${TIMESHEET_DAYS}`, { data: { guid: row.guid, ...values, reason } });
       const sum = sheetTotals(rows.map((item) => (item.guid === row.guid ? { ...item, ...values } : item)));
-      await api.put<unknown>(`/v2/items/${TIMESHEETS}`, {
-        data: { guid: timesheet, worked_hours: hoursOf(sum.workedMinutes), overtime_hours: hoursOf(sum.overtimeMinutes), absence_days: sum.absences },
-      });
-      await logEvent(timesheet, { action: "edited", field: label, before, after, ...(reason ? { comment: reason } : {}), dayId: row.guid });
+      await Promise.all([
+        api.put<unknown>(`/v2/items/${TIMESHEET_DAYS}`, { data: { guid: row.guid, ...values, reason } }),
+        api.put<unknown>(`/v2/items/${TIMESHEETS}`, {
+          data: { guid: timesheet, worked_hours: hoursOf(sum.workedMinutes), overtime_hours: hoursOf(sum.overtimeMinutes), absence_days: sum.absences },
+        }),
+        logEvent(timesheet, { action: "edited", field: label, before, after, ...(reason ? { comment: reason } : {}), dayId: row.guid }),
+      ]);
     },
-    onError: (error) => reportError(error, "common.saveFailed"),
-    onSettled: () =>
-      Promise.all(
-        [TIMESHEETS, TIMESHEET_DAYS, TIMESHEET_EVENTS].map((slug) => queryClient.invalidateQueries({ queryKey: keys.items.table(slug) })),
-      ),
+    onMutate: async ({ row, values, reason }) => {
+      // Летящий запрос дней перезаписал бы патч старым ответом.
+      await queryClient.cancelQueries({ queryKey: keys.items.table(TIMESHEET_DAYS) });
+      queryClient.setQueriesData({ queryKey: keys.items.table(TIMESHEET_DAYS) }, (page: unknown) =>
+        patchRow(page, { guid: row.guid, values: { ...values, reason } }),
+      );
+    },
+    onError: (error) => {
+      reportError(error, "common.saveFailed");
+      // Запись могла пройти частично (день — да, итоги или история — нет): правду знает только сервер.
+      void refresh([TIMESHEET_DAYS]);
+    },
+    onSettled: () => refresh([TIMESHEETS, TIMESHEET_EVENTS]),
   });
 }
 

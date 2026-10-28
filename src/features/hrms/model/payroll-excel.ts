@@ -3,24 +3,24 @@
  * (`udevs-hrms-reports`, methods/get-salary-excel-template.js и
  * import-salary-excel.js; кнопки — udevs_hrms_admin, modules/Finance/Salary).
  *
+ * Раскладка, формулы и подсказки — как в HRMS: «Цена дня / часа» и «Оклад» —
+ * формулы от ставки, нормы и отработанного (правка ставки в Excel пересчитает
+ * оклад), «Количество опозданий» и старая формула «Опозданий» — от минут.
+ * Цифры — арифметикой HRMS (`model/timesheet-salary`) по дням утверждённых
+ * табелей, а где их нет — по посещаемости (ADR-0018, дополнение от 2026-10-28).
+ *
  * Формат файла тот же: строка 5 — скрытые ключи колонок (`__user_guid`,
  * `__base_salary`, `income:<вид>`, `deduction:<вид>`), с 6-й — сотрудники.
  * Загрузка читает только ключи, поэтому подписи можно переводить.
- *
- * Как в HRMS (ADR-0018, дополнение от 2026-10-28): оклад и старую формулу
- * опозданий считает шаблон — в выбранном режиме (дневной / часовой), но по
- * дням утверждённых табелей (`model/timesheet-salary`), а не по живой
- * посещаемости; пишет их загрузка. Штрафы по политикам пишет «Утвердить»,
- * в шаблоне они только читаются (`__auto_attendance_penalty`).
- * - Период ведомости — месяц или неделя пн–вс, тот, что открыт в сводной
- *   (в HRMS — так же, `salary-excel-common.js:36-55`). Он записан в файл
- *   (`__period:<с>:<по>`), и загрузка отказывает файлу другого периода.
+ * Штрафы по политикам пишет «Утвердить», в шаблоне они только читаются
+ * (`__auto_attendance_penalty`). Период — месяц или неделя пн–вс, тот, что
+ * открыт в сводной; он записан в файл (`__period:<с>:<по>`), и загрузка
+ * отказывает файлу другого периода.
  */
 import ExcelJS from "exceljs";
-import type { SalaryPiece } from "./payroll";
+import type { CalcMode } from "./payroll";
 import type { PayUnit } from "./timesheet-days";
-
-const ddmm = (date: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}`;
+import { calculateSalaryRow, hourlyFactor, type SalaryInput } from "./timesheet-salary";
 
 /* ---------- шаблон ---------- */
 
@@ -37,8 +37,10 @@ export type TemplateLabels = {
   payUnit: string;
   salaryGroup: string;
   rate: string;
+  price: string;
   norm: string;
   worked: string;
+  lateMinutes: string;
   accruals: string;
   salary: string;
   deductions: string;
@@ -49,31 +51,26 @@ export type TemplateLabels = {
   daily: string;
   hourly: string;
   unit: Record<PayUnit, string>;
-  /** Примечание к пустому окладу — по причине (`TemplateEmployee.missing`). */
-  noTimesheet: string;
-  noShifts: string;
-  noCredited: string;
+  noCheckout: (dates: string, hourly: boolean) => string;
+  offShift: (dates: string) => string;
 };
 
 export type TemplateEmployee = {
   id: string;
   name: string;
-  /** Оклад периода по кускам; пусто — нет утверждённого табеля. */
-  pieces: SalaryPiece[];
+  /** Вход HRMS за период; нет дней ни в табеле, ни в посещаемости — null. */
+  input: SalaryInput | null;
   /** Штрафы по политикам, записанные «Утвердить», — в колонку `auto`, только чтение. */
   fines: number;
-  /** Старая формула опозданий — при `legacy`, в колонку вида удержаний табеля, её читает загрузка. */
-  lateness: number;
-  /**
-   * Почему оклада нет: нет утверждённого табеля; табель есть, но в «Графике
-   * работы» нет смен (норма 0 — начисления нет, как в HRMS); смены есть, но
-   * ни один день не засчитан.
-   */
-  missing?: "timesheet" | "shifts" | "credited";
+  /** Часть дней периода — из посещаемости: утверждённого табеля на них нет. */
+  fromAttendance: boolean;
 };
 
 export type TemplateInput = {
   period: { from: string; to: string };
+  /** Месячная ведомость или недельная — у HRMS `period.is_month`. */
+  isMonth: boolean;
+  mode: CalcMode;
   labels: TemplateLabels;
   employees: TemplateEmployee[];
   /** Виды без «Оклада»: он своей колонкой. */
@@ -83,6 +80,8 @@ export type TemplateInput = {
   autoDeductionId: string;
   /** Политик штрафов в периоде нет — колонка вида удержаний несёт старую формулу и загружается. */
   legacy: boolean;
+  /** Настройки старой формулы (`core_settings`). */
+  lateness: { coefficient: number; grace: number };
 };
 
 /** Ключи строки 5: по ним загрузка находит колонки. */
@@ -126,14 +125,14 @@ const header = (cell: ExcelJS.Cell, value: string, color: string, size = 12) => 
 const formula = (expression: string, result?: number): ExcelJS.CellValue =>
   result === undefined ? { formula: expression } : ({ formula: expression, result: result === 0 ? "0" : result } as ExcelJS.CellValue);
 
-/** Ведомость за месяц — раскладка и оформление шаблона HRMS. */
+/** Ведомость — раскладка, формулы и оформление шаблона HRMS (get-salary-excel-template.js). */
 export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> {
-  const { labels, employees, accruals, deductions } = input;
+  const { labels, mode, employees, accruals, deductions, isMonth } = input;
   const book = new ExcelJS.Workbook();
   book.creator = "omni4";
   const sheet = book.addWorksheet(labels.sheet, { views: [{ state: "frozen", ySplit: 5 }] });
 
-  const col = { accrualType: 4, payUnit: 5, rate: 6, norm: 7, worked: 8, salary: 9 };
+  const col = { accrualType: 4, payUnit: 5, rate: 6, price: 7, norm: 8, worked: 9, late: 10, salary: 11 };
   const accrualsFrom = col.salary + 1;
   const deductionsFrom = accrualsFrom + accruals.length;
   const accruedCol = deductionsFrom + deductions.length;
@@ -144,7 +143,7 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   // Штрафы — только для чтения; старая формула (нет политик) — обычное удержание, его пишет загрузка.
   const autoCol = input.legacy ? -1 : lateCol;
 
-  [6, 40, 34, 18, 16, 20, 20, 20].forEach((width, i) => (sheet.getColumn(i + 1).width = width));
+  [6, 40, 34, 18, 16, 20, 20, 22, 20, 22].forEach((width, i) => (sheet.getColumn(i + 1).width = width));
   for (let column = col.salary; column <= last; column += 1) sheet.getColumn(column).width = 18;
 
   sheet.mergeCells(1, 1, 1, last);
@@ -167,7 +166,8 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   [labels.index, labels.guid, labels.employee, labels.accrualType, labels.payUnit].forEach((value, i) => tall(i + 1, value, NAVY));
   sheet.mergeCells(3, col.rate, 3, col.worked);
   header(sheet.getCell(3, col.rate), labels.salaryGroup, NAVY);
-  [labels.rate, labels.norm, labels.worked].forEach((value, i) => header(sheet.getCell(4, col.rate + i), value, NAVY, 11));
+  [labels.rate, labels.price, labels.norm, labels.worked].forEach((value, i) => header(sheet.getCell(4, col.rate + i), value, NAVY, 11));
+  tall(col.late, labels.lateMinutes, RED, 11);
   sheet.mergeCells(3, col.salary, 3, deductionsFrom - 1);
   header(sheet.getCell(3, col.salary), labels.accruals, GREEN);
   header(sheet.getCell(4, col.salary), labels.salary, GREEN, 11);
@@ -185,7 +185,7 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   sheet.getRow(3).height = 34;
   sheet.getRow(4).height = 34;
 
-  const meta = ["__index", META.guid, "__employee_name", "__accrual_type", "__pay_unit", "__salary_rate", "__norm", "__worked", META.salary];
+  const meta = ["__index", META.guid, "__employee_name", "__accrual_type", "__pay_unit", "__salary_rate", "__unit_price", "__norm", "__worked", "__lateness_minutes", META.salary];
   meta.forEach((key, i) => (sheet.getCell(META_ROW, i + 1).value = key));
   accruals.forEach((type, i) => (sheet.getCell(META_ROW, accrualsFrom + i).value = `income:${type.id}`));
   deductions.forEach((type, i) => (sheet.getCell(META_ROW, deductionsFrom + i).value = i === autoCol ? META.auto : `deduction:${type.id}`));
@@ -195,46 +195,92 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   sheet.getCell(META_ROW, last + 1).value = `${META.period}${input.period.from}:${input.period.to}`;
   sheet.getRow(META_ROW).hidden = true;
 
+  const kinds = new Set<string>();
   const hourlyRows: boolean[] = [];
   employees.forEach((employee, index) => {
     const r = DATA_ROW + index;
-    const { pieces } = employee;
-    // Общее для всех кусков — в клетку; разное — пусто, куски в примечании.
-    const same = <T,>(get: (piece: SalaryPiece) => T) =>
-      pieces.length > 0 && pieces.every((piece) => get(piece) === get(pieces[0]!)) ? get(pieces[0]!) : undefined;
-    const mode = same((piece) => piece.mode);
-    const unit = same((piece) => piece.unit);
-    const one = pieces.length === 1 ? pieces[0] : undefined;
-    hourlyRows.push(mode === "hourly" || unit === "hour");
-
+    const data = employee.input;
     sheet.getCell(r, 1).value = index + 1;
     sheet.getCell(r, 2).value = employee.id;
     sheet.getCell(r, 3).value = employee.name;
-    sheet.getCell(r, col.accrualType).value = mode ? labels[mode] : null;
-    sheet.getCell(r, col.payUnit).value = unit ? labels.unit[unit] : null;
-    sheet.getCell(r, col.rate).value = same((piece) => piece.rate) ?? null;
-    sheet.getCell(r, col.norm).value = one?.norm ?? null;
-    sheet.getCell(r, col.worked).value = one?.worked ?? null;
-    sheet.getCell(r, col.salary).value = pieces.length ? pieces.reduce((sum, piece) => sum + piece.amount, 0) : null;
     for (let column = accrualsFrom; column < accruedCol; column += 1) sheet.getCell(r, column).value = 0;
-    if (lateCol >= 0) sheet.getCell(r, deductionsFrom + lateCol).value = input.legacy ? employee.lateness : employee.fines;
+    if (autoCol >= 0) sheet.getCell(r, deductionsFrom + autoCol).value = employee.fines;
     sheet.getCell(r, accruedCol).value = formula(`SUM(${letter(col.salary)}${r}:${letter(deductionsFrom - 1)}${r})`);
     sheet.getCell(r, deductedCol).value = formula(deductions.length ? `SUM(${letter(deductionsFrom)}${r}:${letter(accruedCol - 1)}${r})` : "0");
     sheet.getCell(r, netCol).value = formula(`${letter(accruedCol)}${r}-${letter(deductedCol)}${r}`);
-
-    const salary = sheet.getCell(r, col.salary);
-    if (!pieces.length) {
-      fill(salary, "FFFFEB3B");
-      salary.note = employee.missing === "shifts" ? labels.noShifts : employee.missing === "credited" ? labels.noCredited : labels.noTimesheet;
-    } else if (pieces.length > 1) {
-      salary.note = pieces
-        .map((p) => `${ddmm(p.from)}–${ddmm(p.to)} · ${p.rate.toLocaleString()} / ${labels.unit[p.unit]} · ${labels[p.mode]} · ${p.worked} / ${p.norm} · ${p.amount.toLocaleString()}`)
-        .join("\n");
+    if (!data) {
+      // Ни табеля, ни посещаемости за период — строка для премий, оклад 0.
+      sheet.getCell(r, col.salary).value = 0;
+      hourlyRows.push(false);
+      borders(sheet, r, last);
+      return;
     }
+
+    const row = calculateSalaryRow(data, mode, isMonth);
+    kinds.add(`${row.unit}:${row.rowHourly}`);
+    hourlyRows.push(row.rowHourly);
+    const salaryCell = `${letter(col.rate)}${r}`;
+    const normCell = `${letter(col.norm)}${r}`;
+    const workedCell = `${letter(col.worked)}${r}`;
+    const priceCell = `${letter(col.price)}${r}`;
+    // Клетка нормы — когда в ней та же норма, что у цены; иначе (табель без дней «вне работы») — число, чтобы Excel не пересчитал оклад иначе.
+    const normRef = isMonth && row.workDays === row.monthNorm ? normCell : String(row.monthNorm);
+
+    // Цена дня / часа — формула от ставки, как в HRMS: правка ставки в Excel пересчитает и цену, и оклад.
+    const price = sheet.getCell(r, col.price);
+    if (row.rowHourly && row.unit !== "hour") {
+      price.value = formula(`IF(${normCell}>0,${salaryCell}${hourlyFactor(data, isMonth).excel}/${normCell},0)`, row.priceValue);
+    } else if (row.unit === "day" || row.unit === "hour") {
+      price.value = formula(salaryCell, row.priceValue);
+    } else if (row.single) {
+      price.value = formula(`IF(${normRef}>0,${salaryCell}/${normRef},0)`, row.priceValue);
+    } else {
+      const shares = row.shares.map(([credited, shifts]) => `${credited}/${shifts}`).join("+") || "0";
+      price.value = formula(`IF(${workedCell}>0,${salaryCell}*(${shares})/${workedCell},0)`, row.priceValue);
+    }
+    sheet.getCell(r, col.salary).value = formula(`ROUND(${priceCell}*${workedCell},0)`, row.accruedValue);
+
+    sheet.getCell(r, col.accrualType).value = row.rowHourly ? labels.hourly : labels.daily;
+    sheet.getCell(r, col.payUnit).value = labels.unit[row.unit];
+    sheet.getCell(r, col.rate).value = row.salaryMonth;
+    sheet.getCell(r, col.norm).value = row.workDays;
+    sheet.getCell(r, col.worked).value = row.workedDays;
+
+    // Дни без ухода засчитаны целиком, у ставки за день и час — ещё и работа без смены: клетка жёлтая, даты в подсказке.
+    const notes = [
+      data.no_checkout.length > 0 && labels.noCheckout(data.no_checkout.join(", "), row.rowHourly),
+      data.off_shift.length > 0 && labels.offShift(data.off_shift.join(", ")),
+    ].filter(Boolean);
+    if (notes.length) {
+      const worked = sheet.getCell(r, col.worked);
+      fill(worked, "FFFFEB3B");
+      worked.note = notes.join("\n");
+    }
+    // Минуты опозданий — всегда; без смен в периоде клетка красная: норму минут взять неоткуда.
+    const late = sheet.getCell(r, col.late);
+    late.value = data.late_minutes;
+    if (!data.has_work_schedule) fill(late, "FFFF0000");
+
+    // Старая формула опозданий HRMS — только месячная ставка, дневной шаблон, есть смены, нет политик.
+    if (input.legacy && lateCol >= 0) {
+      const cell = sheet.getCell(r, deductionsFrom + lateCol);
+      if (row.rowHourly || row.unit !== "month" || !data.has_work_schedule) cell.value = 0;
+      else {
+        const { coefficient, grace } = input.lateness;
+        const workDaysRef = isMonth && row.workDays === data.month_work_days ? normCell : String(data.month_work_days);
+        const minutes = data.month_work_days * data.daily_minutes;
+        const result = minutes > 0 ? Math.round((row.salaryMonth / minutes) * Math.max(0, data.late_minutes - grace) * coefficient) : 0;
+        cell.value = formula(
+          `IF(AND(${workDaysRef}>0,${data.daily_minutes}>0),ROUND(${salaryCell}/(${workDaysRef}*${data.daily_minutes})*MAX(${letter(col.late)}${r}-${grace},0)*${coefficient},0),0)`,
+          result,
+        );
+      }
+    }
+
     borders(sheet, r, last);
     if (index % 2 === 0) {
       for (let column = 1; column <= last; column += 1) {
-        if (column === col.salary && !pieces.length) continue;
+        if ((column === col.worked && notes.length) || (column === col.late && !data.has_work_schedule)) continue;
         fill(sheet.getCell(r, column), "FFF8FAFC");
       }
     }
@@ -242,16 +288,16 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
 
   const end = Math.max(DATA_ROW, DATA_ROW + employees.length - 1);
   const total = end + 1;
-  // Ставки, нормы и отработанное разных единиц не складываются — итог с оклада.
-  sheet.mergeCells(total, 1, total, col.worked);
+  sheet.mergeCells(total, 1, total, col.payUnit);
   const label = sheet.getCell(total, 1);
   label.value = labels.total;
   label.font = { bold: true, size: 12, color: { argb: "FF1F3562" } };
   label.alignment = { horizontal: "right", vertical: "middle" };
   fill(label, "FFE5ECF7");
-  for (let column = col.salary; column <= last; column += 1) {
+  for (let column = col.rate; column <= last; column += 1) {
     const cell = sheet.getCell(total, column);
-    cell.value = employees.length ? formula(`SUM(${letter(column)}${DATA_ROW}:${letter(column)}${end})`) : 0;
+    // Ставки, дни и часы разных единиц не складываются.
+    cell.value = kinds.size > 1 && column <= col.worked ? null : employees.length ? formula(`SUM(${letter(column)}${DATA_ROW}:${letter(column)}${end})`) : 0;
     cell.font = { bold: true, color: { argb: "FF2B3D63" } };
     fill(cell, "FFE5ECF7");
   }
@@ -259,10 +305,10 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   sheet.getRow(total).height = 30;
 
   for (let r = DATA_ROW; r <= total; r += 1) {
-    const hours = hourlyRows[r - DATA_ROW] ?? false;
+    const hours = r === total ? hourlyRows[0] : hourlyRows[r - DATA_ROW];
     for (let column = col.rate; column <= last; column += 1) {
       const cell = sheet.getCell(r, column);
-      cell.numFmt = hours && (column === col.norm || column === col.worked) ? "#,##0.00" : "#,##0";
+      cell.numFmt = column === col.price || (hours && (column === col.norm || column === col.worked)) ? "#,##0.00" : "#,##0";
       cell.alignment = { horizontal: "right", vertical: "middle" };
     }
     sheet.getCell(r, 1).alignment = { horizontal: "center", vertical: "middle" };

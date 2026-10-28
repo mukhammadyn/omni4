@@ -47,6 +47,19 @@ export type DayRow = Edit & {
   orig_day_kind: DayKind;
 };
 
+/** Длительность «ч:мм» для полей в часах: 300 → «5:00», 330 → «5:30». */
+export const toHours = (minutes: number) => `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
+
+/** Ввод часов → минуты: «5», «5,5», «5.5», «5:30»; пусто — 0; не разобрать — null. */
+export const parseHours = (text: string): number | null => {
+  const value = text.trim().replace(",", ".");
+  if (!value) return 0;
+  const clock = /^(\d+):([0-5]\d)$/.exec(value);
+  if (clock) return Number(clock[1]) * 60 + Number(clock[2]);
+  const hours = /^\d+(\.\d+)?$/.test(value) ? Number(value) : NaN;
+  return Number.isFinite(hours) ? Math.round(hours * 60) : null;
+};
+
 /** Назначение (`hr_job_history`): отдел и ставка на отрезок дат. */
 export type Job = { employeeId: string; departmentId: string; from: string; to: string; salary: number; unit: PayUnit; currency: string };
 

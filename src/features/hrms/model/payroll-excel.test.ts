@@ -1,81 +1,110 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
 import { timesheetPay, type SalaryPiece } from "./payroll";
-import { buildTemplate, parseImport, type TemplateEmployee, type TemplateLabels } from "./payroll-excel";
-
-const piece = (over: Partial<SalaryPiece> = {}): SalaryPiece => ({
-  from: "2026-10-01",
-  to: "2026-10-31",
-  rate: 4000,
-  unit: "month",
-  mode: "daily",
-  norm: 22,
-  worked: 20,
-  amount: 3636,
-  ...over,
-});
-const employee = (id: string, over: Partial<TemplateEmployee> = {}): TemplateEmployee => ({ id, name: id, pieces: [piece()], fines: 0, lateness: 0, ...over });
+import { buildTemplate, parseImport, type TemplateEmployee, type TemplateInput, type TemplateLabels } from "./payroll-excel";
+import type { SalaryInput } from "./timesheet-salary";
 
 const labels = new Proxy({} as TemplateLabels, {
-  get: (_, key) => (key === "unit" ? { month: "м", week: "н", day: "д", hour: "ч" } : String(key)),
+  get: (_, key) =>
+    key === "unit"
+      ? { month: "м", week: "н", day: "д", hour: "ч" }
+      : key === "noCheckout"
+        ? (dates: string) => `нет ухода: ${dates}`
+        : key === "offShift"
+          ? (dates: string) => `без смены: ${dates}`
+          : String(key),
 });
 
-const ids = {
-  one: "0b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d",
-  none: "1b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d",
-  two: "2b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d",
-};
-const types = { accrual: "11111111-1111-4111-8111-111111111111", fine: "22222222-2222-4222-8222-222222222222", salary: "33333333-3333-4333-8333-333333333333" };
+const month = (over: Partial<SalaryInput> = {}): SalaryInput => ({
+  base_salary: 4000,
+  pay_unit: "month",
+  work_days: 22,
+  actual_work_days: 20,
+  plan_hours: 176,
+  paid_hours: 160,
+  segments: [{ unit_work_days: 22, work_days: 22, credited_days: 20 }],
+  late_minutes: 50,
+  has_work_schedule: true,
+  daily_minutes: 480,
+  month_work_days: 22,
+  no_checkout: [],
+  off_shift: [],
+  ...over,
+});
+
+const ids = { one: "0b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d", none: "1b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d" };
+const types = { accrual: "11111111-1111-4111-8111-111111111111", late: "22222222-2222-4222-8222-222222222222", salary: "33333333-3333-4333-8333-333333333333" };
 const kinds = new Map([
   [types.accrual, { id: types.accrual, kind: "accrual" as const }],
-  [types.fine, { id: types.fine, kind: "deduction" as const }],
+  [types.late, { id: types.late, kind: "deduction" as const }],
   [types.salary, { id: types.salary, kind: "accrual" as const }],
 ]);
+const employee = (id: string, over: Partial<TemplateEmployee> = {}): TemplateEmployee => ({ id, name: id, input: month(), fines: 0, fromAttendance: false, ...over });
+const build = (over: Partial<TemplateInput> = {}) =>
+  buildTemplate({
+    period: { from: "2026-10-01", to: "2026-10-31" },
+    isMonth: true,
+    mode: "daily",
+    labels,
+    employees: [employee(ids.one, { fines: 50, input: month({ no_checkout: ["06.10"] }) }), employee(ids.none, { input: null })],
+    accruals: [{ id: types.accrual, name: "KPI" }],
+    deductions: [{ id: types.late, name: "Опоздания" }],
+    autoDeductionId: types.late,
+    legacy: false,
+    lateness: { coefficient: 4, grace: 30 },
+    ...over,
+  });
+const open = async (file: ArrayBuffer) => {
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(file);
+  return { book, sheet: book.worksheets[0]! };
+};
 
-describe("шаблон и загрузка", () => {
-  it("оклад считает шаблон, загрузка его пишет; штрафы — только для чтения", async () => {
-    const file = await buildTemplate({
-      period: { from: "2026-10-01", to: "2026-10-31" },
-      labels,
-      employees: [
-        employee(ids.one, { fines: 50 }),
-        employee(ids.none, { pieces: [], missing: "shifts" }),
-        // Новая ставка с 20-го: два куска одной единицы.
-        employee(ids.two, { pieces: [piece({ to: "2026-10-19", worked: 13, amount: 2364 }), piece({ from: "2026-10-20", rate: 5000, worked: 8, amount: 1818 })] }),
-      ],
-      accruals: [{ id: types.accrual, name: "KPI" }],
-      deductions: [{ id: types.fine, name: "Опоздания" }],
-      autoDeductionId: types.fine,
-      legacy: false,
-    });
+describe("шаблон как в HRMS", () => {
+  it("цена и оклад — формулы от ставки, нормы и отработанного; минуты опозданий; подсказка «нет ухода»", async () => {
+    const { sheet } = await open(await build());
+    // 6 ставка, 7 цена, 8 норма, 9 отработано, 10 опоздания (мин), 11 оклад, 12 KPI, 13 штрафы.
+    expect(sheet.getCell(6, 6).value).toBe(4000);
+    expect(sheet.getCell(6, 7).value).toMatchObject({ formula: "IF(H6>0,F6/H6,0)" });
+    expect([8, 9, 10].map((c) => sheet.getCell(6, c).value)).toEqual([22, 20, 50]);
+    expect(sheet.getCell(6, 11).value).toMatchObject({ formula: "ROUND(G6*I6,0)", result: Math.round(4000 * (20 / 22)) });
+    expect(sheet.getCell(6, 13).value).toBe(50);
+    expect(String(sheet.getCell(6, 9).note)).toContain("06.10");
+  });
 
-    const book = new ExcelJS.Workbook();
-    await book.xlsx.load(file);
-    const sheet = book.worksheets[0]!;
-    // Колонки: 6 ставка, 7 норма, 8 отработано, 9 оклад, 10 KPI, 11 штрафы.
-    expect([6, 7, 8, 9, 11].map((c) => sheet.getCell(6, c).value)).toEqual([4000, 22, 20, 3636, 50]);
-    expect(sheet.getCell(7, 9).value).toBeNull();
-    // Табель есть, но смен в графике нет — примечание называет именно это.
-    expect(sheet.getCell(7, 9).note).toBe("noShifts");
-    // Разные ставки — клетка пуста, норма и отработано — в примечании по кускам.
-    expect([5, 6, 7, 8, 9].map((c) => sheet.getCell(8, c).value)).toEqual(["м", null, null, null, 4182]);
-    expect(String(sheet.getCell(8, 9).note)).toContain("20.10–31.10");
+  it("норма клетки не та, что у цены (табель без дней «вне работы») — в формуле число, Excel не пересчитает иначе", async () => {
+    const { sheet } = await open(await build({ employees: [employee(ids.one, { input: month({ work_days: 11, actual_work_days: 11 }) })] }));
+    expect(sheet.getCell(6, 7).value).toMatchObject({ formula: "IF(22>0,F6/22,0)" });
+  });
 
-    sheet.getCell(6, 10).value = "1 500,5";
-    sheet.getCell(6, 9).value = 9999;
+  it("часовой: цена — ставка × множитель / норма часов, как hourlyFactor HRMS", async () => {
+    const { sheet } = await open(await build({ mode: "hourly", isMonth: false, period: { from: "2026-10-05", to: "2026-10-11" } }));
+    expect(sheet.getCell(6, 7).value).toMatchObject({ formula: "IF(H6>0,F6/4/H6,0)" });
+  });
+
+  it("загрузка пишет оклад (и поправленный руками), премии; штрафы не читает", async () => {
+    const { book, sheet } = await open(await build());
+    sheet.getCell(6, 12).value = "1 500,5";
+    sheet.getCell(6, 11).value = 9999;
     const parsed = await parseImport(await book.xlsx.writeBuffer(), { types: kinds, salaryTypeId: types.salary });
     expect(parsed.period).toEqual({ from: "2026-10-01", to: "2026-10-31" });
-    // Оклад правят в файле — пишется поправленный; штрафы (50) не читаются.
     expect(parsed.records).toEqual([
       { employeeId: ids.one, typeId: types.accrual, kind: "accrual", amount: 1500.5 },
       { employeeId: ids.one, typeId: types.salary, kind: "accrual", amount: 9999 },
-      { employeeId: ids.two, typeId: types.salary, kind: "accrual", amount: 4182 },
     ]);
-    expect(parsed.skipped).toEqual({ invalidEmployee: 0, negative: 0, unknownType: 0 });
+  });
+
+  it("политик нет — «Опоздания» по старой формуле HRMS, и загрузка их пишет", async () => {
+    const { sheet } = await open(await build({ legacy: true }));
+    const late = Math.round((4000 / (22 * 480)) * (50 - 30) * 4);
+    expect(sheet.getCell(6, 13).value).toMatchObject({ formula: "IF(AND(H6>0,480>0),ROUND(F6/(H6*480)*MAX(J6-30,0)*4,0),0)", result: late });
+    const parsed = await parseImport(await build({ legacy: true, employees: [employee(ids.one)] }), { types: kinds, salaryTypeId: types.salary });
+    expect(parsed.records).toContainEqual({ employeeId: ids.one, typeId: types.late, kind: "deduction", amount: late });
   });
 });
 
 describe("timesheetPay", () => {
+  const piece = (over: Partial<SalaryPiece> = {}): SalaryPiece => ({ from: "2026-10-01", to: "2026-10-31", rate: 4000, unit: "month", mode: "daily", norm: 22, worked: 20, amount: 3636, ...over });
   const line = (from: string, to: string, amount: number, kind: "accrual" | "deduction" = "accrual") => ({ ...piece({ from, to, amount }), employeeId: "e", kind });
 
   it("неделя на стыке — обе части, месячный табель в неделю не попадает", () => {
@@ -92,20 +121,3 @@ describe("timesheetPay", () => {
     expect(october.pieces.map((p) => p.amount)).toEqual([400]);
   });
 });
-
-describe("старая формула опозданий", () => {
-  it("политик нет — колонка вида удержаний несёт опоздания и загружается", async () => {
-    const file = await buildTemplate({
-      period: { from: "2026-10-01", to: "2026-10-31" },
-      labels,
-      employees: [employee(ids.one, { fines: 50, lateness: 700 })],
-      accruals: [],
-      deductions: [{ id: types.fine, name: "Опоздания" }],
-      autoDeductionId: types.fine,
-      legacy: true,
-    });
-    const parsed = await parseImport(file, { types: kinds, salaryTypeId: types.salary });
-    expect(parsed.records).toContainEqual({ employeeId: ids.one, typeId: types.fine, kind: "deduction", amount: 700 });
-  });
-});
-

@@ -20,11 +20,13 @@ import { Icon } from "./icon";
  */
 const TONES = {
   error: "text-danger",
+  warning: "text-warning",
   success: "text-success",
 };
 
 const ICONS = {
   error: TriangleAlertIcon,
+  warning: TriangleAlertIcon,
   success: CheckIcon,
 };
 
