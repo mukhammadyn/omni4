@@ -1,82 +1,52 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, LoaderCircleIcon, PanelRightOpenIcon, RefreshCwIcon } from "lucide-react";
+import { PanelRightOpenIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
-import { todayInput } from "@/shared/lib/date-value";
-import { toast } from "@/shared/lib/toast";
-import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
-import { useLastPayMonth, usePayMonth } from "../api/payroll";
-import { useSyncPenalties } from "../api/penalty";
-import { exportPivot, PayrollExcel } from "./PayrollExcel";
+import { usePayPeriod } from "../api/payroll";
+import { PayrollExcel } from "./PayrollExcel";
+import { PeriodBar, usePeriod, usePeriodLabel } from "./attendance-parts";
 import { useScheduleSettings } from "./schedule-settings";
 import { buildPayPivot, compactSum } from "../model/payroll";
+import type { Scale } from "../model/timesheet";
 
 const th = "h-9 border-b border-border px-2 text-[13px] font-normal text-fg-muted whitespace-nowrap";
 const td = "h-row border-b border-border px-2 tabular-nums";
 const num = "text-right";
 const cell = `${td} ${num} border-l border-border`;
 
-const shift = (month: string, by: number) => {
-  const date = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + by, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-};
+/** Платят и помесячно, и по неделям — ведомость HRMS (Finance/Salary) умеет оба. */
+const SCALES: readonly Scale[] = ["month", "week"];
 
 /**
  * «Сводная по месяцам» начислений — `pivotView` прототипа (payroll.html):
- * сотрудник × вид за расчётный месяц, начисления и удержания группами,
+ * сотрудник × вид за месяц или неделю, начисления и удержания группами,
  * справа «Всего начислено · Всего удержано · К выплате», внизу «Итого».
+ * Период — строка периода «Посещаемости»; шаблон и загрузка Excel берут его же.
  *
  * Сделано под `hr_payroll_lines` (FIXED_VIEW_TYPES): строки грузит сам
  * (api/payroll), считает model/payroll.
  */
 export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: string; search: string; onOpenEmployee: (guid: string) => void }) {
-  const { t, i18n } = useTranslation();
-  const last = useLastPayMonth();
-  const [picked, setPicked] = useState("");
-  const month = picked || last.month || todayInput().slice(0, 7);
+  const { t } = useTranslation();
+  const period = usePeriod(viewId, SCALES);
+  const title = usePeriodLabel(period);
   const { where } = useScheduleSettings(viewId);
-  const { lines, loading } = usePayMonth(month, search, where);
+  const { lines, loading } = usePayPeriod(period.range, period.scale === "week", search, where);
   const pivot = useMemo(() => buildPayPivot(lines, false), [lines]);
-  const title = new Intl.DateTimeFormat(i18n.language, { month: "long", year: "numeric" }).format(
-    new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1),
-  );
   const columns = [...pivot.accruals, ...pivot.deductions];
   const signed = (id: string, value: number) => (pivot.deductions.some((c) => c.id === id) ? -value : value);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-1.5 px-6 py-2 text-sm">
-        <NavButton label={t("payroll.back")} onClick={() => setPicked(shift(month, -1))} icon={ChevronLeftIcon} />
-        <b className="min-w-[160px] text-center font-semibold first-letter:uppercase">{title}</b>
-        <NavButton label={t("payroll.forward")} onClick={() => setPicked(shift(month, 1))} icon={ChevronRightIcon} />
+      <PeriodBar view={period}>
         {/* ponytail: «Скрыть без начислений» убран — в сводной только сотрудники
-            со строками за месяц, скрывать нечего. Вернуть вместе со всеми
+            со строками за период, скрывать нечего. Вернуть вместе со всеми
             сотрудниками из hr_employees (нулевые строки, как в прототипе). */}
-        <span className="flex-1" />
-        <SyncPenalties month={month} title={title} />
-        <button
-          type="button"
-          onClick={() =>
-            void exportPivot(pivot, title, {
-              sheet: t("payroll.xlsx.sheet"),
-              employee: t("payroll.employee"),
-              dept: t("payroll.dept"),
-              accruals: t("payroll.accruals"),
-              deductions: t("payroll.deductions"),
-              accrued: t("payroll.accrued"),
-              deducted: t("payroll.deducted"),
-              net: t("payroll.net"),
-              total: t("payroll.total", { count: pivot.rows.length }),
-            }).catch(() => toast.error(t("payroll.xlsx.downloadFailed")))
-          }
-          className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 text-[13px] text-fg transition-colors hover:bg-surface-hover"
-        >
-          <Icon as={DownloadIcon} size={14} />
-          {t("payroll.export")}
-        </button>
-        <PayrollExcel month={month} title={title} where={where} />
-      </div>
+        <div className="flex justify-end">
+          <PayrollExcel range={period.range} title={title} where={where} />
+        </div>
+      </PeriodBar>
 
       <div className="min-h-0 flex-1 overflow-auto px-6">
         <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
@@ -158,80 +128,5 @@ export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: strin
         <p className="py-3 text-xs text-fg-subtle">{t("payroll.hint")}</p>
       </div>
     </div>
-  );
-}
-
-/** «Пересчитать штрафы» за месяц — строки удержаний из посещаемости и политик. */
-function SyncPenalties({ month, title }: { month: string; title: string }) {
-  const { t, i18n } = useTranslation();
-  const sync = useSyncPenalties(month);
-  const [asking, setAsking] = useState(false);
-
-  /* Окно закрывается сразу: ход пересчёта виден на кнопке. */
-  const run = () => {
-    setAsking(false);
-    return sync
-      .run((violation, minutes) => t(`fine.line.${violation}`, { n: minutes }))
-      .then(({ count, total }) =>
-        toast.success(count ? t("fine.synced", { count, total: total.toLocaleString(i18n.language) }) : t("fine.syncedNone")),
-      )
-      .catch(() => toast.error(t("fine.syncFailed")));
-  };
-  const { progress } = sync;
-  const label = !progress
-    ? t("fine.sync")
-    : progress.total
-      ? t("fine.syncWriting", { done: progress.done, total: progress.total })
-      : t("fine.syncCounting");
-
-  return (
-    <>
-      <button
-        type="button"
-        disabled={!sync.ready || sync.busy}
-        aria-busy={sync.busy}
-        title={sync.ready ? undefined : t("common.loading")}
-        onClick={() => setAsking(true)}
-        className="relative inline-flex h-7 items-center gap-1.5 overflow-hidden rounded-md border border-border px-2.5 text-[13px] text-fg-muted tabular-nums transition-colors hover:bg-surface-hover hover:text-fg disabled:cursor-default disabled:hover:bg-transparent"
-      >
-        {/* Полоса хода — под текстом, по доле записанных строк. */}
-        {progress && progress.total > 0 && (
-          <span
-            className="absolute inset-y-0 left-0 bg-accent-subtle transition-[width]"
-            style={{ width: `${(progress.done / progress.total) * 100}%` }}
-          />
-        )}
-        <Icon
-          as={sync.busy || !sync.ready ? LoaderCircleIcon : RefreshCwIcon}
-          size={14}
-          className={`relative ${sync.busy || !sync.ready ? "animate-spin" : ""}`}
-        />
-        <span className={`relative ${sync.busy ? "text-fg" : ""}`}>{label}</span>
-      </button>
-      {asking && (
-        <ConfirmDialog
-          title={t("fine.syncTitle", { month: title })}
-          description={t("fine.syncHint")}
-          confirmLabel={t("fine.sync")}
-          busy={false}
-          onClose={() => setAsking(false)}
-          onConfirm={() => void run()}
-        />
-      )}
-    </>
-  );
-}
-
-function NavButton({ label, onClick, icon }: { label: string; onClick: () => void; icon: typeof ChevronLeftIcon }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
-    >
-      <Icon as={icon} size={16} />
-    </button>
   );
 }

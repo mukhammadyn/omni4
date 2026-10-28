@@ -2,20 +2,43 @@ import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MAX_LIMIT, toRequestBody, type Filters, type Item, type ItemsResponseDto } from "@/features/item";
 import { api } from "@/shared/api/client";
-import { todayInput } from "@/shared/lib/date-value";
 import { keys } from "@/shared/lib/query-keys";
-import type { ImportRecord, ImportType, PayTypeColumn, PayUnit, TemplateEmployee } from "../model/payroll-excel";
-import { buildRow, datesOf, plusDays, rangeOf } from "../model/timesheet";
+import { timesheetPay, type TimesheetPayLine } from "../model/payroll";
+import type { ImportRecord, ImportType, PayTypeColumn, TemplateEmployee } from "../model/payroll-excel";
+import type { PayUnit } from "../model/timesheet-days";
+import { plusDays } from "../model/timesheet";
 import { EMPLOYEES } from "./employee";
 import { JOB_HISTORY } from "./job-history";
 import { firstText, text } from "./org";
 import { PAYROLL_LINES } from "./payroll";
-import { FINES_SOURCE, finesType } from "./penalty";
 import { upsert } from "./schedule";
-import { useAll, useTimesheet } from "./timesheet";
+import { toEmployee, useAll } from "./timesheet";
+
+/** Строки «Зарплаты», которые пишет функция при «Утвердить» табеля (ADR-0018). */
+const TIMESHEET_SOURCE = "timesheet";
+
+/** Вид удержаний табеля — «Опоздания» (`code = late_fine`); нет — первое удержание. Так же выбирает функция. */
+const finesType = (types: Item[]) =>
+  types.find((row) => text(row.code) === "late_fine") ?? types.find((row) => firstText(row.kind) === "deduction");
 
 const UNITS: readonly string[] = ["month", "week", "day", "hour"];
 const num = (value: unknown) => (typeof value === "number" ? value : Number(value) || 0);
+
+const toPayLine = (row: Item): TimesheetPayLine => {
+  const unit = firstText(row.pay_unit);
+  return {
+    employeeId: text(row.hr_employees_id),
+    kind: firstText(row.kind) === "deduction" ? "deduction" : "accrual",
+    from: text(row.period_from).slice(0, 10),
+    to: text(row.period_to).slice(0, 10),
+    rate: num(row.salary_rate),
+    unit: (UNITS.includes(unit) ? unit : "month") as PayUnit,
+    mode: firstText(row.calc_mode) === "hourly" ? "hourly" : "daily",
+    norm: num(row.norm),
+    worked: num(row.worked),
+    amount: num(row.amount),
+  };
+};
 
 /** «Оклад» — по коду или по названию, как `isSalaryTitle` HRMS. */
 const isSalary = (row: Item) => text(row.code) === "salary" || /оклад|salary|зарплат|maosh/i.test(text(row.name).replace(/ё/g, "е"));
@@ -32,7 +55,6 @@ export function usePayTypes() {
     const column = (row: Item): PayTypeColumn => ({ id: text(row.guid), name: text(row.name) });
     return {
       loading,
-      salaryId: salary ? text(salary.guid) : "",
       finesId: text(finesType(rows)?.guid),
       accruals: active.filter((row) => firstText(row.kind) !== "deduction" && row !== salary).map(column),
       deductions: active.filter((row) => firstText(row.kind) === "deduction").map(column),
@@ -41,58 +63,39 @@ export function usePayTypes() {
   }, [rows, loading]);
 }
 
+type Range = { from: string; to: string };
+
 /**
- * Сотрудники ведомости за месяц — как `fetchEmployeesWithSalary` HRMS:
- * у кого назначение (`hr_job_history`) задевает месяц; ставка и единица —
- * из последнего такого. Дни — табель месяца и задетых им недель.
+ * Сотрудники ведомости за месяц или неделю — как `fetchEmployeesWithSalary`
+ * HRMS: у кого назначение (`hr_job_history`) задевает период. Оклад и
+ * удержания — строки «Зарплаты» утверждённых табелей, целиком лежащие
+ * в периоде: месячный табель в недельную ведомость не попадает. Живую
+ * посещаемость шаблон не читает.
  */
-export function usePayrollTemplate(month: string, where: Filters) {
-  const { from, to } = rangeOf("month", `${month}-01`);
-  const wide = { from: rangeOf("week", from).from, to: rangeOf("week", to).to };
-  const dates = useMemo(() => datesOf(wide), [wide.from, wide.to]);
-  const sheet = useTimesheet({ ...wide, dates, today: todayInput(), search: "", where, dismissed: true });
+export function usePayrollTemplate({ from, to }: Range, where: Filters) {
+  const people = useAll(EMPLOYEES, where, false);
   const jobs = useAll(JOB_HISTORY, { date_from: { op: "before", values: [plusDays(to, 1)] } }, false);
-  const lines = useAll(PAYROLL_LINES, { period: { op: "between", values: [from, to] } }, false);
+  // Дата строки табеля — последний день её куска (ADR-0018); целиком ли кусок в периоде — timesheetPay.
+  const lines = useAll(PAYROLL_LINES, { date: { op: "between", values: [from, to] } }, false);
   const types = usePayTypes();
-  const loading = sheet.loading || jobs.loading || lines.loading || types.loading;
+  const loading = people.loading || jobs.loading || lines.loading || types.loading;
 
   const employees = useMemo<TemplateEmployee[]>(() => {
     if (loading) return [];
-    const job = new Map<string, Item>();
-    for (const row of jobs.rows) {
-      const end = text(row.date_to).slice(0, 10);
-      if (end && end < from) continue;
-      const id = text(row.hr_employees_id);
-      const seen = job.get(id);
-      if (!seen || text(row.date_from) > text(seen.date_from)) job.set(id, row);
-    }
-    const fines = new Map<string, number>();
-    for (const row of lines.rows) {
-      if (firstText(row.source) !== FINES_SOURCE || !text(row.fine_key)) continue;
-      const id = text(row.hr_employees_id);
-      fines.set(id, (fines.get(id) ?? 0) + num(row.amount));
-    }
-    return sheet.employees.flatMap((employee) => {
-      const work = job.get(employee.id);
-      // Кто в ведомости, решает назначение, а не даты карточки — как в HRMS.
-      if (!work) return [];
-      const input = sheet.inputOf(employee);
-      const unit = firstText(work.pay_unit);
-      return [
-        {
-          id: employee.id,
-          name: employee.legalName || employee.name,
-          salary: num(work.salary),
-          unit: (UNITS.includes(unit) ? unit : "month") as PayUnit,
-          cells: buildRow(input).cells,
-          planByDate: input.planByDate,
-          from,
-          to,
-          fines: fines.get(employee.id) ?? 0,
-        },
-      ];
-    });
-  }, [loading, sheet, jobs.rows, lines.rows, from, to]);
+    // Кто в ведомости, решает назначение, а не даты карточки — как в HRMS.
+    const assigned = new Set(jobs.rows.filter((row) => !text(row.date_to) || text(row.date_to).slice(0, 10) >= from).map((row) => text(row.hr_employees_id)));
+    const pay = timesheetPay(lines.rows.filter((row) => firstText(row.source) === TIMESHEET_SOURCE).map(toPayLine), { from, to });
+    return people.rows
+      .map(toEmployee)
+      .filter((employee) => assigned.has(employee.id))
+      .map((employee) => ({
+        id: employee.id,
+        name: employee.legalName || employee.name,
+        pieces: pay.get(employee.id)?.pieces ?? [],
+        fines: pay.get(employee.id)?.fines ?? 0,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [loading, people.rows, jobs.rows, lines.rows, from, to]);
 
   return { loading, employees, types };
 }
@@ -113,13 +116,13 @@ const CHUNK = 500;
 
 /**
  * Запись загруженного: строка начисления на сотрудника × вид, датой —
- * последний день месяца, как `insertCompensationsBatch` HRMS. Как и там,
- * прежние строки не трогаются: повторная загрузка добавит их ещё раз.
+ * последний день периода (у недели — воскресенье), как `insertCompensationsBatch`
+ * HRMS; `period` — месяц этой даты. Как и там, прежние строки не трогаются:
+ * повторная загрузка добавит их ещё раз.
  */
 export function useImportPayroll() {
   const queryClient = useQueryClient();
-  return async (month: string, records: ImportRecord[], description: string) => {
-    const { from, to } = rangeOf("month", `${month}-01`);
+  return async ({ to }: Range, records: ImportRecord[], description: string) => {
     const ids = [...new Set(records.map((record) => record.employeeId))];
     const people = ids.length ? await listAll(EMPLOYEES, { guid: { op: "any", values: ids } }) : [];
     const departments = new Map(people.map((row) => [text(row.guid), text(row.hr_departments_id) || null]));
@@ -133,7 +136,7 @@ export function useImportPayroll() {
       amount: record.amount,
       currency: "UZS",
       date: to,
-      period: from,
+      period: `${to.slice(0, 7)}-01`,
       source: "import",
       fine_key: null,
       description,
