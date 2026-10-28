@@ -6,6 +6,7 @@ import { toast } from "@/shared/lib/toast";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { useImportPayroll, usePayrollTemplate, usePayTypes } from "../api/payroll-excel";
+import type { CalcMode } from "../model/payroll";
 import type { TemplateLabels } from "../model/payroll-excel";
 
 type Range = { from: string; to: string };
@@ -23,19 +24,19 @@ const download = (data: ArrayBuffer, name: string) => {
 };
 
 /**
- * «…» сводной — «Скачать шаблон» и «Загрузить Excel» за открытый период
- * (месяц или неделю), как меню шаблона в «Зарплате» HRMS (udevs_hrms_admin,
- * Finance/Salary). Дневной или часовой — выбор при «Утвердить» табеля,
- * у шаблона его нет (ADR-0018).
+ * «…» сводной — «Скачать шаблон: дневной / часовой» и «Загрузить Excel» за
+ * открытый период (месяц или неделю), как меню шаблона в «Зарплате» HRMS
+ * (udevs_hrms_admin, Finance/Salary): один утверждённый табель — любой режим
+ * (ADR-0018, дополнение от 2026-10-28).
  */
 export function PayrollExcel({ range, title, where }: { range: Range; title: string; where: Filters }) {
   const { t } = useTranslation();
-  const [building, setBuilding] = useState(false);
+  const [building, setBuilding] = useState<CalcMode | null>(null);
   const [importing, setImporting] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const types = usePayTypes();
   const save = useImportPayroll();
-  const busy = building || importing;
+  const busy = building !== null || importing;
 
   const upload = async (picked: File | undefined) => {
     if (!picked) return;
@@ -44,7 +45,7 @@ export function PayrollExcel({ range, title, where }: { range: Range; title: str
     let mod: Awaited<ReturnType<typeof excel>> | undefined;
     try {
       mod = await excel();
-      const parsed = await mod.parseImport(await picked.arrayBuffer(), types.kinds);
+      const parsed = await mod.parseImport(await picked.arrayBuffer(), { types: types.kinds, salaryTypeId: types.salaryId });
       // Файл другого периода записался бы в открытый — отказ, а не тихая запись не туда.
       if (parsed.period && (parsed.period.from !== range.from || parsed.period.to !== range.to)) {
         return toast.error(t("payroll.xlsx.otherPeriod", { period: `${ru(parsed.period.from)} – ${ru(parsed.period.to)}` }));
@@ -80,15 +81,18 @@ export function PayrollExcel({ range, title, where }: { range: Range; title: str
       >
         {(close) => (
           <div className="w-60">
-            <PopoverItem
-              icon={<Icon as={DownloadIcon} size={16} />}
-              onClick={() => {
-                close();
-                setBuilding(true);
-              }}
-            >
-              {t("payroll.xlsx.template")}
-            </PopoverItem>
+            {(["daily", "hourly"] as const).map((value) => (
+              <PopoverItem
+                key={value}
+                icon={<Icon as={DownloadIcon} size={16} />}
+                onClick={() => {
+                  close();
+                  setBuilding(value);
+                }}
+              >
+                {t(`payroll.xlsx.template.${value}`)}
+              </PopoverItem>
+            ))}
             <PopoverSeparator />
             <PopoverItem
               icon={<Icon as={UploadIcon} size={16} />}
@@ -113,14 +117,14 @@ export function PayrollExcel({ range, title, where }: { range: Range; title: str
         }}
       />
       {/* Данные шаблона грузятся, только пока он собирается. */}
-      {building && <TemplateJob range={range} title={title} where={where} onDone={() => setBuilding(false)} />}
+      {building && <TemplateJob range={range} title={title} where={where} mode={building} onDone={() => setBuilding(null)} />}
     </>
   );
 }
 
-function TemplateJob({ range, title, where, onDone }: { range: Range; title: string; where: Filters; onDone: () => void }) {
+function TemplateJob({ range, title, where, mode, onDone }: { range: Range; title: string; where: Filters; mode: CalcMode; onDone: () => void }) {
   const { t } = useTranslation();
-  const data = usePayrollTemplate(range, where);
+  const data = usePayrollTemplate(range, where, mode);
   const started = useRef(false);
 
   useEffect(() => {
@@ -165,15 +169,16 @@ function TemplateJob({ range, title, where, onDone }: { range: Range; title: str
           accruals: data.types.accruals,
           deductions: data.types.deductions,
           autoDeductionId: data.types.finesId,
+          legacy: data.legacy,
         }),
       )
       .then((file) => {
-        download(file, `salary-template-${range.from}_${range.to}.xlsx`);
+        download(file, `salary-template-${mode === "hourly" ? "hourly-" : ""}${range.from}_${range.to}.xlsx`);
         toast.success(t("payroll.xlsx.downloaded"));
       })
       .catch(() => toast.error(t("payroll.xlsx.downloadFailed")))
       .finally(onDone);
-  }, [data, range, title, t, onDone]);
+  }, [data, range, mode, title, t, onDone]);
 
   return null;
 }

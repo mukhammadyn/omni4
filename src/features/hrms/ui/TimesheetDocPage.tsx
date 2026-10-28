@@ -409,9 +409,10 @@ export function TimesheetDocPage({
           days={doc.days}
           busy={decide.isPending}
           onClose={() => setDialog(null)}
-          onApprove={(mode) =>
+          // Режим оклада выбирают в шаблоне Excel «Зарплаты» (ADR-0018, дополнение от 2026-10-28).
+          onApprove={() =>
             decide.mutate(
-              { decision: "approve", mode },
+              { decision: "approve", mode: "daily" },
               {
                 onSuccess: () => {
                   toast.success(t("timesheets.approvedToast"));

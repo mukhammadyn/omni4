@@ -7,10 +7,11 @@
  * `__base_salary`, `income:<вид>`, `deduction:<вид>`), с 6-й — сотрудники.
  * Загрузка читает только ключи, поэтому подписи можно переводить.
  *
- * Отличия от HRMS (ADR-0018):
- * - Оклад и штрафы шаблон не считает: это строки «Зарплаты» утверждённых
- *   табелей (`source = timesheet`), их пишет функция. В шаблоне они только
- *   читаются — загрузка берёт премии и удержания, оклад и штрафы не трогает.
+ * Как в HRMS (ADR-0018, дополнение от 2026-10-28): оклад и старую формулу
+ * опозданий считает шаблон — в выбранном режиме (дневной / часовой), но по
+ * дням утверждённых табелей (`model/timesheet-salary`), а не по живой
+ * посещаемости; пишет их загрузка. Штрафы по политикам пишет «Утвердить»,
+ * в шаблоне они только читаются (`__auto_attendance_penalty`).
  * - Период ведомости — месяц или неделя пн–вс, тот, что открыт в сводной
  *   (в HRMS — так же, `salary-excel-common.js:36-55`). Он записан в файл
  *   (`__period:<с>:<по>`), и загрузка отказывает файлу другого периода.
@@ -55,10 +56,12 @@ export type TemplateLabels = {
 export type TemplateEmployee = {
   id: string;
   name: string;
-  /** Оклад месяца по кускам; пусто — нет утверждённого табеля. */
+  /** Оклад периода по кускам; пусто — нет утверждённого табеля. */
   pieces: SalaryPiece[];
-  /** Удержания утверждённых табелей (штрафы, опоздания) — в колонку `auto`. */
+  /** Штрафы по политикам, записанные «Утвердить», — в колонку `auto`, только чтение. */
   fines: number;
+  /** Старая формула опозданий — при `legacy`, в колонку вида удержаний табеля, её читает загрузка. */
+  lateness: number;
 };
 
 export type TemplateInput = {
@@ -68,8 +71,10 @@ export type TemplateInput = {
   /** Виды без «Оклада»: он своей колонкой. */
   accruals: PayTypeColumn[];
   deductions: PayTypeColumn[];
-  /** Вид удержаний табеля: колонка только для чтения. */
+  /** Вид удержаний табеля: штрафы (только чтение) или, при `legacy`, старая формула опозданий. */
   autoDeductionId: string;
+  /** Политик штрафов в периоде нет — колонка вида удержаний несёт старую формулу и загружается. */
+  legacy: boolean;
 };
 
 /** Ключи строки 5: по ним загрузка находит колонки. */
@@ -127,7 +132,9 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
   const deductedCol = accruedCol + 1;
   const netCol = accruedCol + 2;
   const last = netCol;
-  const autoCol = deductions.findIndex((type) => type.id === input.autoDeductionId);
+  const lateCol = deductions.findIndex((type) => type.id === input.autoDeductionId);
+  // Штрафы — только для чтения; старая формула (нет политик) — обычное удержание, его пишет загрузка.
+  const autoCol = input.legacy ? -1 : lateCol;
 
   [6, 40, 34, 18, 16, 20, 20, 20].forEach((width, i) => (sheet.getColumn(i + 1).width = width));
   for (let column = col.salary; column <= last; column += 1) sheet.getColumn(column).width = 18;
@@ -202,7 +209,7 @@ export async function buildTemplate(input: TemplateInput): Promise<ArrayBuffer> 
     sheet.getCell(r, col.worked).value = one?.worked ?? null;
     sheet.getCell(r, col.salary).value = pieces.length ? pieces.reduce((sum, piece) => sum + piece.amount, 0) : null;
     for (let column = accrualsFrom; column < accruedCol; column += 1) sheet.getCell(r, column).value = 0;
-    if (autoCol >= 0) sheet.getCell(r, deductionsFrom + autoCol).value = employee.fines;
+    if (lateCol >= 0) sheet.getCell(r, deductionsFrom + lateCol).value = input.legacy ? employee.lateness : employee.fines;
     sheet.getCell(r, accruedCol).value = formula(`SUM(${letter(col.salary)}${r}:${letter(deductionsFrom - 1)}${r})`);
     sheet.getCell(r, deductedCol).value = formula(deductions.length ? `SUM(${letter(deductionsFrom)}${r}:${letter(accruedCol - 1)}${r})` : "0");
     sheet.getCell(r, netCol).value = formula(`${letter(accruedCol)}${r}-${letter(deductedCol)}${r}`);
@@ -293,17 +300,21 @@ export class TemplateError extends Error {}
 
 /**
  * Файл → строки начислений, правила `importSalaryExcel` HRMS: по строке на
- * сотрудника × вид с суммой больше нуля. Оклад (`__base_salary`) и штрафы
- * (`__auto_…`) не читаются — они из утверждённого табеля (ADR-0018).
- * Есть ли такие сотрудники, проверяет вызывающий (`unknownEmployee`).
+ * сотрудника × вид с суммой больше нуля; «Оклад» — видом `salaryTypeId`, если
+ * его нет среди колонок видов. Штрафы (`__auto_…`) не читаются — их пишет
+ * «Утвердить». Есть ли такие сотрудники, проверяет вызывающий (`unknownEmployee`).
  */
-export async function parseImport(file: ArrayBuffer, types: ReadonlyMap<string, ImportType>): Promise<ImportResult> {
+export async function parseImport(
+  file: ArrayBuffer,
+  { types, salaryTypeId }: { types: ReadonlyMap<string, ImportType>; salaryTypeId: string },
+): Promise<ImportResult> {
   const book = new ExcelJS.Workbook();
   await book.xlsx.load(file);
   const sheet = book.worksheets[0];
   if (!sheet) throw new TemplateError("no sheet");
 
   let guidCol = 0;
+  let salaryCol = 0;
   const columns: { column: number; typeId: string }[] = [];
   let period: ImportResult["period"];
   const meta = sheet.getRow(META_ROW);
@@ -312,6 +323,7 @@ export async function parseImport(file: ArrayBuffer, types: ReadonlyMap<string, 
     const key = cellText(meta.getCell(column).value);
     const dates = key.startsWith(META.period) ? /^(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})$/.exec(key.slice(META.period.length)) : null;
     if (key === META.guid) guidCol = column;
+    else if (key === META.salary) salaryCol = column;
     else if (dates) period = { from: dates[1]!, to: dates[2]! };
     else {
       const id = /^(?:income|deduction):(.+)$/.exec(key)?.[1]?.trim();
@@ -321,6 +333,9 @@ export async function parseImport(file: ArrayBuffer, types: ReadonlyMap<string, 
     }
   }
   if (!guidCol) throw new TemplateError("no guid column");
+  if (salaryCol && salaryTypeId && types.has(salaryTypeId) && !columns.some((c) => c.typeId === salaryTypeId)) {
+    columns.push({ column: salaryCol, typeId: salaryTypeId });
+  }
   if (!columns.length) throw new TemplateError("no pay type columns");
 
   const result: ImportResult = { period, records: [], skipped: { invalidEmployee: 0, negative: 0, unknownType } };

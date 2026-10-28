@@ -35,7 +35,7 @@ import { logEvent, TIMESHEETS, TIMESHEET_EVENTS } from "./timesheet-docs";
 
 /** Строки дня табеля и норма месяца (ADR-0018). */
 export const TIMESHEET_DAYS = "hr_timesheet_days";
-const TIMESHEET_NORMS = "hr_timesheet_norms";
+export const TIMESHEET_NORMS = "hr_timesheet_norms";
 const UNITS: readonly string[] = ["month", "week", "day", "hour"];
 
 const num = (value: unknown) => (typeof value === "number" ? value : Number(value) || 0);
@@ -98,6 +98,13 @@ const departmentOf = (own: Job[], employee: { departmentId: string }) => (date: 
   own.length ? (jobOn(own, date)?.departmentId ?? "") : employee.departmentId;
 
 /**
+ * Строка дня принадлежит табелю. Удалённый через общую таблицу табель
+ * оставляет строки дня с пустой ссылкой (бэкенд её обнуляет, а не удаляет
+ * строку) — это не «другой табель», их не считаем и правки из них не берём.
+ */
+const ofSheet = (row: Item) => Boolean(text(row.hr_timesheets_id));
+
+/**
  * Работает ли в этот день — для табеля компании: есть назначение, с отделом
  * или без, как ведомость HRMS (`salary-attendance.js:34-55`). Без истории
  * назначений — по отделу карточки, как и `departmentOf`.
@@ -141,7 +148,7 @@ export function useFillDays(period: string, kind: PeriodKind) {
    * дни всего периода заново (~1 МБ за месяц).
    */
   const fill = async (target: FillTarget): Promise<FillResult> => {
-    const days = stored.rows.map((row) => ({ ...toStoredDay(row), sheet: text(row.hr_timesheets_id) }));
+    const days = stored.rows.filter(ofSheet).map((row) => ({ ...toStoredDay(row), sheet: text(row.hr_timesheets_id) }));
     const old = new Map(days.filter((d) => d.sheet === target.guid).map((d) => [`${d.hr_employees_id}:${d.date}`, d]));
     /*
      * Правка того же дня в другом табеле (месячный черновик → недельная копия):
@@ -242,7 +249,7 @@ export function useFillDays(period: string, kind: PeriodKind) {
     }
     const holder = new Map<string, string[]>();
     for (const row of stored.rows) {
-      if (row.outside_period) continue;
+      if (row.outside_period || !ofSheet(row)) continue;
       const key = `${text(row.hr_employees_id)}:${text(row.date).slice(0, 10)}`;
       (holder.get(key) ?? holder.set(key, []).get(key)!).push(text(row.hr_timesheets_id));
     }
@@ -312,7 +319,7 @@ export function useSheetOverlap(guid: string, days: DayRow[]) {
     let paid = 0;
     for (const row of others.rows) {
       const sheet = text(row.hr_timesheets_id);
-      if (row.outside_period || sheet === guid || !mine.has(`${text(row.hr_employees_id)}:${text(row.date).slice(0, 10)}`)) continue;
+      if (row.outside_period || !sheet || sheet === guid || !mine.has(`${text(row.hr_employees_id)}:${text(row.date).slice(0, 10)}`)) continue;
       total += 1;
       if (approved.has(sheet)) paid += 1;
     }
@@ -331,7 +338,8 @@ export function useSheetPay(guid: string) {
   return {
     loading,
     count: own.length,
-    total: own.reduce((sum, row) => sum + (firstText(row.kind) === "deduction" ? -num(row.amount) : num(row.amount)), 0),
+    // Строки табеля теперь — штрафы по политикам: сумма снимаемого, без знака.
+    total: own.reduce((sum, row) => sum + num(row.amount), 0),
   };
 }
 

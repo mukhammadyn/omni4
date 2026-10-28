@@ -14,7 +14,7 @@ const piece = (over: Partial<SalaryPiece> = {}): SalaryPiece => ({
   amount: 3636,
   ...over,
 });
-const employee = (id: string, over: Partial<TemplateEmployee> = {}): TemplateEmployee => ({ id, name: id, pieces: [piece()], fines: 0, ...over });
+const employee = (id: string, over: Partial<TemplateEmployee> = {}): TemplateEmployee => ({ id, name: id, pieces: [piece()], fines: 0, lateness: 0, ...over });
 
 const labels = new Proxy({} as TemplateLabels, {
   get: (_, key) => (key === "unit" ? { month: "м", week: "н", day: "д", hour: "ч" } : String(key)),
@@ -25,10 +25,15 @@ const ids = {
   none: "1b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d",
   two: "2b9a1c8e-1d2f-4a3b-8c4d-5e6f7a8b9c0d",
 };
-const types = { accrual: "11111111-1111-4111-8111-111111111111", fine: "22222222-2222-4222-8222-222222222222" };
+const types = { accrual: "11111111-1111-4111-8111-111111111111", fine: "22222222-2222-4222-8222-222222222222", salary: "33333333-3333-4333-8333-333333333333" };
+const kinds = new Map([
+  [types.accrual, { id: types.accrual, kind: "accrual" as const }],
+  [types.fine, { id: types.fine, kind: "deduction" as const }],
+  [types.salary, { id: types.salary, kind: "accrual" as const }],
+]);
 
 describe("шаблон и загрузка", () => {
-  it("оклад и штрафы — из табеля и только для чтения, загрузка берёт премии", async () => {
+  it("оклад считает шаблон, загрузка его пишет; штрафы — только для чтения", async () => {
     const file = await buildTemplate({
       period: { from: "2026-10-01", to: "2026-10-31" },
       labels,
@@ -41,6 +46,7 @@ describe("шаблон и загрузка", () => {
       accruals: [{ id: types.accrual, name: "KPI" }],
       deductions: [{ id: types.fine, name: "Опоздания" }],
       autoDeductionId: types.fine,
+      legacy: false,
     });
 
     const book = new ExcelJS.Workbook();
@@ -56,15 +62,14 @@ describe("шаблон и загрузка", () => {
 
     sheet.getCell(6, 10).value = "1 500,5";
     sheet.getCell(6, 9).value = 9999;
-    const parsed = await parseImport(
-      await book.xlsx.writeBuffer(),
-      new Map([
-        [types.accrual, { id: types.accrual, kind: "accrual" as const }],
-        [types.fine, { id: types.fine, kind: "deduction" as const }],
-      ]),
-    );
+    const parsed = await parseImport(await book.xlsx.writeBuffer(), { types: kinds, salaryTypeId: types.salary });
     expect(parsed.period).toEqual({ from: "2026-10-01", to: "2026-10-31" });
-    expect(parsed.records).toEqual([{ employeeId: ids.one, typeId: types.accrual, kind: "accrual", amount: 1500.5 }]);
+    // Оклад правят в файле — пишется поправленный; штрафы (50) не читаются.
+    expect(parsed.records).toEqual([
+      { employeeId: ids.one, typeId: types.accrual, kind: "accrual", amount: 1500.5 },
+      { employeeId: ids.one, typeId: types.salary, kind: "accrual", amount: 9999 },
+      { employeeId: ids.two, typeId: types.salary, kind: "accrual", amount: 4182 },
+    ]);
     expect(parsed.skipped).toEqual({ invalidEmployee: 0, negative: 0, unknownType: 0 });
   });
 });
@@ -86,3 +91,20 @@ describe("timesheetPay", () => {
     expect(october.pieces.map((p) => p.amount)).toEqual([400]);
   });
 });
+
+describe("старая формула опозданий", () => {
+  it("политик нет — колонка вида удержаний несёт опоздания и загружается", async () => {
+    const file = await buildTemplate({
+      period: { from: "2026-10-01", to: "2026-10-31" },
+      labels,
+      employees: [employee(ids.one, { fines: 50, lateness: 700 })],
+      accruals: [],
+      deductions: [{ id: types.fine, name: "Опоздания" }],
+      autoDeductionId: types.fine,
+      legacy: true,
+    });
+    const parsed = await parseImport(file, { types: kinds, salaryTypeId: types.salary });
+    expect(parsed.records).toContainEqual({ employeeId: ids.one, typeId: types.fine, kind: "deduction", amount: 700 });
+  });
+});
+

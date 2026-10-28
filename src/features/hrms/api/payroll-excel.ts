@@ -3,9 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { MAX_LIMIT, toRequestBody, type Filters, type Item, type ItemsResponseDto } from "@/features/item";
 import { api } from "@/shared/api/client";
 import { keys } from "@/shared/lib/query-keys";
-import { timesheetPay, type TimesheetPayLine } from "../model/payroll";
+import { timesheetPay, type CalcMode, type TimesheetPayLine } from "../model/payroll";
 import type { ImportRecord, ImportType, PayTypeColumn, TemplateEmployee } from "../model/payroll-excel";
-import type { PayUnit } from "../model/timesheet-days";
+import { periodRange, type PayUnit, type PeriodKind } from "../model/timesheet-days";
+import { sheetSalary, type MonthNorm } from "../model/timesheet-salary";
 import { plusDays } from "../model/timesheet";
 import { EMPLOYEES } from "./employee";
 import { JOB_HISTORY } from "./job-history";
@@ -13,8 +14,10 @@ import { firstText, text } from "./org";
 import { PAYROLL_LINES } from "./payroll";
 import { upsert } from "./schedule";
 import { toEmployee, useAll } from "./timesheet";
+import { TIMESHEET_DAYS, TIMESHEET_NORMS, toStoredDay } from "./timesheet-days";
+import { TIMESHEETS } from "./timesheet-docs";
 
-/** Строки «Зарплаты», которые пишет функция при «Утвердить» табеля (ADR-0018). */
+/** Строки «Зарплаты», которые пишет функция при «Утвердить» табеля: штрафы по политикам (ADR-0018). */
 const TIMESHEET_SOURCE = "timesheet";
 
 /** Вид удержаний табеля — «Опоздания» (`code = late_fine`); нет — первое удержание. Так же выбирает функция. */
@@ -55,6 +58,7 @@ export function usePayTypes() {
     const column = (row: Item): PayTypeColumn => ({ id: text(row.guid), name: text(row.name) });
     return {
       loading,
+      salaryId: salary ? text(salary.guid) : "",
       finesId: text(finesType(rows)?.guid),
       accruals: active.filter((row) => firstText(row.kind) !== "deduction" && row !== salary).map(column),
       deductions: active.filter((row) => firstText(row.kind) === "deduction").map(column),
@@ -67,37 +71,98 @@ type Range = { from: string; to: string };
 
 /**
  * Сотрудники ведомости за месяц или неделю — как `fetchEmployeesWithSalary`
- * HRMS: у кого назначение (`hr_job_history`) задевает период. Оклад и
- * удержания — строки «Зарплаты» утверждённых табелей, целиком лежащие
- * в периоде: месячный табель в недельную ведомость не попадает. Живую
- * посещаемость шаблон не читает.
+ * HRMS: у кого назначение (`hr_job_history`) задевает период. Оклад и старая
+ * формула опозданий — по дням утверждённых табелей периода в выбранном
+ * режиме (дневной / часовой), как шаблон HRMS: один табель — любой режим
+ * (ADR-0018, дополнение от 2026-10-28). Берутся куски, целиком лежащие в
+ * периоде. Штрафы по политикам — строки «Зарплаты», что записало «Утвердить».
  */
-export function usePayrollTemplate({ from, to }: Range, where: Filters) {
+export function usePayrollTemplate({ from, to }: Range, where: Filters, mode: CalcMode) {
   const people = useAll(EMPLOYEES, where, false);
   const jobs = useAll(JOB_HISTORY, { date_from: { op: "before", values: [plusDays(to, 1)] } }, false);
-  // Дата строки табеля — последний день её куска (ADR-0018); целиком ли кусок в периоде — timesheetPay.
   const lines = useAll(PAYROLL_LINES, { date: { op: "between", values: [from, to] } }, false);
+  const sheets = useAll(TIMESHEETS, {}, false);
+  const approved = useMemo(
+    () =>
+      sheets.rows.flatMap((row) => {
+        if (firstText(row.status) !== "approved") return [];
+        const kind: PeriodKind = firstText(row.period_kind) === "week" ? "week" : "month";
+        const range = periodRange(text(row.period).slice(0, 10), kind);
+        return range.from <= to && range.to >= from ? [{ guid: text(row.guid), kind }] : [];
+      }),
+    [sheets.rows, from, to],
+  );
+  const ids = approved.map((sheet) => sheet.guid);
+  const ofSheets = { hr_timesheets_id: { op: "any" as const, values: ids } };
+  const days = useAll(ids.length ? TIMESHEET_DAYS : undefined, ofSheets, false);
+  const norms = useAll(ids.length ? TIMESHEET_NORMS : undefined, ofSheets, false);
+  const settings = useAll("core_settings", {}, false);
+  const assignments = useAll("hr_penalty_assignments", {}, false);
   const types = usePayTypes();
-  const loading = people.loading || jobs.loading || lines.loading || types.loading;
+  const loading = [people, jobs, lines, sheets, days, norms, settings, assignments].some((query) => query.loading) || types.loading;
+
+  // Старая формула опозданий — только если в периоде нет ни одного действующего назначения политики штрафов.
+  const legacy = useMemo(
+    () =>
+      !assignments.rows.some((row) => {
+        if (row.is_active === false) return false;
+        const start = text(row.valid_from || row.effective_from).slice(0, 10);
+        const end = text(row.valid_to).slice(0, 10);
+        return (!start || start <= to) && (!end || end >= from);
+      }),
+    [assignments.rows, from, to],
+  );
 
   const employees = useMemo<TemplateEmployee[]>(() => {
     if (loading) return [];
     // Кто в ведомости, решает назначение, а не даты карточки — как в HRMS.
     const assigned = new Set(jobs.rows.filter((row) => !text(row.date_to) || text(row.date_to).slice(0, 10) >= from).map((row) => text(row.hr_employees_id)));
-    const pay = timesheetPay(lines.rows.filter((row) => firstText(row.source) === TIMESHEET_SOURCE).map(toPayLine), { from, to });
+    const setting = settings.rows[0] ?? {};
+    const rules = { coefficient: num(setting.lateness_coefficient), grace: num(setting.lateness_grace_minutes) };
+
+    // Оклад: каждый утверждённый табель × сотрудник — арифметикой функции, в выбранном режиме.
+    const salaryLines: TimesheetPayLine[] = [];
+    const lateness = new Map<string, number>();
+    for (const sheet of approved) {
+      const byPerson = new Map<string, ReturnType<typeof toStoredDay>[]>();
+      for (const row of days.rows) {
+        if (text(row.hr_timesheets_id) !== sheet.guid) continue;
+        const day = toStoredDay(row);
+        (byPerson.get(day.hr_employees_id) ?? byPerson.set(day.hr_employees_id, []).get(day.hr_employees_id)!).push(day);
+      }
+      for (const [employeeId, own] of byPerson) {
+        const normOf = new Map<string, MonthNorm>(
+          norms.rows
+            .filter((row) => text(row.hr_timesheets_id) === sheet.guid && text(row.hr_employees_id) === employeeId)
+            .map((row) => [text(row.month).slice(0, 10), { shifts: num(row.shifts_in_month), minutesPerDay: num(row.minutes_per_day) }]),
+        );
+        const result = sheetSalary({ days: own, norms: normOf, kind: sheet.kind, mode, legacy, settings: rules });
+        for (const piece of result.pieces) salaryLines.push({ ...piece, employeeId, kind: "accrual" });
+        for (const late of result.lateness) {
+          if (late.from >= from && late.to <= to) lateness.set(employeeId, (lateness.get(employeeId) ?? 0) + late.amount);
+        }
+      }
+    }
+    const salary = timesheetPay(salaryLines, { from, to });
+    // Штрафы по политикам — что записало «Утвердить» (оклад оттуда больше не берётся).
+    const fines = timesheetPay(
+      lines.rows.filter((row) => firstText(row.source) === TIMESHEET_SOURCE && firstText(row.kind) === "deduction").map(toPayLine),
+      { from, to },
+    );
     return people.rows
       .map(toEmployee)
       .filter((employee) => assigned.has(employee.id))
       .map((employee) => ({
         id: employee.id,
         name: employee.legalName || employee.name,
-        pieces: pay.get(employee.id)?.pieces ?? [],
-        fines: pay.get(employee.id)?.fines ?? 0,
+        pieces: salary.get(employee.id)?.pieces ?? [],
+        fines: fines.get(employee.id)?.fines ?? 0,
+        lateness: lateness.get(employee.id) ?? 0,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [loading, people.rows, jobs.rows, lines.rows, from, to]);
+  }, [loading, people.rows, jobs.rows, lines.rows, approved, days.rows, norms.rows, settings.rows, legacy, mode, from, to]);
 
-  return { loading, employees, types };
+  return { loading, employees, legacy, types };
 }
 
 /** Все строки по отбору, порциями до конца. */
