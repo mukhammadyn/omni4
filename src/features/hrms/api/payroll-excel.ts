@@ -123,6 +123,8 @@ export function usePayrollTemplate({ from, to }: Range, where: Filters, mode: Ca
     // Оклад: каждый утверждённый табель × сотрудник — арифметикой функции, в выбранном режиме.
     const salaryLines: TimesheetPayLine[] = [];
     const lateness = new Map<string, number>();
+    // У кого есть дни утверждённого табеля в периоде и есть ли среди них смены — для причины пустого оклада.
+    const covered = new Map<string, boolean>();
     for (const sheet of approved) {
       const byPerson = new Map<string, ReturnType<typeof toStoredDay>[]>();
       for (const row of days.rows) {
@@ -131,6 +133,8 @@ export function usePayrollTemplate({ from, to }: Range, where: Filters, mode: Ca
         (byPerson.get(day.hr_employees_id) ?? byPerson.set(day.hr_employees_id, []).get(day.hr_employees_id)!).push(day);
       }
       for (const [employeeId, own] of byPerson) {
+        const inPeriod = own.filter((day) => !day.outside_period && day.date >= from && day.date <= to);
+        if (inPeriod.length) covered.set(employeeId, Boolean(covered.get(employeeId)) || inPeriod.some((day) => day.has_shift && day.plan_minutes > 0));
         const normOf = new Map<string, MonthNorm>(
           norms.rows
             .filter((row) => text(row.hr_timesheets_id) === sheet.guid && text(row.hr_employees_id) === employeeId)
@@ -152,13 +156,18 @@ export function usePayrollTemplate({ from, to }: Range, where: Filters, mode: Ca
     return people.rows
       .map(toEmployee)
       .filter((employee) => assigned.has(employee.id))
-      .map((employee) => ({
-        id: employee.id,
-        name: employee.legalName || employee.name,
-        pieces: salary.get(employee.id)?.pieces ?? [],
-        fines: fines.get(employee.id)?.fines ?? 0,
-        lateness: lateness.get(employee.id) ?? 0,
-      }))
+      .map((employee) => {
+        const pieces = salary.get(employee.id)?.pieces ?? [];
+        const shifts = covered.get(employee.id);
+        return {
+          id: employee.id,
+          name: employee.legalName || employee.name,
+          pieces,
+          fines: fines.get(employee.id)?.fines ?? 0,
+          lateness: lateness.get(employee.id) ?? 0,
+          ...(pieces.length ? {} : { missing: shifts === undefined ? ("timesheet" as const) : shifts ? ("credited" as const) : ("shifts" as const) }),
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [loading, people.rows, jobs.rows, lines.rows, approved, days.rows, norms.rows, settings.rows, legacy, mode, from, to]);
 

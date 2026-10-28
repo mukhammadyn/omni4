@@ -39,7 +39,7 @@ describe("шаблон и загрузка", () => {
       labels,
       employees: [
         employee(ids.one, { fines: 50 }),
-        employee(ids.none, { pieces: [] }),
+        employee(ids.none, { pieces: [], missing: "shifts" }),
         // Новая ставка с 20-го: два куска одной единицы.
         employee(ids.two, { pieces: [piece({ to: "2026-10-19", worked: 13, amount: 2364 }), piece({ from: "2026-10-20", rate: 5000, worked: 8, amount: 1818 })] }),
       ],
@@ -55,7 +55,8 @@ describe("шаблон и загрузка", () => {
     // Колонки: 6 ставка, 7 норма, 8 отработано, 9 оклад, 10 KPI, 11 штрафы.
     expect([6, 7, 8, 9, 11].map((c) => sheet.getCell(6, c).value)).toEqual([4000, 22, 20, 3636, 50]);
     expect(sheet.getCell(7, 9).value).toBeNull();
-    expect(sheet.getCell(7, 9).note).toBe("noTimesheet");
+    // Табель есть, но смен в графике нет — примечание называет именно это.
+    expect(sheet.getCell(7, 9).note).toBe("noShifts");
     // Разные ставки — клетка пуста, норма и отработано — в примечании по кускам.
     expect([5, 6, 7, 8, 9].map((c) => sheet.getCell(8, c).value)).toEqual(["м", null, null, null, 4182]);
     expect(String(sheet.getCell(8, 9).note)).toContain("20.10–31.10");

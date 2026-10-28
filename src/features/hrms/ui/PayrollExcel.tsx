@@ -159,6 +159,8 @@ function TemplateJob({ range, title, where, mode, onDone }: { range: Range; titl
         hour: t("payroll.xlsx.unit.hour"),
       },
       noTimesheet: t("payroll.xlsx.noTimesheet"),
+      noShifts: t("payroll.xlsx.noShifts"),
+      noCredited: t("payroll.xlsx.noCredited"),
     };
     void excel()
       .then(({ buildTemplate }) =>

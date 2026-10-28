@@ -2528,6 +2528,8 @@
   "payroll.xlsx.norm": "Норма",
   "payroll.xlsx.worked": "Отработано",
   "payroll.xlsx.noTimesheet": "Нет утверждённого табеля за период",
+  "payroll.xlsx.noShifts": "В «Графике работы» нет смен за период — норма 0, оклад не начислен (как в HRMS)",
+  "payroll.xlsx.noCredited": "Смены есть, но ни один день не засчитан — оклад 0",
   "payroll.xlsx.otherPeriod": "Шаблон за другой период ({{period}}) — откройте этот период в сводной и загрузите снова",
   "payroll.xlsx.accruals": "НАЧИСЛЕНИЯ (БОНУСЫ)",
   "payroll.xlsx.salary": "Оклад",
