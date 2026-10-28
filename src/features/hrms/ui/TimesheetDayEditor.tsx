@@ -96,11 +96,10 @@ export function ApproveDialog({
   guid: string;
   days: DayRow[];
   busy: boolean;
-  onApprove: (mode: "daily" | "hourly") => void;
+  onApprove: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<"daily" | "hourly">("daily");
   const unconfirmed = days.filter((day) => !day.outside_period && day.unconfirmed).length;
   const empty = !days.length;
   // Пересечение с другими табелями — не запрет, а предупреждение (ADR-0018, дополнение от 2026-10-28).
@@ -110,15 +109,6 @@ export function ApproveDialog({
       <div className={box}>
         <h2 className="text-lg font-semibold">{t("timesheets.approve")}</h2>
         <p className="text-sm text-fg-muted">{t("timesheets.approveHint")}</p>
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="text-fg-muted">{t("timesheets.mode")}</span>
-          <Dropdown
-            value={mode}
-            items={(["daily", "hourly"] as const).map((value) => ({ value, label: t(`timesheets.modes.${value}`) }))}
-            ariaLabel={t("timesheets.mode")}
-            onChange={(value) => setMode(value as "daily" | "hourly")}
-          />
-        </label>
         {empty && <p className="rounded-lg bg-danger-subtle px-3 py-2 text-sm text-danger">{t("timesheets.notFilled")}</p>}
         {unconfirmed > 0 && (
           <p className="rounded-lg bg-warning-subtle px-3 py-2 text-sm text-warning">{t("timesheets.unconfirmed", { count: unconfirmed })}</p>
@@ -134,7 +124,7 @@ export function ApproveDialog({
           <Button variant="ghost" onClick={onClose}>
             {t("action.cancel")}
           </Button>
-          <Button disabled={busy || empty || overlap.loading} onClick={() => onApprove(mode)}>
+          <Button disabled={busy || empty || overlap.loading} onClick={onApprove}>
             {t("timesheets.approve")}
           </Button>
         </div>
