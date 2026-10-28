@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarClockIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useTablePermissions } from "@/features/auth";
@@ -7,6 +7,7 @@ import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { DatePicker } from "@/shared/ui/date-picker";
 import { Icon } from "@/shared/ui/icon";
+import { Input } from "@/shared/ui/input";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Modal } from "@/shared/ui/modal";
 import { ToolButton } from "@/shared/ui/tool-button";
@@ -72,28 +73,34 @@ function FillDialog({ onClose, initial }: { onClose: () => void; initial?: { kin
   // Неделя — пн–вс выбранного дня, как ведомость HRMS; в поле — её понедельник.
   const [monday, setMonday] = useState(rangeOf("week", initial?.anchor ?? todayInput()).from);
   const period = kind === "month" ? `${month}-01` : monday;
-  const { loading, plan, fill, from } = useTimesheetFill(period, kind);
+  const { loading, plan, overlap, fill, from } = useTimesheetFill(period, kind);
   const write = useWriteTimesheets();
   const name = kind === "month" ? monthName(month, i18n.language) : weekName(from, i18n.language);
+  // null — не трогали: название идёт за периодом (у готового табеля — его же).
+  const [title, setTitle] = useState<string | null>(null);
+  const auto = plan?.title || `${t("timesheets.title")} · ${name}`;
+  // Нажали, пока посещаемость ещё едет: запись уйдёт, как только доедет.
+  const [queued, setQueued] = useState(false);
   const nothing = plan !== null && !plan.create.length && !plan.update.length;
   // В сводке — только то, что есть: «Создать 0» и «Пересчитать 0» не показываются.
   const lines = plan
     ? [
         plan.create.length > 0 && <li key="create">{t("timesheets.planCreate", { count: plan.create.length })}</li>,
         plan.update.length > 0 && <li key="update">{t("timesheets.planUpdate", { count: plan.update.length })}</li>,
-        plan.overlap > 0 && (
-          <li key="overlap" className="text-warning">{t("timesheets.planOverlap", { count: plan.overlap })}</li>
+        overlap !== null && overlap > 0 && (
+          <li key="overlap" className="text-warning">{t("timesheets.planOverlap", { count: overlap })}</li>
         ),
         plan.locked.length > 0 && (
           <li key="locked" className="text-fg-muted">{t("timesheets.planLocked", { count: plan.locked.length })}</li>
         ),
+        loading && !nothing && <li key="counting" className="text-fg-subtle">{t("timesheets.counting")}</li>,
       ].filter(Boolean)
     : [];
 
   const run = () => {
     if (!plan) return;
     write.mutate(
-      { plan, period: from, kind, fill, title: `${t("timesheets.title")} · ${name}` },
+      { plan, period: from, kind, fill, title: title?.trim() || auto },
       {
         onSuccess: () => {
           toast.success(t("timesheets.filled", { count: plan.create.length + plan.update.length }));
@@ -103,10 +110,20 @@ function FillDialog({ onClose, initial }: { onClose: () => void; initial?: { kin
     );
   };
 
+  useEffect(() => {
+    if (!queued || loading || !plan) return;
+    setQueued(false);
+    run();
+  }, [queued, loading, plan]);
+
   return (
     <Modal onClose={onClose}>
       <div className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-modal">
         <h2 className="text-lg font-semibold">{t("timesheets.fill")}</h2>
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-fg-muted">{t("timesheets.name")}</span>
+          <Input value={title ?? auto} onChange={(event) => setTitle(event.target.value)} />
+        </label>
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="text-fg-muted">{t("timesheets.periodKind")}</span>
           <Dropdown
@@ -140,9 +157,9 @@ function FillDialog({ onClose, initial }: { onClose: () => void; initial?: { kin
             />
           </div>
         )}
-        {(loading || !plan || lines.length > 0) && (
+        {(!plan || lines.length > 0) && (
           <div className="rounded-lg bg-surface-soft px-3 py-2.5 text-sm">
-            {loading || !plan ? (
+            {!plan ? (
               <span className="text-fg-subtle">{t("timesheets.counting")}</span>
             ) : (
               <ul className="flex flex-col gap-1">{lines}</ul>
@@ -153,7 +170,7 @@ function FillDialog({ onClose, initial }: { onClose: () => void; initial?: { kin
           <Button variant="ghost" onClick={onClose}>
             {t("action.cancel")}
           </Button>
-          <Button disabled={loading || !plan || nothing || write.isPending} onClick={run}>
+          <Button disabled={!plan || nothing || queued || write.isPending} onClick={() => (loading ? setQueued(true) : run())}>
             {t("timesheets.fillRun")}
           </Button>
         </div>

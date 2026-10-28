@@ -27,24 +27,29 @@ export const TIMESHEET_EVENTS = "hr_timesheet_events";
  * отделом или без (ADR-0018, дополнение от 2026-10-28). Нет табеля — создать
  * черновиком, черновик или «на проверке» — заполнить заново, утверждённый —
  * не трогать. Табели отделов, заведённые раньше, план не трогает.
+ *
+ * План — по одному списку табелей (~0,5 с); посещаемость, смены и дни
+ * других табелей (~2,5 МБ, 5–6 с) нужны только записи и предупреждению
+ * о пересечении — `loading` про них, и плана они не держат.
  */
 export function useTimesheetFill(period: string, kind: PeriodKind) {
   const days = useFillDays(period, kind);
   const existing = useAll(TIMESHEETS, { period: { op: "between", values: [days.from, days.from] } }, false);
-  const loading = days.loading || existing.loading;
 
   const plan = useMemo(() => {
-    if (loading) return null;
+    if (existing.loading) return null;
     const company = existing.rows.filter((row) => (firstText(row.period_kind) || "month") === kind && !text(row.hr_departments_id));
     const base = planFill(
       company.map((row) => ({ guid: text(row.guid), departmentId: "", status: firstText(row.status) })),
       [""],
     );
-    // Дни, что уже лежат в других табелях (неделя поверх месяца, табели отделов), — предупреждение, не запрет.
-    return { ...base, overlap: base.locked.length ? 0 : days.overlap("", text(company[0]?.guid) || undefined) };
-  }, [loading, existing.rows, days.overlap, kind]);
+    return { ...base, title: text(company[0]?.title) };
+  }, [existing.loading, existing.rows, kind]);
 
-  return { loading, plan, fill: days.fill, from: days.from };
+  // Дни, что уже лежат в других табелях (неделя поверх месяца, табели отделов), — предупреждение, не запрет.
+  const overlap = !plan || days.loading ? null : plan.locked.length ? 0 : days.overlap("", plan.update[0]?.guid);
+
+  return { loading: days.loading, plan, overlap, fill: days.fill, from: days.from };
 }
 
 export type FillPlan = NonNullable<ReturnType<typeof useTimesheetFill>["plan"]>;
@@ -123,14 +128,19 @@ export function useWriteTimesheets() {
         // Людей за период не нашлось — пустой документ не нужен.
         if (!result.people) await api.delete<unknown>(`/v1/object/${TIMESHEETS}`, { data: { ids: [guid] } });
       }
-      for (const target of plan.update) await fill(target);
+      for (const target of plan.update) await fill({ ...target, title });
     },
     onError: (error) => reportError(error, "common.saveFailed"),
-    // Один раз на весь пакет: fill кэш не трогает.
-    onSettled: () =>
-      Promise.all(
-        [TIMESHEETS, TIMESHEET_DAYS, TIMESHEET_EVENTS].map((slug) => queryClient.invalidateQueries({ queryKey: keys.items.table(slug) })),
-      ),
+    /*
+     * Один раз на весь пакет: fill кэш не трогает. Без await — react-query
+     * ждёт onSettled, прежде чем закрыть окно, а дни за месяц — 1–3 МБ
+     * порциями по очереди. Дни и историю здесь никто не показывает: помечаются
+     * устаревшими и перечитываются тем, кто их откроет.
+     */
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.items.table(TIMESHEETS) });
+      for (const slug of [TIMESHEET_DAYS, TIMESHEET_EVENTS]) void queryClient.invalidateQueries({ queryKey: keys.items.table(slug), refetchType: "none" });
+    },
   });
 }
 

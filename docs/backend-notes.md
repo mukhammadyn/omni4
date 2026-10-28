@@ -1764,3 +1764,18 @@ LOOKUP-колонка таблицы проекта — не просто `uuid`
 ADMIN — строки `core_users` у него нет. Функция, пишущая автора, берёт
 его через `(SELECT guid FROM core_users WHERE guid = $1)`, фронт — из
 `getObjectIds()`. Проверено в omni5 2026-10-27.
+
+## Удалённая строка оставляет сирот, а «не пусто» в отборе нет
+
+Внешний ключ связи — `ON DELETE SET NULL` (`ucode_go_object_builder_service/
+pkg/helper/relation.go:855`): удалили табель — его строки `hr_timesheet_days`
+остаются с пустой `hr_timesheets_id`. Каскада нет, и сироты копятся: в omni5
+2026-10-28 за сентябрь их было 3 063 из 3 399 строк дней (2,7 МБ, ~10 с
+порциями по очереди).
+
+Отбора «поле не пусто» у `get-list` нет: в `buildComparisonFilters`
+(`storage/postgres/build_query.go:359`) только `$gt/$gte/$lt/$lte/$in`.
+Обход — `{"$gt": "00000000-0000-0000-0000-000000000000"}`: это
+`a.<поле> > $n`, NULL не проходит, а любой настоящий uuid больше нулевого.
+Так читает дни табелей `useFillDays` (`SHEET_SET` в
+`features/hrms/api/timesheet-days.ts`). Сами сироты не удаляются.
