@@ -44,7 +44,7 @@ export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: strin
             со строками за период, скрывать нечего. Вернуть вместе со всеми
             сотрудниками из hr_employees (нулевые строки, как в прототипе). */}
         <div className="flex justify-end">
-          <PayrollExcel range={period.range} title={title} where={where} />
+          <PayrollExcel range={period.range} kind={period.scale === "week" ? "week" : "month"} title={title} where={where} />
         </div>
       </PeriodBar>
 

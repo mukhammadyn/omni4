@@ -15,7 +15,7 @@ import i18n, { type TranslationKey } from "./i18n";
  * из мутации, а не из компонента. `useToasts.getState()` работает
  * откуда угодно, хука для этого не требуется.
  */
-export type ToastKind = "error" | "success";
+export type ToastKind = "error" | "warning" | "success";
 
 export type Toast = {
   id: number;
@@ -29,6 +29,8 @@ export type Toast = {
  */
 const LIFETIME: Record<ToastKind, number> = {
   error: 8000,
+  // Предупреждение тоже читают: оно о том, что на экране не видно.
+  warning: 8000,
   success: 5000,
 };
 
@@ -58,6 +60,7 @@ export const useToasts = create<ToastState>((set, get) => ({
 
 export const toast = {
   error: (text: string) => useToasts.getState().push("error", text),
+  warning: (text: string) => useToasts.getState().push("warning", text),
   success: (text: string) => useToasts.getState().push("success", text),
 };
 

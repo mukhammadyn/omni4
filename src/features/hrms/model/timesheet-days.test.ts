@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { buildCell, type RowInput } from "./timesheet";
-import { isEdited, jobOn, loadRange, mergeDay, monthNorm, ownDates, sheetTotals, toDayRow, type Job } from "./timesheet-days";
+import { isEdited, jobOn, loadRange, mergeDay, monthNorm, ownDates, parseHours, sheetTotals, toDayRow, toHours, type Job } from "./timesheet-days";
 
 const input = (patch: Partial<RowInput> = {}): RowInput => ({
   dates: [],
@@ -74,3 +74,12 @@ test("итоги документа — без «вне месяца» и неп
     sheetTotals([base, { ...base, outside_period: true }, { ...base, unconfirmed: true }, { ...base, day_kind: "absent", worked_minutes: 0 }]),
   ).toEqual({ people: 1, workedMinutes: 540, overtimeMinutes: 60, absences: 1 });
 });
+
+test("часы в окне дня: ввод и показ", () => {
+  expect(toHours(300)).toBe("5:00");
+  expect(toHours(330)).toBe("5:30");
+  expect(toHours(0)).toBe("0:00");
+  expect(["5", "5,5", "5.5", "5:30", "", "8:05"].map(parseHours)).toEqual([300, 330, 330, 330, 0, 485]);
+  expect(["5:75", "abc", "-1", "5ч"].map(parseHours)).toEqual([null, null, null, null]);
+});
+

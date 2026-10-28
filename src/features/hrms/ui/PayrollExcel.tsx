@@ -7,6 +7,7 @@ import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { useImportPayroll, usePayrollTemplate, usePayTypes } from "../api/payroll-excel";
 import type { CalcMode } from "../model/payroll";
+import type { PeriodKind } from "../model/timesheet-days";
 import type { TemplateLabels } from "../model/payroll-excel";
 
 type Range = { from: string; to: string };
@@ -29,7 +30,7 @@ const download = (data: ArrayBuffer, name: string) => {
  * (udevs_hrms_admin, Finance/Salary): один утверждённый табель — любой режим
  * (ADR-0018, дополнение от 2026-10-28).
  */
-export function PayrollExcel({ range, title, where }: { range: Range; title: string; where: Filters }) {
+export function PayrollExcel({ range, kind, title, where }: { range: Range; kind: PeriodKind; title: string; where: Filters }) {
   const { t } = useTranslation();
   const [building, setBuilding] = useState<CalcMode | null>(null);
   const [importing, setImporting] = useState(false);
@@ -117,14 +118,28 @@ export function PayrollExcel({ range, title, where }: { range: Range; title: str
         }}
       />
       {/* Данные шаблона грузятся, только пока он собирается. */}
-      {building && <TemplateJob range={range} title={title} where={where} mode={building} onDone={() => setBuilding(null)} />}
+      {building && <TemplateJob range={range} kind={kind} title={title} where={where} mode={building} onDone={() => setBuilding(null)} />}
     </>
   );
 }
 
-function TemplateJob({ range, title, where, mode, onDone }: { range: Range; title: string; where: Filters; mode: CalcMode; onDone: () => void }) {
+function TemplateJob({
+  range,
+  kind,
+  title,
+  where,
+  mode,
+  onDone,
+}: {
+  range: Range;
+  kind: PeriodKind;
+  title: string;
+  where: Filters;
+  mode: CalcMode;
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
-  const data = usePayrollTemplate(range, where, mode);
+  const data = usePayrollTemplate(range, kind, where);
   const started = useRef(false);
 
   useEffect(() => {
@@ -141,8 +156,10 @@ function TemplateJob({ range, title, where, mode, onDone }: { range: Range; titl
       payUnit: t("payroll.xlsx.payUnit"),
       salaryGroup: t("payroll.xlsx.salaryGroup"),
       rate: t("payroll.xlsx.rate"),
+      price: t("payroll.xlsx.price"),
       norm: t("payroll.xlsx.norm"),
       worked: t("payroll.xlsx.worked"),
+      lateMinutes: t("payroll.xlsx.lateMinutes"),
       accruals: t("payroll.xlsx.accruals"),
       salary: t("payroll.xlsx.salary"),
       deductions: t("payroll.deductions"),
@@ -158,14 +175,16 @@ function TemplateJob({ range, title, where, mode, onDone }: { range: Range; titl
         day: t("payroll.xlsx.unit.day"),
         hour: t("payroll.xlsx.unit.hour"),
       },
-      noTimesheet: t("payroll.xlsx.noTimesheet"),
-      noShifts: t("payroll.xlsx.noShifts"),
-      noCredited: t("payroll.xlsx.noCredited"),
+      noCheckout: (dates, hourly) => t(hourly ? "payroll.xlsx.noCheckoutHours" : "payroll.xlsx.noCheckoutDays", { dates }),
+      offShift: (dates) => t("payroll.xlsx.offShift", { dates }),
     };
     void excel()
       .then(({ buildTemplate }) =>
         buildTemplate({
           period: range,
+          isMonth: kind === "month",
+          mode,
+          lateness: data.lateness,
           labels,
           employees: data.employees,
           accruals: data.types.accruals,
@@ -177,6 +196,9 @@ function TemplateJob({ range, title, where, mode, onDone }: { range: Range; titl
       .then((file) => {
         download(file, `salary-template-${mode === "hourly" ? "hourly-" : ""}${range.from}_${range.to}.xlsx`);
         toast.success(t("payroll.xlsx.downloaded"));
+        // Утверждённого табеля на часть дней нет — цифры этих людей из посещаемости (как HRMS); сказать об этом.
+        const live = data.employees.filter((employee) => employee.fromAttendance).length;
+        if (live) toast.warning(t("payroll.xlsx.fromAttendance", { count: live }));
       })
       .catch(() => toast.error(t("payroll.xlsx.downloadFailed")))
       .finally(onDone);
