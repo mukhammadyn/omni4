@@ -184,6 +184,7 @@ import {
   useMenuViews,
   subGroupField,
   chipsField,
+  dateFieldBySlug,
   tabFilter,
   tabGroupField,
   useTabGroup,
@@ -741,8 +742,8 @@ function MenuPage() {
   }, [search.day, period, timelineView, span.past, span.future]);
   /* Поля дат — из ВСЕХ полей таблицы: срок задачи бывает и не показан
      колонкой, а событию он всё равно нужен. Ключ здесь слаг, а не id. */
-  const calendarFrom = tableFields.find((field) => field.slug === view?.dateFromSlug);
-  const calendarTo = tableFields.find((field) => field.slug === view?.dateToSlug);
+  const calendarFrom = dateFieldBySlug(view?.dateFromSlug, tableFields);
+  const calendarTo = dateFieldBySlug(view?.dateToSlug, tableFields);
   /** Поле, вариантами которого красятся события. Только читается. */
   const calendarStatus = tableFields.find((field) => field.slug === view?.statusFieldSlug);
   /** Не с чего начать событие: поле не выбрано в настройках view. */
@@ -829,7 +830,11 @@ function MenuPage() {
      * периода, а не наугад.
      */
     if (dateView) {
-      const byDate = calendarFrom
+      /* По `created_at` не сортируем: бэкенд выкидывает его из ORDER BY,
+         оставляя голое «ORDER BY LIMIT» — SQL-ошибка
+         (ucode_go_object_builder_service storage/postgres/object_builder.go:1215;
+         docs/backend-notes.md). Строки и так идут по нему, только назад. */
+      const byDate = calendarFrom && calendarFrom.slug !== "created_at"
         ? [{ field: calendarFrom.slug, direction: "asc" as const }]
         : [];
 

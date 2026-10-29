@@ -1788,3 +1788,13 @@ pkg/helper/relation.go:855`): удалили табель — его строк�
 знает guid строки. Фронт на этом строит «Сгенерировать пароль» в карточке
 сотрудника (`useResetUserPassword`): в `old_password` уходит новый пароль.
 Начнёт бэкенд сверять — нужна отдельная админская ручка сброса.
+
+## Сортировка по `created_at` в `get-list` роняет запрос (2026-10-29)
+
+`ucode_go_object_builder_service/storage/postgres/object_builder.go:1215`:
+в разборе `order` ключ `created_at` пропускается (`continue`), но
+`" ORDER BY "` к тому времени уже дописан. Если `created_at` — единственный
+ключ, в SQL остаётся `ORDER BY  LIMIT` → `syntax error at or near "LIMIT"`.
+Отбор по диапазону `created_at` работает. Фронт по `created_at` не
+сортирует (таймлайн сделок «создана → закрытие», маршрут `_authed.m.$menuId`,
+`byDate`): строки и так приходят по нему, по убыванию.
