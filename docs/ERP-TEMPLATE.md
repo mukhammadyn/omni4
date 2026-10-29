@@ -749,6 +749,32 @@ Udevs. Воронка — выпадающий список в панели, в�
 `expected_close_date`. Заголовок карточки — `full_name` (раскладка,
 токеном пользователя, как у сделок).
 
+**CRM / Компании** (`crm_companies`) — по прототипу «Компании» (заведено
+в omni4 и omni5 2026-10-29).
+
+| # | Тип | Настройки |
+|---|---|---|
+| 1 | TABLE «Все компании» | `columns`: `name`, `industry`, `status`, `city`, `core_users_id`, `inn`; `attributes.quick_filters`: `status`, `industry`, `city`, `core_users_id` (`is_checked: true`) |
+| 2 | BOARD «По отрасли» | `group_fields` → `industry`; `columns`: `name`, `status`, `city`, `core_users_id` |
+| 3 | LIST «Список» | `columns`: `name`, `industry`, `city`, `core_users_id` |
+
+Вкладки карточки: «Контакты» — `crm_contacts.crm_companies_id`
+(`full_name`, `job_title`, `phone`, `email`, `status`); «Сделки» —
+`crm_deals.crm_companies_id` (`title`, `crm_stages_id`, `amount`,
+`core_users_id`, `expected_close_date`). Заголовок карточки — `name`.
+
+Цвета вариантов (`attributes.options[].color`, `has_color: true`), как
+в прототипе: `industry` — Логистика `#3B82F6`, Ритейл `#F97316`, Финансы
+`#22A06B`, Производство `#A16207`, Медицина `#EF4444`, Образование
+`#8B5CF6`, HoReCa `#EC4899`, Госсектор `#9E9E9E`, Агро `#EAB308`, IT
+`#3B82F6`; `city` — Ташкент `#3B82F6`, Самарканд `#F97316`, Бухара
+`#A16207`, Наманган `#22A06B`, Андижан `#EAB308`, Фергана `#EC4899`, Нукус
+`#8B5CF6`, Карши `#EF4444`; `size` — 1–10 `#9E9E9E`, 11–50 `#3B82F6`,
+51–200 `#22A06B`, 201–500 `#F97316`, 500+ `#8B5CF6`.
+
+«Сделок», «В воронке», «Выручка» прототипа — суммы по сделкам, полей нет
+(нужна формула или функция).
+
 **Настройки модулей / CRM / Воронки** (`crm_pipelines`) — в omni4 у TABLE
 группировка по `business_units_id`. В v2 этой колонки нет: группировку
 не ставить.
