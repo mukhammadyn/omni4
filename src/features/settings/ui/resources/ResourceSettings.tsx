@@ -27,6 +27,7 @@ import {
   type ResourceGroup,
 } from "../../api/resources";
 import { CAPS_LABEL, SectionHeader } from "../parts";
+import { CrmIntegrations } from "./CrmIntegrations";
 import { CreateResourceDialog, EditResourceDialog } from "./ResourceDialog";
 import { ResourceLogo } from "./ResourceIcon";
 
@@ -72,7 +73,12 @@ export function ResourceSettings() {
     return !needle || `${name} ${label} ${about}`.toLowerCase().includes(needle);
   };
 
-  const connected = resources.filter((resource) => fits(resource.kind, resource.name));
+  /* Строки META_LEADS и GOOGLE_LEADS заводят сами интеграции CRM, и
+     правятся они там же (CrmIntegrations): здесь они были бы дублем
+     без единой рабочей кнопки. */
+  const connected = resources.filter(
+    (resource) => !CRM_KINDS.has(resource.kind) && fits(resource.kind, resource.name),
+  );
   const available = CREATABLE.map(({ group: id, kinds }) => ({
     id,
     kinds: kinds.filter((kind) => fits(kind)),
@@ -120,6 +126,8 @@ export function ResourceSettings() {
       )}
 
       {isLoading && <p className="text-sm text-fg-subtle">{t("common.loading")}</p>}
+
+      {!group && <CrmIntegrations query={query} />}
 
       {connected.length > 0 && (
         <>
@@ -281,6 +289,8 @@ export function ResourceSettings() {
     </div>
   );
 }
+
+const CRM_KINDS = new Set(["META_LEADS", "GOOGLE_LEADS"]);
 
 const GROUP_ICONS: Record<ResourceGroup, typeof PlugIcon> = {
   otp: ShieldCheckIcon,
