@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDownIcon, FileIcon, PhoneIcon, UploadIcon, Trash2Icon } from "lucide-react";
+import { ChevronDownIcon, FileIcon, UploadIcon, Trash2Icon } from "lucide-react";
 import { z } from "zod";
 import {
   BOARD_ORDER,
@@ -133,7 +133,8 @@ import {
   showsTable,
   useMenu,
 } from "@/features/sidebar";
-import { phoneToCall, usePbxCall, usePbxEnabled, useWorkspaceTitle } from "@/features/settings";
+import { CallButton, CallLog } from "@/features/pbx";
+import { useWorkspaceTitle } from "@/features/settings";
 import {
   FieldEditor,
   TableActions,
@@ -2294,6 +2295,8 @@ function MenuPage() {
               <KnowledgeBase pageId={search.doc ?? ""} onOpen={(doc) => setSearch({ doc }, true)} />
             ) : view.type === "KPI" ? (
               <KpiSheet viewId={view.id} search={searchText} create={kpiCreate} onCreateClose={() => setKpiCreate(false)} onOpenEmployee={(guid) => openEmployee(guid, KPI_TAB)} />
+            ) : view.type === "PBX_CALLS" ? (
+              <CallLog search={searchText} />
             ) : view.type === "BUDGET" ? (
               <BudgetSheet viewId={view.id} search={searchText} />
             ) : view.type === "PAYROLL" ? (
@@ -3301,26 +3304,5 @@ function Notice({
         )}
       </div>
     </div>
-  );
-}
-
-
-/**
- * «Позвонить» в карточке контакта, компании или сделки — через onlinePBX
- * (Настройки → Интеграции). Нет интеграции или телефона — кнопки нет.
- */
-function CallButton({ tableSlug, row }: { tableSlug: string; row: Record<string, unknown> }) {
-  const { t } = useTranslation();
-  const enabled = usePbxEnabled();
-  const call = usePbxCall();
-  const phone = phoneToCall(tableSlug, row);
-
-  if (!enabled || !phone) return null;
-
-  return (
-    <Button size="sm" variant="secondary" disabled={call.isPending} onClick={() => call.mutate(phone)} title={phone}>
-      <Icon as={PhoneIcon} size={14} />
-      {t("pbx.call")}
-    </Button>
   );
 }
