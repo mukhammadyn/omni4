@@ -311,3 +311,102 @@ export function useMoizvonkiActions() {
     }),
   };
 }
+
+/* ---------------- Формы Meta ---------------- */
+
+/**
+ * Лид-формы страниц Meta — строки `crm_lead_forms`. Заводит их шлюз:
+ * при подключении страницы (`facebookSyncPageForms`) и при первом лиде
+ * с незнакомой формы. Новая форма выключена: лиды принимаются только
+ * с тех, где `accept_leads` включён (`facebook_professional_crm.go:364`).
+ */
+const LEAD_FORMS = "crm_lead_forms";
+
+export type MetaForm = { guid: string; name: string; formId: string; pageId: string; accept: boolean };
+
+type LeadFormRow = { guid?: string; name?: string; form_id?: string; page_id?: string; accept_leads?: boolean };
+
+export function useMetaForms(enabled: boolean) {
+  const envId = useSession().getEnvironmentId() ?? "";
+
+  const query = useQuery({
+    queryKey: [...keys.settings.integration(envId, "facebook"), "forms"],
+    queryFn: () =>
+      api.post<{ data?: { response?: LeadFormRow[] | null } }>(`/v2/object/get-list/${LEAD_FORMS}`, {
+        data: { limit: 500, offset: 0 },
+      }),
+    enabled,
+  });
+
+  return {
+    forms: (query.data?.data?.response ?? []).map(
+      (row): MetaForm => ({
+        guid: row.guid ?? "",
+        name: row.name ?? "",
+        formId: row.form_id ?? "",
+        pageId: row.page_id ?? "",
+        accept: row.accept_leads === true,
+      }),
+    ),
+    isLoading: query.isLoading,
+  };
+}
+
+export function useToggleMetaForm() {
+  const queryClient = useQueryClient();
+  const envId = useSession().getEnvironmentId() ?? "";
+
+  return useMutation({
+    mutationFn: ({ guid, accept }: { guid: string; accept: boolean }) =>
+      api.put<unknown>(`/v2/items/${LEAD_FORMS}`, { data: { guid, accept_leads: accept } }),
+    onError: (error) => reportError(error, "common.saveFailed"),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [...keys.settings.integration(envId, "facebook"), "forms"] }),
+  });
+}
+
+/**
+ * Куда шлюз кладёт лиды Meta. По умолчанию — таблицы new-crm (`contacts`,
+ * `deals`, `lead_forms`), которых в omni4 нет; здесь — наши. Воронку,
+ * этап и источник не трогаем: шлюз пишет их текстом в массиве, а у нас
+ * это связи, и правильного значения ему не передать (backend-notes,
+ * «Лиды Meta пишутся в схему new-crm»).
+ *
+ * Шлюз хранит сопоставление на строках ресурсов META_LEADS и без
+ * подключённой страницы его не принимает — поэтому только после подключения.
+ */
+const OMNI4_MAPPING = {
+  contacts_table: "crm_contacts",
+  deals_table: "crm_deals",
+  lead_forms_table: LEAD_FORMS,
+  deal_contact_field: "crm_contacts_id",
+  deal_form_field: "crm_lead_forms_id",
+};
+
+type CrmMappingDto = { mapping?: Record<string, string> };
+
+export function useMetaMapping(connected: boolean) {
+  const envId = useSession().getEnvironmentId() ?? "";
+  const queryClient = useQueryClient();
+  const key = [...keys.settings.integration(envId, "facebook"), "mapping"];
+
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => api.get<CrmMappingDto>("/v1/facebook/crm-mapping"),
+    enabled: connected,
+  });
+
+  const save = useMutation({
+    mutationFn: () => api.put<unknown>("/v1/facebook/crm-mapping", { ...query.data?.mapping, ...OMNI4_MAPPING }),
+    onError: (error) => reportError(error, "common.saveFailed"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: key }),
+  });
+
+  const current = query.data?.mapping;
+  return {
+    /** Сопоставление уже смотрит в таблицы omni4. */
+    ours: Boolean(current && Object.entries(OMNI4_MAPPING).every(([k, v]) => current[k] === v)),
+    loaded: query.isSuccess,
+    save,
+  };
+}
