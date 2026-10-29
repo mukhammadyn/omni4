@@ -914,7 +914,6 @@ function MenuPage() {
           rememberedFilters ?? {
             ...seedFilters(view?.quickFilterIds ?? [], tableFields),
             ...employeesSeed,
-            ...chipsSeed(view, tableFields),
           },
         viewFields,
         codes,
@@ -957,6 +956,29 @@ function MenuPage() {
   /* У кандидатов полосы этапов нет: этап и так в колонке таблицы. */
   const chipsCandidate = candidatesView ? undefined : chipsField(view, tableFields);
   const chipsBy = chipsCandidate && chipsCandidate !== boardField ? chipsCandidate : undefined;
+  /*
+   * Список вместо полосы — и тогда выбор общий для всех view таблицы
+   * (`View.chipsMenu`): своим ключом в той же памяти отборов, а не
+   * в отборе view. Ни разу не выбирали — значение по умолчанию
+   * (`chipsDefault`); выбрали «Все» — лежит пустой отбор, и посева нет.
+   */
+  const chipsMenu = Boolean(chipsBy) && (boardView || view?.chipsMenu === true);
+  const sharedChipsKey = view ? `${view.tableSlug}|chips` : "";
+  const storedChips = tableFilters[sharedChipsKey];
+  const sharedChips = useMemo(() => parseFilters(storedChips), [storedChips]);
+  const chipValues: string[] = useMemo(() => {
+    if (!chipsBy) return [];
+    if (!chipsMenu) return (filters[chipsBy.slug]?.values ?? []).map(String);
+    if (sharedChips) return (sharedChips[chipsBy.slug]?.values ?? []).map(String);
+    return view?.chipsDefault ? [view.chipsDefault] : [];
+  }, [chipsBy, chipsMenu, filters, sharedChips, view?.chipsDefault]);
+  const chipScope: Filters = useMemo(
+    () =>
+      chipsMenu && chipsBy && chipValues.length
+        ? { [chipsBy.slug]: { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values: chipValues } }
+        : EMPTY_FILTERS,
+    [chipsMenu, chipsBy, chipValues],
+  );
   /** Доску не по чему раскладывать: поле не выбрано в настройках view. */
   const boardNotReady = boardView && !boardField;
 
@@ -993,8 +1015,8 @@ function MenuPage() {
    * отсёк бы как раз то, чего у них нет.
    */
   const scopeFilters: Filters = useMemo(
-    () => ({ ...filters, ...defaultFilters, ...tabFilters }),
-    [filters, defaultFilters, tabFilters],
+    () => ({ ...filters, ...defaultFilters, ...tabFilters, ...chipScope }),
+    [filters, defaultFilters, tabFilters, chipScope],
   );
 
   /*
@@ -1211,7 +1233,7 @@ function MenuPage() {
    * загруженной строки с тем же значением (relatedEntry).
    */
   const chosenChip = (): Record<string, unknown> => {
-    const values = chipsBy ? filters[chipsBy.slug]?.values ?? [] : [];
+    const values = chipValues;
     if (!chipsBy || values.length !== 1) return {};
     const value = values[0];
     const row = rows.rows.find((item) => item[chipsBy.slug] === value);
@@ -1221,6 +1243,15 @@ function MenuPage() {
   /** Выбор в полосе значений — условие её поля в отборе человека. */
   const chooseChips = (values: string[]) => {
     if (!chipsBy) return;
+    if (chipsMenu) {
+      setTableFilters(
+        sharedChipsKey,
+        values.length
+          ? { [chipsBy.slug]: { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values } }
+          : {},
+      );
+      return;
+    }
     const next = { ...filters };
     if (values.length) {
       next[chipsBy.slug] = { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values };
@@ -1767,7 +1798,7 @@ function MenuPage() {
                   заглушкой view искать нечего, а ручка дерева их не читает. */}
               {/* У доски полоса значений — выпадающим списком в панели,
                   как воронка над сделками в прототипе (deals.html, pipeline-sel). */}
-              {boardView && chipsBy && (
+              {chipsMenu && chipsBy && (
                 <ValueChips
                   menu
                   tableSlug={view.tableSlug}
@@ -1776,7 +1807,7 @@ function MenuPage() {
                   language={language}
                   filters={chipFilters}
                   search={searchText}
-                  selected={filters[chipsBy.slug]?.values ?? []}
+                  selected={chipValues}
                   onChange={chooseChips}
                 />
               )}
@@ -2210,7 +2241,7 @@ function MenuPage() {
             </div>
           )}
 
-          {chipsBy && view && can.read && !sheetView && !boardView && (
+          {chipsBy && view && can.read && !sheetView && !chipsMenu && (
             <ValueChips
               className="mx-6 shrink-0 border-b border-border py-2"
               tableSlug={view.tableSlug}
@@ -2219,7 +2250,7 @@ function MenuPage() {
               language={language}
               filters={chipFilters}
               search={searchText}
-              selected={filters[chipsBy.slug]?.values ?? []}
+              selected={chipValues}
               onChange={chooseChips}
             />
           )}
@@ -3267,9 +3298,3 @@ function Notice({
   );
 }
 
-/** Посев отбора значением полосы по умолчанию (`View.chipsDefault`). */
-function chipsSeed(view: View | undefined, fields: Field[]): Filters {
-  const field = chipsField(view, fields);
-  if (!field || !view?.chipsDefault) return {};
-  return { [field.slug]: tabFilter(field, view.chipsDefault) };
-}

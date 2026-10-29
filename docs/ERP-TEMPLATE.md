@@ -711,6 +711,11 @@ TABLE у пункта удалён: карты правятся сводной �
 | 4 | CALENDAR «Календарь» | `calendar_from_slug` = `expected_close_date`; `columns`: `title`, `crm_stages_id`, `amount` (2026-10-29) |
 | 5 | TIMELINE «Таймлайн» | `calendar_from_slug` = `created_at` (системная колонка, полем не заводится), `calendar_to_slug` = `expected_close_date`; `columns`: `title`, `crm_stages_id`, `amount`; колонки — отдельным PUT, POST их не берёт (2026-10-29) |
 
+У всех пяти: `attributes.chips_by_id` → `crm_pipelines_id`,
+`attributes.chips_menu: true`, `attributes.chips_default` → guid воронки
+Udevs. Воронка — выпадающий список в панели, выбор общий для всех view
+таблицы (как в прототипе) (2026-10-29).
+
 **Настройки модулей / CRM / Воронки** (`crm_pipelines`) — в omni4 у TABLE
 группировка по `business_units_id`. В v2 этой колонки нет: группировку
 не ставить.
