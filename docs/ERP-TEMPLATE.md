@@ -724,6 +724,16 @@ Udevs. Воронка — выпадающий список в панели, в�
 | Задачи | TABLE | `crm_tasks.crm_deals_id` | `title`, `status`, `priority`, `due_date`, `core_users_id` (отдельным PUT) |
 | Комментарии | COMMENTS (наш тип, только вкладка) | `crm_timeline.crm_deals_id` | — ; пишет `kind: comment`, `body` |
 
+Раскладка карточки сделки (`PUT /v2/collections/crm_deals/layout` с
+`menu_id`; читать и писать — токеном пользователя: с API-ключом поля
+раскладки приходят пустыми `{}`, и записать такую — стереть поля)
+(2026-10-29): `layout_heading` = `title`; поля по порядку — `crm_stages_id`,
+`amount`, `crm_companies_id`, `crm_contacts_id`, `core_users_id`,
+`crm_pipelines_id`, `probability`, `priority`, `crm_sources_id`, `tags`,
+`expected_close_date`; остальные `field_hide_layout: true`. `title` НЕ
+скрывать: карточка ищет заголовок среди видимых полей, скрытый —
+«Без заголовка».
+
 **Настройки модулей / CRM / Воронки** (`crm_pipelines`) — в omni4 у TABLE
 группировка по `business_units_id`. В v2 этой колонки нет: группировку
 не ставить.
