@@ -21,10 +21,13 @@ import {
   useMetaMapping,
   useMoizvonki,
   useMoizvonkiActions,
+  usePbx,
+  useSavePbx,
   useSaveGoogleForm,
   useToggleMetaForm,
   type GoogleForm,
   type MetaForm,
+  type PbxDraft,
   type GoogleFormDraft,
 } from "../../api/crm-integrations";
 import { CAPS_LABEL } from "../parts";
@@ -40,11 +43,12 @@ import { ResourceLogo } from "./ResourceIcon";
  */
 export function CrmIntegrations({ query }: { query: string }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState<"" | "meta" | "google" | "moizvonki">("");
+  const [open, setOpen] = useState<"" | "meta" | "google" | "moizvonki" | "pbx">("");
 
   const meta = useMetaLeads();
   const google = useGoogleLeads();
   const moizvonki = useMoizvonki();
+  const pbx = usePbx();
 
   /* OAuth Meta уходит в соседнюю вкладку: перечитываем на возврат. */
   useEffect(() => {
@@ -88,6 +92,18 @@ export function CrmIntegrations({ query }: { query: string }) {
       about: t("crmInt.moizvonki.about"),
       on: Boolean(moizvonki.connection?.connected),
       state: moizvonki.connection?.connected ? moizvonki.connection.account : "",
+    },
+    {
+      id: "pbx" as const,
+      logo: (
+        <span className="grid size-8.5 shrink-0 place-items-center rounded-lg bg-surface-hover text-fg-muted">
+          <Icon as={PhoneIcon} size={18} />
+        </span>
+      ),
+      name: "onlinePBX",
+      about: t("crmInt.pbx.about"),
+      on: Boolean(pbx.data?.settings?.enabled),
+      state: pbx.data?.settings?.domain ?? "",
     },
   ];
 
@@ -135,6 +151,7 @@ export function CrmIntegrations({ query }: { query: string }) {
       {open === "meta" && <MetaDialog onClose={() => setOpen("")} />}
       {open === "google" && <GoogleDialog onClose={() => setOpen("")} />}
       {open === "moizvonki" && <MoizvonkiDialog onClose={() => setOpen("")} />}
+      {open === "pbx" && <PbxDialog onClose={() => setOpen("")} />}
     </section>
   );
 }
@@ -564,5 +581,110 @@ function MoizvonkiDialog({ onClose }: { onClose: () => void }) {
         </Button>
       </form>
     </Dialog>
+  );
+}
+
+/* ---------------- onlinePBX ---------------- */
+
+const PBX_DOMAIN = /^[a-z0-9-]+\.onpbx\.ru$/i;
+
+function PbxDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
+  const { data, isLoading } = usePbx();
+  const save = useSavePbx();
+
+  if (isLoading || !data) {
+    return (
+      <Dialog title="onlinePBX" onClose={onClose}>
+        <p className="text-sm text-fg-subtle">{t("common.loading")}</p>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog title="onlinePBX" onClose={onClose}>
+      <PbxForm data={data} busy={save.isPending} onSave={(draft) => save.mutate(draft, { onSuccess: onClose })} />
+    </Dialog>
+  );
+}
+
+function PbxForm({
+  data,
+  busy,
+  onSave,
+}: {
+  data: NonNullable<ReturnType<typeof usePbx>["data"]>;
+  busy: boolean;
+  onSave: (draft: PbxDraft) => void;
+}) {
+  const { t } = useTranslation();
+  const [domain, setDomain] = useState(data.settings?.domain ?? "");
+  const [apiKey, setApiKey] = useState("");
+  const [phone, setPhone] = useState(data.settings?.phone ?? "");
+  const [enabled, setEnabled] = useState(data.settings?.enabled ?? true);
+  const [extensions, setExtensions] = useState<Record<string, string>>(() =>
+    Object.fromEntries(data.operators.map((op) => [op.userId, op.extension])),
+  );
+  const [search, setSearch] = useState("");
+
+  const domainOk = PBX_DOMAIN.test(domain.trim());
+  /* Ключ обязателен только в первый раз: дальше пустое поле — «оставить». */
+  const ready = domainOk && (apiKey.trim() || data.settings?.hasKey) && phone.trim();
+  const needle = search.trim().toLowerCase();
+  const users = data.users.filter((user) => !needle || user.name.toLowerCase().includes(needle));
+
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (ready) onSave({ domain, apiKey, phone, enabled, extensions });
+      }}
+    >
+      <p className="text-[13px] text-fg-muted">{t("crmInt.pbx.hint")}</p>
+
+      <Field label={t("crmInt.pbx.domain")} hint={domain && !domainOk ? t("crmInt.pbx.domainHint") : "company.onpbx.ru"}>
+        <Input autoFocus value={domain} onChange={(event) => setDomain(event.target.value)} />
+      </Field>
+      <Field label={t("crmInt.pbx.apiKey")} {...(data.settings?.hasKey ? { hint: t("crmInt.pbx.keepKey") } : {})}>
+        <PasswordInput autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
+      </Field>
+      <Field label={t("crmInt.pbx.phone")} hint={t("crmInt.pbx.phoneHint")}>
+        <Input value={phone} onChange={(event) => setPhone(event.target.value)} />
+      </Field>
+      <label className="flex items-center gap-2 text-sm text-fg">
+        <Checkbox checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
+        {t("crmInt.pbx.enabled")}
+      </label>
+
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs font-medium text-fg-muted">{t("crmInt.pbx.operators")}</p>
+        <Input
+          value={search}
+          placeholder={t("crmInt.pbx.searchUser")}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <div className="max-h-56 overflow-y-auto rounded-md border border-border">
+          {users.map((user) => (
+            <div key={user.guid} className="flex h-11 items-center gap-2 border-b border-border px-2.5 last:border-b-0">
+              <span className="min-w-0 flex-1 truncate text-sm">{user.name}</span>
+              <div className="w-24 shrink-0">
+              <Input
+                inputMode="numeric"
+                placeholder="—"
+                aria-label={`${user.name}: ${t("crmInt.pbx.extension")}`}
+                value={extensions[user.guid] ?? ""}
+                onChange={(event) => setExtensions({ ...extensions, [user.guid]: event.target.value })}
+              />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Button type="submit" disabled={!ready || busy}>
+        {busy ? t("common.saving") : t("action.save")}
+      </Button>
+    </form>
   );
 }

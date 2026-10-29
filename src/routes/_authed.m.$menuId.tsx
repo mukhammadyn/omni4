@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDownIcon, FileIcon, UploadIcon, Trash2Icon } from "lucide-react";
+import { ChevronDownIcon, FileIcon, PhoneIcon, UploadIcon, Trash2Icon } from "lucide-react";
 import { z } from "zod";
 import {
   BOARD_ORDER,
@@ -133,7 +133,7 @@ import {
   showsTable,
   useMenu,
 } from "@/features/sidebar";
-import { useWorkspaceTitle } from "@/features/settings";
+import { phoneToCall, usePbxCall, usePbxEnabled, useWorkspaceTitle } from "@/features/settings";
 import {
   FieldEditor,
   TableActions,
@@ -2830,6 +2830,8 @@ function MenuPage() {
                 <PrintButton tableSlug={view.tableSlug} row={drawerRow} fields={tableFields} />
               )}
 
+              {drawerRow && <CallButton tableSlug={view.tableSlug} row={drawerRow} />}
+
               <TableActions
                 tableSlug={view.tableSlug}
                 language={language}
@@ -3302,3 +3304,23 @@ function Notice({
   );
 }
 
+
+/**
+ * «Позвонить» в карточке контакта, компании или сделки — через onlinePBX
+ * (Настройки → Интеграции). Нет интеграции или телефона — кнопки нет.
+ */
+function CallButton({ tableSlug, row }: { tableSlug: string; row: Record<string, unknown> }) {
+  const { t } = useTranslation();
+  const enabled = usePbxEnabled();
+  const call = usePbxCall();
+  const phone = phoneToCall(tableSlug, row);
+
+  if (!enabled || !phone) return null;
+
+  return (
+    <Button size="sm" variant="secondary" disabled={call.isPending} onClick={() => call.mutate(phone)} title={phone}>
+      <Icon as={PhoneIcon} size={14} />
+      {t("pbx.call")}
+    </Button>
+  );
+}

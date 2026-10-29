@@ -24,3 +24,4 @@ export { useProfile, useUpdateTimezone, useUserTimezone } from "./api/profile";
 export { execSql, useSavedQueries, type SqlResult } from "./api/sql";
 export { readSqlSchema } from "./api/schema-map";
 export type { SchemaMap } from "./model/schema-map";
+export { phoneToCall, usePbxCall, usePbxEnabled } from "./api/crm-integrations";

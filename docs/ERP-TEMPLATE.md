@@ -775,6 +775,20 @@ Udevs. Воронка — выпадающий список в панели, в�
 «Сделок», «В воронке», «Выручка» прототипа — суммы по сделкам, полей нет
 (нужна формула или функция).
 
+**Телефония onlinePBX** (заведено в omni4 и omni5 2026-10-29) — три
+таблицы без пунктов меню, `attributes.protected: true`, ровно с этими
+слагами: их читает общая функция `professional-crm-pbx-integration-call`
+(репозиторий pbx-fn, ходит только в эти имена — `pbx_runtime_items.go:27`).
+
+| Таблица | Поля |
+|---|---|
+| `pbx_settings` «Настройки PBX», одна строка | `domain`, `api_key`, `phone_number` (SINGLE_LINE), `enable` (SWITCH), `verto_host`, `auth_key_id`, `auth_key`, `auth_expires_at` (SINGLE_LINE, пишет функция) |
+| `pbx_operators` «Операторы PBX» | `users_id` (SINGLE_LINE — guid `core_users`: функция ищет по этому слагу, а связь дала бы `core_users_id`), `pbx_extension` (SINGLE_LINE), `enabled` (SWITCH) |
+| `pbx_calls` «Звонки PBX» | `call_uuid`, `client_phone`, `pbx_from`, `status`, `error_code`, `idempotency_key`, `users_id`, `direction`, `recording_url`, `stereo_recording_url` (SINGLE_LINE), `duration` (NUMBER), `transcript` (MULTI_LINE) |
+
+Запись функции в проекте заводит экран onlinePBX при первом сохранении
+(WORKFLOW → PUT KNATIVE, `max_scale = former_max_scale = 3`).
+
 **Настройки модулей / CRM / Воронки** (`crm_pipelines`) — в omni4 у TABLE
 группировка по `business_units_id`. В v2 этой колонки нет: группировку
 не ставить.
