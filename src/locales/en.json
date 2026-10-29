@@ -784,6 +784,7 @@
   "drawer.heading": "Card heading",
   "drawer.layoutEdit": "Set up the card: sections and field visibility",
   "drawer.mode": "Open in",
+  "relation.noName": "No name",
   "drawer.noHeading": "No heading",
   "drawer.noRelated": "Nothing is linked yet.",
   "drawer.noRelations": "This table has no relations that a tab can show.",

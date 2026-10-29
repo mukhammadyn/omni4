@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import i18n from "@/shared/lib/i18n";
 import type { Field, Relation } from "@/features/table";
 import { autoFilterValues, relationSelection, relationTree, selfDefaults, withoutPrefix } from "./relation";
 
@@ -139,6 +140,6 @@ test("relationSelection: Many2Many — подписи из строк целев
 
   expect(relationSelection({ core_business_units_ids: ["u2", "u9"] }, field, fields, "", known)).toEqual([
     { guid: "u2", label: "Ucode" },
-    { guid: "u9", label: "" },
+    { guid: "u9", label: i18n.t("relation.noName") },
   ]);
 });
