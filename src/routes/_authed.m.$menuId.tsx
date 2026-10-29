@@ -2957,12 +2957,16 @@ function MenuPage() {
                   update.mutate({ guid, values: { [slug]: value } }),
               }
             : {})}
-          /* Раскладка карточки общая для всех view таблицы — это
-             структура, и у системной таблицы она заперта целиком. */
+          /* Настройки поля — структура таблицы: у защищённой заперты. */
           {...(schemaLocked
             ? {}
+            : { onSettings: (field: Field, anchor: DOMRect) => setFieldPanel({ field, anchor }) })}
+          /* Раскладка карточки — вид, а не структура: порядок, видимость,
+             секции, заголовок. У защищённой таблицы её правит тот, кому
+             можно править настройки view (CONTEXT, Protected). */
+          {...(schemaLocked && !can.settings
+            ? {}
             : {
-                onSettings: (field: Field, anchor: DOMRect) => setFieldPanel({ field, anchor }),
                 onReorder: drawerLayout.reorder,
                 /* Секции правит тот же, кто двигает поля: это одна и та же
                    раскладка и одно и то же право. */
