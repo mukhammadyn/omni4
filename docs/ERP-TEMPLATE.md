@@ -734,6 +734,21 @@ Udevs. Воронка — выпадающий список в панели, в�
 скрывать: карточка ищет заголовок среди видимых полей, скрытый —
 «Без заголовка».
 
+**CRM / Контакты** (`crm_contacts`) — по прототипу «Контакты» (заведено
+в omni4 и omni5 2026-10-29). Статусы и цвета уже как в прототипе.
+
+| # | Тип | Настройки |
+|---|---|---|
+| 1 | TABLE «Все контакты» | `columns`: `full_name`, `crm_companies_id`, `job_title`, `phone`, `email`, `status`, `crm_sources_id`, `core_users_id`; `attributes.quick_filters`: `status`, `crm_sources_id`, `core_users_id`, `crm_companies_id` (`is_checked: true`) |
+| 2 | BOARD «По статусу» | `group_fields` → `status`; `columns`: `full_name`, `crm_companies_id`, `job_title`, `phone`, `core_users_id` |
+| 3 | LIST «Список» | `columns`: `full_name`, `crm_companies_id`, `status`, `phone` |
+| 4 | CALENDAR «Календарь» | `calendar_from_slug` = `created_at`; `columns`: `full_name`, `status` |
+
+Вкладка карточки: «Сделки» — TABLE, `crm_deals.crm_contacts_id`,
+колонки `title`, `crm_stages_id`, `amount`, `core_users_id`,
+`expected_close_date`. Заголовок карточки — `full_name` (раскладка,
+токеном пользователя, как у сделок).
+
 **Настройки модулей / CRM / Воронки** (`crm_pipelines`) — в omni4 у TABLE
 группировка по `business_units_id`. В v2 этой колонки нет: группировку
 не ставить.
