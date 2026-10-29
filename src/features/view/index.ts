@@ -4,6 +4,7 @@ export {
   TAB_GROUP_TYPES,
   chipsField,
   subGroupField,
+  tabFilter,
   tabGroupField,
   useTabGroup,
 } from "./api/tab-group";

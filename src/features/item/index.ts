@@ -1,5 +1,5 @@
 export { patchRow, useDeleteItems, useItem, useItemCounts, useItems, useUpdateItem } from "./api/items";
-export { BOARD_ORDER, groupValue } from "./model/board";
+export { BOARD_ORDER, groupValue, relatedEntry } from "./model/board";
 export { Board } from "./ui/Board";
 export { useDisabledDays } from "./api/calendar";
 export { CalendarView } from "./ui/Calendar";
