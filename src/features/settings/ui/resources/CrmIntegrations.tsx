@@ -16,11 +16,15 @@ import {
   useDeleteGoogleForm,
   useDisconnectMeta,
   useGoogleLeads,
+  useMetaForms,
   useMetaLeads,
+  useMetaMapping,
   useMoizvonki,
   useMoizvonkiActions,
   useSaveGoogleForm,
+  useToggleMetaForm,
   type GoogleForm,
+  type MetaForm,
   type GoogleFormDraft,
 } from "../../api/crm-integrations";
 import { CAPS_LABEL } from "../parts";
@@ -160,6 +164,18 @@ function MetaDialog({ onClose }: { onClose: () => void }) {
   const meta = useMetaLeads();
   const connect = useConnectMeta();
   const disconnect = useDisconnectMeta();
+  const mapping = useMetaMapping(meta.connected);
+  const { forms } = useMetaForms(meta.connected);
+
+  /*
+   * Без этого шлюз ищет таблицы new-crm и молча не пишет ничего.
+   * Ставится один раз, как только страница подключена: принять его
+   * раньше шлюз не может (см. useMetaMapping).
+   */
+  const { ours, loaded, save } = mapping;
+  useEffect(() => {
+    if (loaded && !ours && save.isIdle) save.mutate();
+  }, [loaded, ours, save]);
 
   return (
     <Dialog title="Meta Lead Ads" onClose={onClose}>
@@ -173,21 +189,25 @@ function MetaDialog({ onClose }: { onClose: () => void }) {
       )}
 
       {meta.pages.map((page) => (
-        <div key={page.resourceId} className="flex items-center gap-2 border-b border-border py-2 last:border-b-0">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-fg">{page.pageName || page.pageId}</p>
-            {page.connectedAt && (
-              <p className="text-xs text-fg-subtle">{new Date(page.connectedAt).toLocaleString(i18n.language)}</p>
-            )}
+        <div key={page.resourceId} className="flex flex-col gap-1 border-b border-border pb-3 last:border-b-0">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-fg">{page.pageName || page.pageId}</p>
+              {page.connectedAt && (
+                <p className="text-xs text-fg-subtle">{new Date(page.connectedAt).toLocaleString(i18n.language)}</p>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={disconnect.isPending}
+              onClick={() => disconnect.mutate(page.resourceId)}
+            >
+              {t("integrations.disconnect")}
+            </Button>
           </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={disconnect.isPending}
-            onClick={() => disconnect.mutate(page.resourceId)}
-          >
-            {t("integrations.disconnect")}
-          </Button>
+
+          <MetaForms forms={forms.filter((form) => form.pageId === page.pageId)} />
         </div>
       ))}
 
@@ -195,6 +215,36 @@ function MetaDialog({ onClose }: { onClose: () => void }) {
         {meta.connected ? t("crmInt.meta.addPage") : t("resources.connect")}
       </Button>
     </Dialog>
+  );
+}
+
+/**
+ * Формы страницы и «принимать лиды». Новая форма выключена: шлюз заводит
+ * её строку, чтобы её было видно, но лиды с неё не берёт, пока не включат.
+ */
+function MetaForms({ forms }: { forms: MetaForm[] }) {
+  const { t } = useTranslation();
+  const toggle = useToggleMetaForm();
+
+  if (!forms.length) return <p className="text-xs text-fg-subtle">{t("crmInt.meta.noForms")}</p>;
+
+  return (
+    <div className="flex flex-col">
+      <p className="text-xs font-medium text-fg-muted">{t("crmInt.meta.forms")}</p>
+      {forms.map((form) => (
+        <label key={form.guid} className="flex h-8 cursor-pointer items-center gap-2 text-sm text-fg">
+          <Checkbox
+            checked={form.accept}
+            disabled={toggle.isPending}
+            onChange={(event) => toggle.mutate({ guid: form.guid, accept: event.target.checked })}
+          />
+          <span className="min-w-0 flex-1 truncate">{form.name || form.formId}</span>
+          <span className="shrink-0 text-xs text-fg-subtle">
+            {form.accept ? t("crmInt.meta.accepting") : t("crmInt.meta.off")}
+          </span>
+        </label>
+      ))}
+    </div>
   );
 }
 
