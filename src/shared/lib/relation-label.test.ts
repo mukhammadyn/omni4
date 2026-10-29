@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import i18n from "./i18n";
 import { relationLabel } from "./relation-label";
 
 const row = {
@@ -55,4 +56,11 @@ test("пустое и объекты в подпись не идут", () => {
   ]);
 
   expect(label).toBe("есть");
+});
+
+test("empty display fields read as «no name», not as nothing", () => {
+  expect(relationLabel({ guid: "a06fc4c2", full_name: null }, [{ slug: "full_name", type: "SINGLE_LINE" }])).toBe(
+    i18n.t("relation.noName"),
+  );
+  expect(relationLabel({ guid: "a06fc4c2" }, [])).toBe("");
 });

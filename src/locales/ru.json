@@ -784,6 +784,7 @@
   "drawer.heading": "Заголовок карточки",
   "drawer.layoutEdit": "Настроить карточку: секции и видимость полей",
   "drawer.mode": "Открывать",
+  "relation.noName": "Без имени",
   "drawer.noHeading": "Без заголовка",
   "drawer.noRelated": "Связанной записи нет.",
   "drawer.noRelations": "У таблицы нет связей, которые можно показать вкладкой.",

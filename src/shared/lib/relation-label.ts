@@ -58,10 +58,17 @@ export function relationLabel(
      не может зависеть от того, откуда позвали. */
   const locale = i18n.language;
 
-  return pickLanguage(fields, language)
+  const label = pickLanguage(fields, language)
     .map((field) => part(item[field.slug], field.type, locale))
     .filter(Boolean)
     .join(" ");
+
+  /*
+   * Поля показа заданы, а в строке они пустые (пользователь без имени).
+   * Иначе экраны подставляют guid — человеку он ничего не говорит.
+   * Подставлять другое поле нельзя (см. выше), поэтому — честное «без имени».
+   */
+  return label || (fields.length ? i18n.t("relation.noName") : "");
 }
 
 /**
