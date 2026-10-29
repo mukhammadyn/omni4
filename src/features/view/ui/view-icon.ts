@@ -1,4 +1,5 @@
 import {
+  MessageSquareTextIcon,
   BookOpenIcon,
   FolderOpenIcon,
   Grid3x3Icon,
@@ -74,6 +75,7 @@ const ICONS: Record<string, LucideIcon> = {
   SECTION: LayoutListIcon,
   TIMELINE: ChartNoAxesGanttIcon,
   TREE: NetworkIcon,
+  COMMENTS: MessageSquareTextIcon,
 };
 
 /**

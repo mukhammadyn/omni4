@@ -790,7 +790,7 @@
   "drawer.notFound": "Этой строки нет на текущей странице — откройте её из списка.",
   "drawer.open": "Раскрыть строку",
   "drawer.openPdf": "Открыть PDF",
-  "drawer.record": "Запись",
+  "drawer.record": "Детали",
   "drawer.relationMore": "Показаны {{shown}} из {{total}}",
   "drawer.removeTab": "Убрать вкладку",
   "drawer.resize": "Изменить ширину панели",
@@ -3240,5 +3240,9 @@
   "timesheets.hoursPlaceholder": "ч:мм",
   "timesheets.reason": "Причина правки",
   "timesheets.resetDay": "Как в посещаемости",
-  "timesheets.export": "Сформировать табели"
+  "timesheets.export": "Сформировать табели",
+  "view.type.COMMENTS": "Комментарии",
+  "comments.empty": "Комментариев пока нет.",
+  "comments.placeholder": "Написать комментарий… ⌘↵ — отправить",
+  "comments.send": "Отправить"
 }
