@@ -790,7 +790,7 @@
   "drawer.notFound": "Bu qator joriy sahifada yo‘q — uni ro‘yxatdan oching.",
   "drawer.open": "Qatorni ochish",
   "drawer.openPdf": "PDF'ni ochish",
-  "drawer.record": "Yozuv",
+  "drawer.record": "Tafsilotlar",
   "drawer.relationMore": "{{total}} tadan {{shown}} tasi",
   "drawer.removeTab": "Ilovani olib tashlash",
   "drawer.resize": "Panel kengligini o'zgartirish",
@@ -3225,5 +3225,9 @@
   "timesheets.hoursPlaceholder": "s:dd",
   "timesheets.reason": "Tuzatish sababi",
   "timesheets.resetDay": "Davomatdagidek",
-  "timesheets.export": "Tabellarni shakllantirish"
+  "timesheets.export": "Tabellarni shakllantirish",
+  "view.type.COMMENTS": "Izohlar",
+  "comments.empty": "Hozircha izoh yo‘q.",
+  "comments.placeholder": "Izoh yozing… ⌘↵ — yuborish",
+  "comments.send": "Yuborish"
 }

@@ -47,6 +47,7 @@ import type { RelationTab } from "../model/relation-tabs";
 import { tabGroupField } from "../api/tab-group";
 import { useExportExcel } from "../api/excel";
 import { CalendarSetup } from "./CalendarFields";
+import { CommentFeed } from "./CommentFeed";
 import { ExcelImportDialog } from "./ExcelImportDialog";
 import { ViewOptions } from "./ViewOptions";
 
@@ -97,7 +98,16 @@ export type TabSettings = {
  * в нём означал бы либо префиксы у каждого ключа, либо путаницу «чья
  * это страница». Ссылка открывает вкладку с начала — это и есть та цена.
  */
-export function RelationView({
+/** Вкладка связи: лента комментариев своим видом, остальное — RelationTabView. */
+export function RelationView(props: Parameters<typeof RelationTabView>[0]) {
+  return props.tab.view.type === "COMMENTS" ? (
+    <CommentFeed tab={props.tab} parentGuid={props.parentGuid} locale={props.locale} language={props.language} />
+  ) : (
+    <RelationTabView {...props} />
+  );
+}
+
+function RelationTabView({
   tab,
   parentGuid,
   parentValue,

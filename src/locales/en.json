@@ -790,7 +790,7 @@
   "drawer.notFound": "This row is not on the current page — open it from the list.",
   "drawer.open": "Open row",
   "drawer.openPdf": "Open PDF",
-  "drawer.record": "Record",
+  "drawer.record": "Details",
   "drawer.relationMore": "Showing {{shown}} of {{total}}",
   "drawer.removeTab": "Remove the tab",
   "drawer.resize": "Resize panel",
@@ -3228,5 +3228,9 @@
   "timesheets.hoursPlaceholder": "h:mm",
   "timesheets.reason": "Reason",
   "timesheets.resetDay": "As in attendance",
-  "timesheets.export": "Create timesheets"
+  "timesheets.export": "Create timesheets",
+  "view.type.COMMENTS": "Comments",
+  "comments.empty": "No comments yet.",
+  "comments.placeholder": "Write a comment… ⌘↵ to send",
+  "comments.send": "Send"
 }

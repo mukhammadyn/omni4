@@ -45,6 +45,7 @@ export const VIEW_TYPES = [
   "SECTION",
   "TIMELINE",
   "TREE",
+  "COMMENTS",
 ] as const;
 
 export type ViewType = (typeof VIEW_TYPES)[number];
@@ -117,6 +118,11 @@ export type ViewTraits = {
    * Показать его вкладкой — значит предложить открыть таблицу, которой нет.
    */
   notATab?: true;
+  /**
+   * Нарисован только вкладкой карточки: экраном его не заводят и не
+   * рисуют (лента комментариев без записи, к которой пишут, пуста).
+   */
+  tabOnly?: true;
 };
 
 /** Экран HRMS под одну таблицу: см. ViewTraits.fixed. */
@@ -207,6 +213,11 @@ const TRAITS: Record<ViewType, ViewTraits> = {
   SECTION: { notATab: true },
   TIMELINE: { implemented: true, inTabs: true },
   TREE: { implemented: true, inTabs: true, noGrouping: true },
+  /*
+   * Лента комментариев — только вкладкой карточки (features/view/ui/
+   * CommentFeed): у неё нет смысла без записи, к которой пишут.
+   */
+  COMMENTS: { implemented: true, inTabs: true, tabOnly: true, columnless: true, noGrouping: true },
 };
 
 /** Раскладки посещаемости: см. View.layout. */
@@ -231,7 +242,9 @@ export const traitsOf = (type: string): ViewTraits =>
 const typesWith = (trait: keyof ViewTraits) => VIEW_TYPES.filter((type) => TRAITS[type][trait]);
 
 /** Экраны, которые действительно есть. Остальные вкладки видны, но пусты. */
-export const IMPLEMENTED_VIEW_TYPES = new Set<string>(typesWith("implemented"));
+export const IMPLEMENTED_VIEW_TYPES = new Set<string>(
+  typesWith("implemented").filter((type) => !TRAITS[type].tabOnly),
+);
 /** Типы, которые не заводят через «+» и не выбирают сменой типа. */
 export const FIXED_VIEW_TYPES = new Set<string>(typesWith("fixed"));
 /** Типы, которыми бывает вкладка связи в карточке записи. */
