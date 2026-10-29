@@ -21,8 +21,7 @@ import {
   SquareKanbanIcon,
   Table2Icon,
   TablePropertiesIcon,
-  type LucideIcon,
-} from "lucide-react";
+  type LucideIcon, PhoneIcon } from "lucide-react";
 
 /**
  * Значок типа view. Один на вкладки и на выбор типа в настройках.
@@ -65,6 +64,7 @@ const ICONS: Record<string, LucideIcon> = {
   PAYROLL: Grid3x3Icon,
   BUDGET: WalletIcon,
   KPI: TargetIcon,
+  PBX_CALLS: PhoneIcon,
   "ATTENDANCE.sheet": SheetIcon,
   ORG: NetworkIcon,
   BOARD: SquareKanbanIcon,

@@ -10,6 +10,7 @@ import { Field, Input } from "@/shared/ui/input";
 import { Modal } from "@/shared/ui/modal";
 import { PasswordInput } from "@/shared/ui/password-input";
 import { toast } from "@/shared/lib/toast";
+import { usePbx, useSavePbx, type PbxDraft } from "@/features/pbx";
 import { useDataLanguages } from "@/features/workspace";
 import {
   useConnectMeta,
@@ -21,13 +22,10 @@ import {
   useMetaMapping,
   useMoizvonki,
   useMoizvonkiActions,
-  usePbx,
-  useSavePbx,
   useSaveGoogleForm,
   useToggleMetaForm,
   type GoogleForm,
   type MetaForm,
-  type PbxDraft,
   type GoogleFormDraft,
 } from "../../api/crm-integrations";
 import { CAPS_LABEL } from "../parts";

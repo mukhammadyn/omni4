@@ -37,6 +37,7 @@ export const VIEW_TYPES = [
   "PAYROLL",
   "BUDGET",
   "KPI",
+  "PBX_CALLS",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -205,6 +206,11 @@ const TRAITS: Record<ViewType, ViewTraits> = {
    * отделы → сотрудники → показатели, по кварталам цель, факт и %.
    */
   KPI: { ...HRMS, selfLoading: true },
+  /**
+   * Журнал звонков onlinePBX (features/pbx, CallLog) на `pbx_calls`:
+   * сотрудник подписан именем, запись слушается в строке.
+   */
+  PBX_CALLS: { ...HRMS, selfLoading: true },
   BOARD: { implemented: true, inTabs: true, noGrouping: true },
   CALENDAR: { implemented: true, inTabs: true, noGrouping: true },
   CHART: { implemented: true, noGrouping: true },
