@@ -14,6 +14,8 @@ import {
   BriefcaseBusinessIcon,
   BookUserIcon,
   GlobeIcon,
+  IdCardIcon,
+  PhoneIcon,
   MessageSquareIcon,
   ScanSearchIcon,
   SplitIcon,
@@ -27,13 +29,11 @@ import {
   ChevronRightIcon,
   ClockIcon,
   HeartIcon,
-  IdCardIcon,
   LanguagesIcon,
   MapIcon,
   MapPinIcon,
   NetworkIcon,
   PencilIcon,
-  PhoneIcon,
   PlaneIcon,
   SendIcon,
   ArrowLeftRightIcon,
@@ -49,7 +49,7 @@ import { useTranslation } from "react-i18next";
 import { ActiveCell, Avatar, Cell, editorKind, PEOPLE, uploadFolder, useUploadFiles } from "@/features/item";
 import { session } from "@/shared/api/session";
 import { localized, type Field } from "@/features/table";
-import { UserDialog } from "@/features/settings";
+import { PasswordDialog, UserDialog } from "@/features/settings";
 import { RelationView } from "@/features/view";
 import type { DataLanguage } from "@/features/workspace";
 import { formatDate } from "@/shared/lib/date-value";
@@ -62,7 +62,7 @@ import { Tabs } from "@/shared/ui/tabs";
 import { EMPLOYEES, toProfile, useEmployee, useNeighbours, useReports } from "../api/employee";
 import { parsePinfl, splitFullName } from "../model/personal";
 import { applyOrder } from "../model/tab-order";
-import { TabOrder } from "./TabOrder";
+import { MORE, TabOrder } from "./TabOrder";
 import { useUi } from "@/shared/lib/ui-store";
 import { toast } from "@/shared/lib/toast";
 import { isAssignment, JOB_HISTORY, useJobHistory } from "../api/job-history";
@@ -172,16 +172,6 @@ const CARDS: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
     ],
   },
   {
-    icon: PhoneIcon,
-    title: "employee.card.contacts",
-    slugs: ["email", "personal_email", "phone", "work_phone", "telegram_username"],
-  },
-  {
-    icon: IdCardIcon,
-    title: "employee.card.identity",
-    slugs: ["address", "emergency_contact"],
-  },
-  {
     icon: BookUserIcon,
     title: "employee.card.idDocument",
     slugs: [
@@ -206,6 +196,23 @@ const CARDS: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
  * Строки гражданства, которые к человеку не относятся (`cit()` прототипа):
  * у лица без гражданства нет страны, у гражданина Узбекистана — иностранного ИНН.
  */
+/**
+ * Контакты и адрес самой карточки — во вкладке «Адреса и телефоны», над её
+ * списком (`hr_employee_contacts`): это разные таблицы, данные не переносились.
+ */
+const CONTACT_CARDS: typeof CARDS = [
+  {
+    icon: PhoneIcon,
+    title: "employee.card.contacts",
+    slugs: ["email", "personal_email", "phone", "work_phone", "telegram_username"],
+  },
+  {
+    icon: IdCardIcon,
+    title: "employee.card.identity",
+    slugs: ["address", "emergency_contact"],
+  },
+];
+
 const offRow = (slug: string, row: Record<string, unknown>) => {
   const status = firstText(row.citizenship_status);
   if (slug === "citizenship_country") return status === "stateless";
@@ -303,7 +310,8 @@ export function EmployeePage({
   const [editing, setEditing] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [granting, setGranting] = useState(false);
-  /* «Порядок вкладок»: вкладки перетаскиваются, порядок — свой у каждого, в ui-store. */
+  const [resetting, setResetting] = useState(false);
+  /* «Порядок вкладок»: окно, порядок и граница «Больше» — свои у каждого, в ui-store. */
   const [arranging, setArranging] = useState(false);
   const orderKey = `employee-tab-order:${menuId}`;
   const savedOrder = useUi((s) => s.viewState[orderKey]);
@@ -488,8 +496,14 @@ export function EmployeePage({
   ];
   /* «Личное» всегда первое: это сама карточка, а не раздел. */
   const order = Array.isArray(savedOrder) ? savedOrder.filter((id): id is string => typeof id === "string") : [];
+  /* Граница «Больше» — элемент порядка; в старом сохранённом её нет — встаёт на прежнее место. */
   const ordered = applyOrder(defaultTabs, order);
-  const allTabs = [{ id: PERSONAL, label: t("employee.tab.personal") }, ...ordered];
+  const withMore = order.includes(MORE) ? order : [...ordered.map((tab) => tab.id)];
+  if (!order.includes(MORE)) withMore.splice(VISIBLE_TABS - 1, 0, MORE);
+  const arranged = applyOrder([...defaultTabs, { id: MORE, label: "" }], withMore);
+  const cut = arranged.findIndex((tab) => tab.id === MORE);
+  const barTabs = [{ id: PERSONAL, label: t("employee.tab.personal") }, ...arranged.slice(0, cut)];
+  const moreTabs = arranged.slice(cut + 1);
 
   const own = tabId && OWN_TABS.has(tabId) ? tabId : undefined;
   const activeTab = own ?? tab?.id ?? PERSONAL;
@@ -499,6 +513,63 @@ export function EmployeePage({
     return target ? [{ ...action, id: target.id }] : [];
   });
   const canDismiss = employee.can.write && row.status !== "dismissed";
+  /* Пароль есть только у того, кому дан вход: `user_id_auth` ставит синхронизация с auth. */
+  /*
+   * Вход есть, когда есть и учётка, и логин. Импорт из старого HRMS оставил
+   * строки с `user_id_auth` на несуществующую учётку и без логина — им тоже
+   * «Дать вход»: правкой строки бэкенд заведёт учётку заново
+   * (`auth/storage/postgres/sync_user.go:114`).
+   */
+  const hasLogin = Boolean(employee.user?.user_id_auth && employee.user?.login);
+  const canResetPassword = employee.can.write && hasLogin;
+  const renderCard = (card: (typeof CARDS)[number]) => {
+                const fields = fieldsOf(card.slugs).filter((field) => !offRow(field.slug, row));
+                if (!fields.length) return null;
+                return (
+                  <Card key={card.title} icon={card.icon} title={t(card.title)}>
+                    {card.title === "employee.card.personal" && media.length > 0 && (
+                      <div className="flex gap-4 border-b border-border pt-1 pb-3">{media}</div>
+                    )}
+                    {card.title === "employee.card.personal" && (
+                      <Row label={t("employee.id")}>
+                        <code className="rounded bg-surface-hover px-1.5 py-0.5 font-mono text-[12.5px]">
+                          {guid}
+                        </code>
+                      </Row>
+                    )}
+                    {/* Логин — из учётки (`core_users`), не из карточки: правится через «Сгенерировать пароль» / настройки пользователей. */}
+                    {card.title === "employee.card.personal" && (
+                      <Row label={t("auth.login")}>
+                        {hasLogin ? (
+                          <span className="text-sm">{text(employee.user?.login)}</span>
+                        ) : employee.can.write ? (
+                          <button
+                            type="button"
+                            onClick={() => setGranting(true)}
+                            className="cursor-pointer text-sm text-accent-text hover:underline"
+                          >
+                            {t("employee.grantAccess")}
+                          </button>
+                        ) : (
+                          <span className="text-sm text-fg-subtle">—</span>
+                        )}
+                      </Row>
+                    )}
+                    {fields.map((field) => (
+                      <Row key={field.id} label={label(field)}>
+                        {tools && toolFor[field.slug] ? (
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1">{value(field)}</div>
+                            {toolFor[field.slug]}
+                          </div>
+                        ) : (
+                          value(field)
+                        )}
+                      </Row>
+                    ))}
+                  </Card>
+                );
+              };
   const fieldsOf = (slugs: string[]) =>
     slugs.map((slug) => bySlug.get(slug)).filter((field): field is Field => Boolean(field));
 
@@ -583,15 +654,15 @@ export function EmployeePage({
               </>
             )}
             {/* Нет строки в `core_users` — нет и входа: заводим её отсюда. */}
-            {employee.can.write && !employee.user && (
+            {employee.can.write && !hasLogin && (
               <Button variant="secondary" onClick={() => setGranting(true)}>
                 <Icon as={KeyRoundIcon} size={15} />
                 {t("employee.grantAccess")}
               </Button>
             )}
-            <Button variant={arranging ? "primary" : "secondary"} onClick={() => setArranging(!arranging)}>
-              <Icon as={arranging ? CheckIcon : ArrowDownUpIcon} size={15} />
-              {t(arranging ? "employee.done" : "employee.arrangeTabs")}
+            <Button variant="secondary" onClick={() => setArranging(true)}>
+              <Icon as={ArrowDownUpIcon} size={15} />
+              {t("employee.arrangeTabs")}
             </Button>
             {employee.can.write && (
               /* Правка сохраняется сразу, по полю, поэтому выход
@@ -600,14 +671,15 @@ export function EmployeePage({
                 onClick={() => {
                   setEditing(!editing);
                   setActive(null);
-                  if (!editing) onTab(undefined);
+                  /* Правятся поля карточки: они в «Личном» и в «Адресах и телефонах» — с них не уводим. */
+                  if (!editing && own !== CONTACTS_TAB) onTab(undefined);
                 }}
               >
                 <Icon as={editing ? CheckIcon : PencilIcon} size={15} />
                 {t(editing ? "employee.done" : "employee.edit")}
               </Button>
             )}
-            {(tabActions.length > 0 || canDismiss) && (
+            {(tabActions.length > 0 || canDismiss || canResetPassword) && (
               <Popover
                 align="end"
                 trigger={({ open, toggle }) => (
@@ -632,7 +704,18 @@ export function EmployeePage({
                         {t(action.label)}
                       </PopoverItem>
                     ))}
-                    {canDismiss && tabActions.length > 0 && <PopoverSeparator />}
+                    {canResetPassword && (
+                      <PopoverItem
+                        icon={<Icon as={KeyRoundIcon} size={15} />}
+                        onClick={() => {
+                          setResetting(true);
+                          close();
+                        }}
+                      >
+                        {t("employee.action.resetPassword")}
+                      </PopoverItem>
+                    )}
+                    {canDismiss && (tabActions.length > 0 || canResetPassword) && <PopoverSeparator />}
                     {canDismiss && (
                       <PopoverItem
                         danger
@@ -653,39 +736,19 @@ export function EmployeePage({
         </header>
 
         <div className="mb-4 flex border-b border-border">
-          {arranging ? (
-            /* Все вкладки разом, и спрятанные в «Больше»: переносить можно любую, кроме «Личного». */
-            <div className="flex flex-wrap items-center gap-1.5">
-              <TabOrder tabs={ordered} onOrder={(ids) => setViewState(orderKey, ids)} />
-              {order.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setViewState(orderKey, [])}
-                  className="rounded-md px-2 py-1 text-sm text-fg-muted hover:bg-surface-hover hover:text-fg"
-                >
-                  {t("employee.resetTabOrder")}
-                </button>
-              )}
-            </div>
-          ) : (
-            <>
-              <Tabs
-                activeId={activeTab}
-                onSelect={(id) => onTab(id === PERSONAL ? undefined : id)}
-                tabs={allTabs.slice(0, VISIBLE_TABS)}
-              />
-              <MoreTabs
-                tabs={allTabs.slice(VISIBLE_TABS)}
-                activeId={activeTab}
-                label={t("employee.more")}
-                onSelect={onTab}
-              />
-            </>
-          )}
+          <Tabs
+            activeId={activeTab}
+            onSelect={(id) => onTab(id === PERSONAL ? undefined : id)}
+            tabs={barTabs}
+          />
+          <MoreTabs tabs={moreTabs} activeId={activeTab} label={t("employee.more")} onSelect={onTab} />
         </div>
 
         {own && GRIDS[own] ? (
-          <EmployeeGrid key={own} grid={GRIDS[own]} employeeId={guid} language={language} />
+          <>
+            {own === CONTACTS_TAB && CONTACT_CARDS.map(renderCard)}
+            <EmployeeGrid key={own} grid={GRIDS[own]} employeeId={guid} language={language} />
+          </>
         ) : own === ATTENDANCE_TAB ? (
           <EmployeeAttendance employeeId={guid} />
         ) : own === SCHEDULE_TAB ? (
@@ -763,36 +826,7 @@ export function EmployeePage({
           /* `.emp-grid`: поля слева, рабочие данные справа; узко — столбиком. */
           <div className="grid items-start gap-4 min-[1100px]:grid-cols-[minmax(0,1fr)_320px]">
             <div>
-              {CARDS.map((card) => {
-                const fields = fieldsOf(card.slugs).filter((field) => !offRow(field.slug, row));
-                if (!fields.length) return null;
-                return (
-                  <Card key={card.title} icon={card.icon} title={t(card.title)}>
-                    {card.title === "employee.card.personal" && media.length > 0 && (
-                      <div className="flex gap-4 border-b border-border pt-1 pb-3">{media}</div>
-                    )}
-                    {card.title === "employee.card.personal" && (
-                      <Row label={t("employee.id")}>
-                        <code className="rounded bg-surface-hover px-1.5 py-0.5 font-mono text-[12.5px]">
-                          {guid}
-                        </code>
-                      </Row>
-                    )}
-                    {fields.map((field) => (
-                      <Row key={field.id} label={label(field)}>
-                        {tools && toolFor[field.slug] ? (
-                          <div className="flex items-center gap-2">
-                            <div className="min-w-0 flex-1">{value(field)}</div>
-                            {toolFor[field.slug]}
-                          </div>
-                        ) : (
-                          value(field)
-                        )}
-                      </Row>
-                    ))}
-                  </Card>
-                );
-              })}
+              {CARDS.map(renderCard)}
               {TAGS.map(({ icon, slug }) => {
                 const field = bySlug.get(slug);
                 if (!field) return null;
@@ -897,10 +931,48 @@ export function EmployeePage({
         )}
       </div>
 
+      {arranging && (
+        <TabOrder
+          tabs={defaultTabs}
+          ids={arranged.map((tab) => tab.id)}
+          onOrder={(ids) => setViewState(orderKey, ids)}
+          onReset={order.length > 0 ? () => setViewState(orderKey, []) : undefined}
+          onClose={() => setArranging(false)}
+        />
+      )}
+
+      {resetting && employee.user && (
+        <Suspense>
+          <PasswordDialog
+            user={{
+              id: text(employee.user.guid),
+              clientTypeId: text(employee.user.client_type_id),
+              login: text(employee.user.login),
+              name: person.name,
+            }}
+            onClose={() => setResetting(false)}
+          />
+        </Suspense>
+      )}
+
       {granting && (
         <Suspense>
           <UserDialog
             employee={{ id: guid, name: person.name, email: text(row.email), phone: text(row.phone) }}
+            /* Строка в `core_users` уже есть — вход даётся её правкой, а не второй строкой. */
+            {...(employee.user
+              ? {
+                  user: {
+                    id: text(employee.user.guid),
+                    name: text(employee.user.full_name) || person.name,
+                    login: "",
+                    email: text(employee.user.email),
+                    phone: text(employee.user.phone),
+                    roleId: text(employee.user.role_id),
+                    hasLogin: false,
+                  },
+                }
+              : {})}
             onClose={() => setGranting(false)}
           />
         </Suspense>

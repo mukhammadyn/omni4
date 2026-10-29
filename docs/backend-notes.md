@@ -1779,3 +1779,12 @@ pkg/helper/relation.go:855`): удалили табель — его строк�
 `a.<поле> > $n`, NULL не проходит, а любой настоящий uuid больше нулевого.
 Так читает дни табелей `useFillDays` (`SHEET_SET` в
 `features/hrms/api/timesheet-days.ts`). Сами сироты не удаляются.
+
+## `PUT /v2/user/reset-password` не сверяет прежний пароль (2026-10-29)
+
+`auth/grpc/service/user_service_v2.go:1565` проверяет у `old_password`
+только длину (≥ 6) и пишет новый пароль строке `core_users` по guid
+(`ob/storage/postgres/login.go:587`). Сменить пароль может любой, кто
+знает guid строки. Фронт на этом строит «Сгенерировать пароль» в карточке
+сотрудника (`useResetUserPassword`): в `old_password` уходит новый пароль.
+Начнёт бэкенд сверять — нужна отдельная админская ручка сброса.

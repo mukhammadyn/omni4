@@ -14,6 +14,9 @@ export const SettingsPage = lazy(() =>
 export const UserDialog = lazy(() =>
   import("./ui/UserSettings").then((module) => ({ default: module.UserDialog })),
 );
+export const PasswordDialog = lazy(() =>
+  import("./ui/UserSettings").then((module) => ({ default: module.PasswordDialog })),
+);
 export { useSettingsSections } from "./ui/sections";
 export { useProject, useWorkspaceTitle } from "./api/project";
 export { useProfile, useUpdateTimezone, useUserTimezone } from "./api/profile";

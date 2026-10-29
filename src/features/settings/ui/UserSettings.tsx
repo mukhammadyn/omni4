@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from "react";
-import { CopyIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { CopyIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { PEOPLE } from "@/features/item";
 import { useSession } from "@/shared/api/use-session";
@@ -18,6 +18,7 @@ import {
   USERS_PAGE,
   useCreateUser,
   useDeleteUser,
+  useResetUserPassword,
   useUpdateUser,
   useUsers,
   useFreeEmployees,
@@ -250,8 +251,9 @@ export function UserDialog({
     // Логин — почта: учётки общие на все проекты, и короткий логин вроде
     // «Test» почти наверняка занят — бэкенд тогда молча привяжет строку
     // к чужой учётке (docs/backend-notes.md, «прилипает к чужой учётке»).
-    login: user?.login ?? employee?.email ?? "",
-    password: "",
+    login: user?.login || employee?.email || "",
+    // ponytail: со страницы сотрудника пароль генерируется, не спрашивается.
+    password: employee ? generatePassword() : "",
   });
   const put = (patch: Partial<UserDraft>) => setDraft((current) => ({ ...current, ...patch }));
   /* Роли приезжают позже формы: пустая роль — первая подходящая. */
@@ -282,10 +284,36 @@ export function UserDialog({
         onSubmit={(event) => {
           event.preventDefault();
           const full = { ...draft, roleId };
-          if (user) update.mutate({ user, draft: full }, { onSuccess: onClose });
-          else create.mutate(full, { onSuccess: onClose });
+          const done = () => {
+            /* Пароль прочитать назад нельзя — сразу в буфер вместе с логином. */
+            if (employee) {
+              void navigator.clipboard.writeText(`${full.login}\n${full.password}`);
+              toast.success(t("users.credentialsCopied"));
+            }
+            onClose();
+          };
+          if (user) update.mutate({ user, draft: full }, { onSuccess: done });
+          else create.mutate(full, { onSuccess: done });
         }}
       >
+{employee ? (
+<>
+        <h2 className="text-base font-semibold">{t("users.grantTitle", { name: draft.name })}</h2>
+        <Field label={t("auth.login")}>
+          <Input
+            autoFocus
+            required
+            value={draft.login}
+            onChange={(event) => put({ login: event.target.value })}
+          />
+        </Field>
+        <Field label={t("auth.password")}>
+          <GeneratedPassword value={draft.password} onRegenerate={() => put({ password: generatePassword() })} />
+        </Field>
+        <p className="text-xs text-fg-subtle">{t("users.passwordHint")}</p>
+</>
+) : (
+<>
         <h2 className="text-base font-semibold">{t(user ? "users.editTitle" : "users.create")}</h2>
 
         {picking && (
@@ -368,8 +396,10 @@ export function UserDialog({
           </>
         )}
 
+</>
+)}
         <div className="flex items-center justify-end gap-2">
-          {!user && (
+          {!user && !employee && (
             <Button
               type="button"
               variant="ghost"
@@ -393,5 +423,99 @@ export function UserDialog({
         </div>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * 12 символов без похожих (0/O, 1/l/I): диктуется и переписывается без ошибок.
+ * Заглавная, строчная и цифра — обязательно: иначе object builder отклонит
+ * пароль (`ob/pkg/util/validation.go:8`).
+ */
+function generatePassword(): string {
+  const abc = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const password = Array.from(crypto.getRandomValues(new Uint32Array(12)), (n) => abc[n % abc.length]).join("");
+  return /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password) ? password : generatePassword();
+}
+
+/** «Сгенерировать пароль» со страницы сотрудника: новый пароль, сохранён — сразу в буфер. */
+export function PasswordDialog({
+  user,
+  onClose,
+}: {
+  user: { id: string; clientTypeId: string; login: string; name: string };
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [password, setPassword] = useState(generatePassword);
+  const reset = useResetUserPassword();
+  return (
+    <Modal onClose={onClose}>
+      <form
+        className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          reset.mutate(
+            { userId: user.id, clientTypeId: user.clientTypeId, password },
+            {
+              onSuccess: () => {
+                void navigator.clipboard.writeText(user.login ? `${user.login}\n${password}` : password);
+                toast.success(t("users.credentialsCopied"));
+                onClose();
+              },
+            },
+          );
+        }}
+      >
+        <h2 className="text-base font-semibold">{t("users.newPasswordTitle", { name: user.name })}</h2>
+        {user.login && (
+          <Field label={t("auth.login")}>
+            <Input readOnly value={user.login} />
+          </Field>
+        )}
+        <Field label={t("auth.password")}>
+          <GeneratedPassword value={password} onRegenerate={() => setPassword(generatePassword())} />
+        </Field>
+        <p className="text-xs text-fg-subtle">{t("users.newPasswordHint")}</p>
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            {t("action.cancel")}
+          </Button>
+          <Button type="submit" disabled={reset.isPending}>
+            {reset.isPending ? t("common.saving") : t("action.save")}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** Сгенерированный пароль: только чтение, «заново» и «скопировать». */
+function GeneratedPassword({ value, onRegenerate }: { value: string; onRegenerate: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex gap-2">
+      <Input readOnly value={value} className="font-mono" />
+      <Button
+        type="button"
+        variant="secondary"
+        title={t("cell.copy")}
+        aria-label={t("cell.copy")}
+        onClick={() => {
+          void navigator.clipboard.writeText(value);
+          toast.success(t("cell.copied"));
+        }}
+      >
+        <Icon as={CopyIcon} size={14} />
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        title={t("users.regenerate")}
+        aria-label={t("users.regenerate")}
+        onClick={onRegenerate}
+      >
+        <Icon as={RefreshCwIcon} size={14} />
+      </Button>
+    </div>
   );
 }
