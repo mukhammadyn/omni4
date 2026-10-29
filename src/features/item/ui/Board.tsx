@@ -14,8 +14,11 @@ import {
   boardOrderAt,
   colorOf,
   columnOrderEdits,
+  columnTotals,
+  formatTotal,
   groupValue,
   hasSortOrder,
+  moneyField,
   relatedEntry,
   sortOrderOf,
   BOARD_ORDER,
@@ -64,6 +67,7 @@ export function Board({
   locale,
   language,
   hasMore,
+  counts,
   onOpenRow,
   onMove,
   onEdit,
@@ -87,6 +91,8 @@ export function Board({
   language: string;
   /** Загружены не все строки: счётчик в шапке колонки — с «+». */
   hasMore?: boolean | undefined;
+  /** Точное число строк в колонке по её id. Нет числа — загруженные с «+». */
+  counts?: Map<string, number> | undefined;
   onOpenRow: (guid: string) => void;
   /**
    * Перенос карточки. Не задан — без права на правку доска остаётся
@@ -108,6 +114,9 @@ export function Board({
   onEndReached?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
+  /* ponytail: сумма по загруженным карточкам, с «+», пока едут не все;
+     точная — когда бэкенд научится агрегатам в get-list. */
+  const money = useMemo(() => moneyField(columns), [columns]);
   /** Карточка в руке. Пусто — ничего не тащат. */
   const [dragging, setDragging] = useState<string | null>(null);
   /**
@@ -417,9 +426,22 @@ export function Board({
                           не все, у счётчика есть «+» — «столько уже здесь,
                           и это не всё». */}
                       <span className="shrink-0 text-xs text-fg-muted tabular-nums">
-                        {column.rows.length}
-                        {hasMore ? "+" : ""}
+                        {counts?.get(column.id) ?? `${column.rows.length}${hasMore ? "+" : ""}`}
                       </span>
+
+                      {/* Сумма загруженных карточек, по валютам: доллары
+                          с сумами не складываются. «+» — догружены не все. */}
+                      {money && (() => {
+                        const totals = columnTotals(column.rows, money.slug);
+                        if (!totals.length) return null;
+                        const partial = hasMore && counts?.get(column.id) !== column.rows.length;
+                        return (
+                          <span className="min-w-0 truncate text-xs text-fg-muted tabular-nums">
+                            {totals.map((total) => formatTotal(total.sum, total.currency, locale)).join(" · ")}
+                            {partial ? "+" : ""}
+                          </span>
+                        );
+                      })()}
 
                       {/* Кнопка появляется на наведении: она нужна раз в день,
                           а рябит в шапке каждой колонки постоянно. С клавиатуры

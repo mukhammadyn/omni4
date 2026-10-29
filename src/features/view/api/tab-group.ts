@@ -165,6 +165,6 @@ export function useTabGroup({
  * Grid.jsx: `[${groupTab.value}]`). У остальных значение одно,
  * и сравнение точное: `contains` нашёл бы «renew» по «new».
  */
-function tabFilter(field: Field, value: string): Filters[string] {
+export function tabFilter(field: Field, value: string): Filters[string] {
   return field.type === "MULTISELECT" ? { op: "any", values: [value] } : { op: "is", values: [value] };
 }

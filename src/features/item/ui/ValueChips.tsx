@@ -1,7 +1,11 @@
 import { useMemo } from "react";
+import { CheckIcon, ChevronDownIcon, GitBranchIcon, LayersIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { localized, type Field, type Relation } from "@/features/table";
-import { CHIP_HEX, hexToChipColor } from "@/shared/ui/chip";
-import { useItems } from "../api/items";
+import { CHIP_HEX, Chip, hexToChipColor } from "@/shared/ui/chip";
+import { Icon } from "@/shared/ui/icon";
+import { Popover, PopoverItem } from "@/shared/ui/popover";
+import { useItemCounts, useItems } from "../api/items";
 import { NO_GROUP, boardColumns, colorOf, sortOrderOf } from "../model/board";
 import type { Filters } from "../model/query";
 import { valueLabelOf } from "../model/relation";
@@ -41,6 +45,7 @@ export function ValueChips({
   search,
   selected,
   onChange,
+  menu = false,
   className = "",
 }: {
   tableSlug: string;
@@ -57,9 +62,15 @@ export function ValueChips({
   /** Выбранные значения — из отбора человека по этому полю. */
   selected: string[];
   onChange: (values: string[]) => void;
+  /**
+   * Выпадающим списком в панели, с выбором одного значения, — воронка
+   * над доской сделок (deals.html, pipeline-sel). Без него — полоса.
+   */
+  menu?: boolean;
   /** Обёртка полосы: её нет вовсе, когда чипов нет, — и линии под ней тоже. */
   className?: string;
 }) {
+  const { t } = useTranslation();
   const { page } = useItems(tableSlug, { limit: LIMIT, page: 1, filters, search });
 
   const chips = useMemo(() => {
@@ -97,9 +108,89 @@ export function ValueChips({
     return [...byLabel.values()];
   }, [page.rows, field, relations, language]);
 
+  /* Меню показывает числа целиком, а строки выше обрезаны потолком:
+     у каждого значения — свой счёт тем же отбором, как у вкладок. */
+  const exact = useItemCounts(
+    menu ? tableSlug : undefined,
+    useMemo(
+      () =>
+        menu
+          ? chips.map((chip) => ({
+              ...filters,
+              [field.slug]: { op: field.type === "MULTISELECT" ? ("any" as const) : ("is" as const), values: chip.ids },
+            }))
+          : [],
+      [menu, chips, filters, field],
+    ),
+    search,
+  );
+
   if (!chips.length) return null;
 
   const chosen = new Set(selected);
+
+  if (menu) {
+    const current = chips.find((chip) => chip.ids.some((id) => chosen.has(id)));
+    const total = page.count;
+    const title = localized(field.labels, language, field.label);
+
+    return (
+      <Popover
+        align="end"
+        trigger={({ open, toggle }) => (
+          <button
+            type="button"
+            onClick={toggle}
+            title={title}
+            className={`mr-1 inline-flex h-7 max-w-48 items-center gap-1.5 rounded-md px-2 text-sm text-fg-muted ring-1 ring-border ring-inset transition-colors hover:bg-surface-hover ${
+              open ? "bg-surface-hover" : ""
+            }`}
+          >
+            <Icon as={GitBranchIcon} size={14} className="shrink-0" />
+            <span className="truncate">{current?.label ?? t("view.all")}</span>
+            <Icon as={ChevronDownIcon} size={14} className="shrink-0" />
+          </button>
+        )}
+      >
+        {(close) => (
+          <div className="w-62">
+            <p className="px-2.5 pt-0.5 pb-1 text-2xs font-semibold text-fg-subtle">{title}</p>
+            <PopoverItem
+              icon={<Icon as={LayersIcon} />}
+              active={!current}
+              trailing={<span className="text-xs text-fg-subtle tabular-nums">{total}</span>}
+              onClick={() => {
+                close();
+                onChange([]);
+              }}
+            >
+              {t("view.all")}
+            </PopoverItem>
+            {chips.map((chip, index) => {
+              const on = chip === current;
+              return (
+                <PopoverItem
+                  key={chip.label}
+                  trailing={
+                    <span className="flex items-center gap-2 text-xs text-fg-subtle tabular-nums">
+                      {exact[index] ?? chip.count}
+                      {on && <Icon as={CheckIcon} size={14} className="text-accent" />}
+                    </span>
+                  }
+                  onClick={() => {
+                    close();
+                    onChange(chip.ids);
+                  }}
+                >
+                  <Chip color={chip.color ? hexToChipColor(chip.color) : "gray"}>{chip.label}</Chip>
+                </PopoverItem>
+              );
+            })}
+          </div>
+        )}
+      </Popover>
+    );
+  }
 
   return (
     <div className={`flex flex-wrap items-center gap-0.5 ${className}`}>

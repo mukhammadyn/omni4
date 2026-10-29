@@ -523,6 +523,8 @@ export function toView(dto: ViewDto): View {
         : "",
     chipsId:
       typeof dto.attributes?.["chips_by_id"] === "string" ? dto.attributes["chips_by_id"] : "",
+    chipsDefault:
+      typeof dto.attributes?.["chips_default"] === "string" ? dto.attributes["chips_default"] : "",
     dateFromSlug: toDateSlug(dto.calendar_from_slug, dto.attributes, "calendar_from_slug"),
     dateToSlug: toDateSlug(dto.calendar_to_slug, dto.attributes, "calendar_to_slug"),
     statusFieldSlug: dto.status_field_slug?.trim() ?? "",

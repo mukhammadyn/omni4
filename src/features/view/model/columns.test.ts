@@ -52,6 +52,7 @@ const view = (columnIds: string[]): View => ({
   tabGroupId: "",
   subGroupId: "",
   chipsId: "",
+  chipsDefault: "",
   defaultFilters: {},
   navigate: EMPTY_URL_TEMPLATE,
   objectUrl: EMPTY_URL_TEMPLATE,

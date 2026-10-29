@@ -371,3 +371,42 @@ export function orderAt(orders: unknown[], at: number): number {
   // сразу за первым, иначе новый номер снова совпал бы с чужим.
   return middle > before ? middle : before + 0.5;
 }
+
+/*
+ * Денежное поле карточки — то же правило, что у дашбордов
+ * (features/dashboard/model/currency.ts): тип MONEY или слаг суммы.
+ * Валюта — поле `currency` строки; без неё суммы разных валют
+ * сложились бы в бессмыслицу.
+ */
+const MONEY_SLUG = /amount|salary|price|cost/i;
+
+export function moneyField(columns: Field[]): Field | undefined {
+  return columns.find(
+    (field) => field.type === "MONEY" || (["FLOAT", "NUMBER"].includes(field.type) && MONEY_SLUG.test(field.slug)),
+  );
+}
+
+/** Сумма по валютам, по убыванию. Строки без суммы не считаются. */
+export function columnTotals(rows: Item[], slug: string): { currency: string; sum: number }[] {
+  const sums = new Map<string, number>();
+  for (const row of rows) {
+    const value = Number(row[slug]);
+    if (row[slug] === null || row[slug] === "" || !Number.isFinite(value)) continue;
+    const currency = String(row["currency"] ?? "").trim();
+    sums.set(currency, (sums.get(currency) ?? 0) + value);
+  }
+  return [...sums].map(([currency, sum]) => ({ currency, sum })).sort((a, b) => b.sum - a.sum);
+}
+
+/** «$109,8K»: коротко, со знаком валюты, если код ISO; иначе число и код. */
+export function formatTotal(sum: number, currency: string, locale: string): string {
+  try {
+    if (currency) {
+      return new Intl.NumberFormat(locale, { style: "currency", currency, notation: "compact", maximumFractionDigits: 1 }).format(sum);
+    }
+  } catch {
+    // Не ISO-код — ниже, числом с кодом.
+  }
+  const number = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(sum);
+  return currency ? `${number} ${currency}` : number;
+}

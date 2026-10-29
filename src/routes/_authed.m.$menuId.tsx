@@ -42,6 +42,8 @@ import {
   useDrawerLayout,
   useItem,
   useItemCounts,
+  groupValue,
+  relatedEntry,
   ValueChips,
   useItems,
   useUpdateItem,
@@ -182,6 +184,7 @@ import {
   useMenuViews,
   subGroupField,
   chipsField,
+  tabFilter,
   tabGroupField,
   useTabGroup,
   useUpdateView,
@@ -419,13 +422,22 @@ function MenuPage() {
    * все связи: её поля — своя раскладка, а не колонки, и связь вне
    * колонок осталась бы без полей показа — «—» вместо значения и голые
    * id в выборе. Поэтому, пока запись открыта, список не сужается.
+   *
+   * Поля раскладки (вкладки, колонки и дорожки доски, чипы) колонками
+   * быть не обязаны, а подписи им нужны те же: без них доска сделок,
+   * где этапа нет среди колонок карточки, подписывала колонки id этапа.
    */
   const {
     schema,
     isLoading: schemaLoading,
     error: schemaError,
     refetch: refetchSchema,
-  } = useTableSchema(view?.tableSlug, search.item ? undefined : view?.columnIds);
+  } = useTableSchema(
+    view?.tableSlug,
+    search.item || !view
+      ? undefined
+      : [...view.columnIds, view.tabGroupId, view.subGroupId, view.chipsId].filter(Boolean),
+  );
   /*
    * Порядок полей в drawer — свой, из раскладки пункта меню, и с колонками
    * таблицы не связан: перестановка в карточке не двигает колонки, а
@@ -894,12 +906,16 @@ function MenuPage() {
     () =>
       localizeKeys(
         search.filters ??
-          rememberedFilters ?? { ...seedFilters(view?.quickFilterIds ?? [], tableFields), ...employeesSeed },
+          rememberedFilters ?? {
+            ...seedFilters(view?.quickFilterIds ?? [], tableFields),
+            ...employeesSeed,
+            ...chipsSeed(view, tableFields),
+          },
         viewFields,
         codes,
         language,
       ),
-    [search.filters, rememberedFilters, view?.quickFilterIds, tableFields, viewFields, codes, language, employeesSeed],
+    [search.filters, rememberedFilters, view, tableFields, viewFields, codes, language, employeesSeed],
   );
 
   /*
@@ -932,9 +948,10 @@ function MenuPage() {
   /* Поле дорожек ищется теми же двумя ключами, что и поле колонок:
      у поля-связи в настройках лежит id связи, а не поля. */
   const boardLaneField = boardView ? subGroupField(view, tableFields) : undefined;
-  /** Поле полосы значений. У доски его нет: значения там и так колонками. */
+  /** Поле полосы значений. У доски — только не поле колонок: оно и так колонками. */
   /* У кандидатов полосы этапов нет: этап и так в колонке таблицы. */
-  const chipsBy = boardView || candidatesView ? undefined : chipsField(view, tableFields);
+  const chipsCandidate = candidatesView ? undefined : chipsField(view, tableFields);
+  const chipsBy = chipsCandidate && chipsCandidate !== boardField ? chipsCandidate : undefined;
   /** Доску не по чему раскладывать: поле не выбрано в настройках view. */
   const boardNotReady = boardView && !boardField;
 
@@ -1183,6 +1200,32 @@ function MenuPage() {
   };
 
   /**
+   * Выбранное в полосе значение — в новую запись: сделка, заведённая
+   * на доске воронки Udevs, должна в ней и остаться, а не пропасть
+   * из вида. Только когда выбрано ровно одно. Подпись связи — из любой
+   * загруженной строки с тем же значением (relatedEntry).
+   */
+  const chosenChip = (): Record<string, unknown> => {
+    const values = chipsBy ? filters[chipsBy.slug]?.values ?? [] : [];
+    if (!chipsBy || values.length !== 1) return {};
+    const value = values[0];
+    const row = rows.rows.find((item) => item[chipsBy.slug] === value);
+    return { [chipsBy.slug]: groupValue(chipsBy, String(value)), ...relatedEntry(chipsBy, row) };
+  };
+
+  /** Выбор в полосе значений — условие её поля в отборе человека. */
+  const chooseChips = (values: string[]) => {
+    if (!chipsBy) return;
+    const next = { ...filters };
+    if (values.length) {
+      next[chipsBy.slug] = { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values };
+    } else {
+      delete next[chipsBy.slug];
+    }
+    applyFilters(next);
+  };
+
+  /**
    * Как листается этот view: прокруткой или номерами страниц.
    *
    * Доска — всегда прокруткой: страницу сервер режет по всей доске
@@ -1231,6 +1274,32 @@ function MenuPage() {
       filters: effectiveFilters,
       search: searchText,
     },
+  );
+
+  /*
+   * Точное число карточек в колонке доски — тем же запросом, что
+   * и счётчики вкладок. Колонки берутся из загруженных строк: других
+   * доска и не рисует. С дорожками колонка дробится по ним, и счёт
+   * на клетку здесь не делается — там остаётся «загружено +».
+   */
+  const boardCountIds = useMemo(
+    () =>
+      boardField && !boardLaneField && boardField.type !== "MULTISELECT"
+        ? [...new Set(rows.rows.map((row) => row[boardField.slug]).filter((id) => typeof id === "string" && id))] as string[]
+        : [],
+    [boardField, boardLaneField, rows.rows],
+  );
+  const boardCountValues = useItemCounts(
+    can.read && boardField ? view?.tableSlug : undefined,
+    useMemo(
+      () => boardCountIds.map((id) => ({ ...effectiveFilters, [boardField?.slug ?? ""]: tabFilter(boardField!, id) })),
+      [boardCountIds, effectiveFilters, boardField],
+    ),
+    searchText,
+  );
+  const boardCounts = useMemo(
+    () => new Map(boardCountIds.flatMap((id, i) => (boardCountValues[i] === undefined ? [] : [[id, boardCountValues[i]] as const]))),
+    [boardCountIds, boardCountValues],
   );
 
   /* Воронка и счётчики кандидатов — у таблицы вакансий (features/hrms). */
@@ -1691,6 +1760,21 @@ function MenuPage() {
             <div className="ml-auto flex shrink-0 items-center gap-0.5">
               {/* Поиск, отбор и сортировка — про таблицу: у нарисованного
                   заглушкой view искать нечего, а ручка дерева их не читает. */}
+              {/* У доски полоса значений — выпадающим списком в панели,
+                  как воронка над сделками в прототипе (deals.html, pipeline-sel). */}
+              {boardView && chipsBy && (
+                <ValueChips
+                  menu
+                  tableSlug={view.tableSlug}
+                  field={chipsBy}
+                  relations={schema.relations}
+                  language={language}
+                  filters={chipFilters}
+                  search={searchText}
+                  selected={filters[chipsBy.slug]?.values ?? []}
+                  onChange={chooseChips}
+                />
+              )}
               {supportedView && !treeView && !sheetView && whoFields.length > 0 && (
                 <MineToggle fields={whoFields} filters={filters} onFilters={applyFilters} />
               )}
@@ -2121,7 +2205,7 @@ function MenuPage() {
             </div>
           )}
 
-          {chipsBy && view && can.read && !sheetView && (
+          {chipsBy && view && can.read && !sheetView && !boardView && (
             <ValueChips
               className="mx-6 shrink-0 border-b border-border py-2"
               tableSlug={view.tableSlug}
@@ -2131,15 +2215,7 @@ function MenuPage() {
               filters={chipFilters}
               search={searchText}
               selected={filters[chipsBy.slug]?.values ?? []}
-              onChange={(values) => {
-                const next = { ...filters };
-                if (values.length) {
-                  next[chipsBy.slug] = { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values };
-                } else {
-                  delete next[chipsBy.slug];
-                }
-                applyFilters(next);
-              }}
+              onChange={chooseChips}
             />
           )}
 
@@ -2258,6 +2334,7 @@ function MenuPage() {
               locale={i18n.language}
               language={language}
               hasMore={hasMore || loadingMore}
+              counts={boardCounts}
               onOpenRow={openRow}
               /* Перенос карточки — обычная правка строки: значение
                  колонки и номер позиции одним PUT.
@@ -2295,7 +2372,7 @@ function MenuPage() {
                          свою страницу создания — значит, заводят там. */
                       if (openCreateUrl(view)) return;
 
-                      startDraft({ ...blankItem(drawerColumns, newRowDefaults), ...values });
+                      startDraft({ ...blankItem(drawerColumns, newRowDefaults), ...chosenChip(), ...values });
                     },
                   }
                 : {})}
@@ -3183,4 +3260,11 @@ function Notice({
       </div>
     </div>
   );
+}
+
+/** Посев отбора значением полосы по умолчанию (`View.chipsDefault`). */
+function chipsSeed(view: View | undefined, fields: Field[]): Filters {
+  const field = chipsField(view, fields);
+  if (!field || !view?.chipsDefault) return {};
+  return { [field.slug]: tabFilter(field, view.chipsDefault) };
 }
