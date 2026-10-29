@@ -21,7 +21,7 @@ export {
   tabViews,
   toggleColumn,
 } from "./model/columns";
-export { CalendarSetup } from "./ui/CalendarFields";
+export { CalendarSetup, dateFieldBySlug } from "./ui/CalendarFields";
 export { RelationView } from "./ui/RelationView";
 export { IMPLEMENTED_VIEW_TYPES, TAB_VIEW_TYPES, VIEW_TYPES, isTabView, traitsOf, viewKind, viewName } from "./model/types";
 export type { View, ViewType } from "./model/types";
