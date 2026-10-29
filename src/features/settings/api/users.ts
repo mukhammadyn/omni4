@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MAX_LIMIT, PEOPLE, useDeleteItems, useItems, type Item } from "@/features/item";
-import { api } from "@/shared/api/client";
+import { api, authApi } from "@/shared/api/client";
 import i18n from "@/shared/lib/i18n";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError, toast } from "@/shared/lib/toast";
@@ -154,3 +154,24 @@ export function useUpdateUser() {
 export function useDeleteUser() {
   return useDeleteItems(PEOPLE);
 }
+
+/**
+ * Новый пароль чужой учётке — «Сгенерировать пароль» старого HRMS.
+ * Ручка смены своего пароля, но прежний auth только меряет (≥ 6 символов)
+ * и не сверяет (`auth/grpc/service/user_service_v2.go:1565`), а строку ищет
+ * по guid `core_users` (`ob/storage/postgres/login.go:587`). Поэтому вместо
+ * прежнего уходит сам новый пароль.
+ */
+export function useResetUserPassword() {
+  return useMutation({
+    mutationFn: ({ userId, clientTypeId, password }: { userId: string; clientTypeId: string; password: string }) =>
+      authApi.put<unknown>("/v2/user/reset-password", {
+        user_id: userId,
+        client_type_id: clientTypeId,
+        old_password: password,
+        password,
+      }),
+    onError: (error) => reportError(error, "settings.passwordFailed"),
+  });
+}
+
