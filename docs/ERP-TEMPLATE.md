@@ -707,6 +707,8 @@ TABLE у пункта удалён: карты правятся сводной �
 |---|---|---|
 | 1 | TABLE | `attributes.quick_filters` (чипы-фильтры, по порядку): `crm_stages_id`, `core_users_id`, `priority`, `crm_sources_id`, `expected_close_date` — поля целиком с `is_checked: true` (заведено в omni4 и omni5 2026-10-29) |
 | 2 | BOARD | `group_fields` → `crm_stages_id` (колонки доски — этапы); `columns` (карточка, по порядку): `title`, `amount`, `crm_companies_id`, `core_users_id`, `expected_close_date` — как в прототипе; `attributes.chips_by_id` → id поля `crm_pipelines_id` (у доски — выпадающий список воронок в панели); `attributes.chips_default` → guid воронки Udevs (открыта при первом входе, как `pipelineDefault` прототипа) (заведено в omni4 и omni5 2026-10-29) |
+| 3 | LIST «Список» | `columns`: `title`, `crm_stages_id`, `amount`, `crm_companies_id`, `core_users_id`, `expected_close_date` (2026-10-29) |
+| 4 | CALENDAR «Календарь» | `calendar_from_slug` = `expected_close_date`; `columns`: `title`, `crm_stages_id`, `amount` (2026-10-29) |
 
 **Настройки модулей / CRM / Воронки** (`crm_pipelines`) — в omni4 у TABLE
 группировка по `business_units_id`. В v2 этой колонки нет: группировку
