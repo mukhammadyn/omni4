@@ -381,6 +381,10 @@ const OMNI4_MAPPING = {
   lead_forms_table: LEAD_FORMS,
   deal_contact_field: "crm_contacts_id",
   deal_form_field: "crm_lead_forms_id",
+  // Связи: шлюз пишет в них guid, а не массив, и пропускает не-guid
+  // (ветка feat/facebook-leads-lookup-fields шлюза, `setCRMChoice`).
+  pipeline_field: "crm_pipelines_id",
+  stage_field: "crm_stages_id",
 };
 
 type CrmMappingDto = { mapping?: Record<string, string> };
@@ -409,4 +413,47 @@ export function useMetaMapping(connected: boolean) {
     loaded: query.isSuccess,
     save,
   };
+}
+
+/* ---------------- Meta: воронка лидов по странице ---------------- */
+
+type PipelineMappingsDto = { pages?: { page_id?: string; pipeline_value?: string; stage_value?: string }[] };
+export type MetaPageRoute = { pipelineId: string; stageId: string };
+
+/**
+ * Куда ложатся лиды страницы: воронка и этап (`/v1/facebook/pipeline-mappings`,
+ * как в new-crm ARMADA — `MetaPagePipelineEditor`). Значения — guid omni4.
+ * Этап — связь `crm_stages_id`, воронка — `crm_pipelines_id` из crm-mapping
+ * (`OMNI4_MAPPING`); шлюз пишет в них guid (docs/backend-notes.md,
+ * «Воронка лида Meta по странице»).
+ */
+export function useMetaPageRoutes(connected: boolean) {
+  const envId = useSession().getEnvironmentId() ?? "";
+  const queryClient = useQueryClient();
+  const key = [...keys.settings.integration(envId, "facebook"), "pipelines"];
+
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => api.get<PipelineMappingsDto>("/v1/facebook/pipeline-mappings"),
+    enabled: connected,
+  });
+
+  const save = useMutation({
+    mutationFn: ({ pageId, pipelineId, stageId }: MetaPageRoute & { pageId: string }) =>
+      api.put<unknown>(`/v1/facebook/pipeline-mappings/${encodeURIComponent(pageId)}`, {
+        pipeline_value: pipelineId,
+        pipeline_stage_field: pipelineId ? "crm_stages_id" : "",
+        stage_value: stageId,
+      }),
+    onError: (error) => reportError(error, "common.saveFailed"),
+    onSuccess: () => {
+      toast.success(i18n.t("settings.saved"));
+      return queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+
+  const routes = new Map<string, MetaPageRoute>(
+    (query.data?.pages ?? []).map((p) => [p.page_id ?? "", { pipelineId: p.pipeline_value ?? "", stageId: p.stage_value ?? "" }]),
+  );
+  return { routes, loading: query.isLoading, save };
 }

@@ -3449,5 +3449,13 @@
   "crmset.entryBlocked_one": "Она выбрана в {{count}} сделке — удалить нельзя. Её можно выключить.",
   "crmset.entryBlocked_few": "Она выбрана в {{count}} сделках — удалить нельзя. Её можно выключить.",
   "crmset.entryBlocked_many": "Она выбрана в {{count}} сделках — удалить нельзя. Её можно выключить.",
-  "crmset.entryBlocked_other": "Она выбрана в {{count}} сделках — удалить нельзя. Её можно выключить."
+  "crmset.entryBlocked_other": "Она выбрана в {{count}} сделках — удалить нельзя. Её можно выключить.",
+  "crmset.groupMarketing": "Маркетинг",
+  "crmset.metaRoutes": "Лиды Meta",
+  "crmset.metaRoutesHint": "В какую воронку и на какой этап попадают лиды с каждой страницы Facebook.",
+  "crmset.metaNotConnected": "Meta не подключена или у неё нет страниц. Подключите её в «Интеграциях».",
+  "crmset.openIntegrations": "Открыть интеграции",
+  "crmset.pipeline": "Воронка",
+  "crmset.noPipeline": "Без воронки — по умолчанию",
+  "crmset.entryStage": "Этап входа"
 }
