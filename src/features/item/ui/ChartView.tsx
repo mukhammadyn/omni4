@@ -300,7 +300,9 @@ function SizeHandle({
   onPreview,
   onCommit,
   onCancel,
+  stepPx,
 }: {
+  stepPx?: number | undefined;
   edge: "right" | "bottom";
   card: RefObject<HTMLElement | null>;
   value: number;
@@ -317,7 +319,7 @@ function SizeHandle({
 
   const start = (event: PointerEvent<HTMLDivElement>) => {
     const element = card.current;
-    const grid = element?.parentElement;
+    const grid = element?.closest<HTMLElement>("[data-chart-grid-layout]") ?? element?.parentElement;
     if (!element || !grid || event.button !== 0 || !event.isPrimary) return;
 
     // Ручка живёт внутри карточки, которую тащат мышью, — без этого
@@ -329,8 +331,8 @@ function SizeHandle({
 
     const step =
       edge === "right"
-        ? (grid.getBoundingClientRect().width + GRID_GAP) / MAX_SPAN
-        : ROW_HEIGHT;
+        ? (grid.getBoundingClientRect().width + (Number.parseFloat(getComputedStyle(grid).columnGap) || GRID_GAP)) / MAX_SPAN
+        : stepPx ?? ROW_HEIGHT;
 
     const sizeAt = (point: globalThis.PointerEvent) =>
       clamp(
@@ -507,8 +509,10 @@ export function ChartCard({
   hideHeader = false,
   scrollContent = true,
   onPick,
+  sizeRows,
 }: {
   onPick?: ((key: string) => void) | undefined;
+  sizeRows?: { value: number; max: number; unit: number; gap: number } | undefined;
   config: ChartConfig;
   columns: Field[];
   relations: Relation[];
@@ -605,7 +609,7 @@ export function ChartCard({
    */
   const [sizing, setSizing] = useState<{ width: number; height: number } | null>(null);
   const width = sizing?.width ?? config.width;
-  const height = sizing?.height ?? config.height;
+  const height = sizing?.height ?? sizeRows?.value ?? config.height;
   const card = useRef<HTMLElement>(null);
 
   return (
@@ -619,7 +623,7 @@ export function ChartCard({
        * Не поместилось — прокручивается внутри, как и положено плитке
        * на панели.
        */
-      style={plain ? undefined : { height: `${height * ROW_HEIGHT}px`, ...(config.appearance?.padding !== undefined ? { padding: config.appearance.padding } : {}), ...(config.appearance?.radius !== undefined ? { borderRadius: config.appearance.radius } : {}) }}
+      style={plain ? undefined : { height: `${sizeRows ? height * sizeRows.unit + (height - 1) * sizeRows.gap : height * ROW_HEIGHT}px`, ...(config.appearance?.padding !== undefined ? { padding: config.appearance.padding } : {}), ...(config.appearance?.radius !== undefined ? { borderRadius: config.appearance.radius } : {}) }}
       /* Выделение текста в заголовке — не бросок карточки: у поля ввода
          внутри draggable-родителя браузер начинает перетаскивание
          вместо выделения. */
@@ -675,13 +679,14 @@ export function ChartCard({
             card={card}
             value={height}
             min={MIN_ROWS}
-            max={MAX_ROWS}
+            max={sizeRows?.max ?? MAX_ROWS}
             label={t("chart.resizeHeight")}
+            stepPx={sizeRows ? sizeRows.unit + sizeRows.gap : undefined}
             onPreview={(next) => setSizing({ width, height: next })}
             onCancel={() => setSizing(null)}
             onCommit={(next) => {
               setSizing(null);
-              if (next !== config.height) onChange({ height: next });
+              if (next !== (sizeRows?.value ?? config.height)) onChange({ height: next });
             }}
           />
         </>

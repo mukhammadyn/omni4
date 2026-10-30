@@ -1,4 +1,5 @@
 import { parseFilters, toCharts, toChartsAttribute, toAggregation, type ChartConfig, type ChartMeasure, type Filters, type Sort } from "@/features/item";
+import { MAX_LAYOUT_ROW, placeWidgets } from "./widget-layout";
 import { parseCalculatedFields, type CalculatedField } from "./calculated-fields";
 import { parseFieldPresentation, type FieldPresentation } from "./field-presentation";
 import { toDatasets, type Dataset } from "./datasets";
@@ -145,7 +146,7 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
                 source_field: filter.sourceField,
               },
         ),
-        widgets: dashboard.widgets.map((widget) => ({
+        widgets: placeWidgets(dashboard.widgets).map((widget) => ({
           ...toChartsAttribute([widget])[0],
           table_slug: widget.tableSlug,
           ...(widget.layout ? { layout: widget.layout } : {}),
@@ -311,5 +312,5 @@ function toRatio(value: unknown): Widget["ratio"] | null {
 
 function parseLayout(value: Record<string, unknown>): { column: number; row: number; rows: number } {
   const bounded = (key: string, max: number) => typeof value[key] === "number" && Number.isFinite(value[key]) ? Math.max(1, Math.min(max, Math.round(value[key]))) : 1;
-  return { column: bounded("column", 12), row: bounded("row", 100), rows: bounded("rows", 12) };
+  return { column: bounded("column", 12), row: bounded("row", MAX_LAYOUT_ROW), rows: bounded("rows", 12) };
 }
