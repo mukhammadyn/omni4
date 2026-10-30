@@ -197,16 +197,48 @@ export function usePbxCall() {
   });
 }
 
-/** onlinePBX включён в проекте. Без этого кнопки «Позвонить» нет. */
-export function usePbxEnabled() {
+/**
+ * Коды отказа `pbx_get_webrtc_credentials`, при которых человек всё же
+ * оператор: добавочный есть, не вышло только с WebRTC. Ему — звонок
+ * старым путём (`pbx_make_call`). Остальные отказы — «телефонии нет»:
+ * выключена, не оператор, нет настроек или самой функции
+ * (pbx-fn, functions/pbx_webrtc.go, PBXGetWebRTCCredentials).
+ */
+const FALLBACK_CODES = [
+  "PBX_OPERATOR_NOT_FOUND",
+  "PBX_WEBRTC_NOT_AVAILABLE",
+  "PBX_VERTO_HOST_NOT_CONFIGURED",
+  "PBX_AUTH_FAILED",
+  "PBX_PROVIDER_ERROR",
+];
+
+export type PbxMode = "off" | "fallback" | "verto";
+
+/**
+ * Что может этот человек: звонить из браузера, только старым путём
+ * или никак. Спрашиваем функцию, а не читаем `pbx_settings`: в той
+ * строке ключ API onlinePBX, и читать её нужно только экрану настроек
+ * — иначе ключ уезжает в браузер каждому сотруднику.
+ *
+ * ponytail: временный `PBX_PROVIDER_ERROR` держит «старый путь» до
+ * перезапроса (5 минут или возврат на вкладку).
+ */
+export function usePbxMode(): PbxMode {
   const envId = useSession().getEnvironmentId() ?? "";
   const query = useQuery({
-    queryKey: [...keys.settings.integration(envId, "pbx"), "enabled"],
-    queryFn: () => listRows("pbx_settings", 1).then((rows) => rows[0]?.["enable"] === true),
+    queryKey: [...keys.settings.integration(envId, "pbx"), "mode"],
+    queryFn: () =>
+      fetchWebRtcCredentials().then(
+        (): PbxMode => "verto",
+        (error: unknown): PbxMode => {
+          const message = error instanceof Error ? error.message : String(error);
+          return FALLBACK_CODES.some((code) => message.includes(code)) ? "fallback" : "off";
+        },
+      ),
     staleTime: 5 * 60_000,
     retry: false,
   });
-  return query.data === true;
+  return query.data ?? "off";
 }
 
 /**

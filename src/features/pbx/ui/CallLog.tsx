@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { session } from "@/shared/api/session";
+import { formatDate } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
@@ -29,7 +30,6 @@ export function CallLog({ search }: { search: string }) {
     setPage(1);
   };
   const me = session.getUserId();
-  const time = new Intl.DateTimeFormat(i18n.language, { dateStyle: "short", timeStyle: "short" });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -92,7 +92,7 @@ export function CallLog({ search }: { search: string }) {
               {calls.map((call) => (
                 <tr key={call.guid} className="border-b border-border hover:bg-surface-hover">
                   <td className="px-3 py-2 whitespace-nowrap text-fg-muted">
-                    {call.at ? time.format(new Date(call.at)) : "—"}
+                    {formatDate(call.at, "datetime", i18n.language) ?? "—"}
                   </td>
                   <td className="px-3 py-2">{call.userName || "—"}</td>
                   <td className="px-3 py-2 tabular-nums">{call.phone || "—"}</td>
