@@ -3423,5 +3423,13 @@
   "crmset.drag": "Tartibni o‘zgartirish uchun sudrang",
   "crmset.activeVersion": "Amaldagi mezonlar versiyasi",
   "crmset.entryBlocked_one": "U {{count}} ta bitimda tanlangan — o‘chirib bo‘lmaydi. Uni o‘chirib qo‘yish mumkin.",
-  "crmset.entryBlocked_other": "U {{count}} ta bitimda tanlangan — o‘chirib bo‘lmaydi. Uni o‘chirib qo‘yish mumkin."
+  "crmset.entryBlocked_other": "U {{count}} ta bitimda tanlangan — o‘chirib bo‘lmaydi. Uni o‘chirib qo‘yish mumkin.",
+  "crmset.groupMarketing": "Marketing",
+  "crmset.metaRoutes": "Meta lidlari",
+  "crmset.metaRoutesHint": "Har bir Facebook sahifasidan kelgan lidlar qaysi voronka va bosqichga tushadi.",
+  "crmset.metaNotConnected": "Meta ulanmagan yoki sahifalari yo‘q. Uni «Integratsiyalar»da ulang.",
+  "crmset.openIntegrations": "Integratsiyalarni ochish",
+  "crmset.pipeline": "Voronka",
+  "crmset.noPipeline": "Voronkasiz — standart",
+  "crmset.entryStage": "Kirish bosqichi"
 }

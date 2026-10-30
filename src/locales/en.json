@@ -3426,5 +3426,13 @@
   "crmset.drag": "Drag to reorder",
   "crmset.activeVersion": "Active criteria version",
   "crmset.entryBlocked_one": "It is used in {{count}} deal and can't be deleted. You can switch it off.",
-  "crmset.entryBlocked_other": "It is used in {{count}} deals and can't be deleted. You can switch it off."
+  "crmset.entryBlocked_other": "It is used in {{count}} deals and can't be deleted. You can switch it off.",
+  "crmset.groupMarketing": "Marketing",
+  "crmset.metaRoutes": "Meta leads",
+  "crmset.metaRoutesHint": "Which pipeline and stage leads from each Facebook page go to.",
+  "crmset.metaNotConnected": "Meta is not connected or has no pages. Connect it in Integrations.",
+  "crmset.openIntegrations": "Open integrations",
+  "crmset.pipeline": "Pipeline",
+  "crmset.noPipeline": "No pipeline — default",
+  "crmset.entryStage": "Entry stage"
 }

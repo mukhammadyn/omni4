@@ -430,6 +430,17 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
   `is_active`, `sort_order`), `crm_call_quality_versions` (`criteria` —
   JSON `[{id, name, max_score, instructions, allowed_scores}]`,
   `violation_rules`, `auto_evaluate`, `is_active` — действующая одна);
+  «Маркетинг → Лиды Meta» (2026-10-30) пишет не в таблицы проекта,
+  а в шлюз: `PUT /v1/facebook/pipeline-mappings/{page_id}` с guid'ами
+  `crm_pipelines` / `crm_stages` и `pipeline_stage_field = crm_stages_id`.
+  Нужны подключённая Meta со страницами, сопоставление на таблицы omni4
+  (кнопка в «Интеграциях») и активные воронки с этапами. Шлюз пишет:
+  `crm_contacts` — `full_name`, `phone`, `email`; `crm_deals` — `title`,
+  `crm_pipelines_id`, `crm_stages_id`, `crm_contacts_id`,
+  `crm_lead_forms_id`, `meta_ad_id`, `meta_ad_name`; `crm_lead_forms` —
+  `form_id`, `name`, `page_id`, `page_name`, `accept_leads`. Работает
+  после выкладки ветки шлюза `feat/facebook-leads-lookup-fields`
+  (docs/backend-notes.md, «Воронка лида Meta по странице»);
 - `CRM / Служебные`: `crm_deal_items`, `crm_deal_stage_history`,
   `crm_messages`;
 - `HRMS` (прямо в папке): `hr_work_schedules` (Шаблоны графиков, 📐 `1f4d0`);
