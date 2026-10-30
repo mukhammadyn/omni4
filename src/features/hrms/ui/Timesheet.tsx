@@ -201,29 +201,27 @@ export function TotalsCells({ totals }: { totals: SheetTotals }) {
   return TOTALS.map((key, index) => <TotalCell key={key} total={key} totals={totals} className={index === 0 ? "border-l" : ""} />);
 }
 
-/** Один итог строки. `whole` — длительности только часами; `byDays` — норма днями, «Дни» против неё. */
+/** Один итог строки. `whole` — длительности только часами. */
 export function TotalCell({
   total,
   totals,
   whole = false,
-  byDays = false,
   className = "",
   style,
 }: {
   total: (typeof TOTALS)[number];
   totals: SheetTotals;
   whole?: boolean;
-  byDays?: boolean;
   className?: string;
   style?: CSSProperties;
 }) {
   const duration = useDuration(whole);
   const [value, tone] = {
-    plan: [byDays ? totals.planDays || "—" : duration(totals.planMinutes), "text-fg-subtle"],
+    plan: [duration(totals.planMinutes), "text-fg-subtle"],
     hours: [duration(totals.workedMinutes), `font-semibold ${factColor(totals.workedMinutes, totals.planMinutes)}`],
     late: [duration(totals.lateMinutes), "text-fg"],
     overtime: [duration(totals.overtimeMinutes), "text-fg"],
-    days: [totals.days || "—", byDays ? `font-semibold ${factColor(totals.days, totals.planDays)}` : "text-fg"],
+    days: [totals.days || "—", "text-fg"],
     absences: [totals.absences || "—", totals.absences ? "font-semibold text-danger" : "text-fg-subtle"],
   }[total];
   return (
@@ -324,7 +322,15 @@ export function CellView({
         className={`relative flex items-center justify-center px-0.5 text-xs ${square ? "mx-auto size-7 rounded-[4px]" : "h-[30px] w-full rounded-[5px]"} tabular-nums outline-none transition hover:ring-1 hover:ring-accent hover:ring-inset focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${style}`}
       >
         {content}
-        {cell.pending.length > 0 && <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-warning" />}
+        {/* Оплачиваемые часы праздника/отсутствия — в правом углу; точка ожидания тогда уходит влево. */}
+        {cell.paidMinutes !== undefined && (
+          <span className="absolute top-0.5 right-1 text-[9px] leading-none font-normal opacity-80">
+            {t("timesheet.h", { h: Math.round(cell.paidMinutes / 60) })}
+          </span>
+        )}
+        {cell.pending.length > 0 && (
+          <span className={`absolute top-0.5 size-1.5 rounded-full bg-warning ${cell.paidMinutes !== undefined ? "left-0.5" : "right-0.5"}`} />
+        )}
       </button>
     </Tooltip>
   );

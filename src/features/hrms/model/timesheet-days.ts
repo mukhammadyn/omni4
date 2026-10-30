@@ -226,5 +226,8 @@ export function toSheetCell(row: DayRow, leaveOf: (typeId: string | null) => Lea
     holiday: "",
     pending: row.unconfirmed ? ["mark"] : [],
     pendingLeave: null,
+    // Как в расчёте зарплаты (timesheet-salary): оплачиваемый день — часами смены, без оплаты — 0.
+    ...(row.day_kind === "leave" ? { paidMinutes: row.absence_paid ? row.plan_minutes : 0 } : {}),
+    ...(row.day_kind === "holiday" ? { paidMinutes: row.plan_minutes } : {}),
   };
 }

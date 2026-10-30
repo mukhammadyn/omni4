@@ -70,18 +70,18 @@ export function FormSection({
   id?: string;
   icon: LucideIcon;
   title: string;
-  hint: string;
+  hint?: string;
   children: ReactNode;
 }) {
   return (
     <section id={id} className="mb-4 scroll-mt-4 rounded-xl bg-surface ring-1 ring-border ring-inset">
       <div className="flex items-center gap-3 border-b border-border px-4.5 py-3.5">
-        <span className="grid size-7.5 place-items-center rounded-lg bg-surface-hover text-fg-muted">
+        <span className="grid size-7.5 shrink-0 place-items-center rounded-lg bg-surface-hover text-fg-muted">
           <Icon as={icon} size={15} />
         </span>
         <div>
           <h3 className="text-[15px] font-semibold">{title}</h3>
-          <small className="text-[12.5px] text-fg-subtle">{hint}</small>
+          {hint && <small className="text-[12.5px] text-fg-subtle">{hint}</small>}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 px-4.5 pt-3.5 pb-4.5 max-md:grid-cols-1">{children}</div>

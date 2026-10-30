@@ -1,17 +1,17 @@
 import { useState } from "react";
+import { ClockIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Dropdown } from "@/shared/ui/dropdown";
+import { Field, Input } from "@/shared/ui/input";
 import { Modal } from "@/shared/ui/modal";
 import { useEditDay, useFillDays, useSheetOverlap, useSheetPay } from "../api/timesheet-days";
-import { overtimeOf } from "../model/timesheet";
+import { FormItem, FormSection } from "./record-form";
 import { DAY_KINDS, isEdited, parseHours, toHours, type DayKind, type DayRow, type Edit, type PeriodKind } from "../model/timesheet-days";
 
 const box = "flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-modal";
-const input =
-  "h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-accent disabled:bg-surface-soft";
 
 /**
  * «Заполнить» одного табеля: дни его отдела за его период в строки дня
@@ -162,9 +162,23 @@ export function DayEditor({
     no_checkout: row.no_checkout,
   });
   const [reason, setReason] = useState(row.reason);
-  // Отработанное — в часах («5», «5,5», «5:30»): минуты неудобно считать в уме. Хранится в минутах.
-  const [workedText, setWorkedText] = useState(toHours(row.worked_minutes));
-  const workedValid = parseHours(workedText) !== null;
+  const plan = row.plan_minutes;
+  /*
+   * Переработка не хранится — выводится из факта так, чтобы формула ниже
+   * давала сохранённый факт. Факт не правится руками: он считается из
+   * опоздания, раннего ухода и переработки.
+   */
+  const [overtime, setOvertime] = useState(Math.max(0, row.worked_minutes - plan + row.late_minutes + row.early_minutes));
+  /* Поля времени держат свой текст — после «Сбросить день» пересоздаются заново. */
+  const [resets, setResets] = useState(0);
+  const factOf = (late: number, early: number, over: number) => Math.max(0, plan - late - early + over);
+  const change = (next: { late?: number; early?: number; over?: number }) => {
+    const late = next.late ?? draft.late_minutes;
+    const early = next.early ?? draft.early_minutes;
+    const over = next.over ?? overtime;
+    setOvertime(over);
+    setDraft({ ...draft, late_minutes: late, early_minutes: early, worked_minutes: factOf(late, early, over) });
+  };
   const kind = (value: DayKind) => t(`timesheets.dayKind.${value}`);
   const summary = (value: Edit) =>
     [kind(value.day_kind), `${t("timesheets.late")} ${value.late_minutes}`, `${t("timesheets.early")} ${value.early_minutes}`, `${t("timesheets.worked")} ${toHours(value.worked_minutes)}`, value.no_checkout ? t("timesheets.noCheckout") : ""]
@@ -172,22 +186,6 @@ export function DayEditor({
       .join(" · ");
   const before = summary(row);
   const after = summary(draft);
-  const minutes = (key: "late_minutes" | "early_minutes", label: string, orig: number) => (
-    <label className="flex min-w-0 flex-col gap-1 text-sm">
-      {/* Подпись в одну строку, «было» — под полем: иначе поля разъезжаются по высоте. */}
-      <span className="truncate text-fg-muted" title={label}>
-        {label}
-      </span>
-      <input
-        type="number"
-        min={0}
-        value={draft[key]}
-        onChange={(event) => setDraft({ ...draft, [key]: Math.max(0, Number(event.target.value) || 0) })}
-        className={`${input} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none`}
-      />
-      <span className="h-4 text-xs text-fg-subtle">{orig !== draft[key] ? t("timesheets.was", { value: orig }) : ""}</span>
-    </label>
-  );
   const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(`${row.date}T00:00:00Z`));
 
   return (
@@ -197,75 +195,42 @@ export function DayEditor({
           <h2 className="text-lg font-semibold">{name}</h2>
           <span className="text-sm text-fg-muted">{date}</span>
         </div>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg-muted">
-            {t("timesheets.dayKindLabel")}
-            {row.orig_day_kind !== draft.day_kind && <span className="ml-1 text-xs text-fg-subtle">({t("timesheets.was", { value: kind(row.orig_day_kind) })})</span>}
-          </span>
+        <Field
+          label={t("timesheets.dayKindLabel")}
+          {...(row.orig_day_kind !== draft.day_kind ? { hint: t("timesheets.was", { value: kind(row.orig_day_kind) }) } : {})}
+        >
           <Dropdown
             value={draft.day_kind}
             items={DAY_KINDS.map((value) => ({ value, label: kind(value) }))}
             ariaLabel={t("timesheets.dayKindLabel")}
             onChange={(value) => setDraft({ ...draft, day_kind: value as DayKind })}
           />
-        </label>
-        {/* План/факт — часами; ниже минуты дня. План и переработка не правятся: план — из графика, переработка считается из факта. */}
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <label className="flex min-w-0 flex-col gap-1 text-sm">
-            <span className="truncate text-fg-muted">{t("timesheets.planHours")}</span>
-            <input value={toHours(row.plan_minutes)} readOnly disabled className={`${input} opacity-70`} />
-            <span className="h-4" />
-          </label>
-          <label className="flex min-w-0 flex-col gap-1 text-sm">
-            <span className="truncate text-fg-muted" title={t("timesheets.factHours")}>
-              {t("timesheets.factHours")}
-            </span>
-            <input
-              inputMode="decimal"
-              value={workedText}
-              placeholder={t("timesheets.hoursPlaceholder")}
-              aria-invalid={!workedValid}
-              onChange={(event) => {
-                setWorkedText(event.target.value);
-                const next = parseHours(event.target.value);
-                if (next !== null) setDraft({ ...draft, worked_minutes: next });
-              }}
-              onBlur={() => workedValid && setWorkedText(toHours(draft.worked_minutes))}
-              className={`${input} ${workedValid ? "" : "border-danger"}`}
-            />
-            <span className="h-4 text-xs text-fg-subtle">
-              {row.orig_worked_minutes !== draft.worked_minutes ? t("timesheets.was", { value: toHours(row.orig_worked_minutes) }) : ""}
-            </span>
-          </label>
+          <Field label={t("timesheets.planHours")}>
+            <Input value={toHours(plan)} readOnly disabled />
+          </Field>
+          {/* Факт не правится: план − опоздание − ранний уход + переработка. */}
+          <Field label={t("timesheets.factHours")}>
+            <Input value={toHours(draft.worked_minutes)} readOnly disabled className="font-semibold" />
+          </Field>
         </div>
-        <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium">{t("timesheets.minutes")}</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {minutes("late_minutes", t("timesheets.lateLabel"), row.orig_late_minutes)}
-            {minutes("early_minutes", t("timesheets.earlyLabel"), row.orig_early_minutes)}
-            <label className="flex min-w-0 flex-col gap-1 text-sm">
-              <span className="truncate text-fg-muted">{t("timesheets.overtimeLabel")}</span>
-              <input value={overtimeOf(draft.worked_minutes, row.plan_minutes)} readOnly disabled className={`${input} opacity-70`} />
-              <span className="h-4" />
-            </label>
+        <FormSection icon={ClockIcon} title={t("timesheets.time")}>
+          <div key={resets} className="col-span-full grid grid-cols-3 gap-3">
+            <FormItem label={t("timesheets.lateLabel")}>
+              <DurationInput minutes={draft.late_minutes} onChange={(late) => change({ late })} />
+            </FormItem>
+            <FormItem label={t("timesheets.earlyLabel")}>
+              <DurationInput minutes={draft.early_minutes} onChange={(early) => change({ early })} />
+            </FormItem>
+            <FormItem label={t("timesheets.overtimeLabel")}>
+              <DurationInput minutes={overtime} onChange={(over) => change({ over })} />
+            </FormItem>
           </div>
-        </section>
-        <label className="flex w-fit cursor-pointer items-center gap-2.5 text-sm">
-          {/* Переключатель как в record-form (Toggle): нативный чекбокс скрыт, вид — дорожка с бегунком. */}
-          <input
-            type="checkbox"
-            role="switch"
-            checked={draft.no_checkout}
-            onChange={(event) => setDraft({ ...draft, no_checkout: event.target.checked })}
-            className="peer sr-only"
-          />
-          <span className="relative h-4.5 w-7.5 shrink-0 rounded-full bg-border-strong transition-colors peer-checked:bg-warning peer-focus-visible:ring-2 peer-focus-visible:ring-accent after:absolute after:top-0.5 after:left-0.5 after:size-3.5 after:rounded-full after:bg-white after:shadow-sm after:transition-[left] peer-checked:after:left-3.5" />
-          {t("timesheets.noCheckout")}
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg-muted">{t("timesheets.reason")}</span>
-          <input value={reason} onChange={(event) => setReason(event.target.value)} className={input} />
-        </label>
+        </FormSection>
+        <Field label={t("timesheets.reason")}>
+          <Input value={reason} onChange={(event) => setReason(event.target.value)} />
+        </Field>
         <div className="flex items-center justify-between gap-2">
           {isEdited(row) ? (
             <Button
@@ -278,7 +243,8 @@ export function DayEditor({
                   worked_minutes: row.orig_worked_minutes,
                   no_checkout: row.orig_no_checkout,
                 });
-                setWorkedText(toHours(row.orig_worked_minutes));
+                setOvertime(Math.max(0, row.orig_worked_minutes - plan + row.orig_late_minutes + row.orig_early_minutes));
+                setResets(resets + 1);
               }}
             >
               {t("timesheets.resetDay")}
@@ -291,7 +257,7 @@ export function DayEditor({
               {t("action.cancel")}
             </Button>
             <Button
-              disabled={save.isPending || !workedValid || (before === after && reason === row.reason)}
+              disabled={save.isPending || (before === after && reason === row.reason)}
               onClick={() => {
                 // Строка в сетке уже новая (useEditDay правит кэш сразу); отказ вернёт её и скажет об этом.
                 save.mutate({ row, label: `${name}, ${date}`, values: draft, reason: reason.trim(), before, after });
@@ -304,5 +270,27 @@ export function DayEditor({
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Длительность «ч:мм»: «0:15», «1:30», «1,5». Неразборчивое — красной рамкой, наружу не уходит. */
+function DurationInput({ minutes, onChange }: { minutes: number; onChange: (minutes: number) => void }) {
+  const { t } = useTranslation();
+  const [text, setText] = useState(toHours(minutes));
+  const valid = parseHours(text) !== null;
+  return (
+    <Input
+      inputMode="decimal"
+      value={text}
+      placeholder={t("timesheets.hoursPlaceholder")}
+      aria-invalid={!valid}
+      onChange={(event) => {
+        setText(event.target.value);
+        const next = parseHours(event.target.value);
+        if (next !== null) onChange(next);
+      }}
+      onBlur={() => setText(toHours(minutes))}
+      className={valid ? "" : "border-danger"}
+    />
   );
 }

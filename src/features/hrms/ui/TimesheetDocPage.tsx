@@ -101,10 +101,8 @@ export function TimesheetDocPage({
   const decide = useDecideSheet(guid);
   const [dialog, setDialog] = useState<"fill" | "approve" | "return" | null>(null);
   const [editing, setEditing] = useState<{ row: DayRow; name: string } | null>(null);
-  /* «По дням» — факт днями явки, «По часам» — часами. */
-  const [unit, setUnit] = useState<"days" | "hours">("hours");
-  const fact = unit === "days" ? "days" : "hours";
-  const rest = TOTALS.filter((key) => key !== "plan" && key !== "hours" && key !== "days");
+  /* Прогулы на табеле не показываются: они видны в ячейках. */
+  const rest = TOTALS.filter((key) => key !== "plan" && key !== "hours" && key !== "days" && key !== "absences");
   const columns = 3 + rest.length + doc.dates.length;
   const { departments } = useOrgDirectory();
   const head = useDayHead();
@@ -332,17 +330,6 @@ export function TimesheetDocPage({
           <section className="rounded-[10px] border border-border bg-surface">
             <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2.5">
               <Legend types={doc.absenceTypes} sample="8" />
-              <div className="ml-auto">
-                <Tabs
-                  variant="segment"
-                  activeId={unit}
-                  onSelect={(id) => setUnit(id === "days" ? "days" : "hours")}
-                  tabs={[
-                    { id: "days", label: t("timesheets.unit.days") },
-                    { id: "hours", label: t("timesheets.unit.hours") },
-                  ]}
-                />
-              </div>
             </div>
             {/* Своя прокрутка по обеим осям — иначе шапка не держится сверху. */}
             <div className="max-h-[calc(100dvh-260px)] overflow-auto">
@@ -353,7 +340,7 @@ export function TimesheetDocPage({
                       {t("timesheet.employee")}
                     </th>
                     {/* Норма и факт закреплены за сотрудником; прочие итоги — рядом, но едут с прокруткой. */}
-                    {(["plan", fact] as const).map((key) => (
+                    {(["plan", "hours"] as const).map((key) => (
                       <th
                         key={key}
                         className="sticky top-0 z-30 border-b border-border bg-surface px-2 py-2 text-right font-normal whitespace-nowrap"
@@ -400,8 +387,8 @@ export function TimesheetDocPage({
                             <span className="truncate">{employee.name}</span>
                           </button>
                         </td>
-                        <TotalCell total="plan" totals={totals} whole byDays={unit === "days"} className={STICKY_TD} style={STICKY.plan} />
-                        <TotalCell total={fact} totals={totals} whole byDays={unit === "days"} className={STICKY_TD} style={STICKY.fact} />
+                        <TotalCell total="plan" totals={totals} whole className={STICKY_TD} style={STICKY.plan} />
+                        <TotalCell total="hours" totals={totals} whole className={STICKY_TD} style={STICKY.fact} />
                         {rest.map((key, index) => (
                           <TotalCell
                             key={key}

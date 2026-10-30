@@ -57,7 +57,6 @@ test("totals: overtime is a balance, late eats it; absences counted", () => {
     days: 2,
     workedMinutes: 1000,
     planMinutes: 480 * 5,
-    planDays: 5,
     lateMinutes: 20,
     overtimeMinutes: 40,
     absences: 1,
