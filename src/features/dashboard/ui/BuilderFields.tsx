@@ -21,7 +21,7 @@ export function BuilderFields({ widget, fields, language, labels, sql, onChange 
   const name = (field: Field) => localized(field.labels, language, field.label);
   const visible = fields.filter((field) => name(field).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   const assign = (field: Field, target = role) => { if (!target) return; const patch = assignBuilderField(widget, field, target, sql); if (patch) onChange(patch); };
-  return <aside className="flex min-h-0 flex-col border-r border-border" aria-label={labels.fields}>
+  return <aside className="flex max-h-[420px] min-h-0 flex-col border-r border-border md:max-h-none" aria-label={labels.fields}>
     <h2 className="flex items-center justify-between border-b border-border p-4 text-sm font-semibold">{labels.fields}<span className="font-normal text-fg-muted">{fields.length}</span></h2>
     <label className="m-3 flex items-center gap-2 rounded border border-border px-2"><Icon as={SearchIcon} size={14} /><input className="min-w-0 w-full bg-transparent py-2 text-sm outline-none" aria-label={labels.search} placeholder={labels.search} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
     {role && <label className="mx-3 mb-3 text-xs text-fg-muted">{labels.assign}<select className="mt-1 w-full rounded border border-border bg-surface p-2 text-sm text-fg" aria-label={labels.assign} value={role} onChange={(event) => setChosen(event.target.value as BuilderRole)}>{roles.map((item) => <option key={item} value={item}>{labels[item]}</option>)}</select></label>}
