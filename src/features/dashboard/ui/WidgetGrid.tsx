@@ -51,6 +51,7 @@ export function WidgetGrid({
   const { t } = useTranslation();
   const [sqlCross, setSqlCross] = useState<Record<string, SqlSelection>>({});
   const positioned = widgets.some((widget) => widget.layout);
+  const arranged = positioned ? [...widgets].sort((a, b) => (a.layout?.row ?? 101) - (b.layout?.row ?? 101) || (a.layout?.column ?? 1) - (b.layout?.column ?? 1)) : widgets;
   const widgetIds = widgets.map((widget) => widget.id).join(",");
   useEffect(() => { setSqlCross({}); }, [menuId, widgetIds]);
   const [cross, setCross] = useState<Record<string, Filters>>({});
@@ -69,7 +70,7 @@ export function WidgetGrid({
     return true;
   };
   const move = (id: string, delta: number) => {
-    const ids = widgets.map((w) => w.id);
+    const ids = arranged.map((w) => w.id);
     const from = ids.indexOf(id);
     const to = from + delta;
     if (from === -1 || to < 0 || to >= ids.length) return;
@@ -122,7 +123,7 @@ export function WidgetGrid({
 
   return (
     <>{Object.keys(sqlCross).length > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-fg-muted" aria-label="SQL selections">{Object.entries(sqlCross).map(([id, selection]) => <Button key={id} type="button" size="sm" variant="secondary" onClick={() => setSqlCross((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)))}>{selection.field}: {selection.value} ×</Button>)}<Button type="button" size="sm" variant="secondary" onClick={() => setSqlCross({})}>{t("dashboard.clearCrossFilters")}</Button></div>}{Object.keys(cross).length > 0 && <div className="mb-2 flex items-center gap-2 text-xs text-fg-muted"><span>{t("dashboard.crossFilterActive")}</span><Button type="button" size="sm" variant="secondary" onClick={() => setCross({})}>{t("dashboard.clearCrossFilters")}</Button></div>}<div className="mb-3 flex items-center justify-between gap-2">{editing ? <p role="status" className="text-xs text-fg-muted">{t("dashboard.draftHint")}</p> : <span />}{editable && <Button type="button" size="sm" variant="secondary" onClick={add}><Icon as={PlusIcon} size={14} />{t("dashboard.addWidget")}</Button>}</div><div className={`grid grid-cols-1 gap-3 lg:grid-cols-12 ${positioned ? "dashboard-positioned-grid" : ""}`}>
-      {widgets.map((widget) => { const card = <WidgetCard
+      {arranged.map((widget) => { const card = <WidgetCard
           key={widget.id}
           widget={widget}
           sqlSelections={Object.entries(sqlCross).filter(([id]) => id !== widget.id).map(([, selection]) => selection)}
