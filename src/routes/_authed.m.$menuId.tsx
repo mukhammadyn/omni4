@@ -133,7 +133,7 @@ import {
   showsTable,
   useMenu,
 } from "@/features/sidebar";
-import { CallButton, CallLog } from "@/features/pbx";
+import { CALLS_TAB, CallButton, CallLog, RecordCalls, useHasRecordCalls } from "@/features/pbx";
 import { useWorkspaceTitle } from "@/features/settings";
 import {
   FieldEditor,
@@ -1397,6 +1397,10 @@ function MenuPage() {
 
   /** Открытая вкладка связи. Их набор приходит из раскладки карточки. */
   const relationTab = relationTabs.find((item) => item.id === search.tab);
+
+  /* «Звонки» onlinePBX — вкладка не view, а своя: связи у журнала нет,
+     звонки находятся по номеру записи (features/pbx, RecordCalls). */
+  const hasCalls = useHasRecordCalls(view?.tableSlug ?? "", drawerRow);
 
   /**
    * Типы, которыми бывает вкладка связи. Набор короче общего: дерево
@@ -2851,7 +2855,7 @@ function MenuPage() {
           sections={drawerLayout.sections}
           heading={drawerLayout.heading}
           trail={drawerTrail}
-          tabs={relationTabs}
+          tabs={hasCalls ? [...relationTabs, { id: CALLS_TAB, label: t("pbx.callsTab") }] : relationTabs}
           /* Вкладку карточки заводит тот же, кто правит настройки view:
              вкладка и есть view — со своими колонками, отбором и именем.
              Имя и удаление — в её панели «⋯», как у таблицы. */
@@ -2878,7 +2882,9 @@ function MenuPage() {
           tab={search.tab ?? ""}
           onTab={(id) => setSearch({ tab: id || undefined })}
           tabContent={
-            relationTab && (
+            search.tab === CALLS_TAB && hasCalls && drawerRow ? (
+              <RecordCalls tableSlug={view.tableSlug} row={drawerRow} />
+            ) : relationTab && (
               <RelationView
                 key={relationTab.id}
                 tab={relationTab}

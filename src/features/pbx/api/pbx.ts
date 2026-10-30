@@ -338,6 +338,58 @@ const PAGE = 50;
  */
 export type CallLogFilter = { direction: string; status: string; userId: string };
 
+/**
+ * Имена сотрудников: в журнале guid строкой (функция пишет `users_id`
+ * без связи), подпись берём из `core_users`.
+ */
+function useUserNames(): Map<string, string> {
+  const envId = useSession().getEnvironmentId() ?? "";
+  const users = useQuery({
+    queryKey: [...keys.settings.integration(envId, "pbx"), "users"],
+    queryFn: () => listRows("core_users", 1000),
+    staleTime: 5 * 60_000,
+  });
+  return new Map((users.data ?? []).map((user) => [str(user, "guid"), str(user, "full_name")]));
+}
+
+const toCall = (row: Row, names: Map<string, string>): PbxCall => ({
+  guid: str(row, "guid"),
+  at: str(row, "created_at"),
+  userName: names.get(str(row, "users_id")) ?? "",
+  phone: str(row, "client_phone"),
+  direction: str(row, "direction"),
+  status: str(row, "status"),
+  duration: typeof row["duration"] === "number" ? row["duration"] : 0,
+  callUuid: str(row, "call_uuid"),
+  recording: str(row, "recording_url"),
+});
+
+/**
+ * Звонки по номеру открытой записи — вкладка «Звонки» карточки.
+ * Связи с контактом у `pbx_calls` нет (строку пишут функция и
+ * софтфон, о карточках они не знают), поэтому — по последним 9 цифрам,
+ * как и «кто звонит» (useCallerName). 100 последних.
+ */
+export function useRecordCalls(phone: string) {
+  const envId = useSession().getEnvironmentId() ?? "";
+  const digits = phone.replace(/\D+/g, "").slice(-9);
+  const names = useUserNames();
+
+  const calls = useQuery({
+    queryKey: [...keys.settings.integration(envId, "pbx"), "calls", "record", digits],
+    enabled: digits.length === 9,
+    queryFn: () =>
+      api
+        .post<ListDto>("/v2/object/get-list/pbx_calls", { data: { limit: 100, offset: 0, client_phone: digits } })
+        .then((dto) => dto.data?.response ?? []),
+  });
+
+  return {
+    calls: (calls.data ?? []).map((row) => toCall(row, names)),
+    isLoading: calls.isLoading && digits.length === 9,
+  };
+}
+
 export function useCallLog(page: number, search: string, filter: CallLogFilter) {
   const envId = useSession().getEnvironmentId() ?? "";
 
@@ -360,14 +412,7 @@ export function useCallLog(page: number, search: string, filter: CallLogFilter) 
     placeholderData: (previous) => previous,
   });
 
-  /* Имена сотрудников: в журнале guid строкой (функция пишет `users_id`
-     без связи), подпись берём из `core_users`. */
-  const users = useQuery({
-    queryKey: [...keys.settings.integration(envId, "pbx"), "users"],
-    queryFn: () => listRows("core_users", 1000),
-    staleTime: 5 * 60_000,
-  });
-  const names = new Map((users.data ?? []).map((user) => [str(user, "guid"), str(user, "full_name")]));
+  const names = useUserNames();
 
   /* Кого предложить в отборе «Сотрудник» — операторов, а не всех людей. */
   const operators = useQuery({
@@ -381,19 +426,7 @@ export function useCallLog(page: number, search: string, filter: CallLogFilter) 
       .map((op) => ({ value: str(op, "users_id"), label: names.get(str(op, "users_id")) ?? "" }))
       .filter((op) => op.value && op.label)
       .sort((a, b) => a.label.localeCompare(b.label)),
-    calls: (calls.data?.data?.response ?? []).map(
-      (row): PbxCall => ({
-        guid: str(row, "guid"),
-        at: str(row, "created_at"),
-        userName: names.get(str(row, "users_id")) ?? "",
-        phone: str(row, "client_phone"),
-        direction: str(row, "direction"),
-        status: str(row, "status"),
-        duration: typeof row["duration"] === "number" ? row["duration"] : 0,
-        callUuid: str(row, "call_uuid"),
-        recording: str(row, "recording_url"),
-      }),
-    ),
+    calls: (calls.data?.data?.response ?? []).map((row) => toCall(row, names)),
     count: calls.data?.data?.count ?? 0,
     pageSize: PAGE,
     isLoading: calls.isLoading,

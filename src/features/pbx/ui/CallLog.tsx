@@ -137,7 +137,7 @@ export function CallLog({ search }: { search: string }) {
   );
 }
 
-function duration(seconds: number) {
+export function duration(seconds: number) {
   if (!seconds) return "—";
   return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
 }
@@ -147,7 +147,7 @@ function duration(seconds: number) {
  * кнопка, которая просит функцию её достать. Пока onlinePBX запись
  * не отдал, функция отвечает `pending`.
  */
-function Recording({ call }: { call: PbxCall }) {
+export function Recording({ call }: { call: PbxCall }) {
   const { t } = useTranslation();
   const fetch = useCallRecording();
   /* Не копия в state: журнал перечитывается, когда софтфон дождался

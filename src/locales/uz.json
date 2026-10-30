@@ -3298,6 +3298,7 @@
   "pbx.outcome.failed": "Bog‘lanib bo‘lmadi",
   "pbx.outcome.canceled": "Bekor qilindi",
   "pbx.logEmpty": "Hali qo‘ng‘iroqlar yo‘q",
+  "pbx.callsTab": "Qo'ng'iroqlar",
   "pbx.filter.direction": "Yo'nalish",
   "pbx.filter.anyDirection": "Barcha qo'ng'iroqlar",
   "pbx.direction.incoming": "Kiruvchi",
