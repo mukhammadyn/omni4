@@ -126,7 +126,7 @@ function useProjectBranding() {
  * в профиле — командировка не перепишет его молча.
  */
 function useAppTimeZone(): string {
-  const { timezone, hasAccount } = useUserTimezone();
+  const { timezone, hasAccount, isLoading } = useUserTimezone();
   const { profile } = useProfile();
   const { mutate } = useUpdateTimezone();
   const filled = useRef(false);
@@ -134,10 +134,13 @@ function useAppTimeZone(): string {
   setTimeZone(timezone);
 
   useEffect(() => {
-    if (!hasAccount || timezone || !profile || filled.current) return;
+    /* Ждём свою строку: пока она едет, пояс пуст, и у DEFAULT ADMIN
+       (строки нет в auth, только в core_users) это уходило в POST новой
+       строки на каждой загрузке — к 2026-10-30 их в omni4 было 88. */
+    if (isLoading || !hasAccount || timezone || !profile || filled.current) return;
     filled.current = true;
     mutate(browserTimeZone());
-  }, [hasAccount, timezone, profile, mutate]);
+  }, [isLoading, hasAccount, timezone, profile, mutate]);
 
   return timeZone();
 }
