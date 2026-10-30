@@ -40,7 +40,7 @@ test("null из правки удаляет дашборд", () => {
 
 test("records widget columns, widths, sorting and pagination survive save/reopen", () => {
   const tree = toTree(raw), widget = findDashboard(tree, "d")!.dashboard.widgets[0]!;
-  Object.assign(widget, { type: "records", columns: ["created_at", "status", "owner", "amount"], columnWidths: { amount: 120 }, sorts: [{ field: "amount", direction: "desc" }], pageSize: 50, currencySlug: "currency" });
+  Object.assign(widget, { type: "records", columns: ["created_at", "status", "owner", "amount"], columnWidths: { amount: 120 }, sorts: [{ field: "amount", direction: "desc" }], pageSize: 50, currencySlug: "currency", sqlTableComfortable: true, sqlRowHeight: 61 });
   expect(toTree(toTreeAttribute(tree))).toEqual(tree);
 });
 

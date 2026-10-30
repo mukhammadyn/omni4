@@ -512,7 +512,7 @@ export function ChartCard({
   sizeRows,
 }: {
   onPick?: ((key: string) => void) | undefined;
-  sizeRows?: { value: number; max: number; unit: number; gap: number } | undefined;
+  sizeRows?: { value: number; min?: number; max: number; unit: number; gap: number } | undefined;
   config: ChartConfig;
   columns: Field[];
   relations: Relation[];
@@ -624,7 +624,7 @@ export function ChartCard({
        * Не поместилось — прокручивается внутри, как и положено плитке
        * на панели.
        */
-      style={plain ? undefined : { height: `${sizeRows ? height * sizeRows.unit + (height - 1) * sizeRows.gap : height * ROW_HEIGHT}px`, ...(config.appearance?.padding !== undefined ? { padding: config.appearance.padding } : {}), ...(config.appearance?.radius !== undefined ? { borderRadius: config.appearance.radius } : {}) }}
+      style={plain ? undefined : { height: `${sizeRows ? height * sizeRows.unit + (height - 1) * sizeRows.gap : height * ROW_HEIGHT}px`, ...(config.appearance?.headerGap !== undefined ? { gap: config.appearance.headerGap } : {}), ...(config.appearance?.padding !== undefined ? { padding: config.appearance.padding } : {}), ...(config.appearance?.radius !== undefined ? { borderRadius: config.appearance.radius } : {}) }}
       /* Выделение текста в заголовке — не бросок карточки: у поля ввода
          внутри draggable-родителя браузер начинает перетаскивание
          вместо выделения. */
@@ -679,7 +679,7 @@ export function ChartCard({
             edge="bottom"
             card={card}
             value={height}
-            min={MIN_ROWS}
+            min={sizeRows?.min ?? MIN_ROWS}
             max={sizeRows?.max ?? MAX_ROWS}
             label={t("chart.resizeHeight")}
             stepPx={sizeRows ? sizeRows.unit + sizeRows.gap : undefined}
@@ -720,7 +720,7 @@ export function ChartCard({
             className="h-7 min-w-0 flex-1 text-sm"
           />
         ) : (
-          <h3 style={config.appearance?.titleSize ? { fontSize: config.appearance.titleSize, fontWeight: config.appearance.titleSize > 14 ? 600 : 500 } : undefined} className={`min-w-0 flex-1 truncate text-fg ${plain ? "text-lg font-semibold" : "text-sm font-medium"}`}>
+          <h3 style={config.appearance?.titleSize ? { fontSize: config.appearance.titleSize, lineHeight: config.appearance.titleSize >= 18 ? "28px" : "20px", fontWeight: config.appearance.titleSize > 14 ? 600 : 500 } : undefined} className={`min-w-0 flex-1 truncate text-fg ${plain ? "text-lg font-semibold" : "text-sm font-medium"}`}>
             {config.title || derived}
           </h3>
         )}
@@ -1175,9 +1175,9 @@ function AxisBars({ series, config, locale, onPick }: { series: ChartSeries; con
   const x = (value: number) => (value - min) / (max - min || 1) * 100;
   const format = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: config.appearance?.decimals ?? 2 });
   return <div className="flex h-full min-h-0 flex-col gap-3" data-axis-bars>
-    <div className="flex min-h-0 flex-1 flex-col justify-around gap-2">{series.points.map((point) => <div key={point.key} className="flex min-h-6 items-center gap-3">
+    <div className="flex min-h-0 flex-1 flex-col">{series.points.map((point) => <div key={point.key} className="flex min-h-0 flex-1 items-center gap-3">
       <button type="button" disabled={!onPick} title={point.label} className="w-40 shrink-0 truncate text-right text-xs text-fg-muted disabled:cursor-default" onClick={() => onPick?.(point.key)}>{point.label}</button>
-      <div className="relative h-7 min-w-0 flex-1">{config.showGrid && ticks.map((tick) => <span key={tick} className="absolute inset-y-0 border-l border-dashed border-chart-grid" style={{ left: `${x(tick)}%` }} />)}
+      <div style={{ height: `${config.appearance?.columnWidth ?? 56}%` }} className="relative min-w-0 flex-1">{config.showGrid && ticks.map((tick) => <span key={tick} className="absolute inset-y-0 border-l border-dashed border-chart-grid" style={{ left: `${x(tick)}%` }} />)}
         <Tooltip label={`${point.label}: ${format(point.value)}`}><button type="button" disabled={!onPick} aria-label={`${point.label}: ${format(point.value)}`} onClick={() => onPick?.(point.key)} className={`absolute inset-y-0 ${config.appearance?.neutral ? "bg-fg" : "bg-chart-1"} ${config.appearance?.rounded ? "rounded-md" : ""} disabled:cursor-default`} style={{ left: `${x(Math.min(0, point.value))}%`, width: `${Math.abs(x(point.value) - x(0))}%` }} /></Tooltip>
       </div>
     </div>)}</div>

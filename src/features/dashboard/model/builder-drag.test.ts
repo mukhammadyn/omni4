@@ -66,11 +66,18 @@ describe("chart builder drag handlers used by BuilderFields and BuilderSlots", (
     const foreign = event({ "text/plain": "amount" }); overFieldSlot(foreign, widget, "value", false);
     expect(foreign.preventDefault).not.toHaveBeenCalled();
   });
-  it("prevents record-column duplicates and leaves SQL columns owned by query", () => {
+  it("prevents record-column duplicates and allows ordering returned SQL columns", () => {
     const widget: Widget = { ...draft(), type: "records", columns: ["status"] }, e = event(), change = vi.fn();
     startFieldDrag(e, widget, text, false); dropField(e, widget, fields, "columns", false, change);
     expect(change).toHaveBeenCalledWith({ columns: ["status"] });
     const sql = event(); startFieldDrag(sql, widget, text, true);
-    expect(sql.preventDefault).toHaveBeenCalledOnce(); expect(sql.dataTransfer.types).toEqual([]);
+    expect(sql.preventDefault).not.toHaveBeenCalled();
+    expect(sql.dataTransfer.types).toContain(BUILDER_FIELD_MIME);
+    change.mockClear();
+    dropField(sql, widget, fields, "columns", true, change);
+    expect(change).toHaveBeenCalledWith({ columns: ["status"] });
+    change.mockClear();
+    dropField(sql, widget, fields, "columns", false, change);
+    expect(change).not.toHaveBeenCalled();
   });
 });

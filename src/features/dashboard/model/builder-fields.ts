@@ -6,7 +6,7 @@ import { isDateField } from "./widget-editor";
 export type BuilderRole = "group" | "value" | "split" | "columns" | "sort";
 export const numericField = (field: Pick<Field, "type">) => ["NUMBER", "FLOAT", "FLOAT_NOLIMIT", "MONEY", "PROGRESS", "RATING", "INCREMENT_ID"].includes(field.type);
 export function builderRoles(widget: Widget, sql: boolean): BuilderRole[] {
-  if (widget.type === "records") return sql ? [] : ["columns", "sort"];
+  if (widget.type === "records") return sql ? ["columns"] : ["columns", "sort"];
   if ((widget.type && widget.type !== "chart") || RAW_CHART_KINDS.has(widget.kind)) return [];
   return [...(widget.kind === "stat" ? [] : ["group" as const]), ...(!widget.measures?.length ? ["value" as const] : []), ...(widget.kind !== "stat" && splittable(widget.kind) && !widget.measures?.length ? ["split" as const] : []), ...(["bar", "column", "line", "area"].includes(widget.kind) && !widget.measures?.length ? ["sort" as const] : [])];
 }
@@ -15,7 +15,7 @@ export function assignBuilderField(widget: Widget, field: Field, role: BuilderRo
   if (!builderRoles(widget, sql).includes(role)) return null;
   if (role === "sort") {
     if (widget.type === "records" && widget.calculatedFields?.some((definition) => definition.slug === field.slug)) return null;
-    if (widget.type !== "records" && ![widget.groupSlug, widget.valueSlug].includes(field.slug)) return null;
+    if (widget.type !== "records" && !sql && ![widget.groupSlug, widget.valueSlug].includes(field.slug)) return null;
     const sorts = widget.sorts ?? [];
     return sorts.some((s) => s.field === field.slug) ? {} : sorts.length < 3 ? { sorts: [...sorts, { field: field.slug, direction: "asc" }] } : null;
   }

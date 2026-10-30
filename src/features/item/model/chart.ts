@@ -88,7 +88,7 @@ export type ChartMeasure = {
 };
 
 export type ChartConfig = {
-  appearance?: { hideTitle?: boolean; neutral?: boolean; axisTicks?: boolean; rounded?: boolean; columnWidth?: number; decimals?: number; titleSize?: number; padding?: number; radius?: number };
+  appearance?: { headerGap?: number; plotTop?: number; plotBottom?: number; plotRight?: number; axisLabelWidth?: number; hideTitle?: boolean; neutral?: boolean; axisTicks?: boolean; rounded?: boolean; columnWidth?: number; decimals?: number; titleSize?: number; padding?: number; radius?: number };
   sorts?: Sort[];
   showLegend?: boolean;
   showGrid?: boolean;
@@ -941,5 +941,5 @@ export function toChartsAttribute(charts: ChartConfig[]): Record<string, unknown
 
 function parseChartAppearance(raw: object): NonNullable<ChartConfig["appearance"]> {
   const value = raw as Record<string, unknown>;
-  return { ...Object.fromEntries(([ ["titleSize", 12, 24], ["padding", 8, 28], ["radius", 0, 24] ] as const).flatMap(([key, min, max]) => typeof value[key] === "number" && Number.isFinite(value[key]) ? [[key, Math.max(min, Math.min(max, value[key]))]] : [])), ...Object.fromEntries(["neutral", "axisTicks", "rounded", "hideTitle"].flatMap((key) => typeof value[key] === "boolean" ? [[key, value[key]]] : [])), ...(typeof value.columnWidth === "number" && Number.isFinite(value.columnWidth) ? { columnWidth: Math.max(10, Math.min(90, value.columnWidth)) } : {}), ...(typeof value.decimals === "number" && Number.isFinite(value.decimals) ? { decimals: Math.max(0, Math.min(4, Math.round(value.decimals))) } : {}) };
+  return { ...Object.fromEntries(([ ["plotTop", 0, 80], ["plotBottom", 0, 80], ["plotRight", 0, 100], ["axisLabelWidth", 20, 100], ["headerGap", 0, 16], ["titleSize", 12, 24], ["padding", 0, 28], ["radius", 0, 24] ] as const).flatMap(([key, min, max]) => typeof value[key] === "number" && Number.isFinite(value[key]) ? [[key, Math.max(min, Math.min(max, value[key]))]] : [])), ...Object.fromEntries(["neutral", "axisTicks", "rounded", "hideTitle"].flatMap((key) => typeof value[key] === "boolean" ? [[key, value[key]]] : [])), ...(typeof value.columnWidth === "number" && Number.isFinite(value.columnWidth) ? { columnWidth: Math.max(10, Math.min(90, value.columnWidth)) } : {}), ...(typeof value.decimals === "number" && Number.isFinite(value.decimals) ? { decimals: Math.max(0, Math.min(4, Math.round(value.decimals))) } : {}) };
 }
