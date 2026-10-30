@@ -3315,6 +3315,7 @@
   "pbx.outcome.failed": "Не удалось дозвониться",
   "pbx.outcome.canceled": "Отменён",
   "pbx.logEmpty": "Звонков пока нет",
+  "pbx.callsTab": "Звонки",
   "pbx.filter.direction": "Направление",
   "pbx.filter.anyDirection": "Все звонки",
   "pbx.direction.incoming": "Входящие",

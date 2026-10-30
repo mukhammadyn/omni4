@@ -3301,6 +3301,7 @@
   "pbx.outcome.failed": "Call failed",
   "pbx.outcome.canceled": "Canceled",
   "pbx.logEmpty": "No calls yet",
+  "pbx.callsTab": "Calls",
   "pbx.filter.direction": "Direction",
   "pbx.filter.anyDirection": "All calls",
   "pbx.direction.incoming": "Incoming",

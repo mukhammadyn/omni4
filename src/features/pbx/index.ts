@@ -10,3 +10,4 @@ export {
 export { CallButton } from "./ui/CallButton";
 export { CallLog } from "./ui/CallLog";
 export { SoftphoneProvider } from "./ui/Softphone";
+export { CALLS_TAB, RecordCalls, useHasRecordCalls } from "./ui/RecordCalls";
