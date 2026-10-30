@@ -1833,3 +1833,36 @@ pbx-fn, `functions/pbx_webrtc.go`, `PBXLogCall`: в `pbx_calls` уходят
 Обход: omni4 пишет строку сам через `POST /v2/items/pbx_calls`
 с `call_uuid` = id звонка Verto (`features/pbx/api/pbx.ts`, `logCall`),
 как new-crm (`savePbxCallHistory`).
+
+## Воронка лида Meta по странице (2026-10-30)
+
+Прод-шлюз умеет `GET/PUT /v1/facebook/pipeline-mappings/{page_id}`
+(воронка и этап входа на страницу) и `GET/PUT /v1/meta-ads/pipeline-campaigns`
+(какие кампании пускаются в воронку — так в ARMADA «креативы → воронка»).
+Привязки по отдельному объявлению нет.
+
+До правки шлюз писал воронку, этап и источник массивом
+(`facebook_professional_crm.go`, `crmCreateDeal`) — это поля-статусы
+new-crm; связи omni4 (`crm_pipelines_id`, `crm_stages_id`) так не
+заполнить. И `pipeline_stage_field` принимался только `pipeline_*`.
+
+Правка — ветка `feat/facebook-leads-lookup-fields` шлюза
+(клон в `~/Documents/workspace/IT/udevs/ucode/gateway-work/`):
+поле `…_id` получает один guid, не-guid в него не пишется; в настройке
+страницы принимается `crm_stages_id`; у такого проекта не пишется
+`pipeline_udevs`; guid этапа и воронки проверяется при сохранении (400,
+а не молчаливый лид без этапа); `PUT /crm-mapping` больше не затирает
+воронки, настроенные на страницах. Поля-статусы ARMADA — как раньше:
+сквозной тест `TestCRMCreateDealPayloadPerSchema` сверяет сделку целиком
+для обеих схем (`facebook_pipeline_mappings_test.go`).
+
+**Порядок выкладки:** сначала шлюз, потом omni4 — omni4 ставит в
+crm-mapping `pipeline_field = crm_pipelines_id`, и старый шлюз записал бы
+туда массив с названием «Udevs».
+
+Названия полей: если воронка или этап в сопоставлении — связь, шлюз
+считает проект схемой v2 и пишет сделке `title`, контакту
+`full_name`/`phone`/`email` (третий коммит ветки); proto не менялся.
+Не пишутся (полей нет в omni4/omni5): `meta_campaign_id`,
+`meta_campaign_name`, `start_date`. Пропущенные звонки
+(`crm_missed_calls.go:224`) пишут воронку массивом так же — не трогал.

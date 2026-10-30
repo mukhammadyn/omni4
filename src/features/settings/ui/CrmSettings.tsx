@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   CheckCircle2Icon,
@@ -36,6 +37,7 @@ import {
   type Pipeline,
   type Stage,
 } from "../api/crm-settings";
+import { useMetaLeads, useMetaPageRoutes, type MetaPageRoute } from "../api/crm-integrations";
 import { SectionHeader } from "./parts";
 
 /**
@@ -562,3 +564,86 @@ function CriteriaEditor({ version, onSave }: { version: CallQualityVersion; onSa
   );
 }
 
+
+/* ===== Маркетинг: лиды Meta по воронкам ===== */
+
+const select = "h-(--spacing-input) w-full rounded-md border border-border bg-surface px-2 text-sm";
+
+/** Страница Facebook → воронка и этап, куда ложатся её лиды. Как `MetaPagePipelineEditor` ARMADA. */
+export function CrmMetaRoutesSettings() {
+  const { t } = useTranslation();
+  const meta = useMetaLeads();
+  const routes = useMetaPageRoutes(meta.connected);
+  const { pipelines } = useCrmPipelines();
+  const navigate = useNavigate();
+
+  return (
+    <Screen title={t("crmset.metaRoutes")} hint={t("crmset.metaRoutesHint")}>
+      {meta.isLoading || routes.loading ? (
+        <p className="py-6 text-center text-sm text-fg-subtle">{t("common.loading")}</p>
+      ) : !meta.connected || !meta.pages.length ? (
+        <div className="flex flex-col items-start gap-2 rounded-xl border border-border p-4 text-sm text-fg-muted">
+          {t("crmset.metaNotConnected")}
+          <Button variant="secondary" size="sm" onClick={() => void navigate({ to: "/settings", search: { section: "resources" } })}>
+            {t("crmset.openIntegrations")}
+          </Button>
+        </div>
+      ) : (
+        meta.pages.map((page) => (
+          <PageRoute
+            key={page.pageId}
+            name={page.pageName || page.pageId}
+            route={routes.routes.get(page.pageId)}
+            pipelines={pipelines.filter((p) => p.active)}
+            busy={routes.save.isPending}
+            onSave={(route) => routes.save.mutate({ pageId: page.pageId, ...route })}
+          />
+        ))
+      )}
+    </Screen>
+  );
+}
+
+function PageRoute({ name, route, pipelines, busy, onSave }: { name: string; route: MetaPageRoute | undefined; pipelines: Pipeline[]; busy: boolean; onSave: (r: MetaPageRoute) => void }) {
+  const { t } = useTranslation();
+  const [pipelineId, setPipelineId] = useState(route?.pipelineId ?? "");
+  const [stageId, setStageId] = useState(route?.stageId ?? "");
+  const pipeline = pipelines.find((p) => p.id === pipelineId);
+  const changed = pipelineId !== (route?.pipelineId ?? "") || stageId !== (route?.stageId ?? "");
+  return (
+    <div className="flex flex-wrap items-end gap-2 rounded-xl border border-border p-3">
+      <b className="w-full text-sm font-semibold">{name}</b>
+      <label className="min-w-48 flex-1">
+        <span className={fieldLabel}>{t("crmset.pipeline")}</span>
+        <select
+          className={select}
+          value={pipelineId}
+          onChange={(e) => {
+            setPipelineId(e.target.value);
+            setStageId(pipelines.find((p) => p.id === e.target.value)?.stages[0]?.id ?? "");
+          }}
+        >
+          <option value="">{t("crmset.noPipeline")}</option>
+          {pipelines.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="min-w-48 flex-1">
+        <span className={fieldLabel}>{t("crmset.entryStage")}</span>
+        <select className={select} value={stageId} disabled={!pipeline} onChange={(e) => setStageId(e.target.value)}>
+          {pipeline?.stages.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Button disabled={!changed || busy || (Boolean(pipelineId) && !stageId)} onClick={() => onSave({ pipelineId, stageId: pipelineId ? stageId : "" })}>
+        {t("action.save")}
+      </Button>
+    </div>
+  );
+}

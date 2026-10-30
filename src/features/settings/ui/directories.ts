@@ -23,6 +23,7 @@ import {
   ListTodoIcon,
   LogOutIcon,
   MapIcon,
+  MegaphoneIcon,
   MapPinIcon,
   MessageSquareTextIcon,
   NetworkIcon,
@@ -344,6 +345,10 @@ export const DIRECTORY_TABS: DirectoryTab[] = [
             sort: ["sort_order"],
           },
         ],
+      },
+      {
+        titleKey: "crmset.groupMarketing",
+        items: [{ id: "crm-meta-routes", titleKey: "crmset.metaRoutes", icon: MegaphoneIcon, screen: true }],
       },
       {
         titleKey: "dir.groupAi",
