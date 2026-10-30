@@ -6,6 +6,7 @@ import { formatDate } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
+import { TranscriptButton } from "./Transcript";
 import { useCallLog, useCallRecording, type CallLogFilter, type PbxCall } from "../api/pbx";
 
 const STATUSES = ["answered", "no_answer", "busy", "failed", "canceled", "initiated"] as const;
@@ -101,7 +102,10 @@ export function CallLog({ search }: { search: string }) {
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{duration(call.duration)}</td>
                   <td className="px-3 py-2">
+                    <div className="flex items-center gap-3">
                     <Recording call={call} />
+                    <TranscriptButton call={call} />
+                  </div>
                   </td>
                 </tr>
               ))}
