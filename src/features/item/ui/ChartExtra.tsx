@@ -28,7 +28,7 @@ export function CartesianChart({ config, series, locale, onPick }: { onPick?: ((
   const pointsFor = (index: number, upper: boolean) => series.points.map((_, at) => `${x(at)},${y(normalized || stacked ? upper ? bands[at]!.bands[index]!.end : bands[at]!.bands[index]!.start : upper ? value(at, splits[index]!.key) : 0, splits[index]!.axis)}`);
   return <div className="flex h-full min-h-[150px] flex-col gap-1">
     <div className="flex min-h-0 flex-1 gap-2">
-      <div className="flex w-14 shrink-0 flex-col justify-between text-right text-2xs tabular-nums text-fg-subtle">{[...ticks].reverse().map((tick) => <span key={tick}>{format(tick)}{normalized ? "%" : ""}</span>)}</div>
+      <div style={config.appearance?.axisLabelWidth ? { width: config.appearance.axisLabelWidth } : undefined} className="flex w-14 shrink-0 flex-col justify-between text-right text-2xs tabular-nums text-fg-subtle">{[...ticks].reverse().map((tick) => <span key={tick}>{format(tick)}{normalized ? "%" : ""}</span>)}</div>
       <svg role="img" aria-label={t(`chart.kind.${config.kind}` as "chart.kind.column")} viewBox="0 0 100 100" preserveAspectRatio="none" className="min-w-0 flex-1 overflow-visible border-b border-chart-grid">
         {config.showGrid === true && (config.appearance?.axisTicks ? ticks.map((tick) => y(tick)) : [4, 27, 50, 73, 96]).map((position) => <line key={position} data-chart-grid x1="0" x2="100" y1={position} y2={position} className="stroke-chart-grid" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />)}
         <line x1="0" x2="100" y1={y(0)} y2={y(0)} className="stroke-chart-grid" vectorEffect="non-scaling-stroke" />
@@ -41,7 +41,7 @@ export function CartesianChart({ config, series, locale, onPick }: { onPick?: ((
       </svg>
       {splits.some((split) => split.axis === "right") && <div className="flex w-14 shrink-0 flex-col justify-between text-2xs tabular-nums text-fg-subtle"><span>{show(right.max, locale)}</span><span>{show(right.min, locale)}</span></div>}
     </div>
-    <div className="flex pl-16 text-2xs text-fg-muted">{series.points.filter((_, at) => config.appearance?.axisTicks || onPick || n <= 8 || at === 0 || at === n - 1).map((point) => <span key={point.key} role={onPick ? "button" : undefined} tabIndex={onPick ? 0 : undefined} onClick={onPick ? () => onPick(point.key) : undefined} onKeyDown={onPick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(point.key); } } : undefined} style={{ width: `${step}%` }} className={`min-w-0 truncate text-center ${onPick ? "cursor-pointer" : ""}`} title={point.label}>{point.label}</span>)}</div>
+    <div style={config.appearance?.axisLabelWidth ? { paddingLeft: config.appearance.axisLabelWidth + 8 } : undefined} className="flex pl-16 text-2xs text-fg-muted">{series.points.filter((_, at) => config.appearance?.axisTicks || onPick || n <= 8 || at === 0 || at === n - 1).map((point) => <span key={point.key} role={onPick ? "button" : undefined} tabIndex={onPick ? 0 : undefined} onClick={onPick ? () => onPick(point.key) : undefined} onKeyDown={onPick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(point.key); } } : undefined} style={{ width: `${step}%` }} className={`min-w-0 truncate text-center ${onPick ? "cursor-pointer" : ""}`} title={point.label}>{point.label}</span>)}</div>
   </div>;
 }
 

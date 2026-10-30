@@ -4,17 +4,20 @@ export const MAX_LAYOUT_ROW = 10000;
 export const LAYOUT_CELL = 135;
 export const LAYOUT_GAP = 16;
 type Box = { column: number; row: number; rows: number; width: number };
-const bounded = (value: number, low: number, high: number) => Number.isFinite(value) ? Math.max(low, Math.min(high, Math.round(value))) : low;
-export const boxesOverlap = (a: Box, b: Box) => a.column < b.column + b.width && b.column < a.column + a.width && a.row < b.row + b.rows && b.row < a.row + a.rows;
+export const layoutTop = (row: number) => Math.round((row - 1) * (LAYOUT_CELL + LAYOUT_GAP));
+export const layoutHeight = (rows: number) => Math.round(rows * (LAYOUT_CELL + LAYOUT_GAP) - LAYOUT_GAP);
+export const layoutRow = (top: number) => top / (LAYOUT_CELL + LAYOUT_GAP) + 1;
+export const layoutRows = (height: number) => (height + LAYOUT_GAP) / (LAYOUT_CELL + LAYOUT_GAP);
+const bounded = (value: number, low: number, high: number) => Number.isFinite(value) ? Math.max(low, Math.min(high, value)) : low;
+export const boxesOverlap = (a: Box, b: Box) => a.column < b.column + b.width - 1e-7 && b.column < a.column + a.width - 1e-7 && a.row < b.row + b.rows - 1e-7 && b.row < a.row + a.rows - 1e-7;
 
 /** The edited card keeps its requested slot; collisions move other cards down, never over them. */
 export function placeWidgets(widgets: Widget[], preferredId?: string): Widget[] {
   if (!widgets.some((widget) => widget.layout)) return widgets;
   const occupied: Box[] = [], placed = new Map<string, Widget>();
-  const order = [...widgets].sort((a, b) => Number(b.id === preferredId) - Number(a.id === preferredId) || (a.layout?.row ?? MAX_LAYOUT_ROW) - (b.layout?.row ?? MAX_LAYOUT_ROW) || (a.layout?.column ?? 1) - (b.layout?.column ?? 1));
+  const order = [...widgets].sort((a, b) => Number(Boolean(b.layout)) - Number(Boolean(a.layout)) || Number(b.id === preferredId && Boolean(b.layout)) - Number(a.id === preferredId && Boolean(a.layout)) || (a.layout?.row ?? MAX_LAYOUT_ROW) - (b.layout?.row ?? MAX_LAYOUT_ROW) || (a.layout?.column ?? 1) - (b.layout?.column ?? 1));
   for (const widget of order) {
-    if (!widget.layout) { placed.set(widget.id, widget); continue; }
-    const width = bounded(widget.width, 3, 12), box: Box = { width, column: bounded(widget.layout.column, 1, 13 - width), row: bounded(widget.layout.row, 1, MAX_LAYOUT_ROW), rows: bounded(widget.layout.rows, 1, 12) };
+    const width = Math.round(bounded(widget.width, 3, 12)), box: Box = { width, column: Math.round(bounded(widget.layout?.column ?? 1, 1, 13 - width)), row: bounded(widget.layout?.row ?? 1, 1, MAX_LAYOUT_ROW), rows: bounded(widget.layout?.rows ?? layoutRows(widget.height * 260), layoutRows(80), 12) };
     const fit = (start: number) => {
       let row = start;
       for (let attempt = 0; attempt <= occupied.length && row <= MAX_LAYOUT_ROW; attempt++) {
@@ -24,7 +27,12 @@ export function placeWidgets(widgets: Widget[], preferredId?: string): Widget[] 
       }
       return null;
     };
-    const row = fit(box.row) ?? fit(1);
+    let row = fit(box.row) ?? fit(1);
+    if (!widget.layout) {
+      let best = { column: box.column, row: row ?? Infinity };
+      for (let column = 1; column <= 13 - width; column++) { box.column = column; const candidate = fit(1); if (candidate !== null && candidate < best.row) best = { column, row: candidate }; }
+      box.column = best.column; row = Number.isFinite(best.row) ? best.row : null;
+    }
     // If the explicit grid is full, CSS auto-placement still keeps the card visible and separate.
     if (row === null) { const next = { ...widget }; delete next.layout; placed.set(widget.id, next); continue; }
     const next = { ...widget, width, layout: { column: box.column, row, rows: box.rows } };

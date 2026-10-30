@@ -46,3 +46,17 @@ test("moving a large chart into a small card's position retains each card's dime
   expect(moved[0]?.layout?.column).toBe(4);
   expect(widgets[0]?.layout?.column).toBe(1);
 });
+
+test("reference card pixel heights and offsets survive serialization exactly", async () => {
+  const {layoutRow,layoutRows,layoutTop,layoutHeight}=await import('./widget-layout');
+  const widgets=[card('age',1,1,3,9),...[["mean",0,126],["young",142,118],["old",276,118]].map(([id,top,height])=>card(String(id),10,layoutRow(Number(top)),layoutRows(Number(height)),3))];
+  const placed=placeWidgets(widgets);noOverlap(placed);
+  expect(placed.slice(1).map(w=>[layoutTop(w.layout!.row),layoutHeight(w.layout!.rows)])).toEqual([[0,126],[142,118],[276,118]]);
+  const tree={folders:[{...newFolder('module','Fixture'),dashboards:[{...newDashboard('Fixture'),widgets:placed}]}]};
+  expect(toTree(toTreeAttribute(tree))).toEqual(tree);
+});
+test("cards without explicit placement are packed safely once a canvas is enabled",()=>{
+  const auto={...newChart(),id:'auto',tableSlug:'',filters:{},answers:{}};
+  const widgets=placeWidgets([card('existing',1,1,3,9),auto]);
+  expect(widgets[1]?.layout).toBeDefined();noOverlap(widgets);
+});

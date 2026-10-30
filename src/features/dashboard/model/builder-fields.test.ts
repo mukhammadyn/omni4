@@ -20,9 +20,15 @@ describe("builder field assignment", () => {
     expect(builderRoles({ ...widgetDraft(), type: "pivot" }, false)).toEqual([]);
     expect(builderRoles({ ...widgetDraft(), measures: [{ id: "a", field: "amount", aggregation: "sum" }] }, false)).not.toContain("value");
   });
-  it("deduplicates record columns and leaves SQL table columns controlled by the query", () => {
+  it("deduplicates visible record columns for both table and SQL sources", () => {
     const widget = { ...widgetDraft(), type: "records" as const, columns: ["name"] };
     expect(assignBuilderField(widget, field("name", "SINGLE_LINE"), "columns", false)).toEqual({ columns: ["name"] });
-    expect(assignBuilderField(widget, field("amount", "NUMBER"), "columns", true)).toBeNull();
+    expect(assignBuilderField(widget, field("amount", "NUMBER"), "columns", true)).toEqual({ columns: ["name", "amount"] });
   });
+});
+
+it("allows an SQL calendar order column without displaying numeric month labels", () => {
+  const widget = { ...widgetDraft(), kind: "column" as const, groupSlug: "month", valueSlug: "total" };
+  expect(assignBuilderField(widget, field("month_order", "NUMBER"), "sort", true)).toEqual({ sorts: [{ field: "month_order", direction: "asc" }] });
+  expect(assignBuilderField(widget, field("month_order", "NUMBER"), "sort", false)).toBeNull();
 });

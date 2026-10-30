@@ -1,5 +1,5 @@
 import { parseFilters, toCharts, toChartsAttribute, toAggregation, type ChartConfig, type ChartMeasure, type Filters, type Sort } from "@/features/item";
-import { MAX_LAYOUT_ROW, placeWidgets } from "./widget-layout";
+import { MAX_LAYOUT_ROW, layoutRows, placeWidgets } from "./widget-layout";
 import { parseCalculatedFields, type CalculatedField } from "./calculated-fields";
 import { parseFieldPresentation, type FieldPresentation } from "./field-presentation";
 import { toDatasets, type Dataset } from "./datasets";
@@ -25,6 +25,8 @@ export type Widget = ChartConfig & {
   sqlSelectionField?: string;
   sqlReceiveSelections?: boolean;
   sqlPaginationTop?: boolean;
+  sqlTableComfortable?: boolean;
+  sqlRowHeight?: number;
   calculatedFields?: CalculatedField[];
   fieldPresentation?: FieldPresentation;
   tableSlug: string; filters: Filters; answers: Record<string, Answer>;
@@ -90,6 +92,8 @@ export function toTree(value: unknown): Tree {
                   ...(isObject(item["layout"]) ? { layout: parseLayout(item["layout"]) } : {}),
                   ...Object.fromEntries(["sqlDetailField", "sqlSuffix", "sqlSelectionField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
                   ...Object.fromEntries(["sqlSuffixBelow", "sqlShowViewerFilters"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
+                  ...(typeof item["sqlTableComfortable"] === "boolean" ? { sqlTableComfortable: item["sqlTableComfortable"] } : {}),
+                  ...(typeof item["sqlRowHeight"] === "number" ? { sqlRowHeight: Math.max(28, Math.min(120, item["sqlRowHeight"])) } : {}),
                   ...(typeof item["sqlPaginationTop"] === "boolean" ? { sqlPaginationTop: item["sqlPaginationTop"] } : {}),
                   ...(typeof item["sqlReceiveSelections"] === "boolean" ? { sqlReceiveSelections: item["sqlReceiveSelections"] } : {}),
                   ...([0, 900000, 3600000, 86400000].includes(item["refresh_interval"] as number) ? { refreshInterval: item["refresh_interval"] as number } : {}),
@@ -158,6 +162,8 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...(widget.sqlSelectionField !== undefined ? { sqlSelectionField: widget.sqlSelectionField } : {}),
           ...(widget.sqlSuffixBelow !== undefined ? { sqlSuffixBelow: widget.sqlSuffixBelow } : {}),
           ...(widget.sqlShowViewerFilters !== undefined ? { sqlShowViewerFilters: widget.sqlShowViewerFilters } : {}),
+          ...(widget.sqlTableComfortable !== undefined ? { sqlTableComfortable: widget.sqlTableComfortable } : {}),
+          ...(widget.sqlRowHeight !== undefined ? { sqlRowHeight: widget.sqlRowHeight } : {}),
           ...(widget.sqlPaginationTop !== undefined ? { sqlPaginationTop: widget.sqlPaginationTop } : {}),
           ...(widget.sqlReceiveSelections !== undefined ? { sqlReceiveSelections: widget.sqlReceiveSelections } : {}),
           filters: widget.filters,
@@ -311,6 +317,6 @@ function toRatio(value: unknown): Widget["ratio"] | null {
 }
 
 function parseLayout(value: Record<string, unknown>): { column: number; row: number; rows: number } {
-  const bounded = (key: string, max: number) => typeof value[key] === "number" && Number.isFinite(value[key]) ? Math.max(1, Math.min(max, Math.round(value[key]))) : 1;
-  return { column: bounded("column", 12), row: bounded("row", MAX_LAYOUT_ROW), rows: bounded("rows", 12) };
+  const bounded = (key: string, max: number) => typeof value[key] === "number" && Number.isFinite(value[key]) ? Math.max(1, Math.min(max, value[key])) : 1;
+  return { column: Math.round(bounded("column", 12)), row: bounded("row", MAX_LAYOUT_ROW), rows: Math.max(layoutRows(80), typeof value.rows === "number" && Number.isFinite(value.rows) ? Math.min(12, value.rows) : 1) };
 }
