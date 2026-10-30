@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
-import { Checkbox } from "@/shared/ui/checkbox";
+import { Dropdown } from "@/shared/ui/dropdown";
+import { SelectMenu } from "@/shared/ui/select-menu";
 import { CHIP_COLORS, CHIP_DOT, CHIP_HEX, CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { CommitInput } from "@/shared/ui/commit-input";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
@@ -455,22 +456,17 @@ export function CrmCallQualitySettings() {
             </div>
             <label className="mt-3.5 block max-w-75">
               <span className={fieldLabel}>{t("crmset.activeVersion")}</span>
-              <select
-                className="h-(--spacing-input) w-full rounded-md border border-border bg-surface px-2 text-sm"
+              <Dropdown
+                className="w-full"
                 value={version.id}
-                onChange={(e) => {
-                  const next = data.versions.find((v) => v.id === e.target.value);
+                items={data.versions.map((v) => ({ value: v.id, label: v.name }))}
+                onChange={(id) => {
+                  const next = data.versions.find((v) => v.id === id);
                   if (!next) return;
                   setChosen(next.id);
                   run(data.activate(next), t("crmset.activated"));
                 }}
-              >
-                {data.versions.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
           </div>
           <CriteriaEditor key={version.id} version={version} onSave={(criteria, violations) => data.save(version, criteria, violations)} />
@@ -568,7 +564,6 @@ function CriteriaEditor({ version, onSave }: { version: CallQualityVersion; onSa
 
 /* ===== Маркетинг: лиды Meta по воронкам ===== */
 
-const select = "h-(--spacing-input) w-full rounded-md border border-border bg-surface px-2 text-sm";
 
 /** Страница Facebook → воронка и этап, куда ложатся её лиды. Как `MetaPagePipelineEditor` ARMADA. */
 export function CrmMetaRoutesSettings() {
@@ -601,102 +596,99 @@ export function CrmMetaRoutesSettings() {
           />
         ))
       )}
-      {pipelines
-        .filter((p) => [...routes.routes.values()].some((r) => r.pipelineId === p.id))
-        .map((p) => (
-          <PipelineCampaigns key={p.id} pipeline={p} />
-        ))}
+
     </Screen>
   );
 }
 
+/**
+ * Строка страницы: воронка, этап входа и кампании воронки — как доска ARMADA
+ * (MultiSelect кампаний). Лид пускается в воронку, только если объявление
+ * из отмеченной кампании; не отмечено ничего — пускаются все. Пустой список
+ * не сохраняется: шлюз читает его как «никого» и обратно не сбрасывает.
+ */
 function PageRoute({ name, route, pipelines, busy, onSave }: { name: string; route: MetaPageRoute | undefined; pipelines: Pipeline[]; busy: boolean; onSave: (r: MetaPageRoute) => void }) {
   const { t } = useTranslation();
   const [pipelineId, setPipelineId] = useState(route?.pipelineId ?? "");
   const [stageId, setStageId] = useState(route?.stageId ?? "");
-  const pipeline = pipelines.find((p) => p.id === pipelineId);
-  const changed = pipelineId !== (route?.pipelineId ?? "") || stageId !== (route?.stageId ?? "");
-  return (
-    <div className="flex flex-wrap items-end gap-2 rounded-xl border border-border p-3">
-      <b className="w-full text-sm font-semibold">{name}</b>
-      <label className="min-w-48 flex-1">
-        <span className={fieldLabel}>{t("crmset.pipeline")}</span>
-        <select
-          className={select}
-          value={pipelineId}
-          onChange={(e) => {
-            setPipelineId(e.target.value);
-            setStageId(pipelines.find((p) => p.id === e.target.value)?.stages[0]?.id ?? "");
-          }}
-        >
-          <option value="">{t("crmset.noPipeline")}</option>
-          {pipelines.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="min-w-48 flex-1">
-        <span className={fieldLabel}>{t("crmset.entryStage")}</span>
-        <select className={select} value={stageId} disabled={!pipeline} onChange={(e) => setStageId(e.target.value)}>
-          {pipeline?.stages.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <Button disabled={!changed || busy || (Boolean(pipelineId) && !stageId)} onClick={() => onSave({ pipelineId, stageId: pipelineId ? stageId : "" })}>
-        {t("action.save")}
-      </Button>
-    </div>
-  );
-}
-
-/**
- * Кампании воронки — «креативы → воронка» ARMADA: лид пускается в воронку,
- * только если объявление из отмеченной кампании. Ничего не отмечено и не
- * сохранено — пускаются все.
- */
-function PipelineCampaigns({ pipeline }: { pipeline: Pipeline }) {
-  const { t } = useTranslation();
-  const data = useMetaPipelineCampaigns(pipeline.id);
   const [draft, setDraft] = useState<string[] | null>(null);
-  const chosen = draft ?? data.selected;
-  const changed = draft !== null && [...draft].sort().join() !== [...data.selected].sort().join();
-  const toggle = (id: string) => setDraft(chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id]);
+  const [search, setSearch] = useState("");
+  const pipeline = pipelines.find((p) => p.id === pipelineId);
+  const campaigns = useMetaPipelineCampaigns(pipelineId);
+  const chosen = draft ?? campaigns.selected;
+  const routeChanged = pipelineId !== (route?.pipelineId ?? "") || stageId !== (route?.stageId ?? "");
+  const campaignsChanged = draft !== null && draft.length > 0 && [...draft].sort().join() !== [...campaigns.selected].sort().join();
+  const q = search.trim().toLowerCase();
+
+  const save = () => {
+    if (routeChanged) onSave({ pipelineId, stageId: pipelineId ? stageId : "" });
+    if (campaignsChanged && pipelineId) campaigns.save.mutate(draft, { onSuccess: () => (setDraft(null), !routeChanged && toast.success(t("settings.saved"))) });
+  };
 
   return (
-    <section className="rounded-xl border border-border p-3">
-      <header className="mb-2">
-        <b className="block text-sm font-semibold">{t("crmset.campaignsOf", { name: pipeline.name })}</b>
-        <small className="text-xs text-fg-muted">{data.selected.length ? t("crmset.campaignsChosen", { count: data.selected.length }) : t("crmset.campaignsAll")}</small>
-      </header>
-      {data.loading ? (
-        <p className="text-sm text-fg-subtle">{t("common.loading")}</p>
-      ) : data.unavailable ? (
-        <p className="text-sm text-fg-muted">{t("crmset.campaignsUnavailable")}</p>
-      ) : (
-        <>
-          <div className="flex max-h-72 flex-col gap-1 overflow-auto">
-            {data.campaigns.map((c) => (
-              <label key={c.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-surface-hover">
-                <Checkbox checked={chosen.includes(c.id)} onChange={() => toggle(c.id)} />
-                <span className={`min-w-0 flex-1 truncate ${c.active ? "" : "text-fg-subtle"}`}>{c.name}</span>
-                {!c.active && <span className="text-xs text-fg-subtle">{t("crmset.campaignPaused")}</span>}
-              </label>
-            ))}
-            {!data.campaigns.length && <p className="text-sm text-fg-subtle">{t("crmset.noCampaigns")}</p>}
-          </div>
-          <div className="mt-2 flex items-center justify-end gap-2">
-            {draft !== null && !draft.length && <span className="text-xs text-fg-muted">{t("crmset.campaignsNeedOne")}</span>}
-            <Button disabled={!changed || !chosen.length || data.save.isPending} onClick={() => data.save.mutate(chosen, { onSuccess: () => setDraft(null) })}>
-              {t("action.save")}
-            </Button>
-          </div>
-        </>
+    <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
+      <b className="text-sm font-semibold">{name}</b>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="min-w-48 flex-1">
+          <span className={fieldLabel}>{t("crmset.pipeline")}</span>
+          <Dropdown
+            className="w-full"
+            value={pipelineId}
+            placeholder={t("crmset.noPipeline")}
+            items={[{ value: "", label: t("crmset.noPipeline") }, ...pipelines.map((p) => ({ value: p.id, label: p.name }))]}
+            onChange={(id) => {
+              setPipelineId(id);
+              setStageId(pipelines.find((p) => p.id === id)?.stages[0]?.id ?? "");
+              setDraft(null);
+            }}
+          />
+        </label>
+        <label className="min-w-48 flex-1">
+          <span className={fieldLabel}>{t("crmset.entryStage")}</span>
+          <Dropdown
+            className="w-full"
+            value={stageId}
+            disabled={!pipeline}
+            placeholder={t("crmset.entryStage")}
+            items={(pipeline?.stages ?? []).map((s) => ({ value: s.id, label: s.name }))}
+            onChange={setStageId}
+          />
+        </label>
+        <Button disabled={busy || campaigns.save.isPending || (!routeChanged && !campaignsChanged) || (Boolean(pipelineId) && !stageId)} onClick={save}>
+          {t("action.save")}
+        </Button>
+      </div>
+      {pipelineId && (
+        <div className="flex flex-col gap-1">
+          {campaigns.unavailable ? (
+            <p className="text-xs text-fg-muted">{route?.pipelineId ? t("crmset.campaignsUnavailable") : t("crmset.campaignsAfterSave")}</p>
+          ) : (
+            <SelectMenu
+              label={t("crmset.campaigns")}
+              placeholder={t("crmset.campaignsAllShort")}
+              searchPlaceholder={t("crmset.campaignsSearch")}
+              emptyText={t("crmset.noCampaigns")}
+              multiple
+              loading={campaigns.loading}
+              search={search}
+              onSearch={setSearch}
+              onLoadMore={() => {}}
+              items={campaigns.campaigns
+                .filter((c) => !q || c.name.toLowerCase().includes(q))
+                .map((c) => ({ value: c.id, label: c.active ? c.name : `${c.name} · ${t("crmset.campaignPaused")}` }))}
+              selected={new Set(chosen)}
+              onPick={(id) => setDraft(chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id])}
+            />
+          )}
+          <small className="text-xs text-fg-muted">
+            {draft !== null && !draft.length
+              ? t("crmset.campaignsNeedOne")
+              : chosen.length
+                ? t("crmset.campaignsChosen", { count: chosen.length })
+                : t("crmset.campaignsAll")}
+          </small>
+        </div>
       )}
-    </section>
+    </div>
   );
 }
