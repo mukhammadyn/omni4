@@ -341,6 +341,7 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | Задачи | Чаты | TABLE | `crm_conversations` | 💬 `1f4ac` |
 | | Задачи | TABLE | `crm_tasks` (в v2 своя таблица, §5.1) | ✅ `2705` |
 | | Звонки | TABLE | `crm_calls` | 📞 `1f4de` |
+| | Журнал звонков | TABLE | `pbx_calls` (added 2026-10-30) | ☎️ `260e-fe0f` |
 | Списки | Контакты | TABLE | `crm_contacts` | 👤 `1f464` |
 | | Компании | TABLE | `crm_companies` | 🏢 `1f3e2` |
 | | Товары и услуги | TABLE | `crm_products` | 📦 `1f4e6` |
@@ -493,6 +494,7 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | `PIVOT` | любая | `pivot` — см. ниже | обычная сводная |
 | `BUDGET` | `hr_budget_lines` (+ `hr_budget_amounts`) | — | «Бюджет» ФОТ: отделы → строки, план и факт по месяцам/кварталам года, правка в ячейке |
 | `KPI` | `hr_kpi_scorecards` (+ `hr_kpi_results`, `hr_kpi_metrics`) | — | «KPI»: отделы → сотрудники → показатели, вид неделя/месяц/квартал/год, «Цель · Факт · %» по периодам, правка факта; «Создать» — «Добавить KPI». Подробно — §4.2 «HRMS / KPI» |
+| `PBX_CALLS` | `pbx_calls` | — | «Журнал» onlinePBX: когда, сотрудник, телефон, статус, длительность, запись в строке (added 2026-10-30) |
 | `LIST` | любая | — | список |
 
 `attributes.pivot` у `PIVOT` — раскладка, с которой сводная открывается
@@ -788,6 +790,15 @@ Udevs. Воронка — выпадающий список в панели, в�
 
 Запись функции в проекте заводит экран onlinePBX при первом сохранении
 (WORKFLOW → PUT KNATIVE, `max_scale = former_max_scale = 3`).
+
+**CRM / Журнал звонков** (`pbx_calls`) — заведено в omni4 и omni5
+2026-10-30 (`POST /v3/menus` с `table_id`, затем `POST /v2/views/pbx_calls`).
+
+| # | Тип | Имя |
+|---|---|---|
+| 1 | PBX_CALLS | Журнал |
+| 2 | TABLE | — |
+| 3 | SECTION | — |
 
 **Настройки модулей / CRM / Воронки** (`crm_pipelines`) — в omni4 у TABLE
 группировка по `business_units_id`. В v2 этой колонки нет: группировку

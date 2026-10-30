@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CopilotButton } from "@/features/copilot";
 import { useWorkspaceTitle } from "@/features/settings";
+import { SoftphoneButton } from "@/features/pbx";
 import { SidebarToggleButton, TopbarActions, WorkspaceTile } from "@/features/sidebar";
 import { Icon } from "@/shared/ui/icon";
 
@@ -78,6 +79,7 @@ function StaticLayout() {
         </nav>
 
         <CopilotButton />
+        <SoftphoneButton />
         <TopbarActions />
       </header>
 

@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fileUrl } from "@/features/item";
 import { api } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { useSession } from "@/shared/api/use-session";
 import i18n from "@/shared/lib/i18n";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError, toast } from "@/shared/lib/toast";
+import { parseTranscript, type TranscriptLine } from "../model/transcript";
 
 /* ---------------- onlinePBX ---------------- */
 
@@ -197,16 +199,48 @@ export function usePbxCall() {
   });
 }
 
-/** onlinePBX включён в проекте. Без этого кнопки «Позвонить» нет. */
-export function usePbxEnabled() {
+/**
+ * Коды отказа `pbx_get_webrtc_credentials`, при которых человек всё же
+ * оператор: добавочный есть, не вышло только с WebRTC. Ему — звонок
+ * старым путём (`pbx_make_call`). Остальные отказы — «телефонии нет»:
+ * выключена, не оператор, нет настроек или самой функции
+ * (pbx-fn, functions/pbx_webrtc.go, PBXGetWebRTCCredentials).
+ */
+const FALLBACK_CODES = [
+  "PBX_OPERATOR_NOT_FOUND",
+  "PBX_WEBRTC_NOT_AVAILABLE",
+  "PBX_VERTO_HOST_NOT_CONFIGURED",
+  "PBX_AUTH_FAILED",
+  "PBX_PROVIDER_ERROR",
+];
+
+export type PbxMode = "off" | "fallback" | "verto";
+
+/**
+ * Что может этот человек: звонить из браузера, только старым путём
+ * или никак. Спрашиваем функцию, а не читаем `pbx_settings`: в той
+ * строке ключ API onlinePBX, и читать её нужно только экрану настроек
+ * — иначе ключ уезжает в браузер каждому сотруднику.
+ *
+ * ponytail: временный `PBX_PROVIDER_ERROR` держит «старый путь» до
+ * перезапроса (5 минут или возврат на вкладку).
+ */
+export function usePbxMode(): PbxMode {
   const envId = useSession().getEnvironmentId() ?? "";
   const query = useQuery({
-    queryKey: [...keys.settings.integration(envId, "pbx"), "enabled"],
-    queryFn: () => listRows("pbx_settings", 1).then((rows) => rows[0]?.["enable"] === true),
+    queryKey: [...keys.settings.integration(envId, "pbx"), "mode"],
+    queryFn: () =>
+      fetchWebRtcCredentials().then(
+        (): PbxMode => "verto",
+        (error: unknown): PbxMode => {
+          const message = error instanceof Error ? error.message : String(error);
+          return FALLBACK_CODES.some((code) => message.includes(code)) ? "fallback" : "off";
+        },
+      ),
     staleTime: 5 * 60_000,
     retry: false,
   });
-  return query.data === true;
+  return query.data ?? "off";
 }
 
 /**
@@ -252,13 +286,66 @@ export function fetchWebRtcCredentials(): Promise<WebRtcCredentials> {
   });
 }
 
-/** Звонок из браузера закончился — строка в журнал (`pbx_calls`). */
-export function logWebRtcCall(input: { phone: string; duration: number; status: string }) {
-  return invoke<unknown>("pbx_log_call", {
-    client_phone: input.phone,
-    duration: Math.max(0, Math.round(input.duration)),
-    status: input.status,
+/**
+ * Звонок из браузера закончился — строка в журнал (`pbx_calls`).
+ *
+ * Пишем сами, мимо `pbx_log_call`: та не сохраняет ни направления, ни
+ * `call_uuid` (pbx-fn, functions/pbx_webrtc.go, PBXLogCall), а без
+ * `call_uuid` `pbx_get_recording` звонка не найдёт. Id звонка Verto —
+ * он же uuid звонка в onlinePBX (так в new-crm, `savePbxCallHistory`).
+ * Оператор — тот же `users_id`, что функция берёт из токена.
+ */
+export function logCall(input: {
+  callId: string;
+  phone: string;
+  direction: "incoming" | "outgoing";
+  status: string;
+  duration: number;
+}) {
+  return api.post<unknown>("/v2/items/pbx_calls", {
+    data: {
+      call_uuid: input.callId,
+      idempotency_key: input.callId,
+      /* Только цифры и ведущий «+», как нормализует функция для своих
+         строк (pbxNormalizeDial): иначе один номер в журнале в трёх видах. */
+      client_phone: input.phone.trim().replace(/(?!^\+)\D/g, ""),
+      direction: input.direction,
+      status: input.status,
+      duration: Math.max(0, Math.round(input.duration)),
+      users_id: session.getUserId(),
+    },
   });
+}
+
+/**
+ * Запись разговора: адрес в CDN проекта или пусто, пока onlinePBX её
+ * не отдал (`pending`). Функция сама кладёт адрес в строку журнала.
+ */
+export function fetchRecording(callUuid: string): Promise<string> {
+  return invoke<{ status?: string; recording_url?: string }>("pbx_get_recording", { call_uuid: callUuid }).then(
+    (dto) => fileUrl(dto.recording_url ?? ""),
+  );
+}
+
+/**
+ * Свои принятые звонки за сутки без записи — дотянуть после
+ * перезагрузки: вкладку могли закрыть, пока onlinePBX готовил файл.
+ */
+export async function callsWithoutRecording(): Promise<string[]> {
+  const dto = await api.post<ListDto>("/v2/object/get-list/pbx_calls", {
+    data: { limit: 20, offset: 0, users_id: session.getUserId(), status: "answered" },
+  });
+  const since = Date.now() - 24 * 3600_000;
+  return (dto.data?.response ?? [])
+    /* Короче 5 с записи обычно нет вовсе — не спрашивать её каждую загрузку. */
+    .filter(
+      (row) =>
+        !str(row, "recording_url") &&
+        Number(row["duration"]) >= 5 &&
+        Date.parse(str(row, "created_at")) > since,
+    )
+    .map((row) => str(row, "call_uuid"))
+    .filter(Boolean);
 }
 
 /* ---------------- Журнал ---------------- */
@@ -274,15 +361,78 @@ export type PbxCall = {
   duration: number;
   callUuid: string;
   recording: string;
+  /** Текст разговора от воркера распознавания; пусто — ещё нет. */
+  transcript: TranscriptLine[];
 };
 
 const PAGE = 50;
 
-export function useCallLog(page: number, search: string) {
+/**
+ * Отбор журнала. Пусто — без отбора. Текстовый фильтр get-list ищет
+ * подстроку, но значения здесь из закрытого списка (`incoming`,
+ * `no_answer`, guid), и ложных совпадений между ними нет.
+ */
+export type CallLogFilter = { direction: string; status: string; userId: string };
+
+/**
+ * Имена сотрудников: в журнале guid строкой (функция пишет `users_id`
+ * без связи), подпись берём из `core_users`.
+ */
+function useUserNames(): Map<string, string> {
+  const envId = useSession().getEnvironmentId() ?? "";
+  const users = useQuery({
+    queryKey: [...keys.settings.integration(envId, "pbx"), "users"],
+    queryFn: () => listRows("core_users", 1000),
+    staleTime: 5 * 60_000,
+  });
+  return new Map((users.data ?? []).map((user) => [str(user, "guid"), str(user, "full_name")]));
+}
+
+const toCall = (row: Row, names: Map<string, string>): PbxCall => ({
+  guid: str(row, "guid"),
+  at: str(row, "created_at"),
+  userName: names.get(str(row, "users_id")) ?? "",
+  phone: str(row, "client_phone"),
+  direction: str(row, "direction"),
+  status: str(row, "status"),
+  duration: typeof row["duration"] === "number" ? row["duration"] : 0,
+  callUuid: str(row, "call_uuid"),
+  /* Функция кладёт путь в CDN проекта без хоста (`<проект>/Media/<файл>`). */
+  recording: fileUrl(str(row, "recording_url")),
+  transcript: parseTranscript(row["transcript"]),
+});
+
+/**
+ * Звонки по номеру открытой записи — вкладка «Звонки» карточки.
+ * Связи с контактом у `pbx_calls` нет (строку пишут функция и
+ * софтфон, о карточках они не знают), поэтому — по последним 9 цифрам,
+ * как и «кто звонит» (useCallerName). 100 последних.
+ */
+export function useRecordCalls(phone: string) {
+  const envId = useSession().getEnvironmentId() ?? "";
+  const digits = phone.replace(/\D+/g, "").slice(-9);
+  const names = useUserNames();
+
+  const calls = useQuery({
+    queryKey: [...keys.settings.integration(envId, "pbx"), "calls", "record", digits],
+    enabled: digits.length === 9,
+    queryFn: () =>
+      api
+        .post<ListDto>("/v2/object/get-list/pbx_calls", { data: { limit: 100, offset: 0, client_phone: digits } })
+        .then((dto) => dto.data?.response ?? []),
+  });
+
+  return {
+    calls: (calls.data ?? []).map((row) => toCall(row, names)),
+    isLoading: calls.isLoading && digits.length === 9,
+  };
+}
+
+export function useCallLog(page: number, search: string, filter: CallLogFilter) {
   const envId = useSession().getEnvironmentId() ?? "";
 
   const calls = useQuery({
-    queryKey: [...keys.settings.integration(envId, "pbx"), "calls", page, search],
+    queryKey: [...keys.settings.integration(envId, "pbx"), "calls", page, search, filter],
     queryFn: () =>
       api.post<{ data?: { count?: number; response?: Row[] | null } }>("/v2/object/get-list/pbx_calls", {
         data: {
@@ -292,34 +442,29 @@ export function useCallLog(page: number, search: string) {
              по одному created_at роняет запрос (backend-notes,
              «Сортировка по created_at в get-list»). */
           ...(search.trim() ? { search: search.trim() } : {}),
+          ...(filter.direction ? { direction: filter.direction } : {}),
+          ...(filter.status ? { status: filter.status } : {}),
+          ...(filter.userId ? { users_id: filter.userId } : {}),
         },
       }),
     placeholderData: (previous) => previous,
   });
 
-  /* Имена сотрудников: в журнале guid строкой (функция пишет `users_id`
-     без связи), подпись берём из `core_users`. */
-  const users = useQuery({
-    queryKey: [...keys.settings.integration(envId, "pbx"), "users"],
-    queryFn: () => listRows("core_users", 1000),
+  const names = useUserNames();
+
+  /* Кого предложить в отборе «Сотрудник» — операторов, а не всех людей. */
+  const operators = useQuery({
+    queryKey: [...keys.settings.integration(envId, "pbx"), "operators"],
+    queryFn: () => listRows("pbx_operators", 1000),
     staleTime: 5 * 60_000,
   });
-  const names = new Map((users.data ?? []).map((user) => [str(user, "guid"), str(user, "full_name")]));
 
   return {
-    calls: (calls.data?.data?.response ?? []).map(
-      (row): PbxCall => ({
-        guid: str(row, "guid"),
-        at: str(row, "created_at"),
-        userName: names.get(str(row, "users_id")) ?? "",
-        phone: str(row, "client_phone"),
-        direction: str(row, "direction"),
-        status: str(row, "status"),
-        duration: typeof row["duration"] === "number" ? row["duration"] : 0,
-        callUuid: str(row, "call_uuid"),
-        recording: str(row, "recording_url"),
-      }),
-    ),
+    operators: (operators.data ?? [])
+      .map((op) => ({ value: str(op, "users_id"), label: names.get(str(op, "users_id")) ?? "" }))
+      .filter((op) => op.value && op.label)
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    calls: (calls.data?.data?.response ?? []).map((row) => toCall(row, names)),
     count: calls.data?.data?.count ?? 0,
     pageSize: PAGE,
     isLoading: calls.isLoading,
@@ -332,28 +477,8 @@ export function useCallLog(page: number, search: string) {
  */
 export function useCallRecording() {
   return useMutation({
-    mutationFn: (callUuid: string) =>
-      invoke<{ status?: string; recording_url?: string }>("pbx_get_recording", { call_uuid: callUuid }),
+    mutationFn: fetchRecording,
     onError: (error) => reportError(error, "pbx.recordingFailed"),
-  });
-}
-
-/**
- * Входящий звонок — строка в журнал напрямую, мимо функции:
- * `pbx_log_call` пишет только `client_phone/status/duration` и
- * направления не знает (pbx-fn, functions/pbx_webrtc.go, PBXLogCall),
- * а пропущенный от исходящего иначе не отличить. Оператор — тот же
- * `users_id`, что функция берёт из токена.
- */
-export function logIncomingCall(input: { phone: string; duration: number; status: string }) {
-  return api.post<unknown>("/v2/items/pbx_calls", {
-    data: {
-      client_phone: input.phone,
-      direction: "incoming",
-      status: input.status,
-      duration: Math.max(0, Math.round(input.duration)),
-      users_id: session.getUserId(),
-    },
   });
 }
 
