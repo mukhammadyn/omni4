@@ -1,5 +1,6 @@
 import { toDateValue, wallClock, type DateKind } from "@/shared/lib/date-value";
 import { pivotKey, pivotTable, reduce, toAggregation, toNumber, type Aggregation } from "./pivot";
+import type { Sort } from "./query";
 import type { Item } from "./types";
 
 /**
@@ -87,6 +88,7 @@ export type ChartMeasure = {
 };
 
 export type ChartConfig = {
+  sorts?: Sort[];
   /** Ключ для порядка и перетаскивания. Не идентификатор в базе. */
   id: string;
   kind: ChartKind;
@@ -470,6 +472,13 @@ export function chartSeries(
     );
   }
 
+  if (config.sorts?.length) all.sort((a, b) => {
+    for (const sort of config.sorts!) {
+      const comparison = sort.field === config.groupSlug ? a.label.localeCompare(b.label, undefined, { numeric: true }) : sort.field === config.valueSlug ? a.value - b.value : 0;
+      if (comparison) return sort.direction === "desc" ? -comparison : comparison;
+    }
+    return 0;
+  });
   if (["donut", "pie", "treemap"].includes(config.kind)) {
     const slices = foldTail(
       all.map(({ key, label, value }) => ({ key, label, value })),

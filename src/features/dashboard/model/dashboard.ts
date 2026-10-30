@@ -1,4 +1,6 @@
 import { parseFilters, toCharts, toChartsAttribute, toAggregation, type ChartConfig, type ChartMeasure, type Filters, type Sort } from "@/features/item";
+import { parseCalculatedFields, type CalculatedField } from "./calculated-fields";
+import { parseFieldPresentation, type FieldPresentation } from "./field-presentation";
 import { toDatasets, type Dataset } from "./datasets";
 import type { Answer, DashFilter } from "./filters";
 
@@ -10,6 +12,9 @@ import type { Answer, DashFilter } from "./filters";
 export const WIDGET_TYPES = ["chart", "records", "pivot", "ratio", "goal", "heading", "breakdown", "transitions"] as const;
 export type WidgetType = typeof WIDGET_TYPES[number];
 export type Widget = ChartConfig & {
+  refreshInterval?: number;
+  calculatedFields?: CalculatedField[];
+  fieldPresentation?: FieldPresentation;
   tableSlug: string; filters: Filters; answers: Record<string, Answer>;
   type?: WidgetType;
   datasetId?: string;
@@ -70,6 +75,9 @@ export function toTree(value: unknown): Tree {
             ? [
                 {
                   ...chart,
+                  ...([0, 900000, 3600000, 86400000].includes(item["refresh_interval"] as number) ? { refreshInterval: item["refresh_interval"] as number } : {}),
+                  ...(item["calculated_fields"] ? { calculatedFields: parseCalculatedFields(item["calculated_fields"]) } : {}),
+                  ...(item["field_presentation"] ? { fieldPresentation: parseFieldPresentation(item["field_presentation"]) } : {}),
                   tableSlug: text(item["table_slug"]),
                   filters: parseFilters(item["filters"]) ?? {},
                   answers: toAnswers(item["answers"]),
@@ -125,6 +133,9 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...toChartsAttribute([widget])[0],
           table_slug: widget.tableSlug,
           filters: widget.filters,
+          ...(widget.refreshInterval !== undefined ? { refresh_interval: widget.refreshInterval } : {}),
+          ...(widget.calculatedFields ? { calculated_fields: widget.calculatedFields } : {}),
+          ...(widget.fieldPresentation ? { field_presentation: widget.fieldPresentation } : {}),
           answers: widget.answers,
           ...(widget.body !== undefined ? { body: widget.body } : {}),
           ...(widget.pivotRows ? { pivot_rows: widget.pivotRows } : {}),
