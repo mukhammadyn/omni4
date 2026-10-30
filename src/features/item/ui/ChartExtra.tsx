@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ChartConfig, ChartSeries } from "../model/chart";
-import { linearDomain, normalizedBands, scaleY, stackedBands, treemapRects, xyPoints, type XYPoint } from "../model/chart-geometry";
+import { linearDomain, niceChartTicks, normalizedBands, scaleY, stackedBands, treemapRects, xyPoints, type XYPoint } from "../model/chart-geometry";
 import type { Item } from "../model/types";
 
 const colors = ["fill-chart-1 stroke-chart-1", "fill-chart-2 stroke-chart-2", "fill-chart-3 stroke-chart-3", "fill-chart-4 stroke-chart-4", "fill-chart-5 stroke-chart-5", "fill-chart-6 stroke-chart-6", "fill-chart-7 stroke-chart-7", "fill-chart-other stroke-chart-other"];
@@ -8,7 +8,7 @@ const color = (index: number) => colors[index] ?? colors[7];
 const show = (n: number, locale: string) => n.toLocaleString(locale, { maximumFractionDigits: 2 });
 
 /** Columns, area and combination charts share scales; right-axis measures use an explicit second scale. */
-export function CartesianChart({ config, series, locale }: { config: ChartConfig; series: ChartSeries; locale: string }) {
+export function CartesianChart({ config, series, locale, onPick }: { onPick?: ((key: string) => void) | undefined; config: ChartConfig; series: ChartSeries; locale: string }) {
   const { t } = useTranslation();
   const normalized = config.kind === "column100" || config.kind === "area100";
   const area = config.kind === "area" || config.kind === "area100";
@@ -17,7 +17,10 @@ export function CartesianChart({ config, series, locale }: { config: ChartConfig
   const stacked = config.stacked === true && ["column", "area"].includes(config.kind) && splits.every((split) => split.axis !== "right");
   const bands = normalized ? normalizedBands(series) : stackedBands(series);
   const domain = (axis: "left" | "right") => normalized ? { min: 0, max: 100 } : stacked ? linearDomain(bands.flatMap((point) => point.bands.flatMap((band) => [band.start, band.end]))) : linearDomain(series.points.flatMap((_, at) => splits.filter((split) => (split.axis ?? "left") === axis).map((split) => value(at, split.key))));
-  const left = domain("left"), right = domain("right");
+  const initialLeft = domain("left"), right = domain("right"), ticks = config.appearance?.axisTicks ? niceChartTicks(initialLeft.min, initialLeft.max) : [initialLeft.min, initialLeft.max];
+  const left = { min: ticks[0]!, max: ticks.at(-1)! };
+  const format = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: config.appearance?.decimals ?? 2 });
+  const fill = (index: number) => config.appearance?.neutral && index === 0 ? "fill-fg stroke-fg" : color(index);
   const n = series.points.length, step = 100 / Math.max(n, 1);
   const x = (at: number) => (at + 0.5) * step;
   const y = (v: number, axis?: string) => 4 + scaleY(v, axis === "right" ? right : left) * 0.92;
@@ -25,20 +28,20 @@ export function CartesianChart({ config, series, locale }: { config: ChartConfig
   const pointsFor = (index: number, upper: boolean) => series.points.map((_, at) => `${x(at)},${y(normalized || stacked ? upper ? bands[at]!.bands[index]!.end : bands[at]!.bands[index]!.start : upper ? value(at, splits[index]!.key) : 0, splits[index]!.axis)}`);
   return <div className="flex h-full min-h-[150px] flex-col gap-1">
     <div className="flex min-h-0 flex-1 gap-2">
-      <div className="flex w-14 shrink-0 flex-col justify-between text-right text-2xs tabular-nums text-fg-subtle"><span>{show(left.max, locale)}{normalized ? "%" : ""}</span><span>{show(left.min, locale)}{normalized ? "%" : ""}</span></div>
+      <div className="flex w-14 shrink-0 flex-col justify-between text-right text-2xs tabular-nums text-fg-subtle">{[...ticks].reverse().map((tick) => <span key={tick}>{format(tick)}{normalized ? "%" : ""}</span>)}</div>
       <svg role="img" aria-label={t(`chart.kind.${config.kind}` as "chart.kind.column")} viewBox="0 0 100 100" preserveAspectRatio="none" className="min-w-0 flex-1 overflow-visible border-b border-chart-grid">
-        {config.showGrid === true && [4, 27, 50, 73, 96].map((position) => <line key={position} data-chart-grid x1="0" x2="100" y1={position} y2={position} className="stroke-chart-grid" vectorEffect="non-scaling-stroke" />)}
+        {config.showGrid === true && (config.appearance?.axisTicks ? ticks.map((tick) => y(tick)) : [4, 27, 50, 73, 96]).map((position) => <line key={position} data-chart-grid x1="0" x2="100" y1={position} y2={position} className="stroke-chart-grid" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />)}
         <line x1="0" x2="100" y1={y(0)} y2={y(0)} className="stroke-chart-grid" vectorEffect="non-scaling-stroke" />
         {splits.map((split, index) => area ? <polygon key={split.key} points={[...pointsFor(index, true), ...pointsFor(index, false).reverse()].join(" ")} className={color(index)} fillOpacity={normalized ? 0.75 : 0.25} strokeWidth="1.5" vectorEffect="non-scaling-stroke"><title>{`${split.label}: ${series.points.map((point, at) => `${point.label}: ${show(value(at, split.key), locale)}`).join("; ")}`}</title></polygon> : config.kind === "combo" && split.display === "line" ? <polyline key={split.key} points={pointsFor(index, true).join(" ")} className={color(index)} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke"><title>{split.label}</title></polyline> : series.points.map((point, at) => {
           const band = bands[at]!.bands[index]!, top = y(normalized || stacked ? band.end : value(at, split.key), split.axis), bottom = y(normalized || stacked ? band.start : 0, split.axis);
-          const width = normalized || stacked ? step * 0.72 : step * 0.72 / Math.max(columnSplits.length, 1);
+          const width = normalized || stacked ? step * ((config.appearance?.columnWidth ?? 72) / 100) : step * ((config.appearance?.columnWidth ?? 72) / 100) / Math.max(columnSplits.length, 1);
           const offset = normalized || stacked ? 0 : columnSplits.indexOf(split) * width;
-          return <rect key={`${split.key}-${point.key}`} x={at * step + step * 0.14 + offset} y={Math.min(top, bottom)} width={width * (normalized || stacked ? 1 : 0.92)} height={Math.abs(bottom - top)} className={color(index)}><title>{`${point.label}${split.label ? ` · ${split.label}` : ""}: ${show(value(at, split.key), locale)}${normalized ? ` (${show(band.end - band.start, locale)}%)` : ""}`}</title></rect>;
+          return <rect role={onPick ? "button" : undefined} tabIndex={onPick ? 0 : undefined} aria-label={onPick ? `${point.label}: ${show(value(at, split.key), locale)}` : undefined} onClick={onPick ? () => onPick(point.key) : undefined} onKeyDown={onPick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(point.key); } } : undefined} style={onPick ? { cursor: "pointer" } : undefined} key={`${split.key}-${point.key}`} x={at * step + step * (1 - (config.appearance?.columnWidth ?? 72) / 100) / 2 + offset} y={Math.min(top, bottom)} width={width * (normalized || stacked || columnSplits.length === 1 ? 1 : 0.92)} height={Math.abs(bottom - top)} rx={config.appearance?.rounded ? 0.7 : 0} ry={config.appearance?.rounded ? 1.5 : 0} className={fill(index)}><title>{`${point.label}${split.label ? ` · ${split.label}` : ""}: ${show(value(at, split.key), locale)}${normalized ? ` (${show(band.end - band.start, locale)}%)` : ""}`}</title></rect>;
         }))}
       </svg>
       {splits.some((split) => split.axis === "right") && <div className="flex w-14 shrink-0 flex-col justify-between text-2xs tabular-nums text-fg-subtle"><span>{show(right.max, locale)}</span><span>{show(right.min, locale)}</span></div>}
     </div>
-    <div className="flex justify-between gap-2 pl-16 text-2xs text-fg-subtle">{series.points.filter((_, at) => n <= 8 || at === 0 || at === n - 1).map((point) => <span key={point.key} className="min-w-0 truncate" title={point.label}>{point.label}</span>)}</div>
+    <div className="flex pl-16 text-2xs text-fg-muted">{series.points.filter((_, at) => config.appearance?.axisTicks || onPick || n <= 8 || at === 0 || at === n - 1).map((point) => <span key={point.key} role={onPick ? "button" : undefined} tabIndex={onPick ? 0 : undefined} onClick={onPick ? () => onPick(point.key) : undefined} onKeyDown={onPick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(point.key); } } : undefined} style={{ width: `${step}%` }} className={`min-w-0 truncate text-center ${onPick ? "cursor-pointer" : ""}`} title={point.label}>{point.label}</span>)}</div>
   </div>;
 }
 

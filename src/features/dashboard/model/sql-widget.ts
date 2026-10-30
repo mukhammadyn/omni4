@@ -1,8 +1,8 @@
-import { newChart, type ChartKind, type Sort } from "@/features/item";
+import { newChart, type ChartKind, type ChartConfig, type Sort } from "@/features/item";
 import type { Dataset } from "./datasets";
 import type { Widget } from "./dashboard";
 
-export type SqlPresentation = { type: "table" | "chart"; kind: ChartKind; group: string; value: string; split: string; sorts?: Sort[] | undefined; columns?: string[] | undefined; showLegend?: boolean | undefined; showGrid?: boolean | undefined; stacked?: boolean | undefined };
+export type SqlPresentation = { linkField?: string | undefined; linkLabel?: string | undefined; linkTemplate?: string | undefined; appearance?: ChartConfig["appearance"] | undefined; type: "table" | "chart"; kind: ChartKind; group: string; value: string; split: string; sorts?: Sort[] | undefined; pageSize?: number | undefined; paginationTop?: boolean | undefined; detailField?: string | undefined; suffix?: string | undefined; suffixBelow?: boolean | undefined; columns?: string[] | undefined; showLegend?: boolean | undefined; showGrid?: boolean | undefined; stacked?: boolean | undefined };
 export function sqlWidgetFrom(dataset: Dataset, presentation?: SqlPresentation): Widget {
   return { ...newChart(), title: dataset.name, tableSlug: "", datasetId: dataset.id, filters: {}, answers: {}, type: presentation?.type === "chart" ? "chart" : "records", kind: presentation?.kind ?? "bar", groupSlug: presentation?.group ?? "", valueSlug: presentation?.value ?? "", splitSlug: presentation?.split ?? "", aggregation: "sum", ...(presentation?.showLegend !== undefined ? { showLegend: presentation.showLegend } : {}), ...(presentation?.showGrid !== undefined ? { showGrid: presentation.showGrid } : {}), ...(presentation?.stacked !== undefined ? { stacked: presentation.stacked } : {}), width: 12, height: 2, ...(presentation?.sorts ? { sorts: presentation.sorts } : {}), ...(presentation?.columns ? { columns: presentation.columns } : {}) };
 }
@@ -15,7 +15,7 @@ export function stageSqlWidget(datasets: Dataset[], widget: Widget, dataset: Dat
   // A reused dataset must never silently change another widget's SQL.
   const unchanged = previous?.source.kind === "sql" && JSON.stringify(previous.source) === JSON.stringify(dataset.source);
   const saved = unchanged ? previous : dataset;
-  return { widget: { ...widget, tableSlug: "", datasetId: saved.id, filters: {}, answers: {} }, datasets: unchanged ? datasets : [...datasets.filter((item) => item.id !== saved.id), saved] };
+  return { widget: { ...widget, tableSlug: "", datasetId: saved.id, answers: {} }, datasets: unchanged ? datasets : [...datasets.filter((item) => item.id !== saved.id), saved] };
 }
 
 

@@ -37,3 +37,10 @@ test("treemap rectangles cover the square proportionally without overlap", () =>
   for (const rect of rects) expect(rect.width * rect.height / 10000).toBeCloseTo(rect.value / 10);
   for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) { const a = rects[i]!, b = rects[j]!; expect(Math.min(a.x + a.width, b.x + b.width) <= Math.max(a.x, b.x) + 1e-8 || Math.min(a.y + a.height, b.y + b.height) <= Math.max(a.y, b.y) + 1e-8).toBe(true); }
 });
+
+// Nice report axes remain dynamic for both counts and measured values.
+test("nice calendar/count axis ticks", async () => {
+  const { niceChartTicks } = await import("./chart-geometry");
+  expect(niceChartTicks(0, 27)).toEqual([0, 5, 10, 15, 20, 25, 30]);
+  expect(niceChartTicks(0, 9)).toEqual([0, 2, 4, 6, 8, 10]);
+});

@@ -38,3 +38,17 @@ test("empty SQL results retain schema and nullable values", () => {
   expect(hasQueryStatistic(toQueryResult({ ...result, rows: [["0"]] }), "total")).toBe(true);
   expect(toQueryResult({ ...result, rows: [[null]] }).rows).toEqual([{ total: null }]);
 });
+
+test("calendar names sort by a separate returned number without visible prefixes", () => {
+  const result = toQueryResult({ columns: [{ key: "month", type: "text" }, { key: "order", type: "int4" }, { key: "total", type: "int4" }], rows: [["Март", 3, 5], ["Январь", 1, 0], ["Февраль", 2, 1]], limit: 1000, truncated: false });
+  const series = chartSeries(queryChartRows(result), { ...newChart(), kind: "column", groupSlug: "month", valueSlug: "total", aggregation: "sum", sorts: [{ field: "order", direction: "asc" }] });
+  expect(series.points.map((point) => point.label)).toEqual(["Январь", "Февраль", "Март"]);
+  expect(series.points.map((point) => point.value)).toEqual([0, 1, 5]);
+});
+
+test("record links stay internal and encode identifiers", async () => {
+  const { queryRecordHref } = await import('./query-result');
+  expect(queryRecordHref('/employees/{value}', 'a/b?x=1')).toBe('/employees/a%2Fb%3Fx%3D1');
+  for (const template of ['https://other.example/{value}', '//other.example/{value}', 'javascript:{value}', '/\\other.example/{value}', '/records/{value}\n']) expect(queryRecordHref(template, 'id')).toBeUndefined();
+  expect(queryRecordHref('/employees/{value}', null)).toBeUndefined();
+});

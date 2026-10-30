@@ -1,4 +1,4 @@
-import { linearDomain, stackedBands } from "../model/chart-geometry";
+import { linearDomain, niceChartTicks, stackedBands } from "../model/chart-geometry";
 import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { startPointerDrag } from "@/shared/lib/pointer-drag";
 import {
@@ -300,7 +300,9 @@ function SizeHandle({
   onPreview,
   onCommit,
   onCancel,
+  stepPx,
 }: {
+  stepPx?: number | undefined;
   edge: "right" | "bottom";
   card: RefObject<HTMLElement | null>;
   value: number;
@@ -317,7 +319,7 @@ function SizeHandle({
 
   const start = (event: PointerEvent<HTMLDivElement>) => {
     const element = card.current;
-    const grid = element?.parentElement;
+    const grid = element?.closest<HTMLElement>("[data-chart-grid-layout]") ?? element?.parentElement;
     if (!element || !grid || event.button !== 0 || !event.isPrimary) return;
 
     // Ручка живёт внутри карточки, которую тащат мышью, — без этого
@@ -329,8 +331,8 @@ function SizeHandle({
 
     const step =
       edge === "right"
-        ? (grid.getBoundingClientRect().width + GRID_GAP) / MAX_SPAN
-        : ROW_HEIGHT;
+        ? (grid.getBoundingClientRect().width + (Number.parseFloat(getComputedStyle(grid).columnGap) || GRID_GAP)) / MAX_SPAN
+        : stepPx ?? ROW_HEIGHT;
 
     const sizeAt = (point: globalThis.PointerEvent) =>
       clamp(
@@ -506,7 +508,11 @@ export function ChartCard({
   showRowCount = true,
   hideHeader = false,
   scrollContent = true,
+  onPick,
+  sizeRows,
 }: {
+  onPick?: ((key: string) => void) | undefined;
+  sizeRows?: { value: number; max: number; unit: number; gap: number } | undefined;
   config: ChartConfig;
   columns: Field[];
   relations: Relation[];
@@ -603,12 +609,13 @@ export function ChartCard({
    */
   const [sizing, setSizing] = useState<{ width: number; height: number } | null>(null);
   const width = sizing?.width ?? config.width;
-  const height = sizing?.height ?? config.height;
+  const height = sizing?.height ?? sizeRows?.value ?? config.height;
   const card = useRef<HTMLElement>(null);
 
   return (
     <section
       ref={card}
+      aria-label={config.title || derived}
       draggable={editing}
       /*
        * Высота именно ЗАДАНА, а не «не меньше»: с `min-height` карточка
@@ -617,7 +624,7 @@ export function ChartCard({
        * Не поместилось — прокручивается внутри, как и положено плитке
        * на панели.
        */
-      style={plain ? undefined : { height: `${height * ROW_HEIGHT}px` }}
+      style={plain ? undefined : { height: `${sizeRows ? height * sizeRows.unit + (height - 1) * sizeRows.gap : height * ROW_HEIGHT}px`, ...(config.appearance?.padding !== undefined ? { padding: config.appearance.padding } : {}), ...(config.appearance?.radius !== undefined ? { borderRadius: config.appearance.radius } : {}) }}
       /* Выделение текста в заголовке — не бросок карточки: у поля ввода
          внутри draggable-родителя браузер начинает перетаскивание
          вместо выделения. */
@@ -673,18 +680,19 @@ export function ChartCard({
             card={card}
             value={height}
             min={MIN_ROWS}
-            max={MAX_ROWS}
+            max={sizeRows?.max ?? MAX_ROWS}
             label={t("chart.resizeHeight")}
+            stepPx={sizeRows ? sizeRows.unit + sizeRows.gap : undefined}
             onPreview={(next) => setSizing({ width, height: next })}
             onCancel={() => setSizing(null)}
             onCommit={(next) => {
               setSizing(null);
-              if (next !== config.height) onChange({ height: next });
+              if (next !== (sizeRows?.value ?? config.height)) onChange({ height: next });
             }}
           />
         </>
       )}
-      {!hideHeader && <header className="flex min-w-0 items-center gap-1.5">
+      {!hideHeader && (!config.appearance?.hideTitle || editing) && <header className="flex min-w-0 items-center gap-1.5">
         {editing && (
           <button
             type="button"
@@ -712,7 +720,7 @@ export function ChartCard({
             className="h-7 min-w-0 flex-1 text-sm"
           />
         ) : (
-          <h3 className={`min-w-0 flex-1 truncate text-fg ${plain ? "text-lg font-semibold" : "text-sm font-medium"}`}>
+          <h3 style={config.appearance?.titleSize ? { fontSize: config.appearance.titleSize, fontWeight: config.appearance.titleSize > 14 ? 600 : 500 } : undefined} className={`min-w-0 flex-1 truncate text-fg ${plain ? "text-lg font-semibold" : "text-sm font-medium"}`}>
             {config.title || derived}
           </h3>
         )}
@@ -791,7 +799,7 @@ export function ChartCard({
         ) : config.kind === "treemap" ? (
           <TreemapChart series={series} locale={i18n.language} />
         ) : ["column", "column100", "area", "area100", "combo"].includes(config.kind) ? (
-          <CartesianChart config={config} series={series} locale={i18n.language} />
+          <CartesianChart config={config} series={series} locale={i18n.language} onPick={onPick} />
         ) : config.kind === "heatmap" ? (
           <Heatmap series={series} locale={i18n.language} />
         ) : config.kind === "funnel" ? (
@@ -803,7 +811,7 @@ export function ChartCard({
         ) : config.kind === "line" ? (
           <Line series={series} locale={i18n.language} showGrid={config.showGrid === true} />
         ) : (
-          <Bars series={series} locale={i18n.language} config={config} />
+          <Bars series={series} locale={i18n.language} config={config} onPick={onPick} />
         )}
       </div>
 
@@ -1108,7 +1116,7 @@ export function ChartSetup({
  * своей: иначе полосы разных серий нельзя было бы сравнить глазами,
  * а ради этого график и рисуют.
  */
-function Bars({ series, locale, config }: { series: ChartSeries; locale: string; config: ChartConfig }) {
+function Bars({ series, locale, config, onPick }: { onPick?: ((key: string) => void) | undefined; series: ChartSeries; locale: string; config: ChartConfig }) {
   const grouped = series.splits.length > 1;
   const top = grouped
     ? Math.max(...series.points.flatMap((point) => [...point.cells.values()]), 0)
@@ -1121,12 +1129,13 @@ function Bars({ series, locale, config }: { series: ChartSeries; locale: string;
    * ponytail: двусторонняя ось — когда попросят min по полю с минусами.
    */
   if (config.stacked === true) return <AbsoluteBars series={series} locale={locale} showGrid={config.showGrid === true} />;
+  if (config.appearance?.axisTicks && !grouped) return <AxisBars series={series} config={config} locale={locale} onPick={onPick} />;
   const width = (value: number) => `${top > 0 ? Math.max(0, value / top) * 100 : 0}%`;
 
   return (
     <div className="flex flex-col gap-2">
       {series.points.map((point) => (
-        <div key={point.key} className="flex items-start gap-2">
+        <div key={point.key} role={onPick ? "button" : undefined} tabIndex={onPick ? 0 : undefined} aria-label={onPick ? `${point.label}: ${show(point.value, locale)}` : undefined} onClick={onPick ? () => onPick(point.key) : undefined} onKeyDown={onPick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(point.key); } } : undefined} className={`flex items-start gap-2 ${onPick ? "cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-accent" : ""}`}>
           <span
             className="w-28 shrink-0 truncate pt-0.5 text-xs text-fg-muted"
             title={point.label}
@@ -1159,6 +1168,21 @@ function Bars({ series, locale, config }: { series: ChartSeries; locale: string;
       ))}
     </div>
   );
+}
+
+function AxisBars({ series, config, locale, onPick }: { series: ChartSeries; config: ChartConfig; locale: string; onPick?: ((key: string) => void) | undefined }) {
+  const domain = linearDomain(series.points.map((point) => point.value)), ticks = niceChartTicks(domain.min, domain.max), min = ticks[0]!, max = ticks.at(-1)!;
+  const x = (value: number) => (value - min) / (max - min || 1) * 100;
+  const format = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: config.appearance?.decimals ?? 2 });
+  return <div className="flex h-full min-h-0 flex-col gap-3" data-axis-bars>
+    <div className="flex min-h-0 flex-1 flex-col justify-around gap-2">{series.points.map((point) => <div key={point.key} className="flex min-h-6 items-center gap-3">
+      <button type="button" disabled={!onPick} title={point.label} className="w-40 shrink-0 truncate text-right text-xs text-fg-muted disabled:cursor-default" onClick={() => onPick?.(point.key)}>{point.label}</button>
+      <div className="relative h-7 min-w-0 flex-1">{config.showGrid && ticks.map((tick) => <span key={tick} className="absolute inset-y-0 border-l border-dashed border-chart-grid" style={{ left: `${x(tick)}%` }} />)}
+        <Tooltip label={`${point.label}: ${format(point.value)}`}><button type="button" disabled={!onPick} aria-label={`${point.label}: ${format(point.value)}`} onClick={() => onPick?.(point.key)} className={`absolute inset-y-0 ${config.appearance?.neutral ? "bg-fg" : "bg-chart-1"} ${config.appearance?.rounded ? "rounded-md" : ""} disabled:cursor-default`} style={{ left: `${x(Math.min(0, point.value))}%`, width: `${Math.abs(x(point.value) - x(0))}%` }} /></Tooltip>
+      </div>
+    </div>)}</div>
+    <div className="relative ml-[172px] h-5 border-t border-chart-grid text-2xs text-fg-muted">{ticks.map((tick) => <span key={tick} className="absolute -translate-x-1/2 pt-1" style={{ left: `${x(tick)}%` }}>{format(tick)}</span>)}</div>
+  </div>;
 }
 
 function AbsoluteBars({ series, locale, showGrid }: { series: ChartSeries; locale: string; showGrid: boolean }) {

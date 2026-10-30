@@ -1,0 +1,6 @@
+/* Opt-in dashboard layout. Legacy dashboards keep the existing flowing cards. */
+@media (min-width: 1024px) {
+  .dashboard-positioned-grid { grid-auto-rows: var(--dashboard-row-unit); gap: var(--dashboard-row-gap); }
+  .dashboard-positioned-widget { grid-column: var(--widget-column); grid-row: var(--widget-row); }
+  .dashboard-positioned-widget > section { height: 100% !important; min-height: 0; }
+}

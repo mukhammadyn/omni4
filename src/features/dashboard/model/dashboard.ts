@@ -1,4 +1,5 @@
 import { parseFilters, toCharts, toChartsAttribute, toAggregation, type ChartConfig, type ChartMeasure, type Filters, type Sort } from "@/features/item";
+import { MAX_LAYOUT_ROW, placeWidgets } from "./widget-layout";
 import { parseCalculatedFields, type CalculatedField } from "./calculated-fields";
 import { parseFieldPresentation, type FieldPresentation } from "./field-presentation";
 import { toDatasets, type Dataset } from "./datasets";
@@ -13,6 +14,17 @@ export const WIDGET_TYPES = ["chart", "records", "pivot", "ratio", "goal", "head
 export type WidgetType = typeof WIDGET_TYPES[number];
 export type Widget = ChartConfig & {
   refreshInterval?: number;
+  layout?: { column: number; row: number; rows: number } | undefined;
+  sqlDetailField?: string;
+  sqlSuffix?: string;
+  sqlSuffixBelow?: boolean;
+  sqlShowViewerFilters?: boolean;
+  sqlLinkField?: string;
+  sqlLinkLabel?: string;
+  sqlLinkTemplate?: string;
+  sqlSelectionField?: string;
+  sqlReceiveSelections?: boolean;
+  sqlPaginationTop?: boolean;
   calculatedFields?: CalculatedField[];
   fieldPresentation?: FieldPresentation;
   tableSlug: string; filters: Filters; answers: Record<string, Answer>;
@@ -75,6 +87,11 @@ export function toTree(value: unknown): Tree {
             ? [
                 {
                   ...chart,
+                  ...(isObject(item["layout"]) ? { layout: parseLayout(item["layout"]) } : {}),
+                  ...Object.fromEntries(["sqlDetailField", "sqlSuffix", "sqlSelectionField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
+                  ...Object.fromEntries(["sqlSuffixBelow", "sqlShowViewerFilters"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
+                  ...(typeof item["sqlPaginationTop"] === "boolean" ? { sqlPaginationTop: item["sqlPaginationTop"] } : {}),
+                  ...(typeof item["sqlReceiveSelections"] === "boolean" ? { sqlReceiveSelections: item["sqlReceiveSelections"] } : {}),
                   ...([0, 900000, 3600000, 86400000].includes(item["refresh_interval"] as number) ? { refreshInterval: item["refresh_interval"] as number } : {}),
                   ...(item["calculated_fields"] ? { calculatedFields: parseCalculatedFields(item["calculated_fields"]) } : {}),
                   ...(item["field_presentation"] ? { fieldPresentation: parseFieldPresentation(item["field_presentation"]) } : {}),
@@ -129,9 +146,20 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
                 source_field: filter.sourceField,
               },
         ),
-        widgets: dashboard.widgets.map((widget) => ({
+        widgets: placeWidgets(dashboard.widgets).map((widget) => ({
           ...toChartsAttribute([widget])[0],
           table_slug: widget.tableSlug,
+          ...(widget.layout ? { layout: widget.layout } : {}),
+          ...(widget.sqlDetailField !== undefined ? { sqlDetailField: widget.sqlDetailField } : {}),
+          ...(widget.sqlLinkField !== undefined ? { sqlLinkField: widget.sqlLinkField } : {}),
+          ...(widget.sqlLinkLabel !== undefined ? { sqlLinkLabel: widget.sqlLinkLabel } : {}),
+          ...(widget.sqlLinkTemplate !== undefined ? { sqlLinkTemplate: widget.sqlLinkTemplate } : {}),
+          ...(widget.sqlSuffix !== undefined ? { sqlSuffix: widget.sqlSuffix } : {}),
+          ...(widget.sqlSelectionField !== undefined ? { sqlSelectionField: widget.sqlSelectionField } : {}),
+          ...(widget.sqlSuffixBelow !== undefined ? { sqlSuffixBelow: widget.sqlSuffixBelow } : {}),
+          ...(widget.sqlShowViewerFilters !== undefined ? { sqlShowViewerFilters: widget.sqlShowViewerFilters } : {}),
+          ...(widget.sqlPaginationTop !== undefined ? { sqlPaginationTop: widget.sqlPaginationTop } : {}),
+          ...(widget.sqlReceiveSelections !== undefined ? { sqlReceiveSelections: widget.sqlReceiveSelections } : {}),
           filters: widget.filters,
           ...(widget.refreshInterval !== undefined ? { refresh_interval: widget.refreshInterval } : {}),
           ...(widget.calculatedFields ? { calculated_fields: widget.calculatedFields } : {}),
@@ -280,4 +308,9 @@ function toRatio(value: unknown): Widget["ratio"] | null {
   if (!isObject(value) || !isObject(value["numerator"]) || !isObject(value["denominator"])) return null;
   const measure = (item: Record<string, unknown>, id: string): ChartMeasure => ({ id, field: text(item["field"]), aggregation: toAggregation(text(item["aggregation"])) });
   return { numerator: measure(value["numerator"], "numerator"), denominator: measure(value["denominator"], "denominator"), percent: value["percent"] === true };
+}
+
+function parseLayout(value: Record<string, unknown>): { column: number; row: number; rows: number } {
+  const bounded = (key: string, max: number) => typeof value[key] === "number" && Number.isFinite(value[key]) ? Math.max(1, Math.min(max, Math.round(value[key]))) : 1;
+  return { column: bounded("column", 12), row: bounded("row", MAX_LAYOUT_ROW), rows: bounded("rows", 12) };
 }
