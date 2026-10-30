@@ -24,6 +24,22 @@ test("schema examples use explicit permitted columns and keep JOIN currency grou
   expect(boundedSqlSuggestions("", 0, catalog).some(item => ["WITH", "HAVING", "OR", "COALESCE", "NULLIF"].includes(item.value))).toBe(false);
 });
 
+test("calendar reports allow complete age and zero-filled months without arbitrary SQL functions", () => {
+  for (const sql of [
+    "SELECT EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date::date)) AS age FROM hr_employees",
+    "SELECT ROUND(AVG(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date::date))), 1) AS age FROM hr_employees",
+    "SELECT m, COUNT(e.guid) FROM generate_series(1, 12) AS m LEFT JOIN hr_employees AS e ON EXTRACT(MONTH FROM e.birth_date) = m GROUP BY m",
+    "SELECT CASE WHEN birth_date IS NULL THEN 'Unknown' WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date)) <= 25 THEN '≤25' ELSE '26+' END AS band FROM hr_employees",
+  ]) expect(sqlSupportIssue(sql), sql).toBeNull();
+  for (const sql of [
+    "SELECT pg_sleep(10)", "SELECT evil.age(birth_date) FROM hr_employees", 'SELECT "age"(birth_date) FROM hr_employees',
+    "SELECT EXTRACT(EPOCH FROM birth_date) FROM hr_employees", "SELECT generate_series(0,12)",
+    "SELECT generate_series(1,10000000)", "SELECT generate_series(1,:last)", "SELECT generate_series(1,12,1)",
+    "SELECT generate_series(12,1)", "SELECT generate_series(1,12), generate_series(1,12)",
+    "SELECT generate_series(1,12 /* hidden */)",
+  ]) expect(sqlSupportIssue(sql), sql).toBe("function");
+});
+
 test("SQL widget and dataset survive real menu serialization without query output or values", () => {
   const dataset: Dataset = { id: "sql-dataset", name: "Joined total", source: { kind: "sql", sql: "SELECT currency, COUNT(*) AS total FROM deals WHERE amount >= :minimum GROUP BY currency", parameters: [{ name: "minimum", type: "number", required: true }], columns: [] } };
   const widget = sqlWidgetFrom(dataset, { type: "chart", kind: "bar", group: "currency", value: "total", split: "" });
