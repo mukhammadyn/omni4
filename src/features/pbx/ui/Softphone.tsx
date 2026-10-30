@@ -27,7 +27,7 @@ import {
   logCall,
   useCallerName,
   usePbxCall,
-  usePbxEnabled,
+  usePbxMode,
 } from "../api/pbx";
 import { createVertoTransport } from "../lib/verto/VertoTransport";
 import type { VoipCallSnapshot, VoipTransport } from "../lib/verto/types";
@@ -71,7 +71,9 @@ const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve
  * одна вкладка-телефон через BroadcastChannel — когда это начнёт мешать.
  */
 export function SoftphoneProvider({ children }: { children: ReactNode }) {
-  const enabled = usePbxEnabled();
+  /* Телефон в браузере — только у оператора с WebRTC; остальным
+     «Позвонить» уходит старым путём или кнопки нет вовсе (usePbxMode). */
+  const enabled = usePbxMode() === "verto";
   const fallback = usePbxCall();
   const [calls, setCalls] = useState<VoipCallSnapshot[]>([]);
   const transport = useRef<VoipTransport | null>(null);

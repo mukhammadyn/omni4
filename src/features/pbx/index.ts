@@ -3,7 +3,6 @@ export {
   phoneToCall,
   usePbx,
   usePbxCall,
-  usePbxEnabled,
   useSavePbx,
   type PbxDraft,
 } from "./api/pbx";

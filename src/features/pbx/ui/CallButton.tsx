@@ -2,7 +2,7 @@ import { PhoneIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
-import { phoneToCall, usePbxEnabled } from "../api/pbx";
+import { phoneToCall, usePbxMode } from "../api/pbx";
 import { useSoftphone } from "./Softphone";
 
 /**
@@ -12,11 +12,11 @@ import { useSoftphone } from "./Softphone";
  */
 export function CallButton({ tableSlug, row }: { tableSlug: string; row: Record<string, unknown> }) {
   const { t } = useTranslation();
-  const enabled = usePbxEnabled();
+  const mode = usePbxMode();
   const softphone = useSoftphone();
   const phone = phoneToCall(tableSlug, row);
 
-  if (!enabled || !phone) return null;
+  if (mode === "off" || !phone) return null;
 
   return (
     <Button size="sm" variant="secondary" disabled={softphone.busy} onClick={() => softphone.call(phone)} title={phone}>
