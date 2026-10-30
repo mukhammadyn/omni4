@@ -22,7 +22,7 @@ const noop = () => {};
 
 export function SqlDatasetRunner({ menuId, sql, parameters, presentation, onPresentation, autoRun = false, hideResult = false, onResult, active = true, disabled = false, displayOnly = false, fieldPresentation, refreshInterval }: { refreshInterval?: number | undefined; fieldPresentation?: FieldPresentation | undefined; menuId: string; sql: string; parameters: DatasetParameter[]; presentation?: SqlPresentation | undefined; onPresentation?: ((next: SqlPresentation) => void) | undefined; autoRun?: boolean; hideResult?: boolean; onResult?: ((result: QueryResult | null) => void) | undefined; active?: boolean; disabled?: boolean; displayOnly?: boolean }) {
   const { t, i18n } = useTranslation(), copy = sqlCopy(i18n.language);
-  const [values, setValues] = useState<Record<string, string>>({}), [limit, setLimit] = useState(100);
+  const [values, setValues] = useState<Record<string, string>>({}), [limit, setLimit] = useState(autoRun && presentation?.type === "table" ? 1000 : 100);
   const names = namedSqlParameters(sql), catalog = useSqlCatalog(menuId, active);
   const effective: DatasetParameter[] = names.map((name) => parameters.find((parameter) => parameter.name === name) ?? { name, type: "text" as const, required: true });
   const runValues = Object.fromEntries(effective.flatMap((parameter) => Object.hasOwn(values, parameter.name) ? [[parameter.name, values[parameter.name]!]] : parameter.defaultValue !== undefined ? [[parameter.name, parameter.defaultValue]] : []));
