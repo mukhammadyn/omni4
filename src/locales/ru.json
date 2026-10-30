@@ -3357,6 +3357,8 @@
   "pbx.transferGo": "Перевести",
   "pbx.dtmfFailed": "Не удалось отправить цифру",
   "pbx.transferFailed": "Не удалось перевести звонок",
+  "pbx.transferred": "Звонок переведён",
+  "pbx.inCall": "Идёт разговор",
   "crmInt.moizvonki.syncOff": "Синхронизация на паузе",
   "crmInt.moizvonki.syncOn": "Синхронизация звонков включена",
   "crmInt.optional": "Необязательно",

@@ -15,7 +15,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useSession } from "@/shared/api/use-session";
 import { keys } from "@/shared/lib/query-keys";
-import { reportError } from "@/shared/lib/toast";
+import { reportError, toast } from "@/shared/lib/toast";
+import i18n from "@/shared/lib/i18n";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
@@ -280,7 +281,10 @@ function CallStack({
             transport.current?.sendDtmf(call.id, tone).catch((error: unknown) => reportError(error, "pbx.dtmfFailed"))
           }
           onTransfer={(to) =>
-            transport.current?.transfer(call.id, to).catch((error: unknown) => reportError(error, "pbx.transferFailed"))
+            (transport.current?.transfer(call.id, to) ?? Promise.reject(new Error("PBX offline"))).then(
+              () => toast.success(i18n.t("pbx.transferred")),
+              (error: unknown) => reportError(error, "pbx.transferFailed"),
+            )
           }
         />
       ))}
@@ -310,16 +314,19 @@ function CallCard({
   onMute: (muted: boolean) => void;
   onHold: (hold: boolean) => void;
   onDtmf: (tone: string) => void;
-  onTransfer: (destination: string) => void;
+  onTransfer: (destination: string) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const name = useCallerName(call.number);
   const [muted, setMuted] = useState(false);
   const [tool, setTool] = useState<"none" | "keypad" | "transfer">("none");
   const [target, setTarget] = useState("");
+  /* Пока onlinePBX отвечает — второй перевод не уходит. */
+  const [transferring, setTransferring] = useState(false);
   const toggleTool = (next: "keypad" | "transfer") => setTool((current) => (current === next ? "none" : next));
-  /* Добавочный (2–6 цифр) или внешний номер — то же, что принимает onlinePBX. */
-  const dialable = /^\+?\d{2,15}$/.test(target.replace(/[\s()-]/g, ""));
+  /* Добавочный или внешний номер: 2–15 цифр, можно с «+»; пробелы, скобки и дефисы отбрасываются. */
+  const destination = target.replace(/[\s()-]/g, "");
+  const dialable = /^\+?\d{2,15}$/.test(destination);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -347,7 +354,7 @@ function CallCard({
 
   return (
     <div
-      role={incoming ? "alert" : "status"}
+      role={incoming ? "alert" : undefined}
       className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3 shadow-modal"
     >
       <div className="flex items-center gap-3">
@@ -360,9 +367,15 @@ function CallCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-fg">{name || call.number}</p>
-          <p className="truncate text-xs text-fg-muted tabular-nums">
+          {/* Видимая строка тикает раз в секунду — скрыта от озвучки; читалке
+              уходит только смена состояния, без таймера. */}
+          <p aria-hidden className="truncate text-xs text-fg-muted tabular-nums">
             {name ? `${call.number} · ${label}` : label}
           </p>
+          {/* У входящего живая область — вся карточка (alert), своя роль не нужна. */}
+          <span role={incoming ? undefined : "status"} className="sr-only">
+            {call.state === "active" ? t(held ? "pbx.onHold" : "pbx.inCall") : label}
+          </span>
         </div>
 
         {incoming && (
@@ -425,7 +438,9 @@ function CallCard({
           className="flex gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            if (dialable) onTransfer(target.replace(/[\s()-]/g, ""));
+            if (!dialable || transferring) return;
+            setTransferring(true);
+            void onTransfer(destination).finally(() => setTransferring(false));
           }}
         >
           <Input
@@ -437,7 +452,7 @@ function CallCard({
             aria-label={t("pbx.transferTo")}
             className="min-w-0 flex-1"
           />
-          <Button type="submit" size="sm" disabled={!dialable}>
+          <Button type="submit" size="sm" disabled={!dialable || transferring}>
             {t("pbx.transferGo")}
           </Button>
         </form>

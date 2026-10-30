@@ -3340,6 +3340,8 @@
   "pbx.transferGo": "O'tkazish",
   "pbx.dtmfFailed": "Raqamni yuborib bo'lmadi",
   "pbx.transferFailed": "Qo'ng'iroqni o'tkazib bo'lmadi",
+  "pbx.transferred": "Qo'ng'iroq o'tkazildi",
+  "pbx.inCall": "Suhbat davom etmoqda",
   "crmInt.moizvonki.syncOff": "Sinxronizatsiya to‘xtatilgan",
   "crmInt.moizvonki.syncOn": "Qo‘ng‘iroqlar sinxronizatsiyasi yoqilgan",
   "crmInt.optional": "Ixtiyoriy",
