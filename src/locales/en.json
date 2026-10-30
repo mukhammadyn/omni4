@@ -3280,7 +3280,7 @@
   "crmInt.moizvonki.pause": "Pause",
   "crmInt.moizvonki.resume": "Resume",
   "crmInt.pbx.about": "One-click calls to clients via onlinePBX, call log and recordings",
-  "crmInt.pbx.hint": "Domain and API key come from your onlinePBX dashboard. Click-to-call rings the operator number first, then the client.",
+  "crmInt.pbx.hint": "Domain and API key come from your onlinePBX dashboard. An employee with an extension calls and answers right in the browser. Without WebRTC on the extension, onlinePBX rings the operator number first, then the client.",
   "crmInt.pbx.domain": "Domain",
   "crmInt.pbx.domainHint": "A domain like company.onpbx.ru",
   "crmInt.pbx.apiKey": "API key",

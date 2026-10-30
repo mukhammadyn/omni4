@@ -3277,7 +3277,7 @@
   "crmInt.moizvonki.pause": "To‘xtatish",
   "crmInt.moizvonki.resume": "Davom ettirish",
   "crmInt.pbx.about": "onlinePBX orqali mijozlarga bir bosishda qo‘ng‘iroq, jurnal va yozuvlar",
-  "crmInt.pbx.hint": "Domen va API kalit — onlinePBX kabinetidan. Bir bosishda qo‘ng‘iroq: avval operator raqamiga, so‘ng mijozga.",
+  "crmInt.pbx.hint": "Domen va API kalit — onlinePBX kabinetidan. Ichki raqamli xodim brauzerning o‘zida qo‘ng‘iroq qiladi va qabul qiladi. Ichki raqamda WebRTC bo‘lmasa, onlinePBX avval operator raqamiga, so‘ng mijozga qo‘ng‘iroq qiladi.",
   "crmInt.pbx.domain": "Domen",
   "crmInt.pbx.domainHint": "company.onpbx.ru ko‘rinishidagi domen",
   "crmInt.pbx.apiKey": "API kalit",

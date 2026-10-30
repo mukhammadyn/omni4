@@ -3294,7 +3294,7 @@
   "crmInt.moizvonki.pause": "Приостановить",
   "crmInt.moizvonki.resume": "Возобновить",
   "crmInt.pbx.about": "Звонки клиентам в один клик через onlinePBX, журнал и записи",
-  "crmInt.pbx.hint": "Домен и ключ API — из личного кабинета onlinePBX. Звонок по клику: onlinePBX сначала звонит на номер оператора, затем клиенту.",
+  "crmInt.pbx.hint": "Домен и ключ API — из личного кабинета onlinePBX. Сотрудник с добавочным звонит и принимает звонки прямо в браузере. Если у добавочного нет WebRTC, onlinePBX сначала звонит на номер оператора, затем клиенту.",
   "crmInt.pbx.domain": "Домен",
   "crmInt.pbx.domainHint": "Домен вида company.onpbx.ru",
   "crmInt.pbx.apiKey": "Ключ API",
