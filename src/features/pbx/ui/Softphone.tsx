@@ -1,12 +1,24 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MicIcon, MicOffIcon, PauseIcon, PhoneIcon, PhoneIncomingIcon, PhoneOffIcon, PlayIcon } from "lucide-react";
+import {
+  ArrowRightLeftIcon,
+  GripIcon,
+  MicIcon,
+  MicOffIcon,
+  PauseIcon,
+  PhoneIcon,
+  PhoneIncomingIcon,
+  PhoneOffIcon,
+  PlayIcon,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useSession } from "@/shared/api/use-session";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError } from "@/shared/lib/toast";
+import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
+import { Input } from "@/shared/ui/input";
 import {
   fetchWebRtcCredentials,
   callsWithoutRecording,
@@ -264,6 +276,12 @@ function CallStack({
           onHangup={() => void transport.current?.hangup(call.id)}
           onMute={(muted) => transport.current?.setMuted(call.id, muted)}
           onHold={(hold) => void toggleHold(call.id, hold)}
+          onDtmf={(tone) =>
+            transport.current?.sendDtmf(call.id, tone).catch((error: unknown) => reportError(error, "pbx.dtmfFailed"))
+          }
+          onTransfer={(to) =>
+            transport.current?.transfer(call.id, to).catch((error: unknown) => reportError(error, "pbx.transferFailed"))
+          }
         />
       ))}
     </div>,
@@ -280,6 +298,8 @@ function CallCard({
   onHangup,
   onMute,
   onHold,
+  onDtmf,
+  onTransfer,
 }: {
   call: VoipCallSnapshot;
   held: boolean;
@@ -289,10 +309,17 @@ function CallCard({
   onHangup: () => void;
   onMute: (muted: boolean) => void;
   onHold: (hold: boolean) => void;
+  onDtmf: (tone: string) => void;
+  onTransfer: (destination: string) => void;
 }) {
   const { t } = useTranslation();
   const name = useCallerName(call.number);
   const [muted, setMuted] = useState(false);
+  const [tool, setTool] = useState<"none" | "keypad" | "transfer">("none");
+  const [target, setTarget] = useState("");
+  const toggleTool = (next: "keypad" | "transfer") => setTool((current) => (current === next ? "none" : next));
+  /* Добавочный (2–6 цифр) или внешний номер — то же, что принимает onlinePBX. */
+  const dialable = /^\+?\d{2,15}$/.test(target.replace(/[\s()-]/g, ""));
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -316,58 +343,104 @@ function CallCard({
 
   const incoming = call.state === "incoming";
 
+  const live = call.state === "dialing" || call.state === "ringing" || call.state === "active";
+
   return (
     <div
       role={incoming ? "alert" : "status"}
-      className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 shadow-modal"
+      className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3 shadow-modal"
     >
-      <span
-        className={`grid size-9 shrink-0 place-items-center rounded-full ${
-          incoming ? "animate-pulse bg-success-subtle text-success" : "bg-accent-subtle text-accent"
-        }`}
-      >
-        <Icon as={incoming ? PhoneIncomingIcon : PhoneIcon} size={16} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-fg">{name || call.number}</p>
-        <p className="truncate text-xs text-fg-muted tabular-nums">
-          {name ? `${call.number} · ${label}` : label}
-        </p>
-      </div>
+      <div className="flex items-center gap-3">
+        <span
+          className={`grid size-9 shrink-0 place-items-center rounded-full ${
+            incoming ? "animate-pulse bg-success-subtle text-success" : "bg-accent-subtle text-accent"
+          }`}
+        >
+          <Icon as={incoming ? PhoneIncomingIcon : PhoneIcon} size={16} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-fg">{name || call.number}</p>
+          <p className="truncate text-xs text-fg-muted tabular-nums">
+            {name ? `${call.number} · ${label}` : label}
+          </p>
+        </div>
 
-      {incoming && (
-        <>
-          <RoundButton label={t("pbx.answer")} tone="success" disabled={answering} onClick={onAnswer}>
-            <Icon as={PhoneIcon} size={16} />
-          </RoundButton>
-          <RoundButton label={t("pbx.reject")} tone="danger" disabled={answering} onClick={onReject}>
-            <Icon as={PhoneOffIcon} size={16} />
-          </RoundButton>
-        </>
-      )}
-
-      {(call.state === "dialing" || call.state === "ringing" || call.state === "active") && (
-        <>
-          {call.state === "active" && (
-            <>
-              <RoundButton
-                label={t(muted ? "pbx.unmute" : "pbx.mute")}
-                onClick={() => {
-                  onMute(!muted);
-                  setMuted(!muted);
-                }}
-              >
-                <Icon as={muted ? MicOffIcon : MicIcon} size={16} />
-              </RoundButton>
-              <RoundButton label={t(held ? "pbx.resume" : "pbx.hold")} onClick={() => onHold(!held)}>
-                <Icon as={held ? PlayIcon : PauseIcon} size={16} />
-              </RoundButton>
-            </>
-          )}
+        {incoming && (
+          <>
+            <RoundButton label={t("pbx.answer")} tone="success" disabled={answering} onClick={onAnswer}>
+              <Icon as={PhoneIcon} size={16} />
+            </RoundButton>
+            <RoundButton label={t("pbx.reject")} tone="danger" disabled={answering} onClick={onReject}>
+              <Icon as={PhoneOffIcon} size={16} />
+            </RoundButton>
+          </>
+        )}
+        {live && (
           <RoundButton label={t("pbx.hangup")} tone="danger" onClick={onHangup}>
             <Icon as={PhoneOffIcon} size={16} />
           </RoundButton>
-        </>
+        )}
+      </div>
+
+      {call.state === "active" && (
+        <div className="flex items-center gap-1 pl-12">
+          <RoundButton
+            label={t(muted ? "pbx.unmute" : "pbx.mute")}
+            onClick={() => {
+              onMute(!muted);
+              setMuted(!muted);
+            }}
+          >
+            <Icon as={muted ? MicOffIcon : MicIcon} size={16} />
+          </RoundButton>
+          <RoundButton label={t(held ? "pbx.resume" : "pbx.hold")} onClick={() => onHold(!held)}>
+            <Icon as={held ? PlayIcon : PauseIcon} size={16} />
+          </RoundButton>
+          <RoundButton label={t("pbx.keypad")} active={tool === "keypad"} onClick={() => toggleTool("keypad")}>
+            <Icon as={GripIcon} size={16} />
+          </RoundButton>
+          <RoundButton label={t("pbx.transfer")} active={tool === "transfer"} onClick={() => toggleTool("transfer")}>
+            <Icon as={ArrowRightLeftIcon} size={16} />
+          </RoundButton>
+        </div>
+      )}
+
+      {call.state === "active" && tool === "keypad" && (
+        <div className="grid grid-cols-3 gap-1">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((tone) => (
+            <button
+              key={tone}
+              type="button"
+              onClick={() => onDtmf(tone)}
+              className="h-9 cursor-pointer rounded-lg border border-border text-sm font-medium text-fg tabular-nums hover:bg-surface-hover"
+            >
+              {tone}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {call.state === "active" && tool === "transfer" && (
+        <form
+          className="flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (dialable) onTransfer(target.replace(/[\s()-]/g, ""));
+          }}
+        >
+          <Input
+            autoFocus
+            inputMode="tel"
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+            placeholder={t("pbx.transferTo")}
+            aria-label={t("pbx.transferTo")}
+            className="min-w-0 flex-1"
+          />
+          <Button type="submit" size="sm" disabled={!dialable}>
+            {t("pbx.transferGo")}
+          </Button>
+        </form>
       )}
     </div>
   );
@@ -382,12 +455,15 @@ const TONES = {
 function RoundButton({
   label,
   tone = "plain",
+  active = false,
   disabled,
   onClick,
   children,
 }: {
   label: string;
   tone?: keyof typeof TONES;
+  /** Нажатая кнопка-переключатель (клавиатура, перевод). */
+  active?: boolean;
   disabled?: boolean;
   onClick: () => void;
   children: ReactNode;
@@ -396,10 +472,13 @@ function RoundButton({
     <button
       type="button"
       aria-label={label}
+      aria-pressed={active || undefined}
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className={`grid size-8 shrink-0 cursor-pointer place-items-center rounded-full disabled:opacity-40 ${TONES[tone]}`}
+      className={`grid size-8 shrink-0 cursor-pointer place-items-center rounded-full disabled:opacity-40 ${
+        active ? "bg-accent-subtle text-accent" : TONES[tone]
+      }`}
     >
       {children}
     </button>
