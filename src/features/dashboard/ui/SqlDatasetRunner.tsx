@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { SlidersHorizontalIcon } from "lucide-react";
 import { ChartCard, FilterBar, newChart, chartSeries, type Filters, type ChartConfig } from "@/features/item";
@@ -87,7 +87,15 @@ export function SqlResultView({ result, language, presentation, onPresentation, 
 
 function SqlResultTable({ result, language, fieldPresentation, pageSize = 50, paginationTop = false, link }: { link?: SqlPresentation | undefined; paginationTop?: boolean | undefined; pageSize?: number | undefined; fieldPresentation?: FieldPresentation | undefined; result: QueryResult; language: string }) {
   const copy = sqlCopy(language), [page, setPage] = useState(1), pages = Math.max(1, Math.ceil(result.rows.length / pageSize)), currentPage = Math.min(page, pages);
-  useEffect(() => { setPage(1); }, [result.rows, pageSize]);
+  const previousRows = useRef(result.rows);
+  useEffect(() => {
+    // Layout measurement may recreate the filtered array without changing its
+    // records. Reset only for a different result, not a content-height render.
+    const previous = previousRows.current;
+    previousRows.current = result.rows;
+    if (previous.length !== result.rows.length || previous.some((row, index) => row !== result.rows[index])) setPage(1);
+  }, [result.rows]);
+  useEffect(() => { setPage(1); }, [pageSize]);
   const first = result.rows.length ? (currentPage - 1) * pageSize + 1 : 0, last = Math.min(currentPage * pageSize, result.rows.length);
   const comfortable = link?.comfortable === true, cellStyle = comfortable ? { padding: "10px 16px", height: link?.rowHeight ?? 61 } : link?.rowHeight ? { height: link.rowHeight } : undefined;
   const fixed = result.columns.some((column) => link?.columnWidths?.[column.key]);
