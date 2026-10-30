@@ -6,6 +6,7 @@ import { formatDate } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
+import { AudioPlayer } from "./AudioPlayer";
 import { TranscriptButton } from "./Transcript";
 import { useCallLog, useCallRecording, type CallLogFilter, type PbxCall } from "../api/pbx";
 
@@ -159,7 +160,7 @@ export function Recording({ call }: { call: PbxCall }) {
   const [fetched, setUrl] = useState("");
   const url = call.recording || fetched;
 
-  if (url) return <audio controls preload="none" src={url} className="h-8 w-56" />;
+  if (url) return <AudioPlayer src={url} fileName={`call-${call.phone.replace(/\D/g, "")}-${call.at.slice(0, 10)}.mp3`} />;
   if (!call.callUuid) return <span className="text-fg-subtle">—</span>;
 
   return (
