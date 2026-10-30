@@ -1659,8 +1659,6 @@
   "org.loading": "{{total}} tadan {{loaded}} tasi yuklandi…",
   "employee.tab.personal": "Shaxsiy",
   "employee.card.personal": "Shaxsiy",
-  "employee.card.contacts": "Kontaktlar",
-  "employee.card.identity": "Manzil",
   "employee.card.work": "Ish ma’lumotlari",
   "employee.card.manager": "Rahbar",
   "employee.card.reports": "Bo‘ysunuvchilar",
