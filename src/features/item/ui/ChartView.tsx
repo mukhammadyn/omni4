@@ -615,6 +615,7 @@ export function ChartCard({
   return (
     <section
       ref={card}
+      aria-label={config.title || derived}
       draggable={editing}
       /*
        * Высота именно ЗАДАНА, а не «не меньше»: с `min-height` карточка
@@ -691,7 +692,7 @@ export function ChartCard({
           />
         </>
       )}
-      {!hideHeader && <header className="flex min-w-0 items-center gap-1.5">
+      {!hideHeader && (!config.appearance?.hideTitle || editing) && <header className="flex min-w-0 items-center gap-1.5">
         {editing && (
           <button
             type="button"

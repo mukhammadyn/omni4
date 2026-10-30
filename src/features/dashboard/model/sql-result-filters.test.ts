@@ -32,7 +32,7 @@ test("numeric presentation filters preserve exact decimal and int8 comparisons",
 test("axis appearance and date formatting survive saved configuration", async () => {
   const { formatQueryCell } = await import('./query-result');
   expect(formatQueryCell('2026-10-30T00:00:00Z', 'date', 'ru')).toBe('30.10.2026');
-  const widget = { ...newChart(), tableSlug: '', filters: {}, answers: {}, appearance: { neutral: true, axisTicks: true, rounded: true, columnWidth: 40, decimals: 1 } };
+  const widget = { ...newChart(), tableSlug: '', filters: {}, answers: {}, appearance: { hideTitle: true, neutral: true, axisTicks: true, rounded: true, columnWidth: 40, decimals: 1 } };
   const tree = { folders: [{ ...newFolder('module', 'Reports'), dashboards: [{ ...newDashboard('Example'), widgets: [widget] }] }] };
   expect(toTree(toTreeAttribute(tree))).toEqual(tree);
 });
