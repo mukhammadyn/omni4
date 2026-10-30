@@ -16,7 +16,7 @@ test("chart selections narrow only receiving output, combine, and keep missing d
 });
 test("saved filters, compact cards, table order and grid placement round trip without new data access", () => {
   const dataset = { id: "source", name: "Synthetic", source: { kind: "sql" as const, sql: "SELECT age FROM sample", parameters: [], columns: [] } };
-  const widget = { ...newChart(), tableSlug: "", datasetId: dataset.id, filters: { age: { op: "after" as const, values: ["20"] } }, answers: {}, sqlDetailField: "name", sqlSuffix: "years", sqlSelectionField: "month", sqlReceiveSelections: true, pageSize: 20, layout: { column: 9, row: 1, rows: 1 }, columns: ["name", "age"], body: "Dynamic output" };
+  const widget = { ...newChart(), tableSlug: "", datasetId: dataset.id, filters: { age: { op: "after" as const, values: ["20"] } }, answers: {}, sqlDetailField: "name", sqlSuffix: "years", sqlSuffixBelow: true, sqlShowViewerFilters: false, sqlSelectionField: "month", sqlReceiveSelections: true, pageSize: 20, layout: { column: 9, row: 1, rows: 1 }, columns: ["name", "age"], body: "Dynamic output" };
   const tree = { folders: [{ ...newFolder("module", "Reports"), dashboards: [{ ...newDashboard("Example"), widgets: [widget] }] }], datasets: [dataset] };
   expect(toTree(toTreeAttribute(tree))).toEqual(tree);
   expect(stageSqlWidget([dataset], widget, dataset).widget.filters).toEqual(widget.filters);

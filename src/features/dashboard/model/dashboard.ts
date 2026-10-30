@@ -16,6 +16,8 @@ export type Widget = ChartConfig & {
   layout?: { column: number; row: number; rows: number } | undefined;
   sqlDetailField?: string;
   sqlSuffix?: string;
+  sqlSuffixBelow?: boolean;
+  sqlShowViewerFilters?: boolean;
   sqlLinkField?: string;
   sqlLinkLabel?: string;
   sqlLinkTemplate?: string;
@@ -86,6 +88,7 @@ export function toTree(value: unknown): Tree {
                   ...chart,
                   ...(isObject(item["layout"]) ? { layout: parseLayout(item["layout"]) } : {}),
                   ...Object.fromEntries(["sqlDetailField", "sqlSuffix", "sqlSelectionField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
+                  ...Object.fromEntries(["sqlSuffixBelow", "sqlShowViewerFilters"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
                   ...(typeof item["sqlPaginationTop"] === "boolean" ? { sqlPaginationTop: item["sqlPaginationTop"] } : {}),
                   ...(typeof item["sqlReceiveSelections"] === "boolean" ? { sqlReceiveSelections: item["sqlReceiveSelections"] } : {}),
                   ...([0, 900000, 3600000, 86400000].includes(item["refresh_interval"] as number) ? { refreshInterval: item["refresh_interval"] as number } : {}),
@@ -152,6 +155,8 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...(widget.sqlLinkTemplate !== undefined ? { sqlLinkTemplate: widget.sqlLinkTemplate } : {}),
           ...(widget.sqlSuffix !== undefined ? { sqlSuffix: widget.sqlSuffix } : {}),
           ...(widget.sqlSelectionField !== undefined ? { sqlSelectionField: widget.sqlSelectionField } : {}),
+          ...(widget.sqlSuffixBelow !== undefined ? { sqlSuffixBelow: widget.sqlSuffixBelow } : {}),
+          ...(widget.sqlShowViewerFilters !== undefined ? { sqlShowViewerFilters: widget.sqlShowViewerFilters } : {}),
           ...(widget.sqlPaginationTop !== undefined ? { sqlPaginationTop: widget.sqlPaginationTop } : {}),
           ...(widget.sqlReceiveSelections !== undefined ? { sqlReceiveSelections: widget.sqlReceiveSelections } : {}),
           filters: widget.filters,
