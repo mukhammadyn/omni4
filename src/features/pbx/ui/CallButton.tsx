@@ -12,7 +12,7 @@ import { useSoftphone } from "./Softphone";
  */
 export function CallButton({ tableSlug, row }: { tableSlug: string; row: Record<string, unknown> }) {
   const { t } = useTranslation();
-  const mode = usePbxMode();
+  const { mode } = usePbxMode();
   const softphone = useSoftphone();
   const phone = phoneToCall(tableSlug, row);
 

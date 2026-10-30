@@ -99,7 +99,7 @@ const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve
 export function SoftphoneProvider({ children }: { children: ReactNode }) {
   /* Телефон в браузере — только у оператора с WebRTC; остальным
      «Позвонить» уходит старым путём или кнопки нет вовсе (usePbxMode). */
-  const mode = usePbxMode();
+  const { mode, problem: modeProblem } = usePbxMode();
   const enabled = mode === "verto";
   const [link, setLink] = useState<{ state: "connecting" | "online" | "offline"; problem: string; extension: string }>({
     state: "connecting",
@@ -269,18 +269,19 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
   );
 
   const live = calls.some((c) => c.state !== "ended");
-  const status: SoftphoneStatus = mode === "off" ? "off" : mode === "fallback" ? "fallback" : link.state;
+  const status: SoftphoneStatus =
+    mode === "off" ? "off" : mode === "fallback" ? "fallback" : mode === "error" ? "offline" : link.state;
   const value = useMemo(
     () => ({
       call,
       busy: live || fallback.isPending,
       status,
-      problem: status === "offline" ? link.problem : "",
+      problem: mode === "error" ? modeProblem : status === "offline" ? link.problem : "",
       extension: link.extension,
       dnd,
       setDnd,
     }),
-    [call, live, fallback.isPending, status, link.problem, link.extension, dnd, setDnd],
+    [call, live, fallback.isPending, status, mode, modeProblem, link.problem, link.extension, dnd, setDnd],
   );
 
   return (

@@ -251,7 +251,23 @@ const FALLBACK_CODES = [
   "PBX_PROVIDER_ERROR",
 ];
 
-export type PbxMode = "off" | "fallback" | "verto";
+/**
+ * Отказы, после которых телефонии у человека нет: выключена, он не
+ * оператор, нет настроек — или в проекте нет самой функции (шлюз:
+ * `no rows in result set`, проверено на omni5 2026-10-30).
+ */
+const OFF_CODES = [
+  "PBX_SETTINGS_NOT_CONFIGURED",
+  "PBX_ACCESS_DENIED",
+  "PBX_OPERATOR_NOT_CONFIGURED",
+  "UNAUTHORIZED",
+  "no rows in result set",
+];
+
+/** `error` — функция не ответила по делу: сеть, холодный старт, сбой. */
+export type PbxMode = "off" | "fallback" | "verto" | "error";
+
+class PbxModeError extends Error {}
 
 /**
  * Что может этот человек: звонить из браузера, только старым путём
@@ -259,10 +275,15 @@ export type PbxMode = "off" | "fallback" | "verto";
  * строке ключ API onlinePBX, и читать её нужно только экрану настроек
  * — иначе ключ уезжает в браузер каждому сотруднику.
  *
+ * «Никак» — только по явному отказу (OFF_CODES). Любая другая ошибка —
+ * не повод прятать телефон: раньше разовый сбой при загрузке убирал
+ * трубку из шапки молча до перезагрузки. Теперь — повтор, а пока не
+ * ответила, `error` с причиной (панель показывает «Нет связи»).
+ *
  * ponytail: временный `PBX_PROVIDER_ERROR` держит «старый путь» до
  * перезапроса (5 минут или возврат на вкладку).
  */
-export function usePbxMode(): PbxMode {
+export function usePbxMode(): { mode: PbxMode; problem: string } {
   const envId = useSession().getEnvironmentId() ?? "";
   const query = useQuery({
     queryKey: [...keys.settings.integration(envId, "pbx"), "mode"],
@@ -271,13 +292,19 @@ export function usePbxMode(): PbxMode {
         (): PbxMode => "verto",
         (error: unknown): PbxMode => {
           const message = error instanceof Error ? error.message : String(error);
-          return FALLBACK_CODES.some((code) => message.includes(code)) ? "fallback" : "off";
+          if (FALLBACK_CODES.some((code) => message.includes(code))) return "fallback";
+          if (OFF_CODES.some((code) => message.includes(code))) return "off";
+          throw new PbxModeError(message);
         },
       ),
     staleTime: 5 * 60_000,
-    retry: false,
+    retry: 2,
+    /* Не ответила — спрашиваем раз в минуту, пока не ответит. */
+    refetchInterval: (state) => (state.state.status === "error" ? 60_000 : false),
   });
-  return query.data ?? "off";
+  if (query.data) return { mode: query.data, problem: "" };
+  if (query.isError) return { mode: "error", problem: query.error.message };
+  return { mode: "off", problem: "" };
 }
 
 /**
