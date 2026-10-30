@@ -1,13 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MicIcon, MicOffIcon, PauseIcon, PhoneIcon, PhoneIncomingIcon, PhoneOffIcon, PlayIcon } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useSession } from "@/shared/api/use-session";
+import { keys } from "@/shared/lib/query-keys";
 import { reportError } from "@/shared/lib/toast";
 import { Icon } from "@/shared/ui/icon";
 import {
   fetchWebRtcCredentials,
-  logIncomingCall,
-  logWebRtcCall,
+  callsWithoutRecording,
+  fetchRecording,
+  logCall,
   useCallerName,
   usePbxCall,
   usePbxEnabled,
@@ -33,6 +37,15 @@ export function useSoftphone(): Softphone {
 const retryDelay = (attempt: number) => Math.min(60_000, 5_000 * 2 ** attempt);
 
 /**
+ * Запись onlinePBX готовит не сразу — обычно за минуту-две после
+ * разговора. Спрашиваем раз в 15 с, до 5 минут (как new-crm).
+ */
+const RECORDING_DELAY = 15_000;
+const RECORDING_ATTEMPTS = 20;
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+/**
  * Телефон оператора в браузере — один на вкладку, на всё время работы.
  *
  * Пока он в сети, onlinePBX шлёт сюда и входящие: звонок на добавочный
@@ -50,10 +63,39 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
   const [calls, setCalls] = useState<VoipCallSnapshot[]>([]);
   const transport = useRef<VoipTransport | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
+  const queryClient = useQueryClient();
+  const envId = useSession().getEnvironmentId() ?? "";
 
   useEffect(() => {
     if (!enabled) return;
     let stopped = false;
+
+    /* Журнал на экране — перечитать: в строке появилась запись. */
+    const refreshLog = () =>
+      queryClient.invalidateQueries({ queryKey: [...keys.settings.integration(envId, "pbx"), "calls"] });
+
+    const awaitRecording = async (callId: string) => {
+      for (let i = 0; i < RECORDING_ATTEMPTS && !stopped; i++) {
+        await sleep(RECORDING_DELAY);
+        if (stopped) return;
+        try {
+          if (await fetchRecording(callId)) return void refreshLog();
+        } catch {
+          // onlinePBX недоступен — следующая попытка; не дождались — дотянет recover().
+        }
+      }
+    };
+
+    /* Записи, которых не дождались до перезагрузки, — по разу. */
+    const recover = async () => {
+      const pending = await callsWithoutRecording().catch(() => []);
+      for (const callId of pending) {
+        if (stopped) return;
+        if (await fetchRecording(callId).catch(() => "")) void refreshLog();
+      }
+    };
+    void recover();
+
     let attempt = 0;
     let timer: number | undefined;
     let voip: VoipTransport | null = null;
@@ -97,17 +139,25 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
             setCalls((list) => [...list.filter((c) => c.id !== next.id), next].sort((a, b) => a.startedAt - b.startedAt));
             if (next.state !== "ended") return;
 
-            const input = {
-              phone: next.number,
-              duration: next.establishedAt ? (Date.now() - next.establishedAt) / 1000 : 0,
-              status: next.outcome,
-            };
             /* Входящий пишем, только если его приняли здесь. Непринятый
                не обязательно пропущен: его могли взять на трубке или в
                другой вкладке, и каждая вкладка записала бы свой «пропущенный».
                Пропущенные — из истории onlinePBX (docs/PBX-PLAN.md, шаг 11). */
-            if (next.direction === "outgoing") void logWebRtcCall(input).catch(() => {});
-            else if (next.establishedAt) void logIncomingCall(input).catch(() => {});
+            if (next.direction === "outgoing" || next.establishedAt) {
+              void logCall({
+                callId: next.id,
+                phone: next.number,
+                direction: next.direction,
+                status: next.outcome,
+                duration: next.establishedAt ? (Date.now() - next.establishedAt) / 1000 : 0,
+              })
+                .then(() => {
+                  void refreshLog();
+                  /* Запись ищется по строке журнала — только после неё. */
+                  if (next.establishedAt && Date.now() - next.establishedAt >= 5_000) return awaitRecording(next.id);
+                })
+                .catch(() => {});
+            }
             window.setTimeout(() => setCalls((list) => list.filter((c) => c.id !== next.id)), 2500);
           },
           onLocalStream: () => {},
@@ -128,7 +178,7 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
       transport.current = null;
       setCalls([]);
     };
-  }, [enabled]);
+  }, [enabled, queryClient, envId]);
 
   const { mutate: dialFallback } = fallback;
   const call = useCallback(

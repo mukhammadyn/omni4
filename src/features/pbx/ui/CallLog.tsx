@@ -99,7 +99,10 @@ function duration(seconds: number) {
 function Recording({ call }: { call: PbxCall }) {
   const { t } = useTranslation();
   const fetch = useCallRecording();
-  const [url, setUrl] = useState(call.recording);
+  /* Не копия в state: журнал перечитывается, когда софтфон дождался
+     записи, и адрес из строки должен появиться сам. */
+  const [fetched, setUrl] = useState("");
+  const url = call.recording || fetched;
 
   if (url) return <audio controls preload="none" src={url} className="h-8 w-56" />;
   if (!call.callUuid) return <span className="text-fg-subtle">—</span>;
@@ -110,8 +113,8 @@ function Recording({ call }: { call: PbxCall }) {
       disabled={fetch.isPending}
       onClick={() =>
         fetch.mutate(call.callUuid, {
-          onSuccess: (dto) => {
-            if (dto.recording_url) setUrl(dto.recording_url);
+          onSuccess: (recording) => {
+            if (recording) setUrl(recording);
             else toast.warning(t("pbx.recordingPending"));
           },
         })
