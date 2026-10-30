@@ -19,7 +19,7 @@ import { Cell } from "./Cell";
  * любой таблице людей (кандидаты, контакты), а состав правится
  * «Свойствами», как у галереи:
  *   картинка        — аватар (нет — инициалы);
- *   первая прочая   — имя;
+ *   full_name       — имя (нет — первая прочая);
  *   STATUS          — плашка, кроме самого частого значения: «Работает»
  *                     на каждой карточке — шум, прототип его не рисует;
  *   EMAIL, телефоны — кнопки внизу;
@@ -54,9 +54,13 @@ export function PeopleGallery({
   const photo = columns.find((field) => cellKind(field.type) === "image");
   const status = columns.find((field) => field.type === "STATUS");
   const contacts = columns.filter((field) => contactOf(field));
-  const [title, ...rest] = columns.filter(
+  const others = columns.filter(
     (field) => field !== photo && field !== status && !contacts.includes(field),
   );
+  /* Имя — `full_name`, где оно есть (сотрудники, кандидаты): иначе
+     лишняя колонка перед ним во view забирала бы место имени. */
+  const title = others.find((field) => field.slug === "full_name") ?? others[0];
+  const rest = others.filter((field) => field !== title);
   const byId = new Map(relations.map((relation) => [relation.id, relation]));
   const labels = new Map(rest.map((field) => [field, valueLabelOf(field, relations, language)]));
 

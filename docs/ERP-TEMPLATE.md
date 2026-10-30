@@ -518,7 +518,7 @@ LIST, GALLERY); значение — поле или колонка-связь (
 | # | Тип | Имя | Таблица | Атрибуты и настройки |
 |---|---|---|---|---|
 | 1 | TABLE | — | | |
-| 2 | GALLERY | Сетка | | `card: "person"`; колонки: `full_name`, `photo`, `hr_positions_id`, `hr_departments_id`, `hr_locations_id`, `status`, `email`, `phone`, `telegram_username` |
+| 2 | GALLERY | Сетка | | `card: "person"`; колонки: `full_name`, `photo`, `hr_positions_id`, `hr_departments_id`, `hr_locations_id`, `status`, `email`, `phone`, `telegram_username` — ровно эти 9 и в этом порядке: имя — первая колонка, всё прочее (кроме фото, статуса, контактов) уходит строкой под имя. Лишние поля ломают карточку (omni5, исправлено 2026-10-30) |
 
 Плюс **вкладки связей** — view с `is_relation_view: true`,
 `relation_table_slug` и связью. Они становятся вкладками страницы
