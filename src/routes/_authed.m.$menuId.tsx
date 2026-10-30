@@ -133,7 +133,7 @@ import {
   showsTable,
   useMenu,
 } from "@/features/sidebar";
-import { CALLS_TAB, CallButton, CallLog, RecordCalls, useHasRecordCalls } from "@/features/pbx";
+import { CALLS_TAB, CallButton, CallLog, RecordCalls, SoftphoneButton, useHasRecordCalls } from "@/features/pbx";
 import { useWorkspaceTitle } from "@/features/settings";
 import {
   FieldEditor,
@@ -1718,6 +1718,7 @@ function MenuPage() {
           {/* Помощник — справа, перед действиями рабочего места. Сама
               панель живёт в оболочке приложения: она шире одной страницы. */}
           <CopilotButton />
+          <SoftphoneButton />
           <TopbarActions />
         </header>
       )}

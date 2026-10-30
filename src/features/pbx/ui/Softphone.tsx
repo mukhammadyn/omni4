@@ -32,10 +32,36 @@ import {
 import { createVertoTransport } from "../lib/verto/VertoTransport";
 import type { VoipCallSnapshot, VoipTransport } from "../lib/verto/types";
 
+/**
+ * Состояние телефона для панели: `off` — телефонии у человека нет,
+ * `fallback` — оператор без WebRTC (звонит onlinePBX через его трубку),
+ * дальше — связь Verto.
+ */
+export type SoftphoneStatus = "off" | "fallback" | "connecting" | "online" | "offline";
+
 type Softphone = {
   /** Позвонить. Без входа в Verto — старым путём, через телефон оператора. */
   call: (phone: string) => void;
   busy: boolean;
+  status: SoftphoneStatus;
+  /** Почему нет связи — текст транспорта; пусто, если всё хорошо. */
+  problem: string;
+  extension: string;
+  /** «Не беспокоить»: входящие отклоняются сразу, без звонка. */
+  dnd: boolean;
+  setDnd: (on: boolean) => void;
+};
+
+const DND_KEY = "omni4.softphone.dnd";
+
+/* «Не беспокоить» — удобство этого браузера, не настройка оператора:
+   хранилище может быть недоступно, тогда флаг живёт до перезагрузки. */
+const readDnd = () => {
+  try {
+    return localStorage.getItem(DND_KEY) === "1";
+  } catch {
+    return false;
+  }
 };
 
 const SoftphoneContext = createContext<Softphone | null>(null);
@@ -73,7 +99,25 @@ const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve
 export function SoftphoneProvider({ children }: { children: ReactNode }) {
   /* Телефон в браузере — только у оператора с WebRTC; остальным
      «Позвонить» уходит старым путём или кнопки нет вовсе (usePbxMode). */
-  const enabled = usePbxMode() === "verto";
+  const mode = usePbxMode();
+  const enabled = mode === "verto";
+  const [link, setLink] = useState<{ state: "connecting" | "online" | "offline"; problem: string; extension: string }>({
+    state: "connecting",
+    problem: "",
+    extension: "",
+  });
+  const [dnd, setDndState] = useState(readDnd);
+  /* Колбэки транспорта живут дольше отрисовки — флаг читают через ref. */
+  const dndRef = useRef(dnd);
+  const setDnd = useCallback((on: boolean) => {
+    dndRef.current = on;
+    setDndState(on);
+    try {
+      localStorage.setItem(DND_KEY, on ? "1" : "0");
+    } catch {
+      // Нет хранилища — флаг до перезагрузки.
+    }
+  }, []);
   const fallback = usePbxCall();
   const [calls, setCalls] = useState<VoipCallSnapshot[]>([]);
   const transport = useRef<VoipTransport | null>(null);
@@ -135,13 +179,18 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
       }
       if (stopped) return;
 
-      voip = createVertoTransport({
+      const current: VoipTransport = (voip = createVertoTransport({
         websocketUrl: credentials.host,
         login: credentials.login,
         password: credentials.password,
         extension: credentials.extension,
         callbacks: {
-          onConnectionState: (state, _error, retryable = true) => {
+          onConnectionState: (state, error, retryable = true) => {
+            setLink((was) => ({
+              ...was,
+              state: state === "online" ? "online" : state === "connecting" ? "connecting" : "offline",
+              problem: state === "online" || state === "connecting" ? "" : (error ?? ""),
+            }));
             /* В сети — повтор не нужен: его таймер оборвал бы разговор,
                начатый после переподключения из call(). */
             if (state === "online") {
@@ -151,6 +200,13 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
             if ((state === "offline" || state === "error") && retryable && !stopped) retry();
           },
           onCallState: (next) => {
+            /* «Не беспокоить»: входящий кладём сразу, на экран он не попадает
+               и в журнал не пишется — его возьмёт трубка или другой оператор. */
+            if (next.state === "incoming" && dndRef.current) {
+              void current.reject(next.id).catch(() => {});
+              return;
+            }
+            if (next.state === "ended" && next.direction === "incoming" && !next.establishedAt && dndRef.current) return;
             setCalls((list) => [...list.filter((c) => c.id !== next.id), next].sort((a, b) => a.startedAt - b.startedAt));
             if (next.state !== "ended") return;
 
@@ -180,9 +236,10 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
             if (audio.current) audio.current.srcObject = stream;
           },
         },
-      });
-      transport.current = voip;
-      voip.connect().catch(() => {}); // Ошибку входа ловит onConnectionState → retry.
+      }));
+      transport.current = current;
+      setLink((was) => ({ ...was, extension: credentials.extension }));
+      current.connect().catch(() => {}); // Ошибку входа ловит onConnectionState → retry.
     };
 
     void start();
@@ -212,7 +269,19 @@ export function SoftphoneProvider({ children }: { children: ReactNode }) {
   );
 
   const live = calls.some((c) => c.state !== "ended");
-  const value = useMemo(() => ({ call, busy: live || fallback.isPending }), [call, live, fallback.isPending]);
+  const status: SoftphoneStatus = mode === "off" ? "off" : mode === "fallback" ? "fallback" : link.state;
+  const value = useMemo(
+    () => ({
+      call,
+      busy: live || fallback.isPending,
+      status,
+      problem: status === "offline" ? link.problem : "",
+      extension: link.extension,
+      dnd,
+      setDnd,
+    }),
+    [call, live, fallback.isPending, status, link.problem, link.extension, dnd, setDnd],
+  );
 
   return (
     <SoftphoneContext.Provider value={value}>
