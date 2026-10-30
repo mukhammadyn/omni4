@@ -5,6 +5,7 @@ import { formatDate } from "@/shared/lib/date-value";
 import { Icon } from "@/shared/ui/icon";
 import { phoneToCall, useRecordCalls } from "../api/pbx";
 import { Recording, duration } from "./CallLog";
+import { TranscriptButton } from "./Transcript";
 
 /** Id вкладки «Звонки» в карточке. Не view: у неё нет своей связи. */
 export const CALLS_TAB = "pbx-calls";
@@ -53,7 +54,10 @@ export function RecordCalls({ tableSlug, row }: { tableSlug: string; row: Record
               {[formatDate(call.at, "datetime", i18n.language) ?? "", call.userName].filter(Boolean).join(" · ")}
             </p>
           </div>
-          <Recording call={call} />
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Recording call={call} />
+            <TranscriptButton call={call} />
+          </div>
         </li>
       ))}
     </ul>

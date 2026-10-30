@@ -5,6 +5,7 @@ import { useSession } from "@/shared/api/use-session";
 import i18n from "@/shared/lib/i18n";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError, toast } from "@/shared/lib/toast";
+import { parseTranscript, type TranscriptLine } from "../model/transcript";
 
 /* ---------------- onlinePBX ---------------- */
 
@@ -359,6 +360,8 @@ export type PbxCall = {
   duration: number;
   callUuid: string;
   recording: string;
+  /** Текст разговора от воркера распознавания; пусто — ещё нет. */
+  transcript: TranscriptLine[];
 };
 
 const PAGE = 50;
@@ -394,6 +397,7 @@ const toCall = (row: Row, names: Map<string, string>): PbxCall => ({
   duration: typeof row["duration"] === "number" ? row["duration"] : 0,
   callUuid: str(row, "call_uuid"),
   recording: str(row, "recording_url"),
+  transcript: parseTranscript(row["transcript"]),
 });
 
 /**
