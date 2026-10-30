@@ -14,8 +14,6 @@ import {
   BriefcaseBusinessIcon,
   BookUserIcon,
   GlobeIcon,
-  IdCardIcon,
-  PhoneIcon,
   MessageSquareIcon,
   ScanSearchIcon,
   SplitIcon,
@@ -196,23 +194,6 @@ const CARDS: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
  * Строки гражданства, которые к человеку не относятся (`cit()` прототипа):
  * у лица без гражданства нет страны, у гражданина Узбекистана — иностранного ИНН.
  */
-/**
- * Контакты и адрес самой карточки — во вкладке «Адреса и телефоны», над её
- * списком (`hr_employee_contacts`): это разные таблицы, данные не переносились.
- */
-const CONTACT_CARDS: typeof CARDS = [
-  {
-    icon: PhoneIcon,
-    title: "employee.card.contacts",
-    slugs: ["email", "personal_email", "phone", "work_phone", "telegram_username"],
-  },
-  {
-    icon: IdCardIcon,
-    title: "employee.card.identity",
-    slugs: ["address", "emergency_contact"],
-  },
-];
-
 const offRow = (slug: string, row: Record<string, unknown>) => {
   const status = firstText(row.citizenship_status);
   if (slug === "citizenship_country") return status === "stateless";
@@ -305,6 +286,9 @@ export function EmployeePage({
   const neighbours = useNeighbours(guid);
   /* «Лицензии и сертификаты» на «Личном»: образование из той же таблицы — своей вкладкой. */
   const certificates = useEmployeeRows(QUALIFICATIONS, guid, CERTIFICATES).rows;
+  /* Почта и телефон для «Дать вход» — из «Адресов и телефонов», первое заполненное по названию. */
+  const contacts = useEmployeeRows(CONTACTS, guid).rows;
+  const contactOf = (name: string) => text(contacts.find((row) => firstText(row.name) === name && text(row.value))?.value);
   const [active, setActive] = useState<{ slug: string; anchor: DOMRect } | null>(null);
   /** «Изменить»: поля правятся, только пока режим включён, — как в прототипе. */
   const [editing, setEditing] = useState(false);
@@ -671,8 +655,8 @@ export function EmployeePage({
                 onClick={() => {
                   setEditing(!editing);
                   setActive(null);
-                  /* Правятся поля карточки: они в «Личном» и в «Адресах и телефонах» — с них не уводим. */
-                  if (!editing && own !== CONTACTS_TAB) onTab(undefined);
+                  /* Правятся поля карточки, а они в «Личном». */
+                  if (!editing) onTab(undefined);
                 }}
               >
                 <Icon as={editing ? CheckIcon : PencilIcon} size={15} />
@@ -746,7 +730,6 @@ export function EmployeePage({
 
         {own && GRIDS[own] ? (
           <>
-            {own === CONTACTS_TAB && CONTACT_CARDS.map(renderCard)}
             <EmployeeGrid key={own} grid={GRIDS[own]} employeeId={guid} language={language} />
           </>
         ) : own === ATTENDANCE_TAB ? (
@@ -958,7 +941,7 @@ export function EmployeePage({
       {granting && (
         <Suspense>
           <UserDialog
-            employee={{ id: guid, name: person.name, email: text(row.email), phone: text(row.phone) }}
+            employee={{ id: guid, name: person.name, email: contactOf("email"), phone: contactOf("work_phone") || contactOf("personal_phone") }}
             /* Строка в `core_users` уже есть — вход даётся её правкой, а не второй строкой. */
             {...(employee.user
               ? {

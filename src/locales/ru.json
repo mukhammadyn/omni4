@@ -1662,8 +1662,6 @@
   "org.loading": "Загружено {{loaded}} из {{total}}…",
   "employee.tab.personal": "Личное",
   "employee.card.personal": "Личное",
-  "employee.card.contacts": "Контакты",
-  "employee.card.identity": "Адрес",
   "employee.card.work": "Рабочие данные",
   "employee.card.manager": "Руководитель",
   "employee.card.reports": "Подчинённые",

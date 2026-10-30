@@ -1662,8 +1662,6 @@
   "org.loading": "Loaded {{loaded}} of {{total}}…",
   "employee.tab.personal": "Personal",
   "employee.card.personal": "Personal",
-  "employee.card.contacts": "Contacts",
-  "employee.card.identity": "Address",
   "employee.card.work": "Work details",
   "employee.card.manager": "Manager",
   "employee.card.reports": "Direct reports",

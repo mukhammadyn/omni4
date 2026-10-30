@@ -5,6 +5,7 @@ import { useTableSchema } from "@/features/table";
 import { session } from "@/shared/api/session";
 import { candidateSteps } from "../model/candidate-steps";
 import { EMPLOYEES } from "./employee";
+import { CONTACTS } from "./employee-rows";
 import { related, text } from "./org";
 import { todayInput } from "@/shared/lib/date-value";
 import { VACANCIES } from "./vacancy";
@@ -94,6 +95,7 @@ export function useCandidate(guid: string) {
     filters: own,
   });
   const createEmployee = useCreateItem(EMPLOYEES);
+  const createContact = useCreateItem(CONTACTS);
 
   const steps = useMemo(
     () => (row ? candidateSteps(stages, row, history.page.rows, allEvaluations) : []),
@@ -138,7 +140,12 @@ export function useCandidate(guid: string) {
     createEmployee: (onDone: (guid: string) => void) => {
       if (!row) return;
       const id = crypto.randomUUID();
-      createEmployee.mutate(employeeFromCandidate(row, id), { onSuccess: () => onDone(id) });
+      createEmployee.mutate(employeeFromCandidate(row, id), {
+        onSuccess: () => {
+          for (const contact of contactsFromCandidate(row, id)) createContact.mutate(contact);
+          onDone(id);
+        },
+      });
     },
     /**
      * Оценка этапа — своя: правится своя строка оценки с баллом на этом
@@ -176,6 +183,23 @@ function evaluationRow(candidate: string, stage: string, by: string | undefined,
   };
 }
 
+/**
+ * Телефон, почта и Telegram нанятого кандидата — строками «Адресов и
+ * телефонов» (`hr_employee_contacts`), а не полями карточки. Почта — личная:
+ * рабочую выдаст компания. Пустые не пишутся.
+ */
+export function contactsFromCandidate(candidate: Item, employee: string): Item[] {
+  return (
+    [
+      ["personal_phone", text(candidate.phone)],
+      ["email", text(candidate.email)],
+      ["telegram", text(candidate.telegram_username)],
+    ] as const
+  )
+    .filter(([, value]) => value)
+    .map(([name, value]) => ({ guid: crypto.randomUUID(), hr_employees_id: employee, kind: "contact", name, value }));
+}
+
 /** Строка `hr_employees` из нанятого кандидата. Пустые значения не пишутся. */
 export function employeeFromCandidate(candidate: Item, guid: string): Item {
   const vacancy = related(candidate, "hr_vacancies_id");
@@ -185,9 +209,6 @@ export function employeeFromCandidate(candidate: Item, guid: string): Item {
     first_name: candidate.first_name,
     last_name: candidate.last_name,
     full_name: candidate.full_name,
-    phone: candidate.phone,
-    personal_email: candidate.email,
-    telegram_username: candidate.telegram_username,
     photo: candidate.photo,
     hr_positions_id: vacancy.hr_positions_id,
     hr_departments_id: vacancy.hr_departments_id,
