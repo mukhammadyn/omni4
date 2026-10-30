@@ -422,6 +422,14 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 - `CRM / Система`: `crm_pipelines`, `crm_stages`, `crm_lost_reasons`,
   `crm_sources`, `crm_lead_forms`, `crm_call_quality_versions`,
   `crm_reply_templates`, `crm_ad_spend`;
+  вкладка «CRM» настроек (2026-10-30) читает из них: `crm_pipelines`
+  (`name`, `is_active`, `is_default`, `sort_order`), `crm_stages`
+  (`container` = `new` / `in_progress` / `done`, `probability`,
+  `term_days`, `color`, `sort_order` — сквозной по воронке, группа
+  за группой), `crm_sources` и `crm_lost_reasons` (`name`, `color`,
+  `is_active`, `sort_order`), `crm_call_quality_versions` (`criteria` —
+  JSON `[{id, name, max_score, instructions, allowed_scores}]`,
+  `violation_rules`, `auto_evaluate`, `is_active` — действующая одна);
 - `CRM / Служебные`: `crm_deal_items`, `crm_deal_stage_history`,
   `crm_messages`;
 - `HRMS` (прямо в папке): `hr_work_schedules` (Шаблоны графиков, 📐 `1f4d0`);
