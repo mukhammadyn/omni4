@@ -32,7 +32,7 @@ export function SqlDatasetRunner({ menuId, sql, parameters, presentation, onPres
   const runner = useSqlRunner(menuId, sql, effective, runValues, limit);
   const result = useMemo(() => runner.result ? labelQueryResult(runner.result, catalog.tables, i18n.language) : null, [runner.result, catalog.tables, i18n.language]);
   const displayed = result ? filterSqlResult(filterSqlResult(result, filters, selections), viewerFilters) : null;
-  useEffect(() => { setViewerFilters({}); }, [runner.scopeKey, sql]);
+  useEffect(() => { setViewerFilters({}); }, [runner.scopeKey, sql, showViewerFilters]);
   useEffect(() => { onResult?.(result); }, [result, onResult]);
   useEffect(() => { setValues({}); }, [runner.scopeKey]);
   const issue = sqlSupportIssue(sql), missing = effective.some((parameter) => !Object.hasOwn(runValues, parameter.name) || (parameter.type !== "text" && runValues[parameter.name] === ""));
