@@ -3343,6 +3343,8 @@
   "pbx.transferGo": "Transfer",
   "pbx.dtmfFailed": "Could not send the digit",
   "pbx.transferFailed": "Could not transfer the call",
+  "pbx.transferred": "Call transferred",
+  "pbx.inCall": "Call in progress",
   "crmInt.moizvonki.syncOff": "Sync is paused",
   "crmInt.moizvonki.syncOn": "Call sync is on",
   "crmInt.optional": "Optional",
