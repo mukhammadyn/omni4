@@ -10,6 +10,7 @@ import { ClientTypeSettings } from "./ClientTypeSettings";
 import { CodeSettings } from "./CodeSettings";
 import { CompanySettings } from "./CompanySettings";
 import { DatabaseSettings } from "./DatabaseSettings";
+import { CrmCallQualitySettings, CrmLostSettings, CrmPipelineSettings, CrmSourceSettings } from "./CrmSettings";
 import { DirectorySettings } from "./DirectorySettings";
 import { EndpointSettings } from "./EndpointSettings";
 import { ProfileSettings } from "./ProfileSettings";
@@ -59,6 +60,10 @@ const CONTENT: Record<string, () => React.JSX.Element> = {
   billing: BillingSettings,
   resources: ResourceSettings,
   activity: ActivityLog,
+  "crm-pipelines": CrmPipelineSettings,
+  "crm-sources": CrmSourceSettings,
+  "crm-lost": CrmLostSettings,
+  "crm-call-quality": CrmCallQualitySettings,
   "hr-files": HrFilesSettings,
   "hr-fines": HrFinesSettings,
   "hr-salary": HrSalarySettings,
