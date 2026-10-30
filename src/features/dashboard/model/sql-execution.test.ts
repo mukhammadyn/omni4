@@ -50,4 +50,5 @@ test("SQL widget and dataset survive real menu serialization without query outpu
   expect(JSON.stringify(serialized)).not.toContain('"minimum":"');
   expect(widget.tableSlug).toBe("");
   expect(sqlWidgetFrom(dataset).type).toBe("records");
+  expect(sqlWidgetFrom(dataset, { type: "chart", kind: "column", group: "month", value: "total", split: "", sorts: [{ field: "month", direction: "asc" }] }).sorts).toEqual([{ field: "month", direction: "asc" }]);
 });
