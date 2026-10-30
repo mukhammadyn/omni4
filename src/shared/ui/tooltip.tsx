@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, isValidElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -22,21 +22,26 @@ const DELAY = 300;
 
 /** Зазор между подсказкой и тем, к чему она относится. */
 const GAP = 6;
+let activeTooltip: { hide: () => void } | null = null;
 
 export function Tooltip({
   label,
   children,
   placement = "top",
+  as = "span",
 }: {
   /** Пусто — подсказки нет вовсе: обёртка становится прозрачной. */
   label: ReactNode;
   children: ReactNode;
   /** Сверху по умолчанию; снизу — когда сверху мешает липкая шапка. */
   placement?: "top" | "bottom";
+  /** SVG marks need an SVG group, not an HTML span inside an SVG. */
+  as?: "span" | "g";
 }) {
-  const anchor = useRef<HTMLSpanElement>(null);
+  const anchor = useRef<Element | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const timer = useRef<number>(0);
+  const owner = useRef({ hide: () => {} });
 
   /** Прямоугольник того, к чему привязана подсказка. null — скрыта. */
   const [at, setAt] = useState<DOMRect | null>(null);
@@ -44,13 +49,16 @@ export function Tooltip({
 
   const hide = () => {
     window.clearTimeout(timer.current);
+    if (activeTooltip === owner.current) activeTooltip = null;
     setAt(null);
     setPlaced(null);
   };
+  owner.current.hide = hide;
 
   const show = () => {
     if (!label) return;
-
+    if (activeTooltip !== owner.current) activeTooltip?.hide();
+    activeTooltip = owner.current;
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       /* Ребёнок, а не сама обёртка: у элемента с display: contents
@@ -60,7 +68,10 @@ export function Tooltip({
     }, DELAY);
   };
 
-  useEffect(() => () => window.clearTimeout(timer.current), []);
+  useEffect(() => { const identity = owner.current; return () => {
+    window.clearTimeout(timer.current);
+    if (activeTooltip === identity) activeTooltip = null;
+  }; }, []);
 
   /*
    * Место считается после отрисовки: ширина зависит от текста. Слоем,
@@ -78,7 +89,7 @@ export function Tooltip({
     setPlaced({
       left: clamp(at.left + at.width / 2 - size.width / 2, GAP, window.innerWidth - size.width - GAP),
       // Не поместилось с той стороны, куда просили, — становимся с другой.
-      top: above >= GAP && above + size.height <= window.innerHeight - GAP ? above : below,
+      top: clamp(above >= GAP && above + size.height <= window.innerHeight - GAP ? above : below, GAP, window.innerHeight - size.height - GAP),
     });
   }, [at, placement]);
 
@@ -95,23 +106,27 @@ export function Tooltip({
     };
   }, [at]);
 
+  const Anchor = as;
   return (
     <>
-      <span
-        ref={anchor}
-        style={{ display: "contents" }}
+      <Anchor
+        ref={(element: Element | null) => { anchor.current = element; }}
+        data-tooltip-anchor
+        tabIndex={as === "g" && !(isValidElement<{ tabIndex?: number }>(children) && children.props.tabIndex !== undefined) ? 0 : undefined}
+        aria-label={as === "g" && typeof label === "string" ? label : undefined}
+        style={as === "span" ? { display: "contents" } : undefined}
         onPointerEnter={show}
         onPointerLeave={hide}
         /* Нажали — значит уже не читают: подсказка поверх перетаскиваемой
            карточки только мешает. */
-        onPointerDown={hide}
+        onPointerDown={as === "g" ? undefined : hide}
         /* С клавиатуры — тоже: фокус всплывает, и отдельного обработчика
            на каждую кнопку не нужно. */
         onFocus={show}
         onBlur={hide}
       >
         {children}
-      </span>
+      </Anchor>
 
       {at &&
         createPortal(

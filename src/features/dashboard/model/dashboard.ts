@@ -25,6 +25,7 @@ export type Widget = ChartConfig & {
   sqlSelectionField?: string;
   sqlReceiveSelections?: boolean;
   sqlPaginationTop?: boolean;
+  sqlTableFitContent?: boolean;
   sqlTableComfortable?: boolean;
   sqlRowHeight?: number;
   calculatedFields?: CalculatedField[];
@@ -92,6 +93,7 @@ export function toTree(value: unknown): Tree {
                   ...(isObject(item["layout"]) ? { layout: parseLayout(item["layout"]) } : {}),
                   ...Object.fromEntries(["sqlDetailField", "sqlSuffix", "sqlSelectionField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
                   ...Object.fromEntries(["sqlSuffixBelow", "sqlShowViewerFilters"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
+                  ...(typeof item["sqlTableFitContent"] === "boolean" ? { sqlTableFitContent: item["sqlTableFitContent"] } : {}),
                   ...(typeof item["sqlTableComfortable"] === "boolean" ? { sqlTableComfortable: item["sqlTableComfortable"] } : {}),
                   ...(typeof item["sqlRowHeight"] === "number" ? { sqlRowHeight: Math.max(28, Math.min(120, item["sqlRowHeight"])) } : {}),
                   ...(typeof item["sqlPaginationTop"] === "boolean" ? { sqlPaginationTop: item["sqlPaginationTop"] } : {}),
@@ -162,6 +164,7 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...(widget.sqlSelectionField !== undefined ? { sqlSelectionField: widget.sqlSelectionField } : {}),
           ...(widget.sqlSuffixBelow !== undefined ? { sqlSuffixBelow: widget.sqlSuffixBelow } : {}),
           ...(widget.sqlShowViewerFilters !== undefined ? { sqlShowViewerFilters: widget.sqlShowViewerFilters } : {}),
+          ...(widget.sqlTableFitContent !== undefined ? { sqlTableFitContent: widget.sqlTableFitContent } : {}),
           ...(widget.sqlTableComfortable !== undefined ? { sqlTableComfortable: widget.sqlTableComfortable } : {}),
           ...(widget.sqlRowHeight !== undefined ? { sqlRowHeight: widget.sqlRowHeight } : {}),
           ...(widget.sqlPaginationTop !== undefined ? { sqlPaginationTop: widget.sqlPaginationTop } : {}),

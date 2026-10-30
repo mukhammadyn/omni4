@@ -1,5 +1,5 @@
 import { linearDomain, niceChartTicks, stackedBands } from "../model/chart-geometry";
-import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { startPointerDrag } from "@/shared/lib/pointer-drag";
 import {
   AudioWaveformIcon,
@@ -509,9 +509,15 @@ export function ChartCard({
   hideHeader = false,
   scrollContent = true,
   onPick,
+  selectedKey,
+  naturalContentHeight,
+  onAutoHeight,
   sizeRows,
 }: {
   onPick?: ((key: string) => void) | undefined;
+  selectedKey?: string | undefined;
+  naturalContentHeight?: number | undefined;
+  onAutoHeight?: ((height: number) => void) | undefined;
   sizeRows?: { value: number; min?: number; max: number; unit: number; gap: number } | undefined;
   config: ChartConfig;
   columns: Field[];
@@ -611,6 +617,13 @@ export function ChartCard({
   const width = sizing?.width ?? config.width;
   const height = sizing?.height ?? sizeRows?.value ?? config.height;
   const card = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const element = card.current, body = element?.querySelector<HTMLElement>("[data-chart-body]");
+    if (!element || !body || !naturalContentHeight || !onAutoHeight) return;
+    const measure = () => onAutoHeight(Math.ceil(naturalContentHeight + element.getBoundingClientRect().height - body.getBoundingClientRect().height));
+    const observer = new ResizeObserver(measure); observer.observe(element); measure();
+    return () => observer.disconnect();
+  }, [naturalContentHeight, onAutoHeight]);
 
   return (
     <section
@@ -799,7 +812,7 @@ export function ChartCard({
         ) : config.kind === "treemap" ? (
           <TreemapChart series={series} locale={i18n.language} />
         ) : ["column", "column100", "area", "area100", "combo"].includes(config.kind) ? (
-          <CartesianChart config={config} series={series} locale={i18n.language} onPick={onPick} />
+          <CartesianChart config={config} series={series} locale={i18n.language} onPick={onPick} selectedKey={selectedKey} />
         ) : config.kind === "heatmap" ? (
           <Heatmap series={series} locale={i18n.language} />
         ) : config.kind === "funnel" ? (
@@ -811,7 +824,7 @@ export function ChartCard({
         ) : config.kind === "line" ? (
           <Line series={series} locale={i18n.language} showGrid={config.showGrid === true} />
         ) : (
-          <Bars series={series} locale={i18n.language} config={config} onPick={onPick} />
+          <Bars series={series} locale={i18n.language} config={config} onPick={onPick} selectedKey={selectedKey} />
         )}
       </div>
 
@@ -1116,7 +1129,7 @@ export function ChartSetup({
  * своей: иначе полосы разных серий нельзя было бы сравнить глазами,
  * а ради этого график и рисуют.
  */
-function Bars({ series, locale, config, onPick }: { onPick?: ((key: string) => void) | undefined; series: ChartSeries; locale: string; config: ChartConfig }) {
+function Bars({ series, locale, config, onPick, selectedKey }: { selectedKey?: string | undefined; onPick?: ((key: string) => void) | undefined; series: ChartSeries; locale: string; config: ChartConfig }) {
   const grouped = series.splits.length > 1;
   const top = grouped
     ? Math.max(...series.points.flatMap((point) => [...point.cells.values()]), 0)
@@ -1129,7 +1142,7 @@ function Bars({ series, locale, config, onPick }: { onPick?: ((key: string) => v
    * ponytail: двусторонняя ось — когда попросят min по полю с минусами.
    */
   if (config.stacked === true) return <AbsoluteBars series={series} locale={locale} showGrid={config.showGrid === true} />;
-  if (config.appearance?.axisTicks && !grouped) return <AxisBars series={series} config={config} locale={locale} onPick={onPick} />;
+  if (config.appearance?.axisTicks && !grouped) return <AxisBars series={series} config={config} locale={locale} onPick={onPick} selectedKey={selectedKey} />;
   const width = (value: number) => `${top > 0 ? Math.max(0, value / top) * 100 : 0}%`;
 
   return (
@@ -1150,7 +1163,7 @@ function Bars({ series, locale, config, onPick }: { onPick?: ((key: string) => v
                   key={split.key}
                   label={`${point.label} · ${splitName(split)}: ${show(point.cells.get(split.key) ?? 0, locale)}`}
                   width={width(point.cells.get(split.key) ?? 0)}
-                  color={seriesFill(split.key, index)}
+                  color={selectedKey !== undefined && selectedKey !== point.key ? "bg-border-strong" : seriesFill(split.key, index)}
                   value={show(point.cells.get(split.key) ?? 0, locale)}
                   thin
                 />
@@ -1159,7 +1172,7 @@ function Bars({ series, locale, config, onPick }: { onPick?: ((key: string) => v
               <Row
                 label={`${point.label}: ${show(point.value, locale)}`}
                 width={width(point.value)}
-                color="bg-chart-1"
+                color={selectedKey !== undefined && selectedKey !== point.key ? "bg-border-strong" : "bg-chart-1"}
                 value={show(point.value, locale)}
               />
             )}
@@ -1170,18 +1183,18 @@ function Bars({ series, locale, config, onPick }: { onPick?: ((key: string) => v
   );
 }
 
-function AxisBars({ series, config, locale, onPick }: { series: ChartSeries; config: ChartConfig; locale: string; onPick?: ((key: string) => void) | undefined }) {
+function AxisBars({ series, config, locale, onPick, selectedKey }: { selectedKey?: string | undefined; series: ChartSeries; config: ChartConfig; locale: string; onPick?: ((key: string) => void) | undefined }) {
   const domain = linearDomain(series.points.map((point) => point.value)), ticks = niceChartTicks(domain.min, domain.max), min = ticks[0]!, max = ticks.at(-1)!;
   const x = (value: number) => (value - min) / (max - min || 1) * 100;
   const format = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: config.appearance?.decimals ?? 2 });
-  return <div className="flex h-full min-h-0 flex-col gap-3" data-axis-bars>
+  return <div className="flex h-full min-h-0 flex-col gap-3 pr-3" data-axis-bars>
     <div className="flex min-h-0 flex-1 flex-col">{series.points.map((point) => <div key={point.key} className="flex min-h-0 flex-1 items-center gap-3">
       <button type="button" disabled={!onPick} title={point.label} className="w-40 shrink-0 truncate text-right text-xs text-fg-muted disabled:cursor-default" onClick={() => onPick?.(point.key)}>{point.label}</button>
       <div style={{ height: `${config.appearance?.columnWidth ?? 56}%` }} className="relative min-w-0 flex-1">{config.showGrid && ticks.map((tick) => <span key={tick} className="absolute inset-y-0 border-l border-dashed border-chart-grid" style={{ left: `${x(tick)}%` }} />)}
-        <Tooltip label={`${point.label}: ${format(point.value)}`}><button type="button" disabled={!onPick} aria-label={`${point.label}: ${format(point.value)}`} onClick={() => onPick?.(point.key)} className={`absolute inset-y-0 ${config.appearance?.neutral ? "bg-fg" : "bg-chart-1"} ${config.appearance?.rounded ? "rounded-md" : ""} disabled:cursor-default`} style={{ left: `${x(Math.min(0, point.value))}%`, width: `${Math.abs(x(point.value) - x(0))}%` }} /></Tooltip>
+        <Tooltip label={`${point.label}: ${format(point.value)}`}><button type="button" aria-disabled={!onPick} tabIndex={0} aria-pressed={onPick ? selectedKey === point.key : undefined} aria-label={`${point.label}: ${format(point.value)}`} onClick={() => onPick?.(point.key)} className={`absolute inset-y-0 outline-none focus-visible:outline-2 focus-visible:outline-accent ${selectedKey !== undefined && selectedKey !== point.key ? "bg-border-strong" : config.appearance?.neutral ? "bg-fg" : "bg-chart-1"} ${config.appearance?.rounded ? "rounded-md" : ""} disabled:cursor-default`} style={{ left: `${x(Math.min(0, point.value))}%`, width: `${Math.abs(x(point.value) - x(0))}%` }} /></Tooltip>
       </div>
     </div>)}</div>
-    <div className="relative ml-[172px] h-5 border-t border-chart-grid text-2xs text-fg-muted">{ticks.map((tick) => <span key={tick} className="absolute -translate-x-1/2 pt-1" style={{ left: `${x(tick)}%` }}>{format(tick)}</span>)}</div>
+    <div className="relative ml-[172px] h-6 shrink-0 border-t border-chart-grid text-2xs text-fg-muted">{ticks.map((tick) => <span key={tick} className="absolute -translate-x-1/2 pt-1" style={{ left: `${x(tick)}%` }}>{format(tick)}</span>)}</div>
   </div>;
 }
 
@@ -1192,7 +1205,7 @@ function AbsoluteBars({ series, locale, showGrid }: { series: ChartSeries; local
   const splits = series.splits.length ? series.splits : [{ key: "", label: "" }];
   return <div className="flex flex-col gap-2" data-chart-stacked>{series.points.map((point, at) => <div key={point.key} className="flex items-center gap-2">
     <span className="w-28 shrink-0 truncate text-xs text-fg-muted">{point.label}</span>
-    <div className="relative h-5 min-w-0 flex-1" data-chart-grid={showGrid ? "vertical" : undefined} style={showGrid ? { backgroundImage: "linear-gradient(to right, var(--color-chart-grid) 1px, transparent 1px)", backgroundSize: "25% 100%" } : undefined}>{bands[at]!.bands.map((band, index) => <div key={splits[index]!.key} className={`absolute top-0 h-full ${seriesFill(splits[index]!.key, index)}`} style={{ left: `${x(Math.min(band.start, band.end))}%`, width: `${Math.abs(x(band.end) - x(band.start))}%` }} title={`${point.label} · ${splits[index]!.label}: ${show(band.value, locale)}`} />)}</div>
+    <div className="relative h-5 min-w-0 flex-1" data-chart-grid={showGrid ? "vertical" : undefined} style={showGrid ? { backgroundImage: "linear-gradient(to right, var(--color-chart-grid) 1px, transparent 1px)", backgroundSize: "25% 100%" } : undefined}>{bands[at]!.bands.map((band, index) => <Tooltip key={splits[index]!.key} label={`${point.label} · ${splits[index]!.label}: ${show(band.value, locale)}`}><div tabIndex={0} className={`absolute top-0 h-full ${seriesFill(splits[index]!.key, index)}`} style={{ left: `${x(Math.min(band.start, band.end))}%`, width: `${Math.abs(x(band.end) - x(band.start))}%` }} /></Tooltip>)}</div>
     <span className="w-14 shrink-0 text-right text-xs tabular-nums">{show(point.value, locale)}</span>
   </div>)}</div>;
 }
@@ -1214,7 +1227,7 @@ function Row({
   return (
     <div className="flex items-center gap-2">
       <Tooltip label={label}>
-        <div className={`${thin ? "h-2.5" : "h-4"} min-w-0 flex-1`}>
+        <div tabIndex={0} className={`${thin ? "h-2.5" : "h-4"} min-w-0 flex-1`}>
           <div className={`h-full rounded-r-[4px] ${color}`} style={{ width }} />
         </div>
       </Tooltip>
@@ -1253,7 +1266,7 @@ function Stack({ series, locale }: { series: ChartSeries; locale: string }) {
                   key={split.key}
                   label={`${point.label} · ${splitName(split)}: ${show(value, locale)}`}
                 >
-                  <div
+                  <div tabIndex={0}
                     className={`h-full ${seriesFill(split.key, index)}`}
                     style={{ width: `${point.value > 0 ? (value / point.value) * 100 : 0}%` }}
                   />
@@ -1298,7 +1311,7 @@ function Funnel({ series, locale }: { series: ChartSeries; locale: string }) {
             </span>
 
             <Tooltip label={`${point.label}: ${show(point.value, locale)} · ${percent(share)}`}>
-              <div className="h-5 min-w-0 flex-1">
+              <div tabIndex={0} className="h-5 min-w-0 flex-1">
                 <div
                   className="h-full rounded-r-[4px] bg-chart-1"
                   style={{ width: `${top > 0 ? Math.max(0, point.value / top) * 100 : 0}%` }}
@@ -1394,7 +1407,7 @@ function Stream({ series, locale }: { series: ChartSeries; locale: string }) {
           >
             {/* Рамка по индексу, а не `first:`: Tooltip оборачивает каждую
                 колонку в свой span, и «первой» оказывается каждая. */}
-            <div className={`h-full min-w-0 flex-1 px-2 ${index ? "border-l border-border" : ""}`}>
+            <div tabIndex={0} className={`h-full min-w-0 flex-1 px-2 ${index ? "border-l border-border" : ""}`}>
               <p className="truncate text-xs text-fg-muted" title={point.label}>
                 {point.label}
               </p>
@@ -1517,9 +1530,9 @@ function Heatmap({ series, locale }: { series: ChartSeries; locale: string }) {
                       бледная ступень шкалы: у шкалы свой смысл
                       («мало»), а здесь не было ни одной строки. */}
                   {value === undefined ? (
-                    <div className="h-6 rounded-sm bg-surface-hover" role="presentation" />
+                    <div tabIndex={0} className="h-6 rounded-sm bg-surface-hover" role="presentation" />
                   ) : (
-                    <div
+                    <div tabIndex={0}
                       className={`grid h-6 place-items-center rounded-sm text-2xs tabular-nums ${heatFill(value, top)} ${heatInk(value, top)}`}
                     >
                       {/*
@@ -1586,8 +1599,7 @@ function Donut({ series, locale, showLegend = true }: { series: ChartSeries; loc
           offset += share;
 
           return (
-            <circle
-              key={point.key}
+            <Tooltip as="g" key={point.key} label={`${point.label}: ${show(point.value, locale)} (${percent(share)})`}><circle
               cx="21"
               cy="21"
               r="15.9155"
@@ -1596,7 +1608,7 @@ function Donut({ series, locale, showLegend = true }: { series: ChartSeries; loc
               strokeDasharray={dash}
               strokeDashoffset={rotate}
               className={seriesStroke(point.key, index)}
-            />
+            /></Tooltip>
           );
         })}
       </svg>
@@ -1755,7 +1767,7 @@ function Line({ series, locale, showGrid = false }: { series: ChartSeries; local
                   )
                 }
               >
-                <div className="h-full flex-1" />
+                <div tabIndex={0} className="h-full flex-1" />
               </Tooltip>
             ))}
           </div>
@@ -1783,7 +1795,7 @@ export function Stat({ value, previous, locale, compact = false }: { value: numb
   const delta = previous === undefined ? null : statDelta(value, previous);
 
   return (
-    <div className={`flex flex-col gap-1 ${compact ? "py-1" : "py-4"}`}>
+    <Tooltip label={show(value, locale)}><div tabIndex={0} className={`flex flex-col gap-1 ${compact ? "py-1" : "py-4"}`}>
       <p className={`${compact ? "text-xl" : "text-3xl"} font-semibold text-fg`}>{show(value, locale)}</p>
       {delta !== null && (
         <p className="text-xs text-fg-muted">
@@ -1793,7 +1805,7 @@ export function Stat({ value, previous, locale, compact = false }: { value: numb
           {t("chart.vsPrevious", { value: show(previous ?? 0, locale) })}
         </p>
       )}
-    </div>
+    </div></Tooltip>
   );
 }
 
