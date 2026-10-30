@@ -466,8 +466,8 @@ type CampaignsDto = { campaigns?: { id?: string; name?: string; effective_status
 /**
  * Кампании воронки (`/v1/meta-ads/pipeline-campaigns`, как доска ARMADA):
  * лид страницы попадает в воронку, только если его объявление из выбранной
- * кампании. Рекламный аккаунт шлюз подбирает сам — по страницам воронки
- * (`/v1/meta-ads/selected-account`).
+ * кампании. Рекламный аккаунт шлюз подбирает сам — по привязанным
+ * страницам (`/v1/meta-ads/selected-account`).
  *
  * Пустой ответ — «все кампании»: списка ещё нет. Сохранённый пустой список
  * шлюз читает как «никого» и убрать его не даёт — поэтому пустым не пишем.
@@ -477,10 +477,11 @@ export function useMetaPipelineCampaigns(pipelineId: string) {
   const queryClient = useQueryClient();
   const base = [...keys.settings.integration(envId, "meta-ads"), pipelineId];
 
+  /* Аккаунт — по любой привязанной странице, а не по этой воронке: иначе
+     кампании новой воронки не видны, пока страницу на неё не сохранят. */
   const account = useQuery({
-    queryKey: [...base, "account"],
-    queryFn: () => api.get<{ account?: { id?: string } }>("/v1/meta-ads/selected-account", { params: { pipeline_value: pipelineId } }),
-    enabled: Boolean(pipelineId),
+    queryKey: [...keys.settings.integration(envId, "meta-ads"), "account"],
+    queryFn: () => api.get<{ account?: { id?: string } }>("/v1/meta-ads/selected-account"),
     retry: false,
   });
   const accountId = account.data?.account?.id ?? "";
@@ -498,10 +499,7 @@ export function useMetaPipelineCampaigns(pipelineId: string) {
   const save = useMutation({
     mutationFn: (ids: string[]) => api.put<unknown>("/v1/meta-ads/pipeline-campaigns", { pipeline_value: pipelineId, campaign_ids: ids }),
     onError: (error) => reportError(error, "common.saveFailed"),
-    onSuccess: () => {
-      toast.success(i18n.t("settings.saved"));
-      return queryClient.invalidateQueries({ queryKey: [...base, "selected"] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...base, "selected"] }),
   });
 
   return {
@@ -509,7 +507,7 @@ export function useMetaPipelineCampaigns(pipelineId: string) {
       (c): MetaCampaign => ({ id: c.id ?? "", name: c.name ?? c.id ?? "", active: c.effective_status === "ACTIVE" }),
     ),
     selected: selected.data?.campaign_ids ?? [],
-    loading: account.isLoading || campaigns.isLoading || selected.isLoading,
+    loading: account.isLoading || campaigns.isLoading || (Boolean(pipelineId) && selected.isLoading),
     /** Нет рекламного аккаунта или он не видит страниц воронки. */
     unavailable: account.isError || campaigns.isError,
     save,
