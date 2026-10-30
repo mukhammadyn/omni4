@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
+import { session } from "@/shared/api/session";
 import { useSession } from "@/shared/api/use-session";
 import i18n from "@/shared/lib/i18n";
 import { keys } from "@/shared/lib/query-keys";
@@ -335,4 +336,53 @@ export function useCallRecording() {
       invoke<{ status?: string; recording_url?: string }>("pbx_get_recording", { call_uuid: callUuid }),
     onError: (error) => reportError(error, "pbx.recordingFailed"),
   });
+}
+
+/**
+ * Входящий звонок — строка в журнал напрямую, мимо функции:
+ * `pbx_log_call` пишет только `client_phone/status/duration` и
+ * направления не знает (pbx-fn, functions/pbx_webrtc.go, PBXLogCall),
+ * а пропущенный от исходящего иначе не отличить. Оператор — тот же
+ * `users_id`, что функция берёт из токена.
+ */
+export function logIncomingCall(input: { phone: string; duration: number; status: string }) {
+  return api.post<unknown>("/v2/items/pbx_calls", {
+    data: {
+      client_phone: input.phone,
+      direction: "incoming",
+      status: input.status,
+      duration: Math.max(0, Math.round(input.duration)),
+      users_id: session.getUserId(),
+    },
+  });
+}
+
+/**
+ * Кто звонит: контакт, иначе компания с этим номером. Сравниваем по
+ * последним 9 цифрам — АТС присылает номер то с кодом страны, то без,
+ * а текстовый фильтр get-list ищет подстроку. Номер в базе хранится
+ * сплошными цифрами (`+998901234567`); с пробелами внутри не найдётся.
+ */
+export function useCallerName(phone: string): string {
+  const envId = useSession().getEnvironmentId() ?? "";
+  const digits = phone.replace(/\D+/g, "").slice(-9);
+
+  const query = useQuery({
+    queryKey: [...keys.settings.integration(envId, "pbx"), "caller", digits],
+    enabled: digits.length === 9,
+    staleTime: 5 * 60_000,
+    retry: false,
+    queryFn: async () => {
+      for (const [table, field] of [
+        ["crm_contacts", "full_name"],
+        ["crm_companies", "name"],
+      ] as const) {
+        const dto = await api.post<ListDto>(`/v2/object/get-list/${table}`, { data: { limit: 1, phone: digits } });
+        const row = dto.data?.response?.[0];
+        if (row) return str(row, field);
+      }
+      return "";
+    },
+  });
+  return query.data ?? "";
 }
