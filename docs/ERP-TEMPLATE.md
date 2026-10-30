@@ -785,7 +785,7 @@ Udevs. Воронка — выпадающий список в панели, в�
 | Таблица | Поля |
 |---|---|
 | `pbx_settings` «Настройки PBX», одна строка | `domain`, `api_key`, `phone_number` (SINGLE_LINE), `enable` (SWITCH), `verto_host`, `auth_key_id`, `auth_key`, `auth_expires_at` (SINGLE_LINE, пишет функция) |
-| `pbx_operators` «Операторы PBX» | `users_id` (SINGLE_LINE — guid `core_users`: функция ищет по этому слагу, а связь дала бы `core_users_id`), `pbx_extension` (SINGLE_LINE), `enabled` (SWITCH) |
+| `pbx_operators` «Операторы PBX» | `users_id` (SINGLE_LINE — `user_id` токена: у сотрудника guid `core_users`, у DEFAULT ADMIN — его `user_id_auth` (added 2026-10-30); функция ищет по этому слагу, а связь дала бы `core_users_id`), `pbx_extension` (SINGLE_LINE), `enabled` (SWITCH) |
 | `pbx_calls` «Звонки PBX» | `call_uuid`, `client_phone`, `pbx_from`, `status`, `error_code`, `idempotency_key`, `users_id`, `direction`, `recording_url`, `stereo_recording_url` (SINGLE_LINE), `duration` (NUMBER), `transcript` (MULTI_LINE) |
 
 Запись функции в проекте заводит экран onlinePBX при первом сохранении

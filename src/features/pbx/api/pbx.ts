@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fileUrl } from "@/features/item";
-import { api } from "@/shared/api/client";
+import { api, authApi } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { useSession } from "@/shared/api/use-session";
 import i18n from "@/shared/lib/i18n";
@@ -20,6 +20,9 @@ import { parseTranscript, type TranscriptLine } from "../model/transcript";
  */
 export const PBX_FUNCTION = "professional-crm-pbx-integration-call";
 
+/** Таблица входа сотрудников. */
+const PEOPLE_TABLE = "core_users";
+
 export type PbxSettings = {
   guid: string;
   domain: string;
@@ -31,6 +34,11 @@ export type PbxSettings = {
 
 export type PbxOperator = { guid: string; userId: string; extension: string };
 
+/**
+ * Кому можно дать добавочный. `guid` — id, по которому функция найдёт
+ * оператора: `user_id` его токена (pbx_get_webrtc_credentials ищет
+ * `pbx_operators.users_id` по нему).
+ */
 export type PbxUser = { guid: string; name: string };
 
 type Row = Record<string, unknown>;
@@ -44,16 +52,34 @@ const listRows = (table: string, limit: number) =>
 const str = (row: Row, key: string) => (typeof row[key] === "string" ? (row[key] as string) : "");
 
 export function usePbx() {
-  const envId = useSession().getEnvironmentId() ?? "";
+  const session = useSession();
+  const envId = session.getEnvironmentId() ?? "";
+  const projectId = session.getProjectId() ?? "";
 
   const query = useQuery({
     queryKey: keys.settings.integration(envId, "pbx"),
     queryFn: async () => {
-      const [settings, operators, users] = await Promise.all([
+      const [settings, operators, users, clientTypes] = await Promise.all([
         listRows("pbx_settings", 1),
         listRows("pbx_operators", 1000),
         listRows("core_users", 1000),
+        authApi
+          .get<{ data?: { response?: Row[] | null } }>("/v2/client-type", {
+            params: { "project-id": projectId, limit: 50, offset: 0 },
+          })
+          .then((dto) => dto.data?.response ?? [])
+          .catch((): Row[] => []),
       ]);
+      /*
+       * Типы входа не через `core_users` — системный ADMIN (`table_slug`
+       * пуст: его таблица входа — `user` сервиса авторизации). Его строка
+       * в `core_users` — копия ради пояса (ADR-0014) со своим guid, а в
+       * токене у него id учётки — `user_id_auth`. Проверено живьём
+       * 2026-10-30: добавочный на `user_id_auth` даёт админу трубку.
+       */
+      const systemTypes = new Set(
+        clientTypes.filter((type) => str(type, "table_slug") !== PEOPLE_TABLE).map((type) => str(type, "guid")),
+      );
       const row = settings[0];
 
       return {
@@ -76,10 +102,21 @@ export function usePbx() {
             extension: str(op, "pbx_extension"),
           }),
         ),
-        users: users
-          .map((user): PbxUser => ({ guid: str(user, "guid"), name: str(user, "full_name") }))
-          .filter((user) => user.guid && user.name)
-          .sort((a, b) => a.name.localeCompare(b.name)),
+        users: [
+          ...new Map(
+            users
+              .map((user): PbxUser => {
+                const system = systemTypes.has(str(user, "client_type_id"));
+                return {
+                  guid: system ? str(user, "user_id_auth") : str(user, "guid"),
+                  /* Имени у админа нет — подпись логином. */
+                  name: str(user, "full_name") || (system ? str(user, "login") : ""),
+                };
+              })
+              .filter((user) => user.guid && user.name)
+              .map((user) => [user.guid, user] as const),
+          ).values(),
+        ].sort((a, b) => a.name.localeCompare(b.name)),
       };
     },
     retry: false,
