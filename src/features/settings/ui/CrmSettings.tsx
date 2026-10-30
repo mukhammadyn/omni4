@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
+import { Checkbox } from "@/shared/ui/checkbox";
 import { CHIP_COLORS, CHIP_DOT, CHIP_HEX, CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { CommitInput } from "@/shared/ui/commit-input";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
@@ -37,7 +38,7 @@ import {
   type Pipeline,
   type Stage,
 } from "../api/crm-settings";
-import { useMetaLeads, useMetaPageRoutes, type MetaPageRoute } from "../api/crm-integrations";
+import { useMetaLeads, useMetaPageRoutes, useMetaPipelineCampaigns, type MetaPageRoute } from "../api/crm-integrations";
 import { SectionHeader } from "./parts";
 
 /**
@@ -600,6 +601,11 @@ export function CrmMetaRoutesSettings() {
           />
         ))
       )}
+      {pipelines
+        .filter((p) => [...routes.routes.values()].some((r) => r.pipelineId === p.id))
+        .map((p) => (
+          <PipelineCampaigns key={p.id} pipeline={p} />
+        ))}
     </Screen>
   );
 }
@@ -645,5 +651,52 @@ function PageRoute({ name, route, pipelines, busy, onSave }: { name: string; rou
         {t("action.save")}
       </Button>
     </div>
+  );
+}
+
+/**
+ * Кампании воронки — «креативы → воронка» ARMADA: лид пускается в воронку,
+ * только если объявление из отмеченной кампании. Ничего не отмечено и не
+ * сохранено — пускаются все.
+ */
+function PipelineCampaigns({ pipeline }: { pipeline: Pipeline }) {
+  const { t } = useTranslation();
+  const data = useMetaPipelineCampaigns(pipeline.id);
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const chosen = draft ?? data.selected;
+  const changed = draft !== null && [...draft].sort().join() !== [...data.selected].sort().join();
+  const toggle = (id: string) => setDraft(chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id]);
+
+  return (
+    <section className="rounded-xl border border-border p-3">
+      <header className="mb-2">
+        <b className="block text-sm font-semibold">{t("crmset.campaignsOf", { name: pipeline.name })}</b>
+        <small className="text-xs text-fg-muted">{data.selected.length ? t("crmset.campaignsChosen", { count: data.selected.length }) : t("crmset.campaignsAll")}</small>
+      </header>
+      {data.loading ? (
+        <p className="text-sm text-fg-subtle">{t("common.loading")}</p>
+      ) : data.unavailable ? (
+        <p className="text-sm text-fg-muted">{t("crmset.campaignsUnavailable")}</p>
+      ) : (
+        <>
+          <div className="flex max-h-72 flex-col gap-1 overflow-auto">
+            {data.campaigns.map((c) => (
+              <label key={c.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-surface-hover">
+                <Checkbox checked={chosen.includes(c.id)} onChange={() => toggle(c.id)} />
+                <span className={`min-w-0 flex-1 truncate ${c.active ? "" : "text-fg-subtle"}`}>{c.name}</span>
+                {!c.active && <span className="text-xs text-fg-subtle">{t("crmset.campaignPaused")}</span>}
+              </label>
+            ))}
+            {!data.campaigns.length && <p className="text-sm text-fg-subtle">{t("crmset.noCampaigns")}</p>}
+          </div>
+          <div className="mt-2 flex items-center justify-end gap-2">
+            {draft !== null && !draft.length && <span className="text-xs text-fg-muted">{t("crmset.campaignsNeedOne")}</span>}
+            <Button disabled={!changed || !chosen.length || data.save.isPending} onClick={() => data.save.mutate(chosen, { onSuccess: () => setDraft(null) })}>
+              {t("action.save")}
+            </Button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }

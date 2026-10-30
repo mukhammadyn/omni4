@@ -3434,5 +3434,13 @@
   "crmset.openIntegrations": "Open integrations",
   "crmset.pipeline": "Pipeline",
   "crmset.noPipeline": "No pipeline — default",
-  "crmset.entryStage": "Entry stage"
+  "crmset.entryStage": "Entry stage",
+  "crmset.campaignsOf": "Campaigns of “{{name}}”",
+  "crmset.campaignsAll": "Leads from all campaigns are accepted. Tick campaigns to accept only theirs.",
+  "crmset.campaignsChosen_one": "Leads from {{count}} campaign are accepted, the rest are dropped.",
+  "crmset.campaignsChosen_other": "Leads from {{count}} campaigns are accepted, the rest are dropped.",
+  "crmset.campaignsUnavailable": "Campaigns are unavailable: no Meta ad account promotes this pipeline's pages.",
+  "crmset.noCampaigns": "The ad account has no campaigns",
+  "crmset.campaignPaused": "inactive",
+  "crmset.campaignsNeedOne": "Tick at least one: an empty list lets no lead in"
 }

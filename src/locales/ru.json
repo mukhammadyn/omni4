@@ -3457,5 +3457,15 @@
   "crmset.openIntegrations": "Открыть интеграции",
   "crmset.pipeline": "Воронка",
   "crmset.noPipeline": "Без воронки — по умолчанию",
-  "crmset.entryStage": "Этап входа"
+  "crmset.entryStage": "Этап входа",
+  "crmset.campaignsOf": "Кампании воронки «{{name}}»",
+  "crmset.campaignsAll": "Пускаются лиды всех кампаний. Отметьте кампании — и в воронку попадут только их лиды.",
+  "crmset.campaignsChosen_one": "Пускаются лиды {{count}} кампании, остальные отбрасываются.",
+  "crmset.campaignsChosen_few": "Пускаются лиды {{count}} кампаний, остальные отбрасываются.",
+  "crmset.campaignsChosen_many": "Пускаются лиды {{count}} кампаний, остальные отбрасываются.",
+  "crmset.campaignsChosen_other": "Пускаются лиды {{count}} кампании, остальные отбрасываются.",
+  "crmset.campaignsUnavailable": "Кампании недоступны: нет рекламного аккаунта Meta, который продвигает страницы этой воронки.",
+  "crmset.noCampaigns": "В рекламном аккаунте нет кампаний",
+  "crmset.campaignPaused": "не активна",
+  "crmset.campaignsNeedOne": "Отметьте хотя бы одну: пустой список не пустит ни одного лида"
 }

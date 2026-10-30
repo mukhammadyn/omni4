@@ -3431,5 +3431,13 @@
   "crmset.openIntegrations": "Integratsiyalarni ochish",
   "crmset.pipeline": "Voronka",
   "crmset.noPipeline": "Voronkasiz — standart",
-  "crmset.entryStage": "Kirish bosqichi"
+  "crmset.entryStage": "Kirish bosqichi",
+  "crmset.campaignsOf": "«{{name}}» voronkasi kampaniyalari",
+  "crmset.campaignsAll": "Barcha kampaniyalar lidlari qabul qilinadi. Kampaniyalarni belgilang — voronkaga faqat ularning lidlari tushadi.",
+  "crmset.campaignsChosen_one": "{{count}} ta kampaniya lidlari qabul qilinadi, qolganlari tashlab yuboriladi.",
+  "crmset.campaignsChosen_other": "{{count}} ta kampaniya lidlari qabul qilinadi, qolganlari tashlab yuboriladi.",
+  "crmset.campaignsUnavailable": "Kampaniyalar mavjud emas: bu voronka sahifalarini reklama qiluvchi Meta reklama akkaunti yo‘q.",
+  "crmset.noCampaigns": "Reklama akkauntida kampaniyalar yo‘q",
+  "crmset.campaignPaused": "faol emas",
+  "crmset.campaignsNeedOne": "Kamida bittasini belgilang: bo‘sh ro‘yxat hech bir lidni o‘tkazmaydi"
 }
