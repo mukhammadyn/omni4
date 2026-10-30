@@ -1,0 +1,6 @@
+/* Preserve readable horizontal scrolling on phones; fit configured column
+   proportions to a desktop card instead of creating a second page scrollbar. */
+@container sql-table (min-width: 768px) {
+  .sql-table-fixed { width: 100% !important; }
+  .sql-table-fixed col { width: var(--sql-column-share) !important; }
+}

@@ -11,13 +11,13 @@ import type { SqlSelection } from "../model/sql-result-filters";
 import { SqlDatasetWidget } from "./SqlDatasetWidget";
 
 const noop = () => {};
-export function WidgetContents({ widget, data, language, editing = false, page = 1, sorts = [], onPage = noop, onSorts = noop, onChange = noop, onSelect, sqlSelections, onSqlPick }: { sqlSelections?: SqlSelection[] | undefined; onSqlPick?: ((key: string) => void) | undefined;
+export function WidgetContents({ widget, data, language, editing = false, page = 1, sorts = [], onPage = noop, onSorts = noop, onChange = noop, onSelect, sqlSelections, sqlSelectedKey, onSqlPick, onSqlHeight }: { onSqlHeight?: ((height: number) => void) | undefined; sqlSelectedKey?: string | undefined; sqlSelections?: SqlSelection[] | undefined; onSqlPick?: ((key: string) => void) | undefined;
   widget: Widget; data: ReturnType<typeof useWidgetData>; language: string; editing?: boolean; page?: number; sorts?: Sort[];
   onPage?: (page: number) => void; onSorts?: (sorts: Sort[]) => void; onChange?: (patch: Partial<Widget>) => void; onSelect?: (filter: Filters) => void;
 }) {
   const { t, i18n } = useTranslation();
   if (widget.type === "heading") return <p className="whitespace-pre-wrap py-3 text-base text-fg-muted">{widget.body}</p>;
-  if (data.dataset?.source.kind==="sql") return <SqlDatasetWidget dataset={data.dataset} widget={widget} menuId={data.sqlMenuId} selections={sqlSelections ?? []} onPick={onSqlPick} />;
+  if (data.dataset?.source.kind==="sql") return <SqlDatasetWidget dataset={data.dataset} widget={widget} menuId={data.sqlMenuId} selections={sqlSelections ?? []} selectedKey={sqlSelectedKey} onHeight={onSqlHeight} onPick={onSqlPick} />;
   if (!widget.tableSlug && !widget.datasetId) return <p className="text-sm text-fg-muted">{t("dashboard.pickTableFirst")}</p>;
   if (data.denied || data.forbidden) return <p className="text-sm text-fg-muted">{t("dashboard.noWidgetAccess")}</p>;
   if (data.error) return <div role="alert" className="text-sm text-danger">{t(data.error as "dashboard.filterConflict", { defaultValue: data.error })}<button type="button" className="ml-2 underline" onClick={data.refetch}>{t("dashboard.refresh")}</button></div>;
