@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { hoursOf, planFill, summarize, workDaysOf } from "./timesheet-docs";
 
 const totals = (worked: number, overtime: number, absences: number) => ({
-  days: 0, workedMinutes: worked, planMinutes: 0, lateMinutes: 0, overtimeMinutes: overtime, absences,
+  days: 0, workedMinutes: worked, planMinutes: 0, planDays: 0, lateMinutes: 0, overtimeMinutes: overtime, absences,
 });
 
 describe("summarize", () => {

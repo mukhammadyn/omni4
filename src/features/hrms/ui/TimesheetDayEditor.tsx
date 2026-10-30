@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Modal } from "@/shared/ui/modal";
 import { useEditDay, useFillDays, useSheetOverlap, useSheetPay } from "../api/timesheet-days";
+import { overtimeOf } from "../model/timesheet";
 import { DAY_KINDS, isEdited, parseHours, toHours, type DayKind, type DayRow, type Edit, type PeriodKind } from "../model/timesheet-days";
 
 const box = "flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-modal";
@@ -208,12 +209,16 @@ export function DayEditor({
             onChange={(value) => setDraft({ ...draft, day_kind: value as DayKind })}
           />
         </label>
-        <div className="grid grid-cols-3 gap-3">
-          {minutes("late_minutes", t("timesheets.lateMin"), row.orig_late_minutes)}
-          {minutes("early_minutes", t("timesheets.earlyMin"), row.orig_early_minutes)}
+        {/* План/факт — часами; ниже минуты дня. План и переработка не правятся: план — из графика, переработка считается из факта. */}
+        <div className="grid grid-cols-2 gap-3">
           <label className="flex min-w-0 flex-col gap-1 text-sm">
-            <span className="truncate text-fg-muted" title={t("timesheets.workedHours")}>
-              {t("timesheets.workedHours")}
+            <span className="truncate text-fg-muted">{t("timesheets.planHours")}</span>
+            <input value={toHours(row.plan_minutes)} readOnly disabled className={`${input} opacity-70`} />
+            <span className="h-4" />
+          </label>
+          <label className="flex min-w-0 flex-col gap-1 text-sm">
+            <span className="truncate text-fg-muted" title={t("timesheets.factHours")}>
+              {t("timesheets.factHours")}
             </span>
             <input
               inputMode="decimal"
@@ -233,8 +238,28 @@ export function DayEditor({
             </span>
           </label>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={draft.no_checkout} onChange={(event) => setDraft({ ...draft, no_checkout: event.target.checked })} />
+        <section className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium">{t("timesheets.minutes")}</h3>
+          <div className="grid grid-cols-3 gap-3">
+            {minutes("late_minutes", t("timesheets.lateLabel"), row.orig_late_minutes)}
+            {minutes("early_minutes", t("timesheets.earlyLabel"), row.orig_early_minutes)}
+            <label className="flex min-w-0 flex-col gap-1 text-sm">
+              <span className="truncate text-fg-muted">{t("timesheets.overtimeLabel")}</span>
+              <input value={overtimeOf(draft.worked_minutes, row.plan_minutes)} readOnly disabled className={`${input} opacity-70`} />
+              <span className="h-4" />
+            </label>
+          </div>
+        </section>
+        <label className="flex w-fit cursor-pointer items-center gap-2.5 text-sm">
+          {/* Переключатель как в record-form (Toggle): нативный чекбокс скрыт, вид — дорожка с бегунком. */}
+          <input
+            type="checkbox"
+            role="switch"
+            checked={draft.no_checkout}
+            onChange={(event) => setDraft({ ...draft, no_checkout: event.target.checked })}
+            className="peer sr-only"
+          />
+          <span className="relative h-4.5 w-7.5 shrink-0 rounded-full bg-border-strong transition-colors peer-checked:bg-warning peer-focus-visible:ring-2 peer-focus-visible:ring-accent after:absolute after:top-0.5 after:left-0.5 after:size-3.5 after:rounded-full after:bg-white after:shadow-sm after:transition-[left] peer-checked:after:left-3.5" />
           {t("timesheets.noCheckout")}
         </label>
         <label className="flex flex-col gap-1 text-sm">

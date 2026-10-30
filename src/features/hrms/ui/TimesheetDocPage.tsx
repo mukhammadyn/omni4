@@ -43,7 +43,7 @@ import { TimesheetHistory } from "./TimesheetHistory";
 import { monthName, SHEET_STATUS } from "../model/timesheet-docs";
 import { useDayHead, dayTone } from "./attendance-parts";
 import { Card } from "./page-parts";
-import { CellView, Legend, TOTALS, TotalsCells } from "./Timesheet";
+import { CellView, Legend, TOTALS, TotalCell } from "./Timesheet";
 
 const OVERVIEW = "overview";
 const GRID = "grid";
@@ -101,6 +101,11 @@ export function TimesheetDocPage({
   const decide = useDecideSheet(guid);
   const [dialog, setDialog] = useState<"fill" | "approve" | "return" | null>(null);
   const [editing, setEditing] = useState<{ row: DayRow; name: string } | null>(null);
+  /* «По дням» — факт днями явки, «По часам» — часами. */
+  const [unit, setUnit] = useState<"days" | "hours">("hours");
+  const fact = unit === "days" ? "days" : "hours";
+  const rest = TOTALS.filter((key) => key !== "plan" && key !== "hours" && key !== "days");
+  const columns = 3 + rest.length + doc.dates.length;
   const { departments } = useOrgDirectory();
   const head = useDayHead();
   const [active, setActive] = useState<{ slug: string; anchor: DOMRect } | null>(null);
@@ -326,29 +331,51 @@ export function TimesheetDocPage({
         ) : (
           <section className="rounded-[10px] border border-border bg-surface">
             <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2.5">
-              <Legend types={doc.absenceTypes} sample="8:00" />
+              <Legend types={doc.absenceTypes} sample="8" />
+              <div className="ml-auto">
+                <Tabs
+                  variant="segment"
+                  activeId={unit}
+                  onSelect={(id) => setUnit(id === "days" ? "days" : "hours")}
+                  tabs={[
+                    { id: "days", label: t("timesheets.unit.days") },
+                    { id: "hours", label: t("timesheets.unit.hours") },
+                  ]}
+                />
+              </div>
             </div>
-            <div className="overflow-x-auto">
+            {/* Своя прокрутка по обеим осям — иначе шапка не держится сверху. */}
+            <div className="max-h-[calc(100dvh-260px)] overflow-auto">
               <table className="w-full border-separate border-spacing-0 text-xs">
                 <thead>
                   <tr className="text-fg-muted">
-                    <th className="sticky left-0 z-10 min-w-50 border-b border-border bg-surface px-3 py-2 text-left font-normal">
+                    <th className="sticky top-0 left-0 z-30 min-w-50 border-b border-border bg-surface px-3 py-2 text-left font-normal" style={STICKY.name}>
                       {t("timesheet.employee")}
                     </th>
+                    {/* Норма и факт закреплены за сотрудником; прочие итоги — рядом, но едут с прокруткой. */}
+                    {(["plan", fact] as const).map((key) => (
+                      <th
+                        key={key}
+                        className="sticky top-0 z-30 border-b border-border bg-surface px-2 py-2 text-right font-normal whitespace-nowrap"
+                        style={STICKY[key === "plan" ? "plan" : "fact"]}
+                      >
+                        {t(`timesheet.col.${key}`)}
+                      </th>
+                    ))}
+                    {rest.map((key, index) => (
+                      <th
+                        key={key}
+                        className={`sticky top-0 z-20 border-b border-border bg-surface px-2 py-2 text-right font-normal whitespace-nowrap ${index === 0 ? "border-l" : ""} ${index === rest.length - 1 ? "border-r" : ""}`}
+                      >
+                        {t(`timesheet.col.${key}`)}
+                      </th>
+                    ))}
                     {doc.dates.map((date) => (
                       <th
                         key={date}
-                        className={`min-w-10 border-b border-border px-0.5 py-2 text-center font-medium ${dayTone(date, today, doc.holidays)}`}
+                        className={`sticky top-0 z-20 min-w-10 border-b border-border bg-surface px-0.5 py-2 text-center font-medium ${dayTone(date, today, doc.holidays)}`}
                       >
                         {head.day(date)}
-                      </th>
-                    ))}
-                    {TOTALS.map((key, index) => (
-                      <th
-                        key={key}
-                        className={`border-b border-border px-2 py-2 text-right font-normal whitespace-nowrap ${index === 0 ? "border-l" : ""}`}
-                      >
-                        {t(`timesheet.col.${key}`)}
                       </th>
                     ))}
                   </tr>
@@ -356,14 +383,14 @@ export function TimesheetDocPage({
                 <tbody>
                   {doc.daysLoading || !doc.rows.length ? (
                     <tr>
-                      <td colSpan={doc.dates.length + 1 + TOTALS.length} className="py-10 text-center text-fg-subtle">
+                      <td colSpan={columns} className="py-10 text-center text-fg-subtle">
                         {t(doc.daysLoading ? "common.loading" : "timesheets.notFilled")}
                       </td>
                     </tr>
                   ) : (
                     doc.rows.map(({ employee, cells, byDate, totals }) => (
                       <tr key={employee.id} className="group">
-                        <td className="sticky left-0 z-10 border-b border-border bg-surface px-3 py-1 group-hover:tint-surface-hover">
+                        <td className="sticky left-0 z-10 border-b border-border bg-surface px-3 py-1 group-hover:tint-surface-hover" style={STICKY.name}>
                           <button
                             type="button"
                             onClick={() => onOpenEmployee(employee.id)}
@@ -373,6 +400,17 @@ export function TimesheetDocPage({
                             <span className="truncate">{employee.name}</span>
                           </button>
                         </td>
+                        <TotalCell total="plan" totals={totals} whole byDays={unit === "days"} className={STICKY_TD} style={STICKY.plan} />
+                        <TotalCell total={fact} totals={totals} whole byDays={unit === "days"} className={STICKY_TD} style={STICKY.fact} />
+                        {rest.map((key, index) => (
+                          <TotalCell
+                            key={key}
+                            total={key}
+                            totals={totals}
+                            whole
+                            className={`${index === 0 ? "border-l" : ""} ${index === rest.length - 1 ? "border-r" : ""}`}
+                          />
+                        ))}
                         {cells.map((sheetCell, index) => {
                           const date = doc.dates[index]!;
                           const day = byDate.get(date);
@@ -385,15 +423,15 @@ export function TimesheetDocPage({
                               {sheetCell && (
                                 <CellView
                                   cell={sheetCell}
-                                  /* Часы с минутами — «8:30»: бухгалтер сверяет их с правкой дня, а она в минутах. */
                                   hours={(minutes) => toHours(Math.round(minutes))}
+                                  whole
+                                  square={false}
                                   onOpen={() => (canEdit && day ? setEditing({ row: day, name: employee.name }) : onOpenEmployee(employee.id))}
                                 />
                               )}
                             </td>
                           );
                         })}
-                        <TotalsCells totals={totals} />
                       </tr>
                     ))
                   )}
@@ -472,6 +510,14 @@ export function TimesheetDocPage({
 }
 
 /** Значение поля, по щелчку — список с поиском по подписи. */
+/* Закреплённые слева колонки: сотрудник, норма, факт. Ширины заданы — от них считается `left` следующей. */
+const STICKY = {
+  name: { left: 0, width: 220, minWidth: 220, maxWidth: 220 },
+  plan: { left: 220, width: 64, minWidth: 64 },
+  fact: { left: 284, width: 76, minWidth: 76 },
+};
+const STICKY_TD = "sticky z-10 bg-surface group-hover:tint-surface-hover";
+
 function PickValue({
   content,
   items,

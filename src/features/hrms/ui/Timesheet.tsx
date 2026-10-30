@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDownIcon, InfoIcon, LogInIcon, XIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
@@ -178,38 +178,58 @@ const TOTAL_WIDTH: Record<(typeof TOTALS)[number], string> = {
   absences: "w-[68px]",
 };
 
-/** Итог в часах и минутах: «8ч», «7ч 45м», «—». */
-function useDuration() {
+/** Итог в часах и минутах: «8ч», «7ч 45м», «—». `whole` — только часы, округлённо: «8ч». */
+function useDuration(whole = false) {
   const { t } = useTranslation();
   return (minutes: number) => {
     if (minutes <= 0) return "—";
+    if (whole) return t("timesheet.h", { h: Math.round(minutes / 60) });
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
     return h && m ? t("timesheet.hm", { h, m }) : h ? t("timesheet.h", { h }) : t("timesheet.m", { m });
   };
 }
 
-/** Часы против нормы: от 80% — зелёный, от 50% — жёлтый, ниже — красный. */
-const hoursColor = ({ workedMinutes, planMinutes }: SheetTotals) => {
-  if (!planMinutes) return "text-fg";
-  const ratio = workedMinutes / planMinutes;
+/** Факт против нормы: от 80% — зелёный, от 50% — жёлтый, ниже — красный. */
+const factColor = (fact: number, plan: number) => {
+  if (!plan) return "text-fg";
+  const ratio = fact / plan;
   return ratio >= 0.8 ? "text-success" : ratio >= 0.5 ? "text-warning" : "text-danger";
 };
 
 export function TotalsCells({ totals }: { totals: SheetTotals }) {
-  const duration = useDuration();
-  const cell = `${body} whitespace-nowrap px-2 text-right tabular-nums`;
+  return TOTALS.map((key, index) => <TotalCell key={key} total={key} totals={totals} className={index === 0 ? "border-l" : ""} />);
+}
+
+/** Один итог строки. `whole` — длительности только часами; `byDays` — норма днями, «Дни» против неё. */
+export function TotalCell({
+  total,
+  totals,
+  whole = false,
+  byDays = false,
+  className = "",
+  style,
+}: {
+  total: (typeof TOTALS)[number];
+  totals: SheetTotals;
+  whole?: boolean;
+  byDays?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const duration = useDuration(whole);
+  const [value, tone] = {
+    plan: [byDays ? totals.planDays || "—" : duration(totals.planMinutes), "text-fg-subtle"],
+    hours: [duration(totals.workedMinutes), `font-semibold ${factColor(totals.workedMinutes, totals.planMinutes)}`],
+    late: [duration(totals.lateMinutes), "text-fg"],
+    overtime: [duration(totals.overtimeMinutes), "text-fg"],
+    days: [totals.days || "—", byDays ? `font-semibold ${factColor(totals.days, totals.planDays)}` : "text-fg"],
+    absences: [totals.absences || "—", totals.absences ? "font-semibold text-danger" : "text-fg-subtle"],
+  }[total];
   return (
-    <>
-      <td className={`${cell} border-l text-fg-subtle`}>{duration(totals.planMinutes)}</td>
-      <td className={`${cell} font-semibold ${hoursColor(totals)}`}>{duration(totals.workedMinutes)}</td>
-      <td className={`${cell} text-fg`}>{duration(totals.lateMinutes)}</td>
-      <td className={`${cell} text-fg`}>{duration(totals.overtimeMinutes)}</td>
-      <td className={`${cell} text-fg`}>{totals.days || "—"}</td>
-      <td className={`${cell} ${totals.absences ? "font-semibold text-danger" : "text-fg-subtle"}`}>
-        {totals.absences || "—"}
-      </td>
-    </>
+    <td className={`${body} whitespace-nowrap px-2 text-right tabular-nums ${tone} ${className}`} style={style}>
+      {value}
+    </td>
   );
 }
 
@@ -220,17 +240,20 @@ export function CellView({
   cell,
   hours,
   whole = false,
+  square = whole,
   onOpen,
 }: {
   cell: SheetCell;
   hours: (minutes: number) => string;
   /** Месяц: все дни в экран — в ячейке целые часы, точные — в подсказке. */
   whole?: boolean;
+  /** Квадрат 28px по центру узкого дня; нет — плашка во всю ячейку. */
+  square?: boolean;
   onOpen: () => void;
 }) {
   const { t } = useTranslation();
   const duration = useDuration();
-  if (cell.kind === "outside") return <div className={`bg-surface-soft ${whole ? "mx-auto size-7 rounded-[4px]" : "h-[30px] rounded-[5px]"}`} />;
+  if (cell.kind === "outside") return <div className={`bg-surface-soft ${square ? "mx-auto size-7 rounded-[4px]" : "h-[30px] rounded-[5px]"}`} />;
 
   let content: ReactNode = null;
   let style = "text-fg";
@@ -275,7 +298,7 @@ export function CellView({
       break;
     case "day_off":
       content = t("timesheet.dayOffShort");
-      style = "text-fg-subtle";
+      style = `font-semibold ${CHIP_STYLES.gray}`;
       hints.push(t("timesheet.hint.dayOff"));
       break;
     case "empty":
@@ -298,7 +321,7 @@ export function CellView({
         type="button"
         onClick={onOpen}
         /* Месяц — квадрат 28px по центру узкого дня; неделя — плашкой во всю ячейку. */
-        className={`relative flex items-center justify-center px-0.5 text-xs ${whole ? "mx-auto size-7 rounded-[4px]" : "h-[30px] w-full rounded-[5px]"} tabular-nums outline-none transition hover:ring-1 hover:ring-accent hover:ring-inset focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${style}`}
+        className={`relative flex items-center justify-center px-0.5 text-xs ${square ? "mx-auto size-7 rounded-[4px]" : "h-[30px] w-full rounded-[5px]"} tabular-nums outline-none transition hover:ring-1 hover:ring-accent hover:ring-inset focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${style}`}
       >
         {content}
         {cell.pending.length > 0 && <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-warning" />}
@@ -318,7 +341,7 @@ export function Legend({ types, sample = "8,0" }: { types: { title: string; code
     { code: sample, style: "text-fg", label: t("timesheet.legend.worked"), desc: t("timesheet.legendDesc.worked") },
     { code: sample, style: "text-warning", label: t("timesheet.legend.late"), desc: t("timesheet.legendDesc.late") },
     { code: <Icon as={XIcon} size={12} />, style: CHIP_STYLES.red, label: t("timesheet.legend.absent"), desc: t("timesheet.hint.absent") },
-    { code: t("timesheet.dayOffShort"), style: "text-fg-subtle", label: t("timesheet.legend.dayOff"), desc: t("timesheet.hint.dayOff") },
+    { code: t("timesheet.dayOffShort"), style: CHIP_STYLES.gray, label: t("timesheet.legend.dayOff"), desc: t("timesheet.hint.dayOff") },
     { code: t("timesheet.holidayShort"), style: CHIP_STYLES.pink, label: t("timesheet.legend.holiday"), desc: t("timesheet.legendDesc.holiday") },
     { code: <Icon as={LogInIcon} size={12} />, style: "text-success", label: t("timesheet.legend.atWork"), desc: t("timesheet.hint.atWork") },
     { code: "", style: "", label: t("timesheet.legend.missing"), desc: t("timesheet.legendDesc.missing") },

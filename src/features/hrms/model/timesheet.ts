@@ -93,6 +93,8 @@ export type SheetTotals = {
   days: number;
   workedMinutes: number;
   planMinutes: number;
+  /** Норма днями: дни со сменой до сегодня включительно — те же, что в `planMinutes`. */
+  planDays: number;
   lateMinutes: number;
   /** Баланс за период: сверх смен минус недоработки, не меньше нуля. */
   overtimeMinutes: number;
@@ -206,6 +208,7 @@ export const totalsOf = (cells: SheetCell[], today: string): SheetTotals => {
     days: 0,
     workedMinutes: 0,
     planMinutes: 0,
+    planDays: 0,
     lateMinutes: 0,
     overtimeMinutes: 0,
     absences: 0,
@@ -215,7 +218,10 @@ export const totalsOf = (cells: SheetCell[], today: string): SheetTotals => {
   let balance = 0;
   for (const cell of cells) {
     // Норма — по сменам до сегодня включительно: сравнивается с уже отработанным.
-    if (cell.date <= today) totals.planMinutes += cell.planMinutes;
+    if (cell.date <= today) {
+      totals.planMinutes += cell.planMinutes;
+      if (cell.planMinutes > 0) totals.planDays += 1;
+    }
     if (!cell.counted) continue;
     if (cell.kind === "absent") totals.absences += 1;
     if (!WORKED_KINDS.includes(cell.kind)) continue;
