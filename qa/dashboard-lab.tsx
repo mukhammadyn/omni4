@@ -13,7 +13,14 @@ if (!import.meta.env.DEV) throw new Error('QA fixture is development-only');
 await i18n.changeLanguage('en');
 session.set({ access: 'qa.' + btoa(JSON.stringify({ user_id: 'qa-user', tables: [{ table_slug: 'employees', object_id: 'employee-1' }] })) + '.synthetic', refresh: 'synthetic-only', environmentId: 'qa-env', projectId: 'qa-project', userId: 'qa-user' });
 session.setProfile({ name: 'Synthetic analyst', role: 'ANALYST', company: 'QA' });
-session.setPermissions({ events: { read: true }, employees: { read: true }, notes: { read: true }, confidential: { read: false } });
+const catalogExtras = [
+  ...Array.from({ length: 32 }, (_, i) => ({ slug: ["hr_timesheet_events", "hr_employee_family", "hr_employee_contacts", "hr_grade_matrix_cells"][i] ?? `hr_fixture_${i}`, label: `HR reference ${i + 1}` })),
+  ...Array.from({ length: 32 }, (_, i) => ({ slug: i === 31 ? "crm_late_page" : `crm_fixture_${i}`, label: i === 31 ? "Last CRM source" : `CRM reference ${i + 1}` })),
+  { slug: "core_regions", label: "Regions" }, { slug: "core_business_units", label: "Business units" },
+].map((table) => ({ ...table, id: `table-${table.slug}` }));
+const catalogTables = [{ id: 'table-events', slug: 'events', label: 'Events' }, { id: 'table-employees', slug: 'employees', label: 'People' }, { id: 'table-notes', slug: 'notes', label: 'Notes' }, { id: 'table-secret', slug: 'confidential', label: 'Confidential' }, ...catalogExtras];
+const readableTables = new Set(['events', 'employees', 'notes', ...catalogExtras.map((table) => table.slug)]);
+session.setPermissions({ ...Object.fromEntries([...readableTables].map((slug) => [slug, { read: true }])), confidential: { read: false } });
 const fields = [
   { id: 'time', slug: 'time', label: 'Time', type: 'DATE_TIME' },
   { id: 'event', slug: 'event', label: 'Event', type: 'SINGLE_LINE' },
@@ -34,7 +41,7 @@ const rows = Array.from({ length: 2001 }, (_, n) => ({ guid: `00000000-0000-4000
 const widget = (patch: object) => ({ ...newChart(), table_slug: 'events', filters: {}, answers: { period: { field: 'time' }, employees: { field: 'employees_id' } }, ...patch });
 const initial = { folders: [{ id: 'folder', module_id: 'crm', title: 'Sales', dashboards: [{ id: 'overview', title: 'Sales overview', emoji: '📊', description: 'Synthetic data. All API calls are intercepted locally.', filters: [{ kind: 'period', label: 'Date' }, { kind: 'record', label: 'Person', table: 'employees', source_table: 'events', source_field: 'employees_id' }], widgets: [widget({ id: 'table', widget_type: 'records', title: 'Recent events', columns: ['time', 'event', 'stage', 'employees_id', 'amount'], sorts: [{ field: 'time', direction: 'desc' }], width: 12, height: 2, page_size: 20 }), widget({ id: 'count', kind: 'stat', title: 'Record count', width: 3 }), widget({ id: 'revenue', kind: 'stat', title: 'Revenue by currency', aggregation: 'sum', value_slug: 'amount', currency_slug: 'currency', width: 3 }), widget({ id: 'bar', kind: 'bar', title: 'Current stage distribution', group_slug: 'stage', width: 6 }), widget({ id: 'hidden', kind: 'stat', title: 'Hidden field widget', aggregation: 'sum', value_slug: 'private_amount', width: 3 })] }] }] };
 let tree = JSON.parse(localStorage.getItem('omni4.qa.tree') || 'null') || initial;
-let failure = false, saveFailure = false, emptyRows = false, delayReads = false;
+let failure = false, saveFailure = false, emptyRows = false, delayReads = false, catalogFailure = false, catalogRepeat = false;
 const store = () => ({ id: 'store', label: 'Dashboards', type: 'LINK', attributes: { screen: 'dashboards', dashboards: tree }, data: { permission: { read: true, update: true } } });
 const compare = (a: unknown, b: unknown) => typeof a === 'number' ? a - Number(b) : String(a).localeCompare(String(b));
 type RequestEntry = { id: number; at: string; method: string; path: string; table: string | null; fields: string[]; deniedTable: boolean };
@@ -48,7 +55,7 @@ const recordRequest = (config: any, payload: any): RequestEntry => {
   const table = /^\/v2\/(?:collections|fields|relations|object\/get-list)\/([^/]+)(?:\/|$)/.exec(path)?.[1] ?? null;
   const query = path.startsWith('/v2/object/get-list/') ? payload?.data ?? {} : {};
   const fields = [...new Set([...Object.keys(query).filter((key) => !['limit', 'offset', 'order', 'with_relations', 'search'].includes(key)), ...Object.keys(query.order ?? {})])].sort();
-  const entry: RequestEntry = { id: requestTrace.length + 1, at: new Date().toISOString(), method: String(config.method ?? 'get').toUpperCase(), path, table, fields, deniedTable: Boolean(table && !['events', 'employees', 'notes'].includes(table)) };
+  const entry: RequestEntry = { id: requestTrace.length + 1, at: new Date().toISOString(), method: String(config.method ?? 'get').toUpperCase(), path, table, fields, deniedTable: Boolean(table && !readableTables.has(table)) };
   requestTrace = [...requestTrace, entry]; notifyTrace(); return entry;
 };
 function RequestTrace() {
@@ -66,9 +73,16 @@ const adapter = async (config: any) => {
   else if (url === '/v3/menus/store') data = store();
   else if (url === '/v3/menus') data = { menus: config.params?.parent_id === 'crm' ? [{ id: 'events-menu', label: 'Events', type: 'TABLE', table_id: 'table-events', data: { permission: { read: true } } }] : config.params?.parent_id === 'hrms' ? [{ id: 'people-menu', label: 'People', type: 'TABLE', table_id: 'table-employees', data: { permission: { read: true } } }] : [{ id: 'crm', label: 'CRM', type: 'FOLDER', attributes: { is_tab: true }, data: { permission: { read: true, update: true } } }, { id: 'hrms', label: 'HRMS', type: 'FOLDER', attributes: { is_tab: true }, data: { permission: { read: true, update: true } } }, store()] };
   else if (url.startsWith('/v1/company-project/')) data = { language: [{ short_name: 'en', name: 'English' }] };
-  else if (url === '/v2/collections') data = { tables: [{ id: 'table-events', slug: 'events', label: 'Events' }, { id: 'table-employees', slug: 'employees', label: 'People' }, { id: 'table-notes', slug: 'notes', label: 'Notes' }, { id: 'table-secret', slug: 'confidential', label: 'Confidential' }] };
-  else if (url.startsWith('/v2/collections/') && url.includes('/layout/')) data = { tabs: [{ type: 'section', sections: [{ fields: (url.includes('/events/') ? fields : url.includes('/notes/') ? [{ slug: 'title' }] : [{ slug: 'full_name' }]).map((f) => ({ slug: f.slug, attributes: { field_permission: { view_permission: f.slug !== 'private_amount', edit_permission: false } } })) }] }] };
+  else if (url === '/v2/collections') {
+    const offset = Number(config.params?.offset ?? 0), limit = Number(config.params?.limit ?? 30);
+    if (catalogFailure && offset >= 30) throw new Error('Synthetic catalog page interruption');
+    const matches = catalogTables.filter((table) => table.label.toLowerCase().includes(String(config.params?.search ?? '').toLowerCase()));
+    data = { count: matches.length, tables: matches.slice(catalogRepeat ? 0 : offset, (catalogRepeat ? 0 : offset) + limit) };
+  }
+  else if (url.startsWith('/v2/collections/') && url.includes('/layout/')) data = { tabs: [{ type: 'section', sections: [{ fields: (url.includes('/events/') ? fields : (url.includes('/notes/') || catalogExtras.some((table) => url.includes(`/${table.slug}/`))) ? [{ slug: 'title' }] : [{ slug: 'full_name' }]).map((f) => ({ slug: f.slug, attributes: { field_permission: { view_permission: f.slug !== 'private_amount', edit_permission: false } } })) }] }] };
   else if (url === '/v2/fields/events') data = { fields };
+  else if (catalogExtras.some((table) => url === `/v2/fields/${table.slug}`)) data = { fields: [{ id: 'catalog-title', slug: 'title', label: 'Title', type: 'SINGLE_LINE' }] };
+  else if (catalogExtras.some((table) => url.startsWith(`/v2/relations/${table.slug}`))) data = { relations: [] };
   else if (url === '/v2/fields/notes') data = { fields: [{ id: 'note-title', slug: 'title', label: 'Title', type: 'SINGLE_LINE' }] };
   else if (url.startsWith('/v2/relations/notes')) data = { relations: [] };
   else if (url === '/v2/fields/employees') data = { fields: [{ id: 'name', slug: 'full_name', label: 'Name', type: 'SINGLE_LINE' }] };
@@ -78,7 +92,7 @@ const adapter = async (config: any) => {
     if (delayReads) await new Promise((resolve) => setTimeout(resolve, 1500));
     if (failure) throw new Error('Synthetic network interruption');
     const slug = url.split('/').at(-1), query = payload.data;
-    let found = (emptyRows ? [] : slug === 'events' ? rows : slug === 'notes' ? notes : employees).filter((row: any) => Object.entries(query).every(([field, value]: any) => {
+    let found = (emptyRows ? [] : slug === 'events' ? rows : slug === 'notes' ? notes : catalogExtras.some((table) => table.slug === slug) ? [{ guid: `${slug}-1`, title: `Synthetic ${slug} result` }] : employees).filter((row: any) => Object.entries(query).every(([field, value]: any) => {
       if (['limit', 'offset', 'order', 'with_relations', 'search'].includes(field)) return true;
       if (Array.isArray(value)) return value.includes(String(row[field]));
       if (value && typeof value === 'object') return Object.entries(value).every(([operator, bound]) => { const c = compare(row[field], bound); return operator === '$gte' ? c >= 0 : operator === '$lte' ? c <= 0 : operator === '$gt' ? c > 0 : c < 0; });
@@ -93,6 +107,6 @@ http.defaults.adapter = adapter; httpAuth.defaults.adapter = async (config) => {
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 function Lab() {
  const [id, setId] = useState('overview'), [values, setValues] = useState<Record<string, string[]>>({}), [dark, setDark] = useState(false);
- return <QueryClientProvider client={queryClient}><div className='flex h-screen flex-col bg-surface text-fg'><div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2 text-xs"><strong>Synthetic QA · 2,001 records · external requests blocked</strong><button onClick={() => { setDark(!dark); document.documentElement.classList.toggle('dark', !dark); }}>Theme</button><button onClick={() => { void i18n.changeLanguage(i18n.language === 'en' ? 'ru' : 'en'); }}>Language</button><button onClick={() => { failure = !failure; void queryClient.invalidateQueries(); }}>Toggle interruption</button><button onClick={() => { saveFailure = !saveFailure; }}>Toggle save interruption</button><button onClick={() => { emptyRows = !emptyRows; void queryClient.invalidateQueries(); }}>Toggle empty rows</button><button onClick={() => { delayReads = !delayReads; }}>Toggle slow reads</button><button onClick={() => { localStorage.removeItem('omni4.qa.tree'); location.reload(); }}>Reset fixture</button></div><RequestTrace /><DashboardsPage dashboardId={id} moduleId="crm" values={values} onValues={setValues} onOpen={setId} /></div></QueryClientProvider>;
+ return <QueryClientProvider client={queryClient}><div className='flex h-screen flex-col bg-surface text-fg'><div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2 text-xs"><strong>Synthetic QA · 2,001 records · external requests blocked</strong><button onClick={() => { setDark(!dark); document.documentElement.classList.toggle('dark', !dark); }}>Theme</button><button onClick={() => { void i18n.changeLanguage(i18n.language === 'en' ? 'ru' : 'en'); }}>Language</button><button onClick={() => { failure = !failure; void queryClient.invalidateQueries(); }}>Toggle interruption</button><button onClick={() => { saveFailure = !saveFailure; }}>Toggle save interruption</button><button onClick={() => { emptyRows = !emptyRows; void queryClient.invalidateQueries(); }}>Toggle empty rows</button><button onClick={() => { delayReads = !delayReads; }}>Toggle slow reads</button><button onClick={() => { catalogFailure = !catalogFailure; void queryClient.invalidateQueries({ queryKey: ["tables", "catalog"] }); }}>Toggle catalog page failure</button><button onClick={() => { catalogRepeat = !catalogRepeat; void queryClient.invalidateQueries({ queryKey: ["tables", "catalog"] }); }}>Toggle repeated catalog page</button><button onClick={() => { localStorage.removeItem('omni4.qa.tree'); location.reload(); }}>Reset fixture</button></div><RequestTrace /><DashboardsPage dashboardId={id} moduleId="crm" values={values} onValues={setValues} onOpen={setId} /></div></QueryClientProvider>;
 }
 createRoot(document.getElementById('root')!).render(<Lab />);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDownIcon, Table2Icon, SearchIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useMenuTree } from "@/features/sidebar";
@@ -6,7 +6,7 @@ import { builderPreviewLimit } from "../model/builder-preview";
 import { groupBuilderSources } from "../model/builder-sources";
 import { Cell } from "@/features/item";
 import { useTablePermissions } from "@/features/auth";
-import { localized, useTables, type Field } from "@/features/table";
+import { localized, useTableCatalog, type Field } from "@/features/table";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
@@ -27,10 +27,7 @@ export function BuilderSources({ value, language, onPick, active = true }: { val
     if (search.trim()) setSearchCollapsed((current) => ({ query: search, groups: { ...(current.query === search ? current.groups : {}), [id]: current.query === search ? !current.groups[id] : true } }));
     else setCollapsed((current) => ({ ...current, [id]: !current[id] }));
   };
-  const tables = useTables("", active), menus = useMenuTree(active), permissionOf = useTablePermissions();
-  // The collection endpoint searches labels only. Search the complete paginated catalog
-  // locally so technical keys beyond page one remain discoverable.
-  useEffect(() => { if (active && search.trim() && tables.hasMore && !tables.isLoading) tables.loadMore(); }, [active, search, tables]);
+  const tables = useTableCatalog(active), menus = useMenuTree(active), permissionOf = useTablePermissions();
   const groups = groupBuilderSources(tables.items, menus.items, (slug) => permissionOf(slug).read, search, language, language.startsWith("ru") ? "Общие" : "General");
   return <div className="space-y-3">
     <label className="flex items-center gap-2 rounded-md border border-border-strong bg-input px-3"><Icon as={SearchIcon} size={15} className="text-fg-subtle" /><input className="min-w-0 w-full bg-transparent py-2 text-sm outline-none" aria-label={t("menuForm.tableSearch")} placeholder={language.startsWith("ru") ? "Название или ключ таблицы" : "Table name or key"} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
@@ -39,8 +36,8 @@ export function BuilderSources({ value, language, onPick, active = true }: { val
       <div id={`builder-sources-${group.id}`} hidden={!open}><div className="grid gap-2 p-3 sm:grid-cols-3" role="group" aria-label={group.label}>{group.tables.map((table) => <button key={table.slug} type="button" aria-pressed={value === table.slug} onClick={() => onPick(table.slug)} className={`flex min-w-0 items-start gap-2 rounded-lg border p-3 text-left transition-colors ${value === table.slug ? "border-accent bg-accent-subtle ring-1 ring-accent" : "border-border hover:bg-surface-hover"}`}><Icon as={Table2Icon} size={16} className="mt-0.5 shrink-0 text-fg-muted" /><span className="min-w-0 flex-1"><strong className="block truncate text-sm font-medium">{localized(table.labels, language, table.label)}</strong><code className="mt-1 block truncate text-xs text-fg-muted" title={table.slug}>{table.slug}</code><span className="mt-2 inline-flex max-w-full truncate rounded bg-surface-hover px-1.5 py-0.5 text-2xs text-fg-muted">{group.label}</span></span><span className={`mt-1 size-3 shrink-0 rounded-full border ${value === table.slug ? "border-4 border-accent" : "border-border-strong"}`} /></button>)}</div></div>
     </section>; })}
     {(tables.isLoading || menus.isLoading) && <p role="status" className="text-sm text-fg-muted">{t("common.loading")}</p>}
-    {!groups.length && !tables.isLoading && <p role="status" className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-fg-muted">{language.startsWith("ru") ? "Таблицы не найдены. Попробуйте другое название или ключ." : "No tables found. Try another name or technical key."}</p>}
-    {tables.hasMore && !search.trim() && <Button variant="secondary" disabled={tables.isLoading} onClick={tables.loadMore}>{t("action.more", { defaultValue: "…" })}</Button>}
+    {!groups.length && !tables.isLoading && !tables.error && <p role="status" className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-fg-muted">{language.startsWith("ru") ? "Таблицы не найдены. Попробуйте другое название или ключ." : "No tables found. Try another name or technical key."}</p>}
+    {tables.error && <div role="alert" className="flex items-center gap-3 rounded-lg border border-border p-3 text-sm"><p>{language.startsWith("ru") ? "Не удалось загрузить весь список таблиц." : "Could not load the complete table catalog."}</p><Button variant="secondary" disabled={tables.isLoading} onClick={tables.retry}>{language.startsWith("ru") ? "Повторить" : "Retry"}</Button></div>}
   </div>;
 }
 export function BuilderParameters({ dataset, onChange, language }: { dataset: Dataset; onChange: (dataset: Dataset) => void; language: string }) {
