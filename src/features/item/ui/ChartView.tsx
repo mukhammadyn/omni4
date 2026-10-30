@@ -1,3 +1,4 @@
+import { linearDomain, stackedBands } from "../model/chart-geometry";
 import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { startPointerDrag } from "@/shared/lib/pointer-drag";
 import {
@@ -784,9 +785,9 @@ export function ChartCard({
             locale={i18n.language}
           />
         ) : config.kind === "donut" ? (
-          <Donut series={series} locale={i18n.language} />
+          <Donut series={series} locale={i18n.language} showLegend={config.showLegend !== false} />
         ) : config.kind === "pie" ? (
-          <PieChart series={series} locale={i18n.language} />
+          <PieChart series={series} locale={i18n.language} showLegend={config.showLegend !== false} />
         ) : config.kind === "treemap" ? (
           <TreemapChart series={series} locale={i18n.language} />
         ) : ["column", "column100", "area", "area100", "combo"].includes(config.kind) ? (
@@ -800,16 +801,16 @@ export function ChartCard({
         ) : config.kind === "stack" ? (
           <Stack series={series} locale={i18n.language} />
         ) : config.kind === "line" ? (
-          <Line series={series} locale={i18n.language} />
+          <Line series={series} locale={i18n.language} showGrid={config.showGrid === true} />
         ) : (
-          <Bars series={series} locale={i18n.language} />
+          <Bars series={series} locale={i18n.language} config={config} />
         )}
       </div>
 
       {/* Легенда обязательна, как только серий больше одной: опознавать
           их цветом и только цветом нельзя. У кольца она своя — там доли
           и есть серии. */}
-      {content === undefined && series.splits.length > 1 && config.kind !== "heatmap" && <Legend splits={series.splits} />}
+      {content === undefined && series.splits.length > 1 && config.kind !== "heatmap" && <div className={config.showLegend === false ? "sr-only" : undefined} data-chart-legend><Legend splits={series.splits} /></div>}
 
       {/* Сколько значений осталось за кадром. Молча обрезанный рейтинг
           выглядит как весь список. */}
@@ -1107,7 +1108,7 @@ export function ChartSetup({
  * своей: иначе полосы разных серий нельзя было бы сравнить глазами,
  * а ради этого график и рисуют.
  */
-function Bars({ series, locale }: { series: ChartSeries; locale: string }) {
+function Bars({ series, locale, config }: { series: ChartSeries; locale: string; config: ChartConfig }) {
   const grouped = series.splits.length > 1;
   const top = grouped
     ? Math.max(...series.points.flatMap((point) => [...point.cells.values()]), 0)
@@ -1119,6 +1120,7 @@ function Bars({ series, locale }: { series: ChartSeries; locale: string }) {
    * виден.
    * ponytail: двусторонняя ось — когда попросят min по полю с минусами.
    */
+  if (config.stacked === true) return <AbsoluteBars series={series} locale={locale} showGrid={config.showGrid === true} />;
   const width = (value: number) => `${top > 0 ? Math.max(0, value / top) * 100 : 0}%`;
 
   return (
@@ -1132,7 +1134,7 @@ function Bars({ series, locale }: { series: ChartSeries; locale: string }) {
             {point.label}
           </span>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5" data-chart-grid={config.showGrid === true ? "vertical" : undefined} style={config.showGrid === true ? { backgroundImage: "linear-gradient(to right, var(--color-chart-grid) 1px, transparent 1px)", backgroundSize: "25% 100%" } : undefined}>
             {grouped ? (
               series.splits.map((split, index) => (
                 <Row
@@ -1157,6 +1159,18 @@ function Bars({ series, locale }: { series: ChartSeries; locale: string }) {
       ))}
     </div>
   );
+}
+
+function AbsoluteBars({ series, locale, showGrid }: { series: ChartSeries; locale: string; showGrid: boolean }) {
+  const bands = stackedBands(series);
+  const domain = linearDomain(bands.flatMap((point) => [point.min, point.max]));
+  const x = (value: number) => (value - domain.min) / (domain.max - domain.min) * 100;
+  const splits = series.splits.length ? series.splits : [{ key: "", label: "" }];
+  return <div className="flex flex-col gap-2" data-chart-stacked>{series.points.map((point, at) => <div key={point.key} className="flex items-center gap-2">
+    <span className="w-28 shrink-0 truncate text-xs text-fg-muted">{point.label}</span>
+    <div className="relative h-5 min-w-0 flex-1" data-chart-grid={showGrid ? "vertical" : undefined} style={showGrid ? { backgroundImage: "linear-gradient(to right, var(--color-chart-grid) 1px, transparent 1px)", backgroundSize: "25% 100%" } : undefined}>{bands[at]!.bands.map((band, index) => <div key={splits[index]!.key} className={`absolute top-0 h-full ${seriesFill(splits[index]!.key, index)}`} style={{ left: `${x(Math.min(band.start, band.end))}%`, width: `${Math.abs(x(band.end) - x(band.start))}%` }} title={`${point.label} · ${splits[index]!.label}: ${show(band.value, locale)}`} />)}</div>
+    <span className="w-14 shrink-0 text-right text-xs tabular-nums">{show(point.value, locale)}</span>
+  </div>)}</div>;
 }
 
 /** Одна полоса с числом на конце. Тонкая — когда их несколько в группе. */
@@ -1528,7 +1542,7 @@ function Heatmap({ series, locale }: { series: ChartSeries; locale: string }) {
  * и есть длина штриха, и пересчитывать нечего. Зазор между долями —
  * тот же приём, что и везде: разделяет пустота, а не обводка.
  */
-function Donut({ series, locale }: { series: ChartSeries; locale: string }) {
+function Donut({ series, locale, showLegend = true }: { series: ChartSeries; locale: string; showLegend?: boolean }) {
   const { t } = useTranslation();
   /* Одна доля — кольцо целиком, и зазор ему не нужен: он превратился бы
      в надрез, за которым ничего нет. */
@@ -1566,7 +1580,7 @@ function Donut({ series, locale }: { series: ChartSeries; locale: string }) {
       {/* Легенда обязательна: доли различаются только цветом, а цветом
           одним опознавать нельзя. Своя, а не общая: здесь у каждой доли
           есть ещё и число, а у серий его нет — оно на самих полосах. */}
-      <ul className="flex min-w-0 flex-1 flex-col gap-1">
+      <ul className={showLegend ? "flex min-w-0 flex-1 flex-col gap-1" : "sr-only"}>
         {series.points.map((point, index) => (
           <li key={point.key} className="flex min-w-0 items-center gap-1.5 text-xs">
             <span className={`size-2 shrink-0 rounded-full ${seriesDot(point.key, index)}`} />
@@ -1615,7 +1629,7 @@ function Legend({ splits }: { splits: ChartSplit[] }) {
  * системы. Текста внутри поэтому нет вовсе: он растянулся бы вместе
  * с осями. Подписи — обычной разметкой вокруг.
  */
-function Line({ series, locale }: { series: ChartSeries; locale: string }) {
+function Line({ series, locale, showGrid = false }: { series: ChartSeries; locale: string; showGrid?: boolean }) {
   const multi = series.splits.length > 1;
   /* Ось общая для всех линий: у каждой своя означало бы, что рядом
      нарисованы графики с разной ценой деления. */
@@ -1671,6 +1685,7 @@ function Line({ series, locale }: { series: ChartSeries; locale: string }) {
             className="size-full"
             role="presentation"
           >
+            {showGrid && [4, 27, 50, 73, 96].map((position) => <line key={position} data-chart-grid x1="0" x2="100" y1={position} y2={position} className="stroke-chart-grid" vectorEffect="non-scaling-stroke" />)}
             {lines.map((line) => (
               <polyline
                 key={line.key}

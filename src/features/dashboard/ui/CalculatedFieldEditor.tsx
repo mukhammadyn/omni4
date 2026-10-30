@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AGGREGATIONS, type Aggregation } from "@/features/item";
 import type { Field } from "@/features/table";
 import { Button } from "@/shared/ui/button";
 import { Popover } from "@/shared/ui/popover";
@@ -16,6 +17,7 @@ export function CalculatedFieldEditor({ widget, fields, onChange, compact = fals
   const [name, setName] = useState("");
   const [expression, setExpression] = useState("");
   const [error, setError] = useState("");
+  const [aggregation, setAggregation] = useState<Aggregation>("sum");
   const definitions = widget.calculatedFields ?? [];
   const base = fields.filter((field) => !definitions.some((definition) => definition.slug === field.slug));
 
@@ -27,7 +29,7 @@ export function CalculatedFieldEditor({ widget, fields, onChange, compact = fals
         if (!name.trim()) throw new Error(copy.required);
         if (!selected && definitions.length >= 16) throw new Error(copy.limit);
         const next = { slug: selected || `calc_${crypto.randomUUID().replaceAll("-", "_")}`, label: name.trim().slice(0, 200), expression };
-        onChange({ calculatedFields: [...definitions.filter((definition) => definition.slug !== next.slug), next] });
+        onChange({ calculatedFields: [...definitions.filter((definition) => definition.slug !== next.slug), next], fieldPresentation: { ...widget.fieldPresentation, [next.slug]: { ...widget.fieldPresentation?.[next.slug], label: next.label, aggregation } } });
         setError("");
         close();
       } catch (exception) { setError(exception instanceof Error ? exception.message : "Invalid formula"); }
@@ -35,10 +37,11 @@ export function CalculatedFieldEditor({ widget, fields, onChange, compact = fals
       <strong className="text-sm">{copy.title}</strong>
       <select aria-label={copy.title} className="rounded border border-border bg-surface p-2 text-sm" value={selected} onChange={(event) => {
         const value = event.target.value, field = definitions.find((definition) => definition.slug === value);
-        setSelected(value); setName(field?.label ?? ""); setExpression(field?.expression ?? ""); setError("");
+        setSelected(value); setAggregation(widget.fieldPresentation?.[value]?.aggregation ?? "sum"); setName(field?.label ?? ""); setExpression(field?.expression ?? ""); setError("");
       }}><option value="">{copy.new}</option>{definitions.map((field) => <option key={field.slug} value={field.slug}>{field.label}</option>)}</select>
       <input aria-label={copy.name} className="rounded border border-border bg-surface p-2 text-sm" placeholder={copy.name} value={name} onChange={(event) => setName(event.target.value)} />
       <input aria-label={copy.formula} className="rounded border border-border bg-surface p-2 font-mono text-sm" placeholder="[amount] * 1.12" value={expression} onChange={(event) => setExpression(event.target.value)} />
+      <label className="text-xs text-fg-muted">{ru ? "Агрегация по умолчанию" : "Default aggregation"}<select aria-label={ru ? "Агрегация по умолчанию" : "Default aggregation"} className="mt-1 w-full rounded border border-border bg-surface p-2 text-sm text-fg" value={aggregation} onChange={(event) => setAggregation(event.target.value as Aggregation)}>{AGGREGATIONS.map((value) => <option key={value} value={value}>{value.toUpperCase()}</option>)}</select></label>
       <p className="text-xs text-fg-muted">{copy.hint}</p>
       <Button type="submit" size="sm">{copy.apply}</Button>
       {selected && <Button type="button" size="sm" variant="secondary" onClick={() => {

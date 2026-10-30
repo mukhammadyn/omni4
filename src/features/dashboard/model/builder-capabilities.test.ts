@@ -4,6 +4,7 @@ import { toField } from "@/features/table";
 import { calculatedProjection, compileCalculation } from "./calculated-fields";
 import { parseFieldPresentation, presentFields } from "./field-presentation";
 import { toDatasets } from "./datasets";
+import { sqlWidgetFrom } from "./sql-widget";
 import { assignBuilderField } from "./builder-fields";
 import { toTree, toTreeAttribute } from "./dashboard";
 const fields = [toField({ id: "amount", slug: "amount", label: "Amount", type: "NUMBER" }), toField({ id: "name", slug: "name", label: "Name", type: "SINGLE_LINE" })];
@@ -44,4 +45,20 @@ test("record sorting excludes client formula fields while chart sorting accepts 
  const widget = { ...newChart(), tableSlug: "events", filters: {}, answers: {}, valueSlug: "calc_tax", calculatedFields: [{ slug: "calc_tax", label: "Tax", expression: "[amount]*.12" }] };
  expect(assignBuilderField({ ...widget, type: "records" }, derived, "sort", false)).toBeNull();
  expect(assignBuilderField({ ...widget, kind: "column" }, derived, "sort", false)).toEqual({ sorts: [{ field: "calc_tax", direction: "asc" }] });
+});
+
+test("numeric field aggregation defaults persist and assigning a field respects chart constraints", () => {
+ const metadata = parseFieldPresentation({ amount: { aggregation: "avg" }, name: { aggregation: "unsafe" } });
+ expect(metadata.amount?.aggregation).toBe("avg"); expect(metadata.name?.aggregation).toBeUndefined();
+ const widget = { ...newChart(), tableSlug: "events", filters: {}, answers: {}, fieldPresentation: metadata };
+ expect(assignBuilderField({ ...widget, kind: "column" }, fields[0]!, "value", false)).toMatchObject({ aggregation: "avg" });
+ expect(assignBuilderField({ ...widget, kind: "pie" }, fields[0]!, "value", false)).toMatchObject({ aggregation: "sum" });
+ expect(assignBuilderField({ ...widget, kind: "column" }, fields[0]!, "value", true)).toMatchObject({ aggregation: "sum" });
+ const tree = toTree({ folders: [{ id: "f", dashboards: [{ id: "d", widgets: [{ ...newChart(), kind: "column", table_slug: "events", show_legend: false, show_grid: true, stacked: true, field_presentation: metadata }] }] }] });
+ expect(toTree(toTreeAttribute(tree))).toEqual(tree);
+ expect(tree.folders[0]?.dashboards[0]?.widgets[0]).toMatchObject({ showLegend: false, showGrid: true, stacked: true, fieldPresentation: metadata });
+});
+test("SQL presentations preserve optional appearance flags", () => {
+ const dataset = { id: "sql", name: "SQL", source: { kind: "sql" as const, sql: "SELECT amount FROM events", parameters: [], columns: [] } };
+ expect(sqlWidgetFrom(dataset, { type: "chart", kind: "column", group: "category", value: "amount", split: "series", showLegend: false, showGrid: true, stacked: true })).toMatchObject({ showLegend: false, showGrid: true, stacked: true });
 });

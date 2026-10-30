@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ChartConfig, ChartSeries } from "../model/chart";
-import { linearDomain, normalizedBands, scaleY, treemapRects, xyPoints, type XYPoint } from "../model/chart-geometry";
+import { linearDomain, normalizedBands, scaleY, stackedBands, treemapRects, xyPoints, type XYPoint } from "../model/chart-geometry";
 import type { Item } from "../model/types";
 
 const colors = ["fill-chart-1 stroke-chart-1", "fill-chart-2 stroke-chart-2", "fill-chart-3 stroke-chart-3", "fill-chart-4 stroke-chart-4", "fill-chart-5 stroke-chart-5", "fill-chart-6 stroke-chart-6", "fill-chart-7 stroke-chart-7", "fill-chart-other stroke-chart-other"];
@@ -14,24 +14,26 @@ export function CartesianChart({ config, series, locale }: { config: ChartConfig
   const area = config.kind === "area" || config.kind === "area100";
   const splits = series.splits.length ? series.splits : [{ key: "", label: "" }];
   const value = (at: number, key: string) => series.points[at]?.cells.size ? series.points[at]!.cells.get(key) ?? 0 : series.points[at]?.value ?? 0;
-  const bands = normalizedBands(series);
-  const domain = (axis: "left" | "right") => normalized ? { min: 0, max: 100 } : linearDomain(series.points.flatMap((_, at) => splits.filter((split) => (split.axis ?? "left") === axis).map((split) => value(at, split.key))));
+  const stacked = config.stacked === true && ["column", "area"].includes(config.kind) && splits.every((split) => split.axis !== "right");
+  const bands = normalized ? normalizedBands(series) : stackedBands(series);
+  const domain = (axis: "left" | "right") => normalized ? { min: 0, max: 100 } : stacked ? linearDomain(bands.flatMap((point) => point.bands.flatMap((band) => [band.start, band.end]))) : linearDomain(series.points.flatMap((_, at) => splits.filter((split) => (split.axis ?? "left") === axis).map((split) => value(at, split.key))));
   const left = domain("left"), right = domain("right");
   const n = series.points.length, step = 100 / Math.max(n, 1);
   const x = (at: number) => (at + 0.5) * step;
   const y = (v: number, axis?: string) => 4 + scaleY(v, axis === "right" ? right : left) * 0.92;
   const columnSplits = splits.filter((split) => config.kind !== "combo" || split.display !== "line");
-  const pointsFor = (index: number, upper: boolean) => series.points.map((_, at) => `${x(at)},${y(normalized ? upper ? bands[at]!.bands[index]!.end : bands[at]!.bands[index]!.start : upper ? value(at, splits[index]!.key) : 0, splits[index]!.axis)}`);
+  const pointsFor = (index: number, upper: boolean) => series.points.map((_, at) => `${x(at)},${y(normalized || stacked ? upper ? bands[at]!.bands[index]!.end : bands[at]!.bands[index]!.start : upper ? value(at, splits[index]!.key) : 0, splits[index]!.axis)}`);
   return <div className="flex h-full min-h-[150px] flex-col gap-1">
     <div className="flex min-h-0 flex-1 gap-2">
       <div className="flex w-14 shrink-0 flex-col justify-between text-right text-2xs tabular-nums text-fg-subtle"><span>{show(left.max, locale)}{normalized ? "%" : ""}</span><span>{show(left.min, locale)}{normalized ? "%" : ""}</span></div>
       <svg role="img" aria-label={t(`chart.kind.${config.kind}` as "chart.kind.column")} viewBox="0 0 100 100" preserveAspectRatio="none" className="min-w-0 flex-1 overflow-visible border-b border-chart-grid">
+        {config.showGrid === true && [4, 27, 50, 73, 96].map((position) => <line key={position} data-chart-grid x1="0" x2="100" y1={position} y2={position} className="stroke-chart-grid" vectorEffect="non-scaling-stroke" />)}
         <line x1="0" x2="100" y1={y(0)} y2={y(0)} className="stroke-chart-grid" vectorEffect="non-scaling-stroke" />
-        {splits.map((split, index) => area ? <polygon key={split.key} points={[...pointsFor(index, true), ...pointsFor(index, false).reverse()].join(" ")} className={color(index)} fillOpacity={normalized ? 0.75 : 0.25} strokeWidth="1.5" vectorEffect="non-scaling-stroke"><title>{split.label}: {series.points.map((point, at) => `${point.label}: ${show(value(at, split.key), locale)}`).join("; ")}</title></polygon> : config.kind === "combo" && split.display === "line" ? <polyline key={split.key} points={pointsFor(index, true).join(" ")} className={color(index)} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke"><title>{split.label}</title></polyline> : series.points.map((point, at) => {
-          const band = bands[at]!.bands[index]!, top = y(normalized ? band.end : value(at, split.key), split.axis), bottom = y(normalized ? band.start : 0, split.axis);
-          const width = normalized ? step * 0.72 : step * 0.72 / Math.max(columnSplits.length, 1);
-          const offset = normalized ? 0 : columnSplits.indexOf(split) * width;
-          return <rect key={`${split.key}-${point.key}`} x={at * step + step * 0.14 + offset} y={Math.min(top, bottom)} width={width * (normalized ? 1 : 0.92)} height={Math.abs(bottom - top)} className={color(index)}><title>{point.label}{split.label ? ` · ${split.label}` : ""}: {show(value(at, split.key), locale)}{normalized ? ` (${show(band.end - band.start, locale)}%)` : ""}</title></rect>;
+        {splits.map((split, index) => area ? <polygon key={split.key} points={[...pointsFor(index, true), ...pointsFor(index, false).reverse()].join(" ")} className={color(index)} fillOpacity={normalized ? 0.75 : 0.25} strokeWidth="1.5" vectorEffect="non-scaling-stroke"><title>{`${split.label}: ${series.points.map((point, at) => `${point.label}: ${show(value(at, split.key), locale)}`).join("; ")}`}</title></polygon> : config.kind === "combo" && split.display === "line" ? <polyline key={split.key} points={pointsFor(index, true).join(" ")} className={color(index)} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke"><title>{split.label}</title></polyline> : series.points.map((point, at) => {
+          const band = bands[at]!.bands[index]!, top = y(normalized || stacked ? band.end : value(at, split.key), split.axis), bottom = y(normalized || stacked ? band.start : 0, split.axis);
+          const width = normalized || stacked ? step * 0.72 : step * 0.72 / Math.max(columnSplits.length, 1);
+          const offset = normalized || stacked ? 0 : columnSplits.indexOf(split) * width;
+          return <rect key={`${split.key}-${point.key}`} x={at * step + step * 0.14 + offset} y={Math.min(top, bottom)} width={width * (normalized || stacked ? 1 : 0.92)} height={Math.abs(bottom - top)} className={color(index)}><title>{`${point.label}${split.label ? ` · ${split.label}` : ""}: ${show(value(at, split.key), locale)}${normalized ? ` (${show(band.end - band.start, locale)}%)` : ""}`}</title></rect>;
         }))}
       </svg>
       {splits.some((split) => split.axis === "right") && <div className="flex w-14 shrink-0 flex-col justify-between text-2xs tabular-nums text-fg-subtle"><span>{show(right.max, locale)}</span><span>{show(right.min, locale)}</span></div>}
@@ -40,14 +42,14 @@ export function CartesianChart({ config, series, locale }: { config: ChartConfig
   </div>;
 }
 
-export function PieChart({ series, locale }: { series: ChartSeries; locale: string }) {
+export function PieChart({ series, locale, showLegend = true }: { series: ChartSeries; locale: string; showLegend?: boolean }) {
   let start = -Math.PI / 2;
   return <div data-chart-pie className="flex flex-wrap items-center gap-4"><svg viewBox="0 0 100 100" className="size-36 shrink-0" role="img" aria-label="Pie chart">{series.points.filter((point) => point.value > 0).map((point, index) => {
     const angle = point.value / series.total * Math.PI * 2, end = start + angle;
     const path = `M50,50 L${50 + 48 * Math.cos(start)},${50 + 48 * Math.sin(start)} A48,48 0 ${angle > Math.PI ? 1 : 0},1 ${50 + 48 * Math.cos(end)},${50 + 48 * Math.sin(end)} Z`; start = end;
     const title = `${point.label}: ${show(point.value, locale)} (${show(point.value / series.total * 100, locale)}%)`;
     return angle >= Math.PI * 2 - 1e-8 ? <circle key={point.key} cx="50" cy="50" r="48" className={color(index)}><title>{title}</title></circle> : <path key={point.key} d={path} className={color(index)} strokeWidth="0.5"><title>{title}</title></path>;
-  })}</svg><ul className="min-w-0 flex-1 text-xs text-fg-muted">{series.points.map((point) => <li key={point.key} className="flex justify-between gap-2"><span className="truncate">{point.label}</span><span className="tabular-nums">{show(point.value, locale)}</span></li>)}</ul></div>;
+  })}</svg><ul className={showLegend ? "min-w-0 flex-1 text-xs text-fg-muted" : "sr-only"}>{series.points.map((point) => <li key={point.key} className="flex justify-between gap-2"><span className="truncate">{point.label}</span><span className="tabular-nums">{show(point.value, locale)}</span></li>)}</ul></div>;
 }
 
 export function TreemapChart({ series, locale }: { series: ChartSeries; locale: string }) {

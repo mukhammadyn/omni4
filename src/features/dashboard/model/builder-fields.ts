@@ -1,4 +1,4 @@
-import { RAW_CHART_KINDS, splittable } from "@/features/item";
+import { RAW_CHART_KINDS, aggregationAllowed, splittable } from "@/features/item";
 import type { Field } from "@/features/table";
 import type { Widget } from "./dashboard";
 import { isDateField } from "./widget-editor";
@@ -20,7 +20,10 @@ export function assignBuilderField(widget: Widget, field: Field, role: BuilderRo
     return sorts.some((s) => s.field === field.slug) ? {} : sorts.length < 3 ? { sorts: [...sorts, { field: field.slug, direction: "asc" }] } : null;
   }
   if (role === "columns") return { columns: [...new Set([...(widget.columns ?? []), field.slug])] };
-  if (role === "value") return numericField(field) ? { valueSlug: field.slug, aggregation: "sum" } : null;
+  if (role === "value") {
+    const aggregation = sql ? "sum" : widget.fieldPresentation?.[field.slug]?.aggregation ?? "sum";
+    return numericField(field) ? { valueSlug: field.slug, aggregation: aggregationAllowed(widget.kind, aggregation) ? aggregation : "sum" } : null;
+  }
   if (role === "group") return { groupSlug: field.slug, ...(!sql ? { groupBucket: isDateField(field) ? "month" : "" } : {}) };
   return { splitSlug: field.slug, ...(!sql ? { splitBucket: isDateField(field) ? "month" : "" } : {}) };
 }
