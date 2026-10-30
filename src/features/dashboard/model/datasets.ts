@@ -6,7 +6,7 @@ import { parseJoinDraft, type JoinDraft } from "./sql-join-builder";
 export type DatasetField = { slug: string; label: string; type: string; target?: string; joinable?: boolean };
 /** Table sources use normal role metadata; SQL sources reuse SQL-console schema metadata. */
 export type DatasetTable = { slug: string; label: string; fields: DatasetField[] };
-export type DatasetParameter = { name: string; type: "text" | "number" | "date" | "boolean"; required: boolean };
+export type DatasetParameter = { name: string; type: "text" | "number" | "date" | "boolean"; required: boolean; defaultValue?: string };
 export type DatasetJoin = { fromTable: string; field: string; toTable: string; kind: "left" | "inner" };
 export type Dataset = {
   id: string; name: string;
@@ -59,7 +59,7 @@ export function toDatasets(value: unknown): Dataset[] {
     if (source["kind"] === "sql" && typeof source["sql"] === "string") return [{ ...identity, source: { kind: "sql", sql: source["sql"], columns: [], ...(source["sqlMode"] === "visual" || source["sqlMode"] === "manual" ? { sqlMode: source["sqlMode"] } : {}), ...(parseJoinDraft(source["visual"]) ? { visual: parseJoinDraft(source["visual"])! } : {}), parameters: Array.isArray(source["parameters"]) ? source["parameters"].flatMap((raw): DatasetParameter[] => {
       if (!raw || typeof raw !== "object") return [];
       const p = raw as Record<string, unknown>;
-      return typeof p["name"] === "string" && ["text", "number", "date", "boolean"].includes(p["type"] as string) ? [{ name: p["name"], type: p["type"] as DatasetParameter["type"], required: p["required"] === true }] : [];
+      return typeof p["name"] === "string" && ["text", "number", "date", "boolean"].includes(p["type"] as string) ? [{ name: p["name"], type: p["type"] as DatasetParameter["type"], required: p["required"] === true, ...(typeof p["defaultValue"] === "string" ? { defaultValue: p["defaultValue"] } : {}) }] : [];
     }) : [] } }];
     return [];
   });

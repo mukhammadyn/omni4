@@ -72,3 +72,19 @@ export function treemapRects(series: ChartSeries): TreeRect[] {
   };
   return visit(items, 0, 0, 100, 100);
 }
+
+/** Absolute stacks accumulate positive and negative values independently; never normalize totals. */
+export function stackedBands(series: ChartSeries) {
+  const splits = series.splits.length ? series.splits : [{ key: "", label: "" }];
+  return series.points.map((point) => {
+    let positive = 0, negative = 0;
+    const bands = splits.map((split) => {
+      const value = point.cells.size ? point.cells.get(split.key) ?? 0 : point.value;
+      const start = value >= 0 ? positive : negative;
+      const end = start + value;
+      if (value >= 0) positive = end; else negative = end;
+      return { start, end, value };
+    });
+    return { bands, min: negative, max: positive };
+  });
+}

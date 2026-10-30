@@ -1,5 +1,6 @@
 import { toDateValue, wallClock, type DateKind } from "@/shared/lib/date-value";
 import { pivotKey, pivotTable, reduce, toAggregation, toNumber, type Aggregation } from "./pivot";
+import type { Sort } from "./query";
 import type { Item } from "./types";
 
 /**
@@ -87,6 +88,10 @@ export type ChartMeasure = {
 };
 
 export type ChartConfig = {
+  sorts?: Sort[];
+  showLegend?: boolean;
+  showGrid?: boolean;
+  stacked?: boolean;
   /** Ключ для порядка и перетаскивания. Не идентификатор в базе. */
   id: string;
   kind: ChartKind;
@@ -470,6 +475,13 @@ export function chartSeries(
     );
   }
 
+  if (config.sorts?.length) all.sort((a, b) => {
+    for (const sort of config.sorts!) {
+      const comparison = sort.field === config.groupSlug ? a.label.localeCompare(b.label, undefined, { numeric: true }) : sort.field === config.valueSlug ? a.value - b.value : 0;
+      if (comparison) return sort.direction === "desc" ? -comparison : comparison;
+    }
+    return 0;
+  });
   if (["donut", "pie", "treemap"].includes(config.kind)) {
     const slices = foldTail(
       all.map(({ key, label, value }) => ({ key, label, value })),
@@ -864,6 +876,7 @@ export function toCharts(value: unknown): ChartConfig[] {
         valueSlug: typeof raw["value_slug"] === "string" ? raw["value_slug"] : "",
         width: toSpan(raw["width"]),
         height: clampRows(typeof raw["height"] === "number" ? raw["height"] : MIN_ROWS),
+        ...Object.fromEntries([["show_legend", "showLegend"], ["show_grid", "showGrid"], ["stacked", "stacked"]].flatMap(([key, name]) => typeof raw[key!] === "boolean" ? [[name!, raw[key!]]] : [])),
         ...(typeof raw["show_empty"] === "boolean" ? { showEmpty: raw["show_empty"] } : {}),
         ...(Array.isArray(raw["measures"]) ? { measures: raw["measures"].slice(0, SERIES_LIMIT).flatMap((value, index): ChartMeasure[] => {
           if (typeof value !== "object" || value === null) return [];
@@ -906,6 +919,9 @@ export function toChartsAttribute(charts: ChartConfig[]): Record<string, unknown
     value_slug: chart.valueSlug,
     width: chart.width,
     height: chart.height,
+    ...(chart.showLegend !== undefined ? { show_legend: chart.showLegend } : {}),
+    ...(chart.showGrid !== undefined ? { show_grid: chart.showGrid } : {}),
+    ...(chart.stacked !== undefined ? { stacked: chart.stacked } : {}),
     ...(chart.showEmpty !== undefined ? { show_empty: chart.showEmpty } : {}),
     ...(chart.measures ? { measures: chart.measures } : {}),
     ...(chart.xSlug ? { x_slug: chart.xSlug } : {}),

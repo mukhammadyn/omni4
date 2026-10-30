@@ -14,10 +14,11 @@ const groups: { key: "common" | "composition" | "analysis"; kinds: Visualization
   { key: "analysis", kinds: ["area", "combo", "heatmap", "scatter", "bubble", "map", "pivot", "ratio", "goal", "heading"] },
 ];
 
-export function VisualizationPicker({ value, onChange, allowed }: { value: Visualization; onChange: (value: Visualization) => void; allowed?: readonly Visualization[] | undefined }) {
+export function VisualizationPicker({ value, onChange, allowed, compact = false }: { value: Visualization; onChange: (value: Visualization) => void; allowed?: readonly Visualization[] | undefined; compact?: boolean }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const name = (kind: Visualization) => kind === "records" ? t("dashboard.plainTable") : t((["records", "pivot", "ratio", "goal", "heading"].includes(kind) ? `dashboard.widget.${kind}` : `chart.kind.${kind}`) as "chart.kind.bar");
+  if (compact) return <label className="flex flex-col gap-2 text-sm font-medium"><span className="sr-only">{t("dashboard.visualization")}</span><select aria-label={t("dashboard.visualization")} value={value} onChange={(event) => onChange(event.target.value as Visualization)} className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm">{groups.map((group) => <optgroup key={group.key} label={group.key === "common" ? t("dashboard.visualization") : t(`dashboard.visualizations.${group.key}` as const)}>{group.kinds.filter((kind) => !allowed || allowed.includes(kind)).map((kind) => <option key={kind} value={kind}>{name(kind)}</option>)}</optgroup>)}</select></label>;
   const tiles = (kinds: Visualization[]) => <div className="grid grid-cols-2 gap-1.5">{kinds.map((kind) => <button type="button" key={kind} role="radio" aria-checked={value === kind} aria-label={name(kind)} title={name(kind)} onClick={() => onChange(kind)} className={`flex h-11 min-w-0 items-center gap-2 rounded-lg border px-2 py-0.5 text-left text-xs transition-colors ${value === kind ? "border-accent bg-accent-subtle text-fg" : "border-border text-fg-muted hover:bg-surface-hover hover:text-fg"}`}><VisualizationThumbnail kind={kind} /><span className="line-clamp-2 min-w-0 leading-snug">{kind === "bar" ? t("dashboard.visualizations.bar") : kind === "donut" ? t("dashboard.visualizations.donut") : name(kind)}</span></button>)}</div>;
   return <section className="flex flex-col gap-2" aria-label={t("dashboard.visualization")}>
     <span className="text-sm font-medium">{t("dashboard.visualization")}</span>

@@ -9,7 +9,7 @@ export function resetWidgetSource(widget: Widget, tableSlug: string): Widget {
   delete next.pivotRows; delete next.pivotSkipEmpty; delete next.ratio;
   if (widget.type === "ratio") next.ratio = { numerator: { id: "numerator", field: "", aggregation: "count" }, denominator: { id: "denominator", field: "", aggregation: "count" }, percent: false };
   delete next.datasetId; delete next.measures; delete next.xSlug; delete next.ySlug; delete next.sizeSlug; delete next.latitudeSlug; delete next.longitudeSlug; delete next.interaction;
-  delete next.columns; delete next.columnWidths; delete next.sorts; delete next.currencySlug;
+  delete next.calculatedFields; delete next.fieldPresentation; delete next.columns; delete next.columnWidths; delete next.sorts; delete next.currencySlug;
   return next;
 }
 
