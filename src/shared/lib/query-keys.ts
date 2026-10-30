@@ -10,6 +10,7 @@
 export const keys = {
   tables: {
     all: ["tables"] as const,
+    catalog: (projectId: string, envId: string, account: string) => [...keys.tables.all, "catalog", projectId, envId, account] as const,
     list: (projectId: string) => [...keys.tables.all, projectId] as const,
     detail: (tableSlug: string) => [...keys.tables.all, "detail", tableSlug] as const,
     /** Схема: поля и связи. Два запроса, потому что бэкенд отдаёт их порознь. */

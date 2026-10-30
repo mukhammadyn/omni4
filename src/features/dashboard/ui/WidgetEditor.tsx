@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "@/shared/api/use-session";
 import { useTablePermissions } from "@/features/auth";
 import { ChartCard, ChartRoles, FilterBar, chartTitle, filterKind, splittable, needsSplit } from "@/features/item";
-import { localized, useTables, type Field as TableField, type Relation } from "@/features/table";
+import { localized, useTables, useTableCatalog, type Field as TableField, type Relation } from "@/features/table";
 import { useDataLanguages } from "@/features/workspace";
 import { Button } from "@/shared/ui/button";
 import { Icon } from "@/shared/ui/icon";
@@ -85,7 +85,7 @@ export function WidgetEditor({ initial, datasets, isNew, filters, values, menuId
   const [custom, setCustom] = useState(() => Boolean(initial.title));
   const data = useWidgetData(draft, filters, values, menuId, {}, previewPage, draft.sorts ?? [], datasets);
   const { schema } = data;
-  const tables = useTables("");
+  const tables = useTableCatalog(sourceKind === "table");
   const effectiveTable = data.dataset?.source.kind === "table" ? data.dataset.source.tableSlug : draft.tableSlug;
   const source = tables.items.find((table) => table.slug === effectiveTable);
   const sourceName = source ? localized(source.labels, language, source.label) : effectiveTable;

@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
 import { useSession } from "@/shared/api/use-session";
 import i18n from "@/shared/lib/i18n";
@@ -14,6 +14,7 @@ import { toCascadingsBody } from "../model/cascade";
 import type { Labels, Relation } from "../model/types";
 import { invalidateSchema } from "./fields";
 import { pickLabels } from "./normalize";
+import { readCatalogPages } from "../model/catalog-pages";
 import { perLanguage } from "@/shared/lib/i18n";
 
 /** Одна таблица в списке. Кроме слага, подписи и значка отсюда ничего не нужно. */
@@ -99,6 +100,25 @@ export function useTables(search: string, enabled = true) {
     hasMore: result.hasNextPage,
     loadMore: () => void result.fetchNextPage(),
   };
+}
+
+/** Complete chart-source metadata catalog. Does not request any table rows or schema. */
+export function useTableCatalog(enabled = true) {
+  const session = useSession();
+  const projectId = session.getProjectId() ?? "", envId = session.getEnvironmentId() ?? "";
+  const account = JSON.stringify([session.getUserId(), session.getProfile()?.role, session.getPermissions()]);
+  const result = useQuery({
+    queryKey: keys.tables.catalog(projectId, envId, account),
+    queryFn: async ({ signal }) => {
+      // Gateway GetAllCollections forwards limit/offset (v2/collection.go:225).
+      // The old 30-row dropdown hook remains paginated for its other consumers.
+      const tables = await readCatalogPages<TableDto>((offset, limit) => api.get<TablesResponseDto>("/v2/collections", { params: { limit, offset }, signal }), { signal });
+      return tables.filter((table) => table.slug).map((table): TableOption => ({ id: table.id ?? "", slug: table.slug!, label: table.label?.trim() || table.slug!, labels: pickLabels(table.attributes), icon: table.icon ?? "" }));
+    },
+    enabled: enabled && Boolean(projectId), staleTime: 5 * 60_000,
+    retry: false, refetchOnWindowFocus: false,
+  });
+  return { items: result.data ?? [], isLoading: result.isFetching, error: result.error, retry: () => void result.refetch() };
 }
 
 /**

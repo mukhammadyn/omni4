@@ -16,7 +16,7 @@ export {
   useCreateRelation,
   useDeleteRelation,
   useTableFields,
-  type TableOption, useTables,
+  type TableOption, useTables, useTableCatalog,
   useUpdateRelation,
 } from "./api/tables";
 export { EMPTY_RELATION_DRAFT, isRelationReady } from "./model/relation-draft";
