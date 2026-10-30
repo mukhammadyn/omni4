@@ -1,97 +1,71 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FilterBar } from "@/features/item";
 import { localized } from "@/features/table";
 import { useDataLanguages } from "@/features/workspace";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
-import { Dropdown } from "@/shared/ui/dropdown";
 import { Field, Input } from "@/shared/ui/input";
+import { Tabs } from "@/shared/ui/tabs";
 import { useDialogFocus } from "@/shared/lib/use-dialog-focus";
 import { Modal } from "@/shared/ui/modal";
 import { useDashboardSchema } from "../api/schema";
-import { useSqlCatalog } from "../api/sql-catalog";
 import { TablePicker } from "./WidgetEditor";
 import type { Widget } from "../model/dashboard";
 import { sqlWidgetFrom, type SqlPresentation } from "../model/sql-widget";
-import type { Dataset, DatasetParameter } from "../model/datasets";
-import { insertJoinGuidance, joinSqlGuidance, namedSqlParameters, type SqlSuggestion } from "../model/sql-assist";
-
+import type { Dataset } from "../model/datasets";
+import { namedSqlParameters } from "../model/sql-assist";
+import { syncVisualSql } from "../model/sql-visual-source";
+import { SqlQueryEditor } from "./SqlQueryEditor";
 import { SqlDatasetRunner } from "./SqlDatasetRunner";
-import { boundedSqlSuggestions, sqlSupportIssue, supportedSqlExamples } from "../model/sql-query-guidance";
-import { sqlCopy } from "../model/sql-copy";
+import { sqlSupportIssue } from "../model/sql-query-guidance";
+import type { QueryResult } from "../model/query-result";
 
 const fresh = (): Dataset => ({ id: crypto.randomUUID(), name: "", source: { kind: "table", tableSlug: "", fields: [], filters: {}, joins: [] } });
 export function DatasetEditor({ datasets, menuId, onSave, onClose, onCreateWidget }: { datasets: Dataset[]; onCreateWidget?: ((datasets: Dataset[], widget: Widget) => Promise<boolean>) | undefined; menuId: string; onSave: (datasets: Dataset[]) => Promise<boolean>; onClose: () => void }) {
-  const dialog = useDialogFocus(onClose);
-  const { t, i18n } = useTranslation(), { current: language } = useDataLanguages();
+  const dialog = useDialogFocus(onClose), { t } = useTranslation(), { current: language } = useDataLanguages();
   const [drafts, setDrafts] = useState(datasets), [current, setCurrent] = useState<Dataset>(fresh), [context, setContext] = useState("");
-  const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false), [suggesting, setSuggesting] = useState(false), [caret, setCaret] = useState(0), [selected, setSelected] = useState(0);
-  const [manualJoin, setManualJoin] = useState("");
-  const [presentation,setPresentation]=useState<SqlPresentation>();
-  const input = useRef<HTMLTextAreaElement>(null);
+  const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false), [presentation, setPresentation] = useState<SqlPresentation>();
+  const sources = useRef(new Map<string, Dataset["source"]>());
   const slug = current.source.kind === "table" ? current.source.tableSlug : context;
   const access = useDashboardSchema(current.source.kind === "table" ? slug || undefined : undefined, menuId), { schema } = access;
-  const sqlAccess = useSqlCatalog(menuId, current.source.kind === "sql");
-  const catalog = context ? [...sqlAccess.tables.filter((table) => table.slug === context), ...sqlAccess.tables.filter((table) => table.slug !== context)] : sqlAccess.tables;
-  const sql = current.source.kind === "sql" ? current.source.sql : "";
-  useEffect(() => { setPresentation(undefined); }, [current.id, sql]);
-  useEffect(() => { setManualJoin(""); }, [sql, current.id, context]);
-  const suggestions = suggesting ? boundedSqlSuggestions(sql, caret, catalog) : [];
-  const joins = joinSqlGuidance(catalog);
-  const examples = supportedSqlExamples(catalog), copy = sqlCopy(i18n.language);
-  const choose = (suggestion: SqlSuggestion) => {
-    if (current.source.kind !== "sql") return;
-    const next = sql.slice(0, suggestion.replaceFrom) + suggestion.value + sql.slice(suggestion.replaceTo);
-    setCurrent({ ...current, source: { ...current.source, sql: next } }); setSuggesting(false);
-    const at = suggestion.replaceFrom + suggestion.value.length;
-    requestAnimationFrame(() => { input.current?.focus(); input.current?.setSelectionRange(at, at); });
-  };
-  const valid = Boolean(current.name.trim() && (current.source.kind === "sql" ? sql.trim() : current.source.tableSlug && current.source.fields.length && access.ready && !access.error && !access.denied));
+  const sql = current.source.kind === "sql" ? current.source.sql : "", signature = JSON.stringify([current.id, sql, current.source.kind === "sql" ? current.source.parameters : []]);
+  const [preview, setPreview] = useState<{ signature: string; result: QueryResult | null }>();
+  const receive = useCallback((result: QueryResult | null) => setPreview({ signature, result }), [signature]);
+  const valid = Boolean(current.name.trim() && (current.source.kind === "sql" ? sql.trim() && !sqlSupportIssue(sql) : current.source.tableSlug && current.source.fields.length && access.ready && !access.error && !access.denied));
   const normalized = (): Dataset => current.source.kind === "sql" ? { ...current, name: current.name.trim(), source: { ...current.source, parameters: namedSqlParameters(sql).map((name) => current.source.kind === "sql" ? current.source.parameters.find((p) => p.name === name) ?? { name, type: "text" as const, required: true } : { name, type: "text" as const, required: true }) } } : { ...current, name: current.name.trim() };
+  const listWith = (next: Dataset) => drafts.some((item) => item.id === next.id) ? drafts.map((item) => item.id === next.id ? next : item) : [...drafts, next];
   const activeEdit = Boolean(current.name.trim() || (current.source.kind === "sql" ? sql.trim() : current.source.tableSlug));
-  const stage = () => {
-    if (!valid) return;
-    const next = normalized();
-    setDrafts((items) => items.some((item) => item.id === next.id) ? items.map((item) => item.id === next.id ? next : item) : [...items, next]);
-    setCurrent(fresh());
+  const switchSource = (kind: string) => {
+    sources.current.set(`${current.id}:${current.source.kind}`, current.source);
+    const table = current.source.kind === "table" ? current.source.tableSlug : current.source.visual?.base.table ?? context;
+    setContext(table);
+    const source = sources.current.get(`${current.id}:${kind}`) ?? (kind === "table" ? { kind: "table" as const, tableSlug: table, fields: [], filters: {}, joins: [] } : { kind: "sql" as const, sql: "", sqlMode: "visual" as const, parameters: [], columns: [] });
+    setCurrent(kind === "sql" ? syncVisualSql({ ...current, source }, table, []) : { ...current, source }); setPresentation(undefined);
   };
   return <Modal onClose={onClose} className="flex items-start justify-center px-4 pt-[6vh]"><div ref={dialog} role="dialog" aria-modal="true" aria-label={t("dashboard.datasets")} className="flex max-h-[88vh] w-[960px] max-w-full flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-modal">
-    <header className="px-6 pt-5"><h2 className="text-xl font-semibold">{t("dashboard.datasets")}</h2><p className="mt-1 text-sm text-fg-muted">{copy.datasetHint}</p></header>
+    <header className="px-6 pt-5"><h2 className="text-xl font-semibold">{t("dashboard.datasets")}</h2></header>
     <div className="grid min-h-0 flex-1 gap-5 overflow-auto p-6 md:grid-cols-[200px_1fr]">
-      <div className="flex flex-col gap-2"><Button type="button" size="sm" variant="secondary" onClick={() => setCurrent(fresh())}>{t("dashboard.newDataset")}</Button>{drafts.map((dataset) => <button key={dataset.id} type="button" onClick={() => setCurrent(dataset)} className={`rounded-md border px-3 py-2 text-left text-sm ${current.id === dataset.id ? "border-accent bg-accent-subtle" : "border-border hover:bg-surface-hover"}`}><span className="block truncate">{dataset.name}</span><span className="text-2xs text-fg-muted">{dataset.source.kind === "table" ? t("dashboard.tableDataset") : copy.sqlSource}</span></button>)}</div>
+      <div className="flex flex-col gap-2"><Button type="button" size="sm" variant="secondary" onClick={() => { setCurrent(fresh()); setContext(""); }}>{t("dashboard.newDataset")}</Button>{drafts.map((dataset) => <button key={dataset.id} type="button" onClick={() => { setCurrent(dataset); setContext(dataset.source.kind === "table" ? dataset.source.tableSlug : dataset.source.visual?.base.table ?? ""); }} className={`rounded-md border px-3 py-2 text-left text-sm ${current.id === dataset.id ? "border-accent bg-accent-subtle" : "border-border hover:bg-surface-hover"}`}><span className="block truncate">{dataset.name}</span></button>)}</div>
       <div className="flex min-w-0 flex-col gap-3">
         <Field label={t("dashboard.datasetName")}><Input data-autofocus value={current.name} onChange={(event) => setCurrent({ ...current, name: event.target.value })} /></Field>
-        <Field label={t("dashboard.sourceKind")}><Dropdown ariaLabel={t("dashboard.sourceKind")} value={current.source.kind} items={[{ value: "table", label: t("dashboard.tableDataset") }, { value: "sql", label: copy.sqlSource }]} onChange={(kind) => { setCurrent({ ...current, source: kind === "table" ? { kind: "table", tableSlug: "", fields: [], filters: {}, joins: [] } : { kind: "sql", sql: "", parameters: [], columns: [] } }); setSuggesting(false); }} /></Field>
-        {current.source.kind === "sql" && <p className="text-xs text-fg-muted">{t("dashboard.sqlSchemaContext")}</p>}
-        {current.source.kind === "table" ? <TablePicker value={slug} onPick={(tableSlug) => { if (current.source.kind === "table") setCurrent({ ...current, source: { kind: "table", tableSlug, fields: [], filters: {}, joins: [] } }); else setContext(tableSlug); }} /> : <Dropdown ariaLabel={copy.table} value={context} items={sqlAccess.tables.map((table) => ({ value: table.slug, label: table.label }))} onChange={setContext} />}
-        {(current.source.kind === "table" ? access.loading : sqlAccess.checking) && <p role="status" className="text-sm text-fg-muted">{t("common.loading")}</p>}
-        {current.source.kind === "table" && access.error && <p role="alert" className="text-sm text-danger">{access.error}<Button type="button" size="sm" variant="secondary" onClick={access.retry}>{t("dashboard.refresh")}</Button></p>}
-        {current.source.kind === "sql" && sqlAccess.error && <p role="alert" className="text-sm text-danger">{sqlAccess.error.message}</p>}
+        <Tabs variant="module" panelPrefix="dataset-source" ariaLabel={t("dashboard.sourceKind")} tabs={[{ id: "table", label: t("dashboard.plainTable") }, { id: "sql", label: "SQL" }]} activeId={current.source.kind} onSelect={switchSource} />
+        <div id={`dataset-source-panel-${current.source.kind}`} role="tabpanel" aria-labelledby={`dataset-source-${current.source.kind}`} className="flex min-w-0 flex-col gap-3">
         {current.source.kind === "table" ? <>
-          <fieldset className="flex flex-wrap gap-2"><legend className="mb-1 text-xs text-fg-muted">{t("dashboard.columns")}</legend>{schema.fields.map((field) => <label key={field.slug} className="flex items-center gap-1 text-xs"><Checkbox checked={current.source.kind === "table" && current.source.fields.includes(field.slug)} onChange={(event) => { if (current.source.kind !== "table") return; setCurrent({ ...current, source: { ...current.source, fields: event.target.checked ? [...current.source.fields, field.slug] : current.source.fields.filter((slug) => slug !== field.slug) } }); }} />{localized(field.labels, language, field.label)}</label>)}</fieldset>
+          <TablePicker value={slug} onPick={(tableSlug) => setCurrent({ ...current, source: { kind: "table", tableSlug, fields: [], filters: {}, joins: [] } })} />
+          {access.loading && <p role="status" className="text-sm text-fg-muted">{t("common.loading")}</p>}
+          {access.error && <p role="alert" className="text-sm text-danger">{access.error}<Button type="button" size="sm" variant="secondary" onClick={access.retry}>{t("dashboard.refresh")}</Button></p>}
+          <fieldset className="flex flex-wrap gap-2"><legend className="mb-1 text-xs text-fg-muted">{t("dashboard.columns")}</legend>{schema.fields.map((field) => <label key={field.slug} className="flex items-center gap-1 text-xs"><Checkbox checked={current.source.kind === "table" && current.source.fields.includes(field.slug)} onChange={(event) => { if (current.source.kind === "table") setCurrent({ ...current, source: { ...current.source, fields: event.target.checked ? [...current.source.fields, field.slug] : current.source.fields.filter((slug) => slug !== field.slug) } }); }} />{localized(field.labels, language, field.label)}</label>)}</fieldset>
           <FilterBar columns={schema.fields} relations={schema.relations} language={language} filters={current.source.filters} sorts={[]} onFilters={(filters) => { if (current.source.kind === "table") setCurrent({ ...current, source: { ...current.source, filters } }); }} onSorts={() => {}} />
         </> : <>
-
-          <label className="text-sm font-medium" htmlFor="dataset-sql">SQL</label>
-          <textarea id="dataset-sql" ref={input} value={sql} aria-describedby="sql-assist-hint" spellCheck={false} className="h-44 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-fg outline-none focus:border-accent" onChange={(event) => { if (current.source.kind === "sql") setCurrent({ ...current, source: { ...current.source, sql: event.target.value } }); setCaret(event.target.selectionStart); setSuggesting(true); setSelected(0); }} onClick={(event) => setCaret(event.currentTarget.selectionStart)} onKeyDown={(event) => {
-            if ((event.ctrlKey || event.metaKey) && event.code === "Space") { event.preventDefault(); setCaret(event.currentTarget.selectionStart); setSuggesting(true); return; }
-            if (event.key === "Escape" && suggesting) { event.preventDefault(); event.stopPropagation(); setSuggesting(false); }
-            if (suggestions.length && ["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); setSelected((at) => (at + (event.key === "ArrowDown" ? 1 : -1) + suggestions.length) % suggestions.length); }
-            if (suggestions.length && (event.key === "Tab" || event.key === "Enter")) { event.preventDefault(); choose(suggestions[selected % suggestions.length]!); }
-          }} />
-          <p id="sql-assist-hint" className="text-2xs text-fg-muted">{t("dashboard.sqlAssistHint")}</p>
-          {suggestions.length > 0 && <div role="listbox" aria-label={t("dashboard.sqlSuggestions")} className="max-h-40 overflow-auto rounded-md border border-border">{suggestions.map((suggestion, index) => <button type="button" role="option" aria-selected={index === selected} key={suggestion.value} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(suggestion)} className={`flex w-full justify-between gap-2 px-2 py-1 text-left text-xs ${index === selected ? "bg-accent-subtle" : "hover:bg-surface-hover"}`}><span className="font-mono">{suggestion.label}</span><span className="text-fg-muted">{suggestion.detail}</span></button>)}</div>}
-          {namedSqlParameters(sql).map((name) => <div key={name} className="flex items-center gap-2 text-xs"><span className="w-28 truncate">:{name}</span><Dropdown ariaLabel={`${t("dashboard.parameterType")}: ${name}`} value={current.source.kind === "sql" ? current.source.parameters.find((p) => p.name === name)?.type ?? "text" : "text"} items={["text", "number", "date", "boolean"].map((type) => ({ value: type, label: type }))} onChange={(type) => { if (current.source.kind === "sql") setCurrent({ ...current, source: { ...current.source, parameters: [...current.source.parameters.filter((p) => p.name !== name), { name, type: type as DatasetParameter["type"], required: true }] } }); }} /></div>)}
-          {joins.length > 0 && <div><p className="mb-1 text-xs text-fg-muted">{t("dashboard.joinGuidanceHint")}</p>{joins.map((join) => <button key={join} type="button" className="block max-w-full truncate py-1 text-left font-mono text-2xs text-accent-text" title={join} onClick={() => { if (current.source.kind !== "sql") return; setSuggesting(false); const next = insertJoinGuidance(sql, join, slug); if (next === null) setManualJoin(join); else { setManualJoin(""); setCurrent({ ...current, source: { ...current.source, sql: next } }); } }}>{join}</button>)}</div>}
-          {manualJoin && <div role="status" className="rounded-md border border-border p-2"><p className="mb-1 text-xs text-fg-muted">{t("dashboard.joinManualHint")}</p><textarea readOnly aria-label={t("dashboard.joinSnippet")} value={manualJoin} onFocus={(event) => event.currentTarget.select()} className="h-20 w-full rounded-md border border-border bg-surface p-2 font-mono text-2xs text-fg" /></div>}
-          {examples.length>0 && <div className="flex flex-wrap gap-2"><p className="w-full text-xs text-fg-muted">{copy.examples}</p>{examples.map(example=><Button key={example.kind} type="button" size="sm" variant="secondary" onClick={()=>{if(current.source.kind==="sql")setCurrent({...current,source:{...current.source,sql:example.sql}});setSuggesting(false)}}>{example.kind==="table"?copy.tableExample:example.kind==="totals"?copy.totalsExample:copy.joinExample}</Button>)}</div>}
-          <SqlDatasetRunner key={current.id} menuId={menuId} sql={sql} parameters={current.source.parameters} onPresentation={setPresentation} />
-          {onCreateWidget && <Button type="button" variant="secondary" size="sm" disabled={!valid || busy || Boolean(sqlSupportIssue(sql))} onClick={async()=>{setBusy(true);const next=normalized();const list=drafts.some(dataset=>dataset.id===next.id)?drafts.map(dataset=>dataset.id===next.id?next:dataset):[...drafts,next];const saved=await onCreateWidget(list,sqlWidgetFrom(next,presentation));setBusy(false);setFailed(!saved);if(saved)onClose();}}>{t("dashboard.addWidget")} · SQL</Button>}
+          <SqlQueryEditor dataset={current} menuId={menuId} tableSlug={context} onChange={setCurrent} />
+          <SqlDatasetRunner key={current.id} menuId={menuId} sql={sql} parameters={current.source.parameters} onPresentation={setPresentation} onResult={receive} />
+          {onCreateWidget && <Button type="button" variant="secondary" size="sm" disabled={!valid || busy || preview?.signature !== signature || !preview.result} onClick={async () => { setBusy(true); const next = normalized(); const saved = await onCreateWidget(listWith(next), sqlWidgetFrom(next, presentation)); setBusy(false); setFailed(!saved); if (saved) onClose(); }}>{t("dashboard.addWidget")} · SQL</Button>}
         </>}
-        <Button type="button" size="sm" variant="secondary" disabled={!valid} onClick={stage}>{t("dashboard.applyDatasetDraft")}</Button>
+        </div>
+        <Button type="button" size="sm" variant="secondary" disabled={!valid} onClick={() => { setDrafts(listWith(normalized())); setCurrent(fresh()); setContext(""); }}>{t("dashboard.applyDatasetDraft")}</Button>
       </div>
     </div>
-    <footer className="flex items-center justify-end gap-2 px-6 pb-5">{failed && <p role="alert" className="mr-auto text-xs text-danger">{t("dashboard.saveFailed")}</p>}<Button type="button" variant="secondary" disabled={busy} onClick={onClose}>{t("action.cancel")}</Button><Button type="button" disabled={busy || (activeEdit && !valid)} onClick={async () => { setBusy(true); const saved = await onSave(valid ? drafts.some((dataset) => dataset.id === current.id) ? drafts.map((dataset) => dataset.id === current.id ? normalized() : dataset) : [...drafts, normalized()] : drafts); setBusy(false); setFailed(!saved); if (saved) onClose(); }}>{t("dashboard.saveDatasets")}</Button></footer>
+    <footer className="flex items-center justify-end gap-2 px-6 pb-5">{failed && <p role="alert" className="mr-auto text-xs text-danger">{t("dashboard.saveFailed")}</p>}<Button type="button" variant="secondary" disabled={busy} onClick={onClose}>{t("action.cancel")}</Button><Button type="button" disabled={busy || (activeEdit && !valid)} onClick={async () => { setBusy(true); const saved = await onSave(valid ? listWith(normalized()) : drafts); setBusy(false); setFailed(!saved); if (saved) onClose(); }}>{t("dashboard.saveDatasets")}</Button></footer>
   </div></Modal>;
 }

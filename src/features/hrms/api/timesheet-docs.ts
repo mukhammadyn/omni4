@@ -1,0 +1,243 @@
+import { useMemo } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTablePermissions } from "@/features/auth";
+import { MAX_LIMIT, PEOPLE, useItem, useItems, useUpdateItem } from "@/features/item";
+import { useTableSchema } from "@/features/table";
+import { api } from "@/shared/api/client";
+import { session } from "@/shared/api/session";
+import { todayInput } from "@/shared/lib/date-value";
+import { keys } from "@/shared/lib/query-keys";
+import { reportError } from "@/shared/lib/toast";
+import { datesOf, totalsOf, type Leave, type SheetCell } from "../model/timesheet";
+import { periodRange, toSheetCell, type PeriodKind } from "../model/timesheet-days";
+import { planFill, SHEET_STATUS, type SheetEvent } from "../model/timesheet-docs";
+import { EMPLOYEES } from "./employee";
+import { firstText, text } from "./org";
+import { useAll } from "./timesheet";
+import { TIMESHEET_DAYS, useFillDays, useTimesheetDays, type FillResult, type FillTarget } from "./timesheet-days";
+
+/** «Табели» — документ «табель за месяц по отделу» (`timesheets.html` прототипа). */
+export const TIMESHEETS = "hr_timesheets";
+/** История табеля — `history` прототипа: событие на действие и правку. */
+export const TIMESHEET_EVENTS = "hr_timesheet_events";
+
+/**
+ * «Заполнить из посещаемости»: один табель на компанию за период (месяц или
+ * неделю), как ведомость HRMS — все, у кого есть назначение в периоде, с
+ * отделом или без (ADR-0018, дополнение от 2026-10-28). Нет табеля — создать
+ * черновиком, черновик или «на проверке» — заполнить заново, утверждённый —
+ * не трогать. Табели отделов, заведённые раньше, план не трогает.
+ *
+ * План — по одному списку табелей (~0,5 с); посещаемость, смены и дни
+ * других табелей (~2,5 МБ, 5–6 с) нужны только записи и предупреждению
+ * о пересечении — `loading` про них, и плана они не держат.
+ */
+export function useTimesheetFill(period: string, kind: PeriodKind) {
+  const days = useFillDays(period, kind);
+  const existing = useAll(TIMESHEETS, { period: { op: "between", values: [days.from, days.from] } }, false);
+
+  const plan = useMemo(() => {
+    if (existing.loading) return null;
+    const company = existing.rows.filter((row) => (firstText(row.period_kind) || "month") === kind && !text(row.hr_departments_id));
+    const base = planFill(
+      company.map((row) => ({ guid: text(row.guid), departmentId: "", status: firstText(row.status) })),
+      [""],
+    );
+    return { ...base, title: text(company[0]?.title) };
+  }, [existing.loading, existing.rows, kind]);
+
+  // Дни, что уже лежат в других табелях (неделя поверх месяца, табели отделов), — предупреждение, не запрет.
+  const overlap = !plan || days.loading ? null : plan.locked.length ? 0 : days.overlap("", plan.update[0]?.guid);
+
+  return { loading: days.loading, plan, overlap, fill: days.fill, from: days.from };
+}
+
+export type FillPlan = NonNullable<ReturnType<typeof useTimesheetFill>["plan"]>;
+
+/** Событие истории; автор — вошедший (у ADMIN без строки `core_users` — пусто). */
+export async function logEvent(timesheet: string, event: SheetEvent) {
+  await api.post<unknown>(`/v2/items/${TIMESHEET_EVENTS}`, {
+    data: {
+      guid: crypto.randomUUID(),
+      hr_timesheets_id: timesheet,
+      core_users_id: session.getObjectIds()[PEOPLE] ?? null,
+      action: event.action,
+      field: event.field ?? null,
+      before: event.before ?? null,
+      after: event.after ?? null,
+      comment: event.comment ?? null,
+      hr_timesheet_days_id: event.dayId ?? null,
+    },
+  });
+}
+
+/** Лента истории табеля, новые сверху (порядок бэкенда по умолчанию). */
+export function useTimesheetEvents(guid: string) {
+  const { page, isLoading } = useItems(TIMESHEET_EVENTS, {
+    limit: 200,
+    page: 1,
+    filters: { hr_timesheets_id: { op: "contains", values: [guid] } },
+  });
+  return { rows: page.rows, isLoading };
+}
+
+/**
+ * Записать событие истории. Отдельно от правки: сбой истории не должен
+ * откатывать уже сохранённое поле, а лишь сказать о себе.
+ */
+export function useLogEvent(guid: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (event: SheetEvent) => logEvent(guid, event),
+    onError: (error) => reportError(error, "common.saveFailed"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.items.table(TIMESHEET_EVENTS) }),
+  });
+}
+
+/** Новый табель — черновиком, ответственный — вошедший; затем заполняется днями. */
+export function useWriteTimesheets() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      plan,
+      period,
+      kind,
+      title,
+      fill,
+    }: {
+      plan: FillPlan;
+      period: string;
+      kind: PeriodKind;
+      title: string;
+      fill: (target: FillTarget) => Promise<FillResult>;
+    }) => {
+      for (const departmentId of plan.create) {
+        const guid = crypto.randomUUID();
+        await api.post<unknown>(`/v2/items/${TIMESHEETS}`, {
+          data: {
+            guid,
+            title,
+            period,
+            period_kind: kind,
+            hr_departments_id: departmentId || null,
+            status: SHEET_STATUS.draft,
+            core_users_id: session.getObjectIds()[PEOPLE] ?? null,
+          },
+        });
+        const result = await fill({ guid, departmentId, fresh: true });
+        // Людей за период не нашлось — пустой документ не нужен.
+        if (!result.people) await api.delete<unknown>(`/v1/object/${TIMESHEETS}`, { data: { ids: [guid] } });
+      }
+      for (const target of plan.update) await fill({ ...target, title });
+    },
+    onError: (error) => reportError(error, "common.saveFailed"),
+    /*
+     * Один раз на весь пакет: fill кэш не трогает. Без await — react-query
+     * ждёт onSettled, прежде чем закрыть окно, а дни за месяц — 1–3 МБ
+     * порциями по очереди. Дни и историю здесь никто не показывает: помечаются
+     * устаревшими и перечитываются тем, кто их откроет.
+     */
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.items.table(TIMESHEETS) });
+      for (const slug of [TIMESHEET_DAYS, TIMESHEET_EVENTS]) void queryClient.invalidateQueries({ queryKey: keys.items.table(slug), refetchType: "none" });
+    },
+  });
+}
+
+/**
+ * Один табель — страница `timesheet.html` прототипа: запись, схема, права
+ * и сохранённые строки дня (ADR-0018) — сотрудники × дни периода.
+ */
+export function useTimesheetDoc(guid: string) {
+  const record = useItem(TIMESHEETS, guid, true);
+  const { schema, isLoading } = useTableSchema(TIMESHEETS);
+  const permissionOf = useTablePermissions();
+  const update = useUpdateItem(TIMESHEETS);
+  const row = record.item;
+  const kind: PeriodKind = firstText(row?.period_kind) === "week" ? "week" : "month";
+  const { from, to } = periodRange(text(row?.period).slice(0, 10) || todayInput(), kind);
+  const dates = useMemo(() => datesOf({ from, to }), [from, to]);
+  const days = useTimesheetDays(guid);
+  const ids = useMemo(() => [...new Set(days.rows.map((day) => day.hr_employees_id))], [days.rows]);
+  const people = useAll(ids.length ? EMPLOYEES : undefined, { guid: { op: "any", values: ids } }, false);
+  const types = useAll("hr_absence_types", {}, false);
+  // Имена пользователей — «Ответственному» в истории: у нового значения связи `_data` ещё старая.
+  const users = useAll(PEOPLE, {}, false);
+  const userNames = useMemo(
+    () => new Map(users.rows.map((user) => [text(user.guid), text(user.full_name) || text(user.email)])),
+    [users.rows],
+  );
+  const absenceTypes = useMemo(
+    () => types.rows.map((type) => ({ id: text(type.guid), title: text(type.name), code: text(type.code), icon: text(type.icon), color: text(type.color), paid: type.is_paid === true })),
+    [types.rows],
+  );
+  const holidays = useMemo(() => new Map(days.rows.filter((day) => day.is_holiday).map((day) => [day.date, ""])), [days.rows]);
+  const rows = useMemo(() => {
+    const leaveOf = (typeId: string | null): Leave | null => {
+      const type = absenceTypes.find((item) => item.id === typeId);
+      return type ? { ...type, typeId: type.id, status: "approved", from: "", to: "" } : null;
+    };
+    const names = new Map(people.rows.map((person) => [text(person.guid), person]));
+    return ids
+      .map((id) => {
+        const person = names.get(id);
+        const own = days.rows.filter((day) => day.hr_employees_id === id && !day.outside_period);
+        const byDate = new Map(own.map((day) => [day.date, day]));
+        const cells = dates.map((date) => {
+          const day = byDate.get(date);
+          return day ? toSheetCell(day, leaveOf) : null;
+        });
+        const shown = cells.filter((cell): cell is SheetCell => cell !== null);
+        return {
+          employee: { id, name: text(person?.full_name) || "—", photo: text(person?.photo) },
+          cells,
+          byDate,
+          totals: totalsOf(shown, todayInput()),
+        };
+      })
+      .sort((a, b) => a.employee.name.localeCompare(b.employee.name));
+  }, [ids, people.rows, days.rows, dates, absenceTypes]);
+  return {
+    row,
+    isLoading: record.isLoading || isLoading,
+    error: record.error,
+    fields: schema.fields,
+    relations: schema.relations,
+    can: permissionOf(TIMESHEETS),
+    userNames,
+    kind,
+    dates,
+    days: days.rows,
+    daysLoading: days.loading || people.loading,
+    absenceTypes,
+    holidays,
+    rows,
+    edit: (values: Record<string, unknown>, onSuccess?: () => void) =>
+      update.mutate({ guid, values }, { onSuccess: () => onSuccess?.() }),
+  };
+}
+
+/**
+ * «1 из 18» и стрелки страницы табеля: место среди всех табелей, новые
+ * месяцы сверху, внутри месяца — по названию. Края не замыкаются:
+ * у первого нет «назад», у последнего — «вперёд», как в прототипе.
+ *
+ * ponytail: весь список ради соседей; табелей — отделы × месяцы, сотни.
+ */
+export function useTimesheetNeighbours(guid: string) {
+  const { page } = useItems(TIMESHEETS, {
+    limit: MAX_LIMIT,
+    page: 1,
+    relations: false,
+  });
+  /*
+   * Порядок — здесь, а не сортировкой запроса: вторая сортировка бэкенда
+   * нестабильна, и после правки табель прыгал с «3 из 52» на «29 из 52».
+   */
+  const ids = [...page.rows]
+    .sort((a, b) => text(b.period).localeCompare(text(a.period)) || text(a.title).localeCompare(text(b.title)) || text(a.guid).localeCompare(text(b.guid)))
+    .map((row) => text(row.guid));
+  const at = ids.indexOf(guid);
+  if (at < 0) return null;
+  return { index: at + 1, total: ids.length, prev: ids[at - 1], next: ids[at + 1] };
+}

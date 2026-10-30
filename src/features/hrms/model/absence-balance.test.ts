@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { balanceOf, limitPeriod, type AbsenceType } from "./absence-balance";
+import { balanceOf, eligibleFrom, limitPeriod, type AbsenceType } from "./absence-balance";
 
 const type = (id: string, limit: number | null, period: string): AbsenceType => ({
   id,
@@ -8,6 +8,7 @@ const type = (id: string, limit: number | null, period: string): AbsenceType => 
   color: "",
   limit,
   period,
+  minMonths: 0,
 });
 
 test("limit periods: week from Monday, month, year, none", () => {
@@ -34,4 +35,11 @@ test("balance: approved of the period is used, pending apart, outside the period
   expect(vacation).toMatchObject({ used: 5, pending: 3, left: 5 });
   expect(dayOff).toMatchObject({ used: 1, pending: 0, left: 0 });
   expect(trip).toMatchObject({ used: 7, left: null });
+});
+
+test("eligibility: hire date plus min tenure, end of month clamped", () => {
+  expect(eligibleFrom("2026-03-15", 6)).toBe("2026-09-15");
+  expect(eligibleFrom("2026-08-31", 6)).toBe("2027-02-28");
+  expect(eligibleFrom("2026-08-31", 0)).toBe("");
+  expect(eligibleFrom("", 6)).toBe("");
 });

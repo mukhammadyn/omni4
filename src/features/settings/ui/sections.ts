@@ -1,12 +1,10 @@
 import {
   BracesIcon,
   Building2Icon,
-  CableIcon,
   CreditCardIcon,
   DatabaseIcon,
   HistoryIcon,
   IdCardIcon,
-  GlobeIcon,
   KeyRoundIcon,
   PaletteIcon,
   PlugIcon,
@@ -18,7 +16,7 @@ import {
 } from "lucide-react";
 import { useGlobalRight } from "@/features/auth";
 import type { TranslationKey } from "@/shared/lib/i18n";
-import { DIRECTORY_TABS, type Directory, type RecordSection } from "./directories";
+import { DIRECTORY_TABS, type Directory, type OptionsSection, type RecordSection } from "./directories";
 
 /**
  * Разделы настроек и их группы — отдельно от самих разделов: крошки
@@ -63,6 +61,8 @@ export type SettingsSection = {
   directory?: Directory;
   /** Раздел — одна строка таблицы Ядра (RecordSettings). */
   record?: RecordSection;
+  /** Раздел — варианты поля без своей таблицы (OptionsSettings). */
+  options?: OptionsSection;
 };
 
 export type SettingsGroup = {
@@ -105,9 +105,7 @@ const GROUPS: SettingsGroup[] = [
          остальных узких — в нём таблица окружений. */
       { id: "company", labelKey: "core.company", icon: Building2Icon, medium: true },
       { id: "brand", labelKey: "core.brand", icon: PaletteIcon },
-      /* Пояс, формат даты, валюта и НДС — `core_settings` Ядра; ниже
-         языки данных проекта и курсы валют. */
-      { id: "locale", labelKey: "core.locale", icon: GlobeIcon },
+      /* «Локализация» живёт во вкладке «Язык и регион» «Профиля». */
       {
         id: "billing",
         labelKey: "billing.title",
@@ -136,9 +134,6 @@ const GROUPS: SettingsGroup[] = [
     right: "settings_button",
     items: [
       { id: "resources", labelKey: "resources.title", icon: PlugIcon, wide: true },
-      /* Не DatabaseIcon: он у раздела «База данных» — своей базы проекта.
-         Здесь — провод к чужой. */
-      { id: "connections", labelKey: "connections.title", icon: CableIcon, wide: true },
     ],
   },
   {
@@ -204,7 +199,11 @@ const TABS: SettingsTab[] = [
       items: group.items.map((item) =>
         "fields" in item
           ? { id: item.id, labelKey: item.titleKey, icon: item.icon, record: item }
-          : { id: item.id, labelKey: item.titleKey, icon: item.icon, wide: true, directory: item },
+          : "screen" in item
+            ? { id: item.id, labelKey: item.titleKey, icon: item.icon, wide: true }
+            : "tables" in item
+            ? { id: item.id, labelKey: item.titleKey, icon: item.icon, wide: true, options: item }
+            : { id: item.id, labelKey: item.titleKey, icon: item.icon, wide: true, directory: item },
       ),
     })),
   })),

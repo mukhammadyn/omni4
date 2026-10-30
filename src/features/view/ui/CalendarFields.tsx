@@ -1,6 +1,6 @@
 import { XIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { localized, type Field } from "@/features/table";
+import { localized, toField, type Field } from "@/features/table";
 import { fieldIcon } from "@/features/item";
 import { Icon } from "@/shared/ui/icon";
 import { PopoverItem } from "@/shared/ui/popover";
@@ -32,8 +32,28 @@ import { viewIcon } from "./view-icon";
  */
 const DATE_TYPES = new Set(["DATE", "DATE_TIME", "DATE_TIME_WITHOUT_TIME_ZONE"]);
 
+/*
+ * Даты записи, которые ведёт сам ucode. В `GET /v2/fields` их нет
+ * (справочник ucode API, «created_at, updated_at and deleted_at are
+ * owned by Ucode»), а в строках они приходят, и по ним же фильтрует
+ * get-list. Таймлайну сделок нужна полоса «создана → закрытие», как
+ * в прототипе. Только для чтения: менять их сервер не даст.
+ */
+const SYSTEM_DATES: Field[] = [
+  { slug: "created_at", label_ru: "Создано", label_en: "Created", label_uz: "Yaratilgan" },
+  { slug: "updated_at", label_ru: "Изменено", label_en: "Updated", label_uz: "O‘zgartirilgan" },
+].map(({ slug, ...labels }) =>
+  toField({ id: slug, slug, type: "DATE_TIME", label: labels.label_ru, attributes: { ...labels, disabled: true } }),
+);
+
 export function dateFields(fields: Field[]): Field[] {
-  return fields.filter((field) => DATE_TYPES.has(field.type));
+  const own = fields.filter((field) => DATE_TYPES.has(field.type));
+  return [...own, ...SYSTEM_DATES.filter((system) => !own.some((field) => field.slug === system.slug))];
+}
+
+/** Поле даты по слагу — из схемы или системное. */
+export function dateFieldBySlug(slug: string | undefined, fields: Field[]): Field | undefined {
+  return slug ? dateFields(fields).find((field) => field.slug === slug) : undefined;
 }
 
 export function CalendarFields({

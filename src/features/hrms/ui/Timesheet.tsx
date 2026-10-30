@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDownIcon, InfoIcon, LogInIcon, XIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
@@ -6,10 +6,11 @@ import { CHIP_STYLES, hexToChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
 import { Popover } from "@/shared/ui/popover";
 import { Tooltip } from "@/shared/ui/tooltip";
-import { isWeekend, type Scale, type SheetCell, type SheetTotals } from "../model/timesheet";
-import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, useAttendance, useDayHead, type OpenDay, type OpenEmployee } from "./attendance-parts";
+import type { Scale, SheetCell, SheetTotals } from "../model/timesheet";
+import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, GroupedRows, useAttendance, dayTone, useDayHead, type OpenDay, type OpenEmployee } from "./attendance-parts";
 import { ATTENDANCE_TAB } from "./employee-tabs";
 import { TimesheetDay } from "./TimesheetDay";
+import { TimesheetExport } from "./TimesheetFill";
 
 const SHEET_SCALES: readonly Scale[] = ["month", "week"];
 
@@ -36,34 +37,45 @@ export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PeriodBar view={view}>
-        <Legend types={sheet.absenceTypes} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Legend types={sheet.absenceTypes} />
+          <TimesheetExport kind={scale === "week" ? "week" : "month"} anchor={range.from} />
+        </div>
       </PeriodBar>
 
       {/* Поля — снаружи прокрутки: внутри неё ячейки заезжали бы
           в отступ слева от липкой колонки сотрудника. */}
-      <div className="relative mx-6 mb-4 min-h-0 flex-1 overflow-auto">
+      <div className="@container relative mx-6 mb-4 min-h-0 flex-1 overflow-auto">
         {sheet.fetching && !sheet.loading && <div className="sticky top-0 z-30 h-0.5 animate-pulse bg-accent" />}
-        <table className="min-w-full border-separate border-spacing-0 text-xs">
+        {/* Месяц — все дни в ширину видимой области (как табель прототипа), итоги — правее, под прокруткой. */}
+        <table
+          className={`border-separate border-spacing-0 text-xs ${scale === "week" ? "min-w-full" : "table-fixed"}`}
+          style={scale === "week" ? undefined : { width: `calc(100cqw - 12px + ${TOTALS_PX}px)` }}
+        >
           <thead>
             <tr>
-              <th className={`${headCell} left-0 z-30 min-w-[230px] px-3 text-left font-normal text-fg-muted`}>
+              <th className={`${headCell} left-0 z-30 px-3 text-left font-normal text-fg-muted ${scale === "week" ? "min-w-[230px]" : "w-[200px]"}`}>
                 {t("timesheet.employee")} <span className="text-fg-subtle">{sheet.total || ""}</span>
               </th>
               {dates.map((date) => (
                 <th
                   key={date}
-                  className={`${headCell} z-20 px-0.5 text-center font-medium ${scale === "week" ? "min-w-[84px]" : "min-w-[36px]"} ${
-                    date === today ? "bg-accent-subtle text-accent-text" : isWeekend(date) ? "text-danger" : "text-fg-muted"
+                  className={`${headCell} z-20 px-0.5 text-center font-medium ${scale === "week" ? "min-w-[84px]" : ""} ${
+                    dayTone(date, today, sheet.holidays)
                   }`}
+                  title={sheet.holidays.get(date)}
+                  /* Видимая ширина без колонки сотрудника и полосы прокрутки — поровну на дни. */
+                  style={scale === "week" ? undefined : dayWidth(dates.length)}
                 >
                   <div className="text-xs leading-tight">{head.day(date)}</div>
-                  <div className="text-2xs font-normal leading-tight opacity-70">{head.weekday(date)}</div>
+                  {/* День недели — только у недели: в месяце число и цвет выходного говорят сами. */}
+                  {scale === "week" && <div className="text-2xs font-normal leading-tight opacity-70">{head.weekday(date)}</div>}
                 </th>
               ))}
               {TOTALS.map((key, index) => (
                 <th
                   key={key}
-                  className={`${headCell} z-20 whitespace-nowrap px-2 text-right font-normal text-fg-muted ${index === 0 ? "border-l" : ""}`}
+                  className={`${headCell} z-20 whitespace-nowrap px-2 text-right font-normal text-fg-muted ${index === 0 ? "border-l" : ""} ${scale === "week" ? "" : TOTAL_WIDTH[key]}`}
                 >
                   <Tooltip label={t(`timesheet.colHint.${key}`)} placement="bottom">
                     <span className="cursor-help border-b border-dotted border-border-strong">{t(`timesheet.col.${key}`)}</span>
@@ -88,31 +100,37 @@ export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; 
                 </td>
               </tr>
             ) : (
-              rows.map(({ employee, cells, totals }) => (
+              <GroupedRows rows={rows} group={view.group} keysOf={({ employee }) => employee} colSpan={dates.length + 1 + TOTALS.length}>
+
+                {({ employee, cells, totals }) => (
                 <tr key={employee.id} className="group">
                   <td className={`${body} sticky left-0 z-10 bg-surface px-3 py-1 group-hover:tint-surface-hover`}>
                     <EmployeeName
                       employee={employee}
                       until={range.to}
-                      avatar={<Avatar name={employee.name} photo={employee.photo || undefined} size="lg" />}
+                      avatar={<Avatar name={employee.name} photo={employee.photo || undefined} size="md" />}
+                      brief
                       onOpen={() => onOpenEmployee(employee.id, ATTENDANCE_TAB)}
                     />
                   </td>
                   {cells.map((cell) => (
                     <td
                       key={cell.date}
-                      className={`${body} px-0.5 py-[3px] text-center ${cell.date === today ? "bg-accent-subtle/30" : ""}`}
+                      className={`${body} text-center ${scale === "week" ? "px-0.5 py-[3px]" : "px-0 py-0.5"} ${cell.date === today ? "bg-accent-subtle/30" : ""}`}
                     >
                       <CellView
                         cell={cell}
                         hours={(minutes) => hours.format(minutes / 60)}
+                        whole={scale !== "week"}
                         onOpen={() => setOpen({ employee, date: cell.date })}
                       />
                     </td>
                   ))}
                   <TotalsCells totals={totals} />
                 </tr>
-              ))
+              )}
+
+              </GroupedRows>
             )}
           </tbody>
         </table>
@@ -142,52 +160,98 @@ export function Timesheet({ viewId, search, onOpenEmployee }: { viewId: string; 
  * по обеим осям — иначе липкие шапка и колонка не держатся.
  */
 const headCell = "sticky top-0 h-11 border-b border-border bg-surface";
+
+/** Месяц: видимая ширина без колонки сотрудника (200px) и полосы прокрутки — поровну на дни. */
+const dayWidth = (days: number) => ({ width: `calc((100cqw - 212px) / ${days})` });
 const body = "border-b border-border";
 
-const TOTALS = ["plan", "hours", "late", "overtime", "days", "absences"] as const;
+export const TOTALS = ["plan", "hours", "late", "overtime", "days", "absences"] as const;
+/** Ширины итогов при месяце (раскладка fixed): длительностям «135ч 56м» — шире, счётчикам — уже. */
+/** Сумма ширин итогов ниже — таблица шире экрана ровно на них (раскладка fixed). */
+const TOTALS_PX = 72 + 84 + 76 + 76 + 48 + 68;
+const TOTAL_WIDTH: Record<(typeof TOTALS)[number], string> = {
+  plan: "w-[72px]",
+  hours: "w-[84px]",
+  late: "w-[76px]",
+  overtime: "w-[76px]",
+  days: "w-[48px]",
+  absences: "w-[68px]",
+};
 
-/** Итог в часах и минутах: «8ч», «7ч 45м», «—». */
-function useDuration() {
+/** Итог в часах и минутах: «8ч», «7ч 45м», «—». `whole` — только часы, округлённо: «8ч». */
+function useDuration(whole = false) {
   const { t } = useTranslation();
   return (minutes: number) => {
     if (minutes <= 0) return "—";
+    if (whole) return t("timesheet.h", { h: Math.round(minutes / 60) });
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
     return h && m ? t("timesheet.hm", { h, m }) : h ? t("timesheet.h", { h }) : t("timesheet.m", { m });
   };
 }
 
-/** Часы против нормы: от 80% — зелёный, от 50% — жёлтый, ниже — красный. */
-const hoursColor = ({ workedMinutes, planMinutes }: SheetTotals) => {
-  if (!planMinutes) return "text-fg";
-  const ratio = workedMinutes / planMinutes;
+/** Факт против нормы: от 80% — зелёный, от 50% — жёлтый, ниже — красный. */
+const factColor = (fact: number, plan: number) => {
+  if (!plan) return "text-fg";
+  const ratio = fact / plan;
   return ratio >= 0.8 ? "text-success" : ratio >= 0.5 ? "text-warning" : "text-danger";
 };
 
-function TotalsCells({ totals }: { totals: SheetTotals }) {
-  const duration = useDuration();
-  const cell = `${body} whitespace-nowrap px-2 text-right tabular-nums`;
+export function TotalsCells({ totals }: { totals: SheetTotals }) {
+  return TOTALS.map((key, index) => <TotalCell key={key} total={key} totals={totals} className={index === 0 ? "border-l" : ""} />);
+}
+
+/** Один итог строки. `whole` — длительности только часами. */
+export function TotalCell({
+  total,
+  totals,
+  whole = false,
+  className = "",
+  style,
+}: {
+  total: (typeof TOTALS)[number];
+  totals: SheetTotals;
+  whole?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const duration = useDuration(whole);
+  const [value, tone] = {
+    plan: [duration(totals.planMinutes), "text-fg-subtle"],
+    hours: [duration(totals.workedMinutes), `font-semibold ${factColor(totals.workedMinutes, totals.planMinutes)}`],
+    late: [duration(totals.lateMinutes), "text-fg"],
+    overtime: [duration(totals.overtimeMinutes), "text-fg"],
+    days: [totals.days || "—", "text-fg"],
+    absences: [totals.absences || "—", totals.absences ? "font-semibold text-danger" : "text-fg-subtle"],
+  }[total];
   return (
-    <>
-      <td className={`${cell} border-l text-fg-subtle`}>{duration(totals.planMinutes)}</td>
-      <td className={`${cell} font-semibold ${hoursColor(totals)}`}>{duration(totals.workedMinutes)}</td>
-      <td className={`${cell} text-fg`}>{duration(totals.lateMinutes)}</td>
-      <td className={`${cell} text-fg`}>{duration(totals.overtimeMinutes)}</td>
-      <td className={`${cell} text-fg`}>{totals.days || "—"}</td>
-      <td className={`${cell} ${totals.absences ? "font-semibold text-danger" : "text-fg-subtle"}`}>
-        {totals.absences || "—"}
-      </td>
-    </>
+    <td className={`${body} whitespace-nowrap px-2 text-right tabular-nums ${tone} ${className}`} style={style}>
+      {value}
+    </td>
   );
 }
 
 /** Код отсутствия цветом его типа — через палитру чипов, не сырым hex. */
 const leaveStyle = (color: string) => CHIP_STYLES[hexToChipColor(color)];
 
-function CellView({ cell, hours, onOpen }: { cell: SheetCell; hours: (minutes: number) => string; onOpen: () => void }) {
+export function CellView({
+  cell,
+  hours,
+  whole = false,
+  square = whole,
+  onOpen,
+}: {
+  cell: SheetCell;
+  hours: (minutes: number) => string;
+  /** Месяц: все дни в экран — в ячейке целые часы, точные — в подсказке. */
+  whole?: boolean;
+  /** Квадрат 28px по центру узкого дня; нет — плашка во всю ячейку. */
+  square?: boolean;
+  onOpen: () => void;
+}) {
   const { t } = useTranslation();
   const duration = useDuration();
-  if (cell.kind === "outside") return <div className="h-[30px] rounded-[5px] bg-surface-soft" />;
+  if (cell.kind === "outside") return <div className={`bg-surface-soft ${square ? "mx-auto size-7 rounded-[4px]" : "h-[30px] rounded-[5px]"}`} />;
 
   let content: ReactNode = null;
   let style = "text-fg";
@@ -198,7 +262,7 @@ function CellView({ cell, hours, onOpen }: { cell: SheetCell; hours: (minutes: n
   switch (cell.kind) {
     case "worked":
     case "late":
-      content = cell.workedMinutes != null ? hours(cell.workedMinutes) : "—";
+      content = cell.workedMinutes == null ? "—" : whole ? String(Math.round(cell.workedMinutes / 60)) : hours(cell.workedMinutes);
       if (cell.kind === "late") {
         style = "font-semibold text-warning";
         hints.push(t("timesheet.hint.late", { duration: duration(cell.lateMinutes) }));
@@ -232,7 +296,7 @@ function CellView({ cell, hours, onOpen }: { cell: SheetCell; hours: (minutes: n
       break;
     case "day_off":
       content = t("timesheet.dayOffShort");
-      style = "text-fg-subtle";
+      style = `font-semibold ${CHIP_STYLES.gray}`;
       hints.push(t("timesheet.hint.dayOff"));
       break;
     case "empty":
@@ -254,10 +318,19 @@ function CellView({ cell, hours, onOpen }: { cell: SheetCell; hours: (minutes: n
       <button
         type="button"
         onClick={onOpen}
-        className={`relative flex h-[30px] w-full items-center justify-center rounded-[5px] px-0.5 text-xs tabular-nums outline-none transition hover:ring-1 hover:ring-accent hover:ring-inset focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${style}`}
+        /* Месяц — квадрат 28px по центру узкого дня; неделя — плашкой во всю ячейку. */
+        className={`relative flex items-center justify-center px-0.5 text-xs ${square ? "mx-auto size-7 rounded-[4px]" : "h-[30px] w-full rounded-[5px]"} tabular-nums outline-none transition hover:ring-1 hover:ring-accent hover:ring-inset focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${style}`}
       >
         {content}
-        {cell.pending.length > 0 && <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-warning" />}
+        {/* Оплачиваемые часы праздника/отсутствия — в правом углу; точка ожидания тогда уходит влево. */}
+        {cell.paidMinutes !== undefined && (
+          <span className="absolute top-0.5 right-1 text-[9px] leading-none font-normal opacity-80">
+            {t("timesheet.h", { h: Math.round(cell.paidMinutes / 60) })}
+          </span>
+        )}
+        {cell.pending.length > 0 && (
+          <span className={`absolute top-0.5 size-1.5 rounded-full bg-warning ${cell.paidMinutes !== undefined ? "left-0.5" : "right-0.5"}`} />
+        )}
       </button>
     </Tooltip>
   );
@@ -267,13 +340,14 @@ function CellView({ cell, hours, onOpen }: { cell: SheetCell; hours: (minutes: n
 
 const CODE = "inline-flex h-[19px] min-w-6 shrink-0 items-center justify-center rounded px-1 text-2xs font-semibold tabular-nums ring-1 ring-border ring-inset";
 
-function Legend({ types }: { types: { title: string; code: string; color: string }[] }) {
+/** `sample` — как в ячейках пишутся часы: «8,0» на «Посещаемости», «8:00» в табеле. */
+export function Legend({ types, sample = "8,0" }: { types: { title: string; code: string; color: string }[]; sample?: string }) {
   const { t } = useTranslation();
   const items: { code: ReactNode; style: string; label: string; desc: string }[] = [
-    { code: "8,0", style: "text-fg", label: t("timesheet.legend.worked"), desc: t("timesheet.legendDesc.worked") },
-    { code: "8,0", style: "text-warning", label: t("timesheet.legend.late"), desc: t("timesheet.legendDesc.late") },
+    { code: sample, style: "text-fg", label: t("timesheet.legend.worked"), desc: t("timesheet.legendDesc.worked") },
+    { code: sample, style: "text-warning", label: t("timesheet.legend.late"), desc: t("timesheet.legendDesc.late") },
     { code: <Icon as={XIcon} size={12} />, style: CHIP_STYLES.red, label: t("timesheet.legend.absent"), desc: t("timesheet.hint.absent") },
-    { code: t("timesheet.dayOffShort"), style: "text-fg-subtle", label: t("timesheet.legend.dayOff"), desc: t("timesheet.hint.dayOff") },
+    { code: t("timesheet.dayOffShort"), style: CHIP_STYLES.gray, label: t("timesheet.legend.dayOff"), desc: t("timesheet.hint.dayOff") },
     { code: t("timesheet.holidayShort"), style: CHIP_STYLES.pink, label: t("timesheet.legend.holiday"), desc: t("timesheet.legendDesc.holiday") },
     { code: <Icon as={LogInIcon} size={12} />, style: "text-success", label: t("timesheet.legend.atWork"), desc: t("timesheet.hint.atWork") },
     { code: "", style: "", label: t("timesheet.legend.missing"), desc: t("timesheet.legendDesc.missing") },

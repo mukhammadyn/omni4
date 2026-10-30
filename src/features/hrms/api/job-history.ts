@@ -1,7 +1,9 @@
 import { useMemo } from "react";
+import { api } from "@/shared/api/client";
+import { todayInput } from "@/shared/lib/date-value";
+import { reportError } from "@/shared/lib/toast";
 import { useTablePermission } from "@/features/auth";
 import {
-  MAX_LIMIT,
   applyRights,
   orderColumns,
   useCreateItem,
@@ -12,7 +14,9 @@ import {
   type Item,
 } from "@/features/item";
 import { localized, optionOf, useTableSchema, type Field } from "@/features/table";
-import { gradeIssue, type Band, type GradeIssue } from "../model/job-history";
+import { gradeIssue, type GradeIssue } from "../model/job-history";
+import { EMPLOYEES } from "./employee";
+import { useMatrixBands } from "./grade-matrix";
 import { firstText, related, text } from "./org";
 
 /** История назначений (`erp.dbml`, hr_job_history): приём, переводы, повышения, оклад. */
@@ -43,8 +47,46 @@ export type JobEntry = {
   issue: GradeIssue | null;
 };
 
+/** Поля назначения, которые сотрудник держит у себя копией ([snap] в erp.dbml). */
+const UNITS = "core_business_units_ids";
+/** Поля назначения, которые можно исправить в текущей записи со страницы сотрудника. */
+export const isAssignment = (slug: string) => slug === UNITS || SNAP.includes(slug);
+const SNAP = ["hr_departments_id", "hr_positions_id", "hr_grades_id", "hr_locations_id", "hr_work_schedules_id", "employment_type", "work_format"];
+
+/**
+ * Копия текущего назначения в карточку сотрудника. Текущее — последнее
+ * по `date_from`, уже начавшееся и не закрытое.
+ *
+ * ponytail: по схеме это делает функция после записи в hr_job_history,
+ * но её нет — без копии отдел и должность не доходят до KPI, графика,
+ * зарплаты и списка. Появится функция — отсюда уходит.
+ */
+/**
+ * Действует сегодня: уже началась и не закончилась. Одно правило и для
+ * метки «Текущая должность», и для копии в карточку — иначе запись с завтрашней
+ * датой помечена текущей, а в карточке ещё прежняя.
+ */
+function isCurrent(row: Item, today = todayInput()): boolean {
+  return text(row.date_from).slice(0, 10) <= today && (!row.date_to || text(row.date_to).slice(0, 10) >= today);
+}
+
+async function currentSnap(employee: string, link: string): Promise<Item | null> {
+  /* Клиент API уже снял внешнюю обёртку: здесь `{ data: { count, response } }`. */
+  type List = { data?: { response?: Item[] } };
+  const res = await api.post<List>(`/v2/object/get-list/${JOB_HISTORY}`, { data: { [link]: employee, limit: 100 } });
+  const current = (res.data?.response ?? [])
+    .filter((r) => isCurrent(r))
+    .sort((a, b) => text(b.date_from).localeCompare(text(a.date_from)))[0];
+  if (!current) return null;
+  const snap: Item = Object.fromEntries(SNAP.map((slug) => [slug, current[slug] ?? null]));
+  /* Юниты — только заданные: у старых записей их не задавали (`null`),
+     и копия стёрла бы юниты карточки. Пустой список — их очистили. */
+  const units = current[UNITS];
+  if (Array.isArray(units)) snap[UNITS] = units;
+  return snap;
+}
+
 const SORT = [{ field: "date_from", direction: "desc" as const }];
-const ALL = { limit: MAX_LIMIT, page: 1 };
 
 /**
  * Всё для вкладки «Работа»: записи истории сотрудника, матрица грейдов
@@ -75,10 +117,25 @@ export function useJobHistory({
     // `contains` — голое значение рядом со слагом, то есть равенство (см. toCondition).
     filters: { [link]: { op: "contains", values: [employee] } },
   });
-  const bandRows = useItems("hr_salary_bands", ALL);
+  const bands = useMatrixBands();
   const create = useCreateItem(JOB_HISTORY);
   const update = useUpdateItem(JOB_HISTORY);
   const remove = useDeleteItems(JOB_HISTORY);
+  /* Через общую правку строки: у таблицы входа она сама добавит from_auth_service (authBypass). */
+  const updateEmployee = useUpdateItem(EMPLOYEES);
+  /*
+   * Через промис, а не `mutate(…, { onSuccess })`: колбэки вызова
+   * теряются, если вкладка «Работа» перемонтировалась, пока шёл запрос
+   * (список перезапрашивается сразу после правки) — копия молча не уходила.
+   */
+  const after = (write: Promise<unknown>, onDone?: () => void) =>
+    void write
+      .then(() => {
+        onDone?.();
+        return currentSnap(employee, link);
+      })
+      .then((values) => values && updateEmployee.mutateAsync({ guid: employee, values }))
+      .catch((error: unknown) => reportError(error, "common.saveFailed"));
 
   /** Поля без запрещённых роли: оклад скрыт правами — его нет и в ленте. */
   const fields = useMemo(
@@ -86,21 +143,6 @@ export function useJobHistory({
     [schema.fields, layout.rights],
   );
 
-  const bands = useMemo(
-    () =>
-      bandRows.page.rows
-        .filter((row) => row.is_active !== false)
-        .map(
-          (row): Band => ({
-            positionId: text(row.hr_positions_id),
-            gradeId: text(row.hr_grades_id),
-            gradeName: text(related(row, "hr_grades_id").name),
-            max: typeof row.salary_max === "number" ? row.salary_max : null,
-            from: text(row.effective_from),
-          }),
-        ),
-    [bandRows.page.rows],
-  );
 
   const entries = useMemo(() => {
     const bySlug = new Map(fields.map((field) => [field.slug, field]));
@@ -121,7 +163,7 @@ export function useJobHistory({
         row,
         from: text(row.date_from),
         to: text(row.date_to),
-        current: row.is_current === true || !row.date_to,
+        current: isCurrent(row),
         reason: choice("change_reason", row),
         employment: choice("employment_type", row),
         format: choice("work_format", row)?.label ?? "",
@@ -136,7 +178,7 @@ export function useJobHistory({
       return {
         ...entry,
         issue: gradeIssue(
-          { positionId: text(row.hr_positions_id), gradeId: text(row.hr_grades_id), salary },
+          { positionId: text(row.hr_positions_id), gradeId: text(row.hr_grades_id), salary, date: text(row.date_from).slice(0, 10), currency: firstText(row.currency) },
           bands,
         ),
       };
@@ -158,9 +200,12 @@ export function useJobHistory({
     ),
     sections: layout.sections,
     creating: create.isPending,
-    create: (values: Item, onDone: () => void) => create.mutate(values, { onSuccess: onDone }),
-    edit: (guid: string, slug: string, value: unknown) =>
-      update.mutate({ guid, values: { [slug]: value } }),
-    remove: (guid: string) => remove.mutate([guid]),
+    create: (values: Item, onDone: () => void) => after(create.mutateAsync(values), onDone),
+    edit: (guid: string, slug: string, value: unknown) => after(update.mutateAsync({ guid, values: { [slug]: value } })),
+    /** Правка из формы: все её поля одним запросом. */
+    save: (guid: string, values: Item, onDone: () => void) =>
+      after(update.mutateAsync({ guid, values }), onDone),
+    saving: update.isPending,
+    remove: (guid: string) => after(remove.mutateAsync([guid])),
   };
 }

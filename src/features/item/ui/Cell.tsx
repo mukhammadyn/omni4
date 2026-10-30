@@ -27,7 +27,8 @@ import { mapLink, parseCoords } from "../model/coords";
 import { formatDate, type DateKind } from "@/shared/lib/date-value";
 import { formatNumber } from "@/shared/lib/number-value";
 import { isBlank, plainText, toList } from "../model/cell-value";
-import { relationSelection } from "../model/relation";
+import { useRelationItems } from "../api/relations";
+import { isMany, relationSelection } from "../model/relation";
 import type { Item } from "../model/types";
 import { ButtonCell } from "./ButtonCell";
 import { CodeCell } from "./CodeCell";
@@ -542,8 +543,12 @@ function RelationCell({
   line: string;
 }) {
   const { t } = useTranslation();
-  const slugs = field.relationId ? relations.get(field.relationId)?.viewFields : undefined;
-  const selected = relationSelection(row, field, slugs, language).filter((item) => item.label);
+  const relation = field.relationId ? relations.get(field.relationId) : undefined;
+  const slugs = relation?.viewFields;
+  /* Many2Many приходит без `_data` — подписи из самой целевой таблицы.
+     ponytail: первая страница (20 строк) — хватает справочнику; больше — грузить по guid. */
+  const { items: known } = useRelationItems(relation && isMany(relation.type) ? relation.toSlug : undefined, "");
+  const selected = relationSelection(row, field, slugs, language, known).filter((item) => item.label);
   const parts = selected.map((item) => item.label);
 
   /*
@@ -555,7 +560,7 @@ function RelationCell({
     return (
       <span className="flex min-w-0 gap-1 overflow-hidden">
         {selected.map((item) => (
-          <Chip key={item.guid || item.label} color={item.color ? hexToChipColor(item.color) : "gray"}>
+          <Chip key={item.guid || item.label} color={item.color ? hexToChipColor(item.color) : "gray"} off={item.off}>
             {item.label}
           </Chip>
         ))}

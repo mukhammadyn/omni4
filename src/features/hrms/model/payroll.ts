@@ -3,6 +3,7 @@
  * сотрудник × вид, начисления слева, удержания справа, итоги строки
  * и подвал. Колонки — только виды, что встретились в месяце.
  */
+import type { PayUnit } from "./timesheet-days";
 
 export type PayLine = {
   employeeId: string;
@@ -77,4 +78,40 @@ export function compactSum(value: number): string {
   if (abs >= 1e6) return `${sign}${short(abs / 1e6)}M`;
   if (abs >= 1e3) return `${sign}${short(abs / 1e3)}k`;
   return `${sign}${Math.round(abs)}`;
+}
+
+/** Режим расчёта оклада — выбирают при «Утвердить» табеля (ADR-0018). */
+export type CalcMode = "daily" | "hourly";
+
+/** Кусок оклада — строка «Зарплаты» утверждённого табеля: период с одной ставкой. */
+export type SalaryPiece = {
+  from: string;
+  to: string;
+  rate: number;
+  unit: PayUnit;
+  mode: CalcMode;
+  norm: number;
+  worked: number;
+  amount: number;
+};
+
+/** Строка «Зарплаты» утверждённого табеля (`source = timesheet`): оклад или удержание. */
+export type TimesheetPayLine = SalaryPiece & { employeeId: string; kind: "accrual" | "deduction" };
+
+/**
+ * Оклад кусками и сумма удержаний табелей по сотруднику за период ведомости.
+ * Берутся только строки, целиком лежащие в периоде: месячный табель в недельную
+ * ведомость не попадает, обе части недели на стыке месяцев — попадают.
+ */
+export function timesheetPay(lines: readonly TimesheetPayLine[], { from, to }: { from: string; to: string }) {
+  const pay = new Map<string, { pieces: SalaryPiece[]; fines: number }>();
+  for (const { employeeId, kind, ...piece } of lines) {
+    if (piece.from < from || piece.to > to) continue;
+    const own = pay.get(employeeId) ?? { pieces: [], fines: 0 };
+    pay.set(employeeId, own);
+    if (kind === "deduction") own.fines += piece.amount;
+    else own.pieces.push(piece);
+  }
+  for (const own of pay.values()) own.pieces.sort((a, b) => (a.from < b.from ? -1 : 1));
+  return pay;
 }

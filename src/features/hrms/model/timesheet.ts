@@ -25,6 +25,8 @@ export type AttendanceDay = {
   lastOut: string;
   workedMinutes: number | null;
   lateMinutes: number;
+  /** Ранний уход, минуты (`early_leave_minutes`). */
+  earlyMinutes: number;
   requestId: string;
   comment: string;
 };
@@ -32,11 +34,15 @@ export type AttendanceDay = {
 /** Заявка на отсутствие (`hr_requests`, тип absence) с типом из `hr_absence_types`. */
 export type Leave = {
   id: string;
+  /** Тип отсутствия (`hr_absence_types`). */
+  typeId: string;
   title: string;
   code: string;
   icon: string;
   color: string;
   status: "approved" | "pending";
+  /** Оплачиваемое (`is_paid` типа): зарплата засчитывает такой день. */
+  paid?: boolean;
   from: string;
   to: string;
 };
@@ -81,6 +87,8 @@ export type SheetCell = {
   /** Что ждёт решения: ячейка показывает засчитанное, точка — это. */
   pending: PendingKind[];
   pendingLeave: Leave | null;
+  /** Табель: сколько минут дня оплачивается у праздника и отсутствия (неоплачиваемое — 0). Нет — не показывать. */
+  paidMinutes?: number;
 };
 
 export type SheetTotals = {
@@ -105,7 +113,7 @@ export type RowInput = {
   /** Одобренные и ждущие; отклонённые уже отброшены. */
   leaves: Leave[];
   /** Праздники компании: дата → название. */
-  holidays: Map<string, string>;
+  holidays: ReadonlyMap<string, string>;
 };
 
 /** Переработка дня: сверх смены, короче порога — ноль. */

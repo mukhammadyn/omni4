@@ -2,7 +2,7 @@ import type { DatasetTable } from "./datasets";
 
 type Token = { text: string; start: number; end: number; kind: "name" | "symbol" | "literal" | "comment"; quoted?: boolean };
 const WORD = /[\p{L}\p{N}_$]/u;
-const KEYWORDS = ["SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "INNER JOIN", "ON", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "AS", "AND", "OR", "WITH", "COUNT", "SUM", "AVG", "MIN", "MAX", "COALESCE", "NULLIF"];
+const KEYWORDS = ["SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL JOIN", "ON", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "AS", "AND", "OR", "WITH", "COUNT", "SUM", "AVG", "MIN", "MAX", "COALESCE", "NULLIF"];
 const RESERVED = new Set([...KEYWORDS.flatMap((word) => word.toLowerCase().split(" ")), "asc", "desc", "union", "all", "distinct", "right", "full", "outer", "cross", "offset", "returning", "using", "then", "else", "end"]);
 
 /** Advisory lexer only. PostgreSQL and the permission-aware server remain authoritative. */
@@ -81,14 +81,14 @@ export function sqlSuggestions(sql: string, caret: number, catalog: DatasetTable
   let candidates: { value: string; label: string; detail: string }[];
   if (qualifier) {
     const table = aliases.get(qualifier) ?? catalog.find((item) => item.slug === qualifier);
-    candidates = table?.fields.map((field) => ({ value: quoteSqlName(field.slug), label: field.slug, detail: `${field.label} · ${field.type}` })) ?? [];
+    candidates = table?.fields.map((field) => ({ value: quoteSqlName(field.slug), label: field.label, detail: table?.label ?? "" })) ?? [];
   } else if (["from", "join"].includes(nameOf(previous))) {
-    candidates = catalog.map((table) => ({ value: quoteSqlName(table.slug), label: table.slug, detail: table.label }));
+    candidates = catalog.map((table) => ({ value: quoteSqlName(table.slug), label: table.label, detail: table.label }));
   } else {
-    candidates = [...aliases].flatMap(([alias, table]) => table.fields.map((field) => ({ value: `${quoteSqlName(alias)}.${quoteSqlName(field.slug)}`, label: field.slug, detail: `${table.label} · ${field.type}` })));
+    candidates = [...aliases].flatMap(([alias, table]) => table.fields.map((field) => ({ value: `${quoteSqlName(alias)}.${quoteSqlName(field.slug)}`, label: field.label, detail: table.label })));
     candidates.push(...KEYWORDS.map((value) => ({ value, label: value, detail: "SQL" })));
   }
-  const unique = new Map(candidates.filter((item) => item.label.toLowerCase().startsWith(prefix)).map((item) => [item.value, item]));
+  const unique = new Map(candidates.filter((item) => (item.label.toLowerCase().startsWith(prefix) || item.value.replaceAll('"', "").toLowerCase().split(".").at(-1)?.startsWith(prefix))).map((item) => [item.value, item]));
   return [...unique.values()].slice(0, 20).map((item) => ({ ...item, replaceFrom: from, replaceTo }));
 }
 

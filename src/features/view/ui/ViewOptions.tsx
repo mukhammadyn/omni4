@@ -215,7 +215,8 @@ export function ViewOptions({
    * Панель может оказаться пустой целиком: роль без единого права
    * не должна видеть кнопку, которая открывает пустоту.
    */
-  const anything = can.settings || can.columns || can.fixColumn || can.excelMenu;
+  // Excel — только если экран его даёт: у «Сводной» зарплаты свой (PayrollExcel).
+  const anything = can.settings || can.columns || can.fixColumn || (can.excelMenu && Boolean(handlers.onImport && handlers.onExport));
   // Кнопка между ними от прав на настройки не зависит.
   if (!anything) return <>{beforeMenu}</>;
 
@@ -1141,9 +1142,10 @@ function Panel({
         />
       )}
 
-      {/* Полоса значений — над списком, поэтому не у доски: там значения
-          и так стоят колонками, и у календаря с графиком ей не над чем стоять. */}
-      {can.settings && handlers.onChips && isGrid && (
+      {/* Полоса значений — над списком или доской. У доски — по другому
+          полю (воронка над этапами): поле колонок и так стоит колонками.
+          У календаря с графиком ей не над чем стоять. */}
+      {can.settings && handlers.onChips && (isGrid || isBoard) && (
         <Row
           icon={ChartNoAxesColumnIcon}
           label={t("view.chips")}

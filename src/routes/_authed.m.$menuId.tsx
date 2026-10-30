@@ -42,6 +42,8 @@ import {
   useDrawerLayout,
   useItem,
   useItemCounts,
+  groupValue,
+  relatedEntry,
   ValueChips,
   useItems,
   useUpdateItem,
@@ -85,6 +87,7 @@ import {
   CandidatesTable,
   ScheduleCalendar,
   ScheduleTools,
+  PeopleFilterBar,
   SCHEDULE_VIEWS,
   ScheduleCreate,
   WorkSchedules,
@@ -92,6 +95,8 @@ import {
   Timesheet,
   PayrollPivot,
   BudgetSheet,
+  KpiSheet,
+  KPI_TAB,
   VACANCIES,
   VacancyCards,
   VacancyPlan,
@@ -100,9 +105,22 @@ import {
   useVacancyColumns,
   TRAININGS,
   useTrainingColumns,
+  SURVEYS,
+  useSurveyColumns,
+  ASSETS,
+  useAssetColumns,
+  AssetGallery,
+  AssetTotal,
+  SurveyTemplates,
+  SURVEY_TEMPLATES_VIEW,
   KnowledgeBase,
   KB_VIEW,
+  DocumentBrowser,
+  DOCUMENTS_VIEW,
   useKbActions,
+  useNotDismissed,
+  TimesheetFill,
+  TIMESHEETS,
   type EmployeeTab,
 } from "@/features/hrms";
 import { MicrofrontendPage } from "@/features/microfrontend";
@@ -115,6 +133,7 @@ import {
   showsTable,
   useMenu,
 } from "@/features/sidebar";
+import { CallButton, CallLog } from "@/features/pbx";
 import { useWorkspaceTitle } from "@/features/settings";
 import {
   FieldEditor,
@@ -166,6 +185,8 @@ import {
   useMenuViews,
   subGroupField,
   chipsField,
+  dateFieldBySlug,
+  tabFilter,
   tabGroupField,
   useTabGroup,
   useUpdateView,
@@ -188,6 +209,11 @@ import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tabs } from "@/shared/ui/tabs";
 
+
+/** Экраны HRMS, где строки — сотрудники: у них свои фильтр и группировка (ScheduleTools). */
+const PEOPLE_VIEWS = new Set(["SCHEDULE", "ATTENDANCE", "ABSENCES"]);
+/** Сводные HRMS: фильтр по полям своей таблицы, без группировки. */
+const SUMMARY_VIEWS = new Set(["PAYROLL", "BUDGET"]);
 /**
  * Экран пункта меню. Маршрут ключуется на menuId, а не на слаге таблицы:
  * набор view принадлежит пункту меню (GET /v3/menus/{menuId}/views),
@@ -398,13 +424,22 @@ function MenuPage() {
    * все связи: её поля — своя раскладка, а не колонки, и связь вне
    * колонок осталась бы без полей показа — «—» вместо значения и голые
    * id в выборе. Поэтому, пока запись открыта, список не сужается.
+   *
+   * Поля раскладки (вкладки, колонки и дорожки доски, чипы) колонками
+   * быть не обязаны, а подписи им нужны те же: без них доска сделок,
+   * где этапа нет среди колонок карточки, подписывала колонки id этапа.
    */
   const {
     schema,
     isLoading: schemaLoading,
     error: schemaError,
     refetch: refetchSchema,
-  } = useTableSchema(view?.tableSlug, search.item ? undefined : view?.columnIds);
+  } = useTableSchema(
+    view?.tableSlug,
+    search.item || !view
+      ? undefined
+      : [...view.columnIds, view.tabGroupId, view.subGroupId, view.chipsId].filter(Boolean),
+  );
   /*
    * Порядок полей в drawer — свой, из раскладки пункта меню, и с колонками
    * таблицы не связан: перестановка в карточке не двигает колонки, а
@@ -646,7 +681,7 @@ function MenuPage() {
   /** Галерея (`r_gallery` прототипа) — то же самое карточками. */
   const galleryView = supportedView && view?.type === "GALLERY";
   /** «Сетка» сотрудников — та же галерея, карточка человека (ADR-0016). */
-  const GalleryCards = view?.card === "person" ? PeopleGallery : Gallery;
+  const GalleryCards = view?.card === "person" ? PeopleGallery : view?.card === "asset" ? AssetGallery : Gallery;
   /** «Карточки» вакансий (features/hrms) — та же галерея, карточка вакансии. */
   const vacancyCardsView = supportedView && view?.type === "VACANCIES";
   /** Таблица кандидатов (features/hrms): колонки по вкладке-статусу. */
@@ -660,6 +695,9 @@ function MenuPage() {
   /** «Календарь», «Список», «Табель» посещаемости и «Отсутствия»
       (features/hrms): данные за период грузят сами, строки view им не нужны. */
   const sheetView = supportedView && Boolean(traitsOf(view?.type ?? "").selfLoading);
+  /** «Сводная» зарплаты: свой Excel (шаблон и загрузка за период) — общий
+      импорт и экспорт строк таблицы там лишние и обходят шаблон. */
+  const ownExcel = view?.type === "PAYROLL";
   /** Экраны, отбирающие строки по видимому диапазону дат. */
   const dateView = calendarView || timelineView;
   /** Режим: из адреса, иначе из настроек view, иначе месяц. */
@@ -705,8 +743,8 @@ function MenuPage() {
   }, [search.day, period, timelineView, span.past, span.future]);
   /* Поля дат — из ВСЕХ полей таблицы: срок задачи бывает и не показан
      колонкой, а событию он всё равно нужен. Ключ здесь слаг, а не id. */
-  const calendarFrom = tableFields.find((field) => field.slug === view?.dateFromSlug);
-  const calendarTo = tableFields.find((field) => field.slug === view?.dateToSlug);
+  const calendarFrom = dateFieldBySlug(view?.dateFromSlug, tableFields);
+  const calendarTo = dateFieldBySlug(view?.dateToSlug, tableFields);
   /** Поле, вариантами которого красятся события. Только читается. */
   const calendarStatus = tableFields.find((field) => field.slug === view?.statusFieldSlug);
   /** Не с чего начать событие: поле не выбрано в настройках view. */
@@ -727,7 +765,7 @@ function MenuPage() {
    * таблицы, иначе настройка view. Значение из localStorage проверяется
    * — испорченное руками «0» оставило бы таблицу пустой навсегда.
    */
-  const { tableLimits, setTableLimit, tableFilters, setTableFilters, columnWidths, setColumnWidth } =
+  const { tableLimits, setTableLimit, tableFilters, setTableFilters, columnWidths, setColumnWidth, viewState, setViewState } =
     useUi();
   const rememberedLimit = view ? tableLimits[view.tableSlug] : undefined;
   const limit = boardView
@@ -793,7 +831,11 @@ function MenuPage() {
      * периода, а не наугад.
      */
     if (dateView) {
-      const byDate = calendarFrom
+      /* По `created_at` не сортируем: бэкенд выкидывает его из ORDER BY,
+         оставляя голое «ORDER BY LIMIT» — SQL-ошибка
+         (ucode_go_object_builder_service storage/postgres/object_builder.go:1215;
+         docs/backend-notes.md). Строки и так идут по нему, только назад. */
+      const byDate = calendarFrom && calendarFrom.slug !== "created_at"
         ? [{ field: calendarFrom.slug, direction: "asc" as const }]
         : [];
 
@@ -848,17 +890,37 @@ function MenuPage() {
 
   /** Отбор, которым управляет человек: он в адресе, он же в подшапке.
       Слаги мультиязычных полей переезжают на активный язык — как у сортировки. */
+  /*
+   * Сотрудники открываются без уволенных — стартовым отбором, а не областью
+   * видимости: чип снимается, и снятый не возвращается (лежит в памяти).
+   */
+  const notDismissed = useNotDismissed();
+  const employeesSeed = view?.tableSlug === EMPLOYEES ? notDismissed : EMPTY_FILTERS;
+  /*
+   * Кто уже настраивал отбор сотрудников до появления этого правила — тому
+   * «не уволен» дописывается к сохранённому один раз; дальше снятый чип
+   * не возвращается (отметка в viewState).
+   */
+  const seedKey = `${filtersKey}:not-dismissed`;
+  useEffect(() => {
+    if (!employeesSeed.status || viewState[seedKey] || search.filters) return;
+    if (rememberedFilters && !rememberedFilters.status) setTableFilters(filtersKey, { ...rememberedFilters, ...employeesSeed });
+    setViewState(seedKey, true);
+  }, [employeesSeed, viewState, seedKey, search.filters, rememberedFilters, filtersKey, setTableFilters, setViewState]);
+
   const filters: Filters = useMemo(
     () =>
       localizeKeys(
         search.filters ??
-          rememberedFilters ??
-          seedFilters(view?.quickFilterIds ?? [], tableFields),
+          rememberedFilters ?? {
+            ...seedFilters(view?.quickFilterIds ?? [], tableFields),
+            ...employeesSeed,
+          },
         viewFields,
         codes,
         language,
       ),
-    [search.filters, rememberedFilters, view?.quickFilterIds, tableFields, viewFields, codes, language],
+    [search.filters, rememberedFilters, view, tableFields, viewFields, codes, language, employeesSeed],
   );
 
   /*
@@ -891,8 +953,33 @@ function MenuPage() {
   /* Поле дорожек ищется теми же двумя ключами, что и поле колонок:
      у поля-связи в настройках лежит id связи, а не поля. */
   const boardLaneField = boardView ? subGroupField(view, tableFields) : undefined;
-  /** Поле полосы значений. У доски его нет: значения там и так колонками. */
-  const chipsBy = boardView ? undefined : chipsField(view, tableFields);
+  /** Поле полосы значений. У доски — только не поле колонок: оно и так колонками. */
+  /* У кандидатов полосы этапов нет: этап и так в колонке таблицы. */
+  const chipsCandidate = candidatesView ? undefined : chipsField(view, tableFields);
+  const chipsBy = chipsCandidate && chipsCandidate !== boardField ? chipsCandidate : undefined;
+  /*
+   * Список вместо полосы — и тогда выбор общий для всех view таблицы
+   * (`View.chipsMenu`): своим ключом в той же памяти отборов, а не
+   * в отборе view. Ни разу не выбирали — значение по умолчанию
+   * (`chipsDefault`); выбрали «Все» — лежит пустой отбор, и посева нет.
+   */
+  const chipsMenu = Boolean(chipsBy) && (boardView || view?.chipsMenu === true);
+  const sharedChipsKey = view ? `${view.tableSlug}|chips` : "";
+  const storedChips = tableFilters[sharedChipsKey];
+  const sharedChips = useMemo(() => parseFilters(storedChips), [storedChips]);
+  const chipValues: string[] = useMemo(() => {
+    if (!chipsBy) return [];
+    if (!chipsMenu) return (filters[chipsBy.slug]?.values ?? []).map(String);
+    if (sharedChips) return (sharedChips[chipsBy.slug]?.values ?? []).map(String);
+    return view?.chipsDefault ? [view.chipsDefault] : [];
+  }, [chipsBy, chipsMenu, filters, sharedChips, view?.chipsDefault]);
+  const chipScope: Filters = useMemo(
+    () =>
+      chipsMenu && chipsBy && chipValues.length
+        ? { [chipsBy.slug]: { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values: chipValues } }
+        : EMPTY_FILTERS,
+    [chipsMenu, chipsBy, chipValues],
+  );
   /** Доску не по чему раскладывать: поле не выбрано в настройках view. */
   const boardNotReady = boardView && !boardField;
 
@@ -929,8 +1016,8 @@ function MenuPage() {
    * отсёк бы как раз то, чего у них нет.
    */
   const scopeFilters: Filters = useMemo(
-    () => ({ ...filters, ...defaultFilters, ...tabFilters }),
-    [filters, defaultFilters, tabFilters],
+    () => ({ ...filters, ...defaultFilters, ...tabFilters, ...chipScope }),
+    [filters, defaultFilters, tabFilters, chipScope],
   );
 
   /*
@@ -1103,6 +1190,21 @@ function MenuPage() {
       void navigate({ to: "/trainings/$itemId", params: { itemId: guid }, search: { menu: menuId } });
       return;
     }
+    /* Табель — тоже: итоги, утверждение и табель по дням (features/hrms, TimesheetDocPage). */
+    if (view?.tableSlug === TIMESHEETS) {
+      void navigate({ to: "/timesheets/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
+    /* Имущество — тоже: действия, история и владелец (features/hrms, AssetPage). */
+    if (view?.tableSlug === ASSETS) {
+      void navigate({ to: "/assets/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
+    /* Опрос — тоже: вопросы в конструкторе SurveyJS (features/hrms, SurveyForm). */
+    if (view?.tableSlug === SURVEYS) {
+      void navigate({ to: "/surveys/$itemId", params: { itemId: guid }, search: { menu: menuId } });
+      return;
+    }
     /* Кандидата — тоже: воронка, оценки по этапам и история
        (features/hrms, CandidatePage). */
     if (view?.tableSlug === CANDIDATES) {
@@ -1123,6 +1225,41 @@ function MenuPage() {
   const applyFilters = (next: Filters) => {
     if (filtersKey) setTableFilters(filtersKey, next);
     setSearch({ filters: next, page: 1 }, true);
+  };
+
+  /**
+   * Выбранное в полосе значение — в новую запись: сделка, заведённая
+   * на доске воронки Udevs, должна в ней и остаться, а не пропасть
+   * из вида. Только когда выбрано ровно одно. Подпись связи — из любой
+   * загруженной строки с тем же значением (relatedEntry).
+   */
+  const chosenChip = (): Record<string, unknown> => {
+    const values = chipValues;
+    if (!chipsBy || values.length !== 1) return {};
+    const value = values[0];
+    const row = rows.rows.find((item) => item[chipsBy.slug] === value);
+    return { [chipsBy.slug]: groupValue(chipsBy, String(value)), ...relatedEntry(chipsBy, row) };
+  };
+
+  /** Выбор в полосе значений — условие её поля в отборе человека. */
+  const chooseChips = (values: string[]) => {
+    if (!chipsBy) return;
+    if (chipsMenu) {
+      setTableFilters(
+        sharedChipsKey,
+        values.length
+          ? { [chipsBy.slug]: { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values } }
+          : {},
+      );
+      return;
+    }
+    const next = { ...filters };
+    if (values.length) {
+      next[chipsBy.slug] = { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values };
+    } else {
+      delete next[chipsBy.slug];
+    }
+    applyFilters(next);
   };
 
   /**
@@ -1176,6 +1313,32 @@ function MenuPage() {
     },
   );
 
+  /*
+   * Точное число карточек в колонке доски — тем же запросом, что
+   * и счётчики вкладок. Колонки берутся из загруженных строк: других
+   * доска и не рисует. С дорожками колонка дробится по ним, и счёт
+   * на клетку здесь не делается — там остаётся «загружено +».
+   */
+  const boardCountIds = useMemo(
+    () =>
+      boardField && !boardLaneField && boardField.type !== "MULTISELECT"
+        ? [...new Set(rows.rows.map((row) => row[boardField.slug]).filter((id) => typeof id === "string" && id))] as string[]
+        : [],
+    [boardField, boardLaneField, rows.rows],
+  );
+  const boardCountValues = useItemCounts(
+    can.read && boardField ? view?.tableSlug : undefined,
+    useMemo(
+      () => boardCountIds.map((id) => ({ ...effectiveFilters, [boardField?.slug ?? ""]: tabFilter(boardField!, id) })),
+      [boardCountIds, effectiveFilters, boardField],
+    ),
+    searchText,
+  );
+  const boardCounts = useMemo(
+    () => new Map(boardCountIds.flatMap((id, i) => (boardCountValues[i] === undefined ? [] : [[id, boardCountValues[i]] as const]))),
+    [boardCountIds, boardCountValues],
+  );
+
   /* Воронка и счётчики кандидатов — у таблицы вакансий (features/hrms). */
   const vacancyColumns = useVacancyColumns(
     view?.tableSlug === VACANCIES && view.type === "TABLE" ? rows.rows : undefined,
@@ -1183,6 +1346,16 @@ function MenuPage() {
   /* Участники и прогресс ДЗ — у таблицы тренингов (features/hrms). */
   const trainingColumns = useTrainingColumns(
     view?.tableSlug === TRAININGS && view.type === "TABLE" ? rows.rows : undefined,
+  );
+  /* Меню строки — у таблицы имущества (features/hrms). */
+  const assetColumns = useAssetColumns(
+    view?.tableSlug === ASSETS && view.type === "TABLE" ? rows.rows : undefined,
+    (guid, edit) => void navigate({ to: "/assets/$itemId", params: { itemId: guid }, search: { menu: menuId, ...(edit ? { edit } : {}) } }),
+  );
+  /* Назначено, заполняемость и меню строки — у таблицы опросов (features/hrms). */
+  const surveyColumns = useSurveyColumns(
+    view?.tableSlug === SURVEYS && view.type === "TABLE" ? rows.rows : undefined,
+    (guid, edit) => void navigate({ to: "/surveys/$itemId", params: { itemId: guid }, search: { menu: menuId, ...(edit ? { edit } : {}) } }),
   );
 
   /*
@@ -1255,14 +1428,11 @@ function MenuPage() {
   ];
 
   /*
-   * Подшапка открыта, если её открыли явно или в ней уже что-то есть:
-   * прятать заданный отбор нельзя — таблица показывала бы неполный
-   * список без единого следа на экране.
-   *
-   * Открывается она по СВОЕМУ отбору, а считается по действующему.
-   * Отбор по умолчанию снять нечем, и раскрывать ради него пустую
-   * подшапку незачем; но значок «список неполный» гореть обязан —
-   * иначе урезанная выборка ничем на экране не отмечена.
+   * Подшапка по умолчанию закрыта и открывается только кнопкой фильтра
+   * (`filtersOpen` в адресе). Отбор при этом не прячется бесследно:
+   * значок «список неполный» на кнопке считается по действующему отбору,
+   * включая отбор по умолчанию, — иначе урезанная выборка ничем на экране
+   * не отмечена.
    *
    * Диапазон дат в счёт не идёт: на календаре и таймлайне он и ЕСТЬ
    * экран — он нарисован сеткой и переключается стрелками. Гори значок
@@ -1270,8 +1440,7 @@ function MenuPage() {
    * там, где никто ничего не отбирал.
    */
   const activeFilters = activeFilterCount(scopeFilters);
-  const filtersVisible =
-    search.filtersOpen ?? (activeFilterCount(filters) > 0 || sorts.length > 0);
+  const filtersVisible = search.filtersOpen ?? false;
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   /*
@@ -1296,6 +1465,8 @@ function MenuPage() {
   const [confirming, setConfirming] = useState(false);
   /** Открытое окно «Создать» графика — тип его view. */
   const [scheduleCreate, setScheduleCreate] = useState<string | null>(null);
+  /* «Создать» у сводной KPI — окно «Добавить KPI» (KpiSheet). */
+  const [kpiCreate, setKpiCreate] = useState(false);
   const kbActions = useKbActions();
 
   /**
@@ -1310,6 +1481,10 @@ function MenuPage() {
     /* В базе знаний «Создать» — новая страница верхнего уровня. */
     if (view?.type === KB_VIEW) {
       setSearch({ doc: kbActions.create("") }, true);
+      return;
+    }
+    if (view?.type === "KPI") {
+      setKpiCreate(true);
       return;
     }
     /* У графика «Создать» — своё окно: смена или шаблон (features/hrms). */
@@ -1327,6 +1502,16 @@ function MenuPage() {
        и материалы в карточку сбоку не помещаются. */
     if (view?.tableSlug === TRAININGS) {
       void navigate({ to: "/trainings/new", search: { menu: menuId } });
+      return;
+    }
+    /* Имущество — формой с фото и выдачей (property.html?new=1). */
+    if (view?.tableSlug === ASSETS) {
+      void navigate({ to: "/assets/new", search: { menu: menuId } });
+      return;
+    }
+    /* Опрос — тоже: вопросы собираются в конструкторе SurveyJS. */
+    if (view?.tableSlug === SURVEYS) {
+      void navigate({ to: "/surveys/new", search: { menu: menuId } });
       return;
     }
     /* Кандидата — тоже страницей (candidate.html?new=1): вакансию
@@ -1556,7 +1741,9 @@ function MenuPage() {
         </div>
       )}
 
-      {supported && !chromeLoading && (tabs.length > 0 || (can.viewCreate && tableSlug)) && (
+      {/* База знаний — один экран со своим «Создать» в дереве: полоса
+          view над ней — лишняя строка. Скрыта, пока view у меню один. */}
+      {supported && !chromeLoading && (tabs.length > 0 || (can.viewCreate && tableSlug)) && !(tabs.length === 1 && view?.type === KB_VIEW) && (
         /* Строка вкладок — `.viewbar` прототипа: 46px, линия снизу;
            справа тулбар (`.view-actions`) с зазором 2px между кнопками.
            Поля 24px — `.page.full`: линия начинается там же, где таблица. */
@@ -1610,6 +1797,21 @@ function MenuPage() {
             <div className="ml-auto flex shrink-0 items-center gap-0.5">
               {/* Поиск, отбор и сортировка — про таблицу: у нарисованного
                   заглушкой view искать нечего, а ручка дерева их не читает. */}
+              {/* У доски полоса значений — выпадающим списком в панели,
+                  как воронка над сделками в прототипе (deals.html, pipeline-sel). */}
+              {chipsMenu && chipsBy && (
+                <ValueChips
+                  menu
+                  tableSlug={view.tableSlug}
+                  field={chipsBy}
+                  relations={schema.relations}
+                  language={language}
+                  filters={chipFilters}
+                  search={searchText}
+                  selected={chipValues}
+                  onChange={chooseChips}
+                />
+              )}
               {supportedView && !treeView && !sheetView && whoFields.length > 0 && (
                 <MineToggle fields={whoFields} filters={filters} onFilters={applyFilters} />
               )}
@@ -1655,7 +1857,7 @@ function MenuPage() {
                   (features/hrms), а не настройки view из ⋮. */}
               {/* Экраны HRMS ищут сотрудника сами — та же лупа, что
                   у таблиц, без меню полей. «Шаблонам» искать нечего. */}
-              {sheetView && view.type !== "WORK_SCHEDULES" && view.type !== KB_VIEW && can.searchButton && (
+              {sheetView && view.type !== "WORK_SCHEDULES" && view.type !== KB_VIEW && view.type !== DOCUMENTS_VIEW && can.searchButton && (
                 <SearchBox
                   value={searchText}
                   onChange={(next) => setSearch({ search: next || undefined }, true)}
@@ -1664,7 +1866,10 @@ function MenuPage() {
                 />
               )}
               {vacancyPlanView && <VacancyPlanTools viewId={view.id} />}
-              {sheetView && view.type === "SCHEDULE" && <ScheduleTools viewId={view.id} />}
+              {/* «Табели»: документы месяца по отделам — из посещаемости. */}
+              {view.tableSlug === TIMESHEETS && <TimesheetFill />}
+              {sheetView && PEOPLE_VIEWS.has(view.type) && <ScheduleTools viewId={view.id} />}
+              {sheetView && (SUMMARY_VIEWS.has(view.type) || view.type === "KPI") && <ScheduleTools viewId={view.id} grouping={false} />}
 
               {/* Действия таблицы: функции проекта над отмеченными
                   строками. Рядом с настройками, а не среди поиска
@@ -1753,7 +1958,7 @@ function MenuPage() {
                               >
                                 {t("table.blankRecord")}
                               </PopoverItem>
-                              {can.excelMenu && (
+                              {can.excelMenu && !ownExcel && (
                                 <>
                                   <PopoverSeparator />
                                   <PopoverItem
@@ -1831,16 +2036,20 @@ function MenuPage() {
                           setFieldPanel({ field, anchor, back }),
                         onDeleteField: setDeletingField,
                       }),
-                  onImport: () => setImporting(true),
-                  // Выгружается то, что видно: колонки view и действующий
-                  // отбор — вместе с областью видимости view, иначе файл
-                  // содержал бы строки, которых на экране нет.
-                  onExport: () =>
-                    exportExcel.mutate({
-                      fieldIds: columns.map((field) => field.id),
-                      filters: effectiveFilters,
-                      search: searchText,
-                    }),
+                  ...(ownExcel
+                    ? {}
+                    : {
+                        onImport: () => setImporting(true),
+                        // Выгружается то, что видно: колонки view и действующий
+                        // отбор — вместе с областью видимости view, иначе файл
+                        // содержал бы строки, которых на экране нет.
+                        onExport: () =>
+                          exportExcel.mutate({
+                            fieldIds: columns.map((field) => field.id),
+                            filters: effectiveFilters,
+                            search: searchText,
+                          }),
+                      }),
                   // Удаляется любой view, включая последний: так же ведёт
                   // себя старая админка. Пункт меню без view не тупик —
                   // «+» в полосе вкладок остаётся на месте.
@@ -2033,7 +2242,7 @@ function MenuPage() {
             </div>
           )}
 
-          {chipsBy && view && can.read && !sheetView && (
+          {chipsBy && view && can.read && !sheetView && !chipsMenu && (
             <ValueChips
               className="mx-6 shrink-0 border-b border-border py-2"
               tableSlug={view.tableSlug}
@@ -2042,16 +2251,8 @@ function MenuPage() {
               language={language}
               filters={chipFilters}
               search={searchText}
-              selected={filters[chipsBy.slug]?.values ?? []}
-              onChange={(values) => {
-                const next = { ...filters };
-                if (values.length) {
-                  next[chipsBy.slug] = { op: chipsBy.type === "MULTISELECT" ? "any" : "is", values };
-                } else {
-                  delete next[chipsBy.slug];
-                }
-                applyFilters(next);
-              }}
+              selected={chipValues}
+              onChange={chooseChips}
             />
           )}
 
@@ -2059,9 +2260,15 @@ function MenuPage() {
               анимируем: у чипов внутри есть выпадающие списки, а сжать
               высоту можно только обрезающим контейнером — он бы их
               срезал (см. shared/ui/popover: меню лежит в потоке). */}
+          {sheetView && PEOPLE_VIEWS.has(view.type) && <PeopleFilterBar viewId={view.id} language={language} />}
+          {sheetView && view.type === "KPI" && <PeopleFilterBar viewId={view.id} language={language} />}
+          {sheetView && SUMMARY_VIEWS.has(view.type) && (
+            <PeopleFilterBar viewId={view.id} language={language} tableSlug={view.tableSlug} />
+          )}
           {filtersVisible && !sheetView && (
             <FilterBar
               columns={columns}
+              hidden={tableFields}
               relations={schema.relations}
               language={language}
               filters={filters}
@@ -2080,12 +2287,20 @@ function MenuPage() {
           {/* Пока варианты вкладок едут, запрос строк не запущен вовсе —
               и пустая таблица врала бы «записей нет». */}
           {sheetView ? (
-            view.type === KB_VIEW ? (
+            view.type === SURVEY_TEMPLATES_VIEW ? (
+              <SurveyTemplates onUse={(tpl) => void navigate({ to: "/surveys/new", search: { menu: menuId, tpl } })} />
+            ) : view.type === DOCUMENTS_VIEW ? (
+              <DocumentBrowser locale={i18n.language} onOpenEmployee={openEmployee} />
+            ) : view.type === KB_VIEW ? (
               <KnowledgeBase pageId={search.doc ?? ""} onOpen={(doc) => setSearch({ doc }, true)} />
+            ) : view.type === "KPI" ? (
+              <KpiSheet viewId={view.id} search={searchText} create={kpiCreate} onCreateClose={() => setKpiCreate(false)} onOpenEmployee={(guid) => openEmployee(guid, KPI_TAB)} />
+            ) : view.type === "PBX_CALLS" ? (
+              <CallLog search={searchText} />
             ) : view.type === "BUDGET" ? (
-              <BudgetSheet search={searchText} />
+              <BudgetSheet viewId={view.id} search={searchText} />
             ) : view.type === "PAYROLL" ? (
-              <PayrollPivot search={searchText} onOpenEmployee={openEmployee} />
+              <PayrollPivot viewId={view.id} search={searchText} onOpenEmployee={openEmployee} />
             ) : view.type === "ABSENCES" ? (
               <Absences viewId={view.id} search={searchText} onOpenRow={openRow} onOpenEmployee={openEmployee} />
             ) : view.type === "WORK_SCHEDULES" ? (
@@ -2158,6 +2373,7 @@ function MenuPage() {
               locale={i18n.language}
               language={language}
               hasMore={hasMore || loadingMore}
+              counts={boardCounts}
               onOpenRow={openRow}
               /* Перенос карточки — обычная правка строки: значение
                  колонки и номер позиции одним PUT.
@@ -2195,7 +2411,7 @@ function MenuPage() {
                          свою страницу создания — значит, заводят там. */
                       if (openCreateUrl(view)) return;
 
-                      startDraft({ ...blankItem(drawerColumns, newRowDefaults), ...values });
+                      startDraft({ ...blankItem(drawerColumns, newRowDefaults), ...chosenChip(), ...values });
                     },
                   }
                 : {})}
@@ -2426,7 +2642,15 @@ function MenuPage() {
             <DataGrid
               tableSlug={view.tableSlug}
               columns={columns}
-              extra={view.tableSlug === TRAININGS ? trainingColumns : vacancyColumns}
+              extra={
+                view.tableSlug === TRAININGS
+                  ? trainingColumns
+                  : view.tableSlug === SURVEYS
+                    ? surveyColumns
+                    : view.tableSlug === ASSETS
+                      ? assetColumns
+                      : vacancyColumns
+              }
               /* Та же подстановка, что и в карточке: настройка, которая
                  работает в одном из двух мест, хуже отсутствующей. */
               newRowDefaults={newRowDefaults}
@@ -2561,6 +2785,8 @@ function MenuPage() {
               setTableLimit(view.tableSlug, next);
               setSearch({ limit: next, page: 1 });
             }}
+            /* «Общая стоимость» имущества — по всему отбору, а не странице. */
+            {...(view.tableSlug === ASSETS ? { aside: <AssetTotal filters={effectiveFilters} search={searchText} /> } : {})}
             /* Кнопка удаления отмеченных переехала в шапку, к остальным
                действиям над выделением (TableActions) — см. выше. */
           />
@@ -2606,6 +2832,8 @@ function MenuPage() {
               {drawerRow && (
                 <PrintButton tableSlug={view.tableSlug} row={drawerRow} fields={tableFields} />
               )}
+
+              {drawerRow && <CallButton tableSlug={view.tableSlug} row={drawerRow} />}
 
               <TableActions
                 tableSlug={view.tableSlug}
@@ -2734,12 +2962,16 @@ function MenuPage() {
                   update.mutate({ guid, values: { [slug]: value } }),
               }
             : {})}
-          /* Раскладка карточки общая для всех view таблицы — это
-             структура, и у системной таблицы она заперта целиком. */
+          /* Настройки поля — структура таблицы: у защищённой заперты. */
           {...(schemaLocked
             ? {}
+            : { onSettings: (field: Field, anchor: DOMRect) => setFieldPanel({ field, anchor }) })}
+          /* Раскладка карточки — вид, а не структура: порядок, видимость,
+             секции, заголовок. У защищённой таблицы её правит тот, кому
+             можно править настройки view (CONTEXT, Protected). */
+          {...(schemaLocked && !can.settings
+            ? {}
             : {
-                onSettings: (field: Field, anchor: DOMRect) => setFieldPanel({ field, anchor }),
                 onReorder: drawerLayout.reorder,
                 /* Секции правит тот же, кто двигает поля: это одна и та же
                    раскладка и одно и то же право. */

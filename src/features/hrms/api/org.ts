@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { MAX_LIMIT, useItems, type Item } from "@/features/item";
+import { MAX_LIMIT, useItems, type Item, type OrgNode } from "@/features/item";
 import { hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 
 /*
@@ -15,6 +15,7 @@ export type Person = {
   name: string;
   photo: string;
   position: string;
+  positionId: string;
   department: string;
   departmentId: string;
   location: string;
@@ -63,6 +64,7 @@ export function toPerson(row: Item): Person {
     name: text(row.full_name) || [text(row.last_name), text(row.first_name)].filter(Boolean).join(" "),
     photo: firstText(row.photo),
     position: text(related(row, "hr_positions_id").name),
+    positionId: text(row.hr_positions_id),
     department: text(related(row, "hr_departments_id").name),
     departmentId: text(row.hr_departments_id),
     location: text(related(row, "hr_locations_id").name),
@@ -95,16 +97,52 @@ const ALL = { limit: MAX_LIMIT, page: 1 };
 
 export function useOrgDirectory() {
   const departments = useItems("hr_departments", ALL);
+  const positions = useItems("hr_positions", ALL);
 
   /* Памяткой: от этого списка считаются цвета и деревья экрана. */
   const departmentList = useMemo(() => departments.page.rows.map(toDepartment), [departments.page.rows]);
 
+  /* Должность → вышестоящая (`hr_positions.hr_positions_id`). */
+  const positionParent = useMemo(
+    () => new Map(positions.page.rows.map((row) => [text(row.guid), text(row.hr_positions_id)])),
+    [positions.page.rows],
+  );
+
   return {
     departments: departmentList,
-    isLoading: departments.isLoading,
+    positionParent,
+    isLoading: departments.isLoading || positions.isLoading,
     /** Отказ словами сервера. null — всё загрузилось. */
-    error: departments.error ?? null,
-    refetch: () => void departments.refetch(),
+    error: departments.error ?? positions.error ?? null,
+    refetch: () => {
+      void departments.refetch();
+      void positions.refetch();
+    },
+  };
+}
+
+/**
+ * Руководитель для дерева: свой (`hr_employees_id`), а не указан —
+ * первый на экране, кто занимает вышестоящую должность; нет такого —
+ * следующую выше. Иерархия должностей в проектах заполнена, а поле
+ * руководителя у людей — обычно нет, и дерево выходило плоским.
+ */
+export function managerByPosition(people: Person[], positionParent: Map<string, string>) {
+  const holder = new Map<string, string>();
+  for (const person of people) {
+    if (person.positionId && !holder.has(person.positionId)) holder.set(person.positionId, person.id);
+  }
+  return (person: Person) => {
+    if (person.managerId) return person.managerId;
+    const seen = new Set<string>();
+    let at = positionParent.get(person.positionId);
+    while (at && !seen.has(at)) {
+      seen.add(at);
+      const boss = holder.get(at);
+      if (boss && boss !== person.id) return boss;
+      at = positionParent.get(at);
+    }
+    return undefined;
   };
 }
 
@@ -128,4 +166,156 @@ export function departmentColors(departments: Department[], fallback: (name: str
   }
 
   return colors;
+}
+
+export type UnitNode = {
+  kind: "unit" | "region" | "location";
+  name: string;
+  sub: string;
+  /** Руководитель юнита — карточка сотрудника (`hr_employees_id`). */
+  headId: string;
+  headName: string;
+  headPhoto: string;
+  color: string;
+  /** Guid юнита — у `kind: "unit"`; люди юнита считаются по нему, а не по локациям. */
+  unitId?: string;
+  locationIds: string[];
+};
+
+/**
+ * Дерево «Организация»: бизнес-юнит → дочерние юниты (`core_business_units_id`,
+ * родитель) → регион → локация. Регион — свой
+ * у локации (`core_regions_id`), без вложенности регионов; локация
+ * с несколькими юнитами стоит под каждым. Локации без юнита — под
+ * головным юнитом, если корень один; иначе отдельный корень «Без юнита».
+ */
+export function useOrgUnits(enabled: boolean) {
+  const units = useItems(enabled ? "core_business_units" : undefined, ALL);
+  const locations = useItems(enabled ? "hr_locations" : undefined, ALL);
+
+  const roots = useMemo(() => {
+    const node = (id: string, data: Omit<UnitNode, "headId" | "headName" | "headPhoto" | "color"> & Partial<UnitNode>, kids: OrgNode<UnitNode>[] = []): OrgNode<UnitNode> => ({
+      id,
+      kids,
+      data: { headId: "", headName: "", headPhoto: "", color: "", ...data },
+    });
+    const branch = (unitId: string, rows: Item[]) => {
+      const byRegion = new Map<string, Item[]>();
+      for (const row of rows) {
+        const region = text(row.core_regions_id);
+        byRegion.set(region, [...(byRegion.get(region) ?? []), row]);
+      }
+      const leaf = (row: Item) =>
+        node(`${unitId}:${text(row.guid)}`, {
+          kind: "location",
+          name: text(row.name),
+          sub: text(row.address),
+          color: text(row.color),
+          locationIds: [text(row.guid)],
+        });
+      // Локация без региона — прямо под юнитом, без карточки «Без региона».
+      return [...byRegion].flatMap(([regionId, list]) => {
+        if (!regionId) return list.map(leaf);
+        const kids = list.map(leaf);
+        return [node(`${unitId}:r:${regionId}`, {
+          kind: "region",
+          name: text(related(list[0]!, "core_regions_id").name),
+          sub: "",
+          locationIds: kids.flatMap((kid) => kid.data.locationIds),
+        }, kids)];
+      });
+    };
+    const unitsOf = (row: Item) => (Array.isArray(row.core_business_units_ids) ? row.core_business_units_ids.map(String) : []);
+    const rows = new Map(units.page.rows.map((row) => [text(row.guid), row]));
+    const parentOf = (id: string) => {
+      const parent = text(rows.get(id)?.core_business_units_id);
+      return parent !== id && rows.has(parent) ? parent : "";
+    };
+    const orphans = locations.page.rows.filter((loc) => !unitsOf(loc).length);
+    const tops = [...rows.keys()].filter((id) => !parentOf(id));
+    const home = tops.length === 1 ? tops[0] : "";
+    const build = (id: string, seen: Set<string>): OrgNode<UnitNode> => {
+      const row = rows.get(id)!;
+      const childUnits = [...rows.keys()]
+        .filter((kid) => parentOf(kid) === id && !seen.has(kid))
+        .map((kid) => build(kid, new Set(seen).add(kid)));
+      const regions = branch(id, locations.page.rows.filter((loc) => unitsOf(loc).includes(id) || (id === home && !unitsOf(loc).length)));
+      return node(id, {
+        kind: "unit",
+        unitId: id,
+        name: text(row.name),
+        sub: text(related(row, "crm_legal_entities_id").name) || text(row.description),
+        headId: text(row.hr_employees_id),
+        headName: who(row, "hr_employees_id").name,
+        headPhoto: who(row, "hr_employees_id").photo,
+        color: text(row.color),
+        // Юнит считает и людей дочерних: локацию под двумя юнитами — один раз.
+        locationIds: [...new Set([...childUnits, ...regions].flatMap((kid) => kid.data.locationIds))],
+      }, [...childUnits, ...regions]);
+    };
+    // Корни — юниты без родителя; цикл в данных (A → B → A) обрывается на повторе.
+    const result = tops.map((id) => build(id, new Set([id])));
+    if (orphans.length && !home) {
+      const kids = branch("none", orphans);
+      result.push(node("none", { kind: "unit", name: "", sub: "", locationIds: kids.flatMap((kid) => kid.data.locationIds) }, kids));
+    }
+    return result;
+  }, [units.page.rows, locations.page.rows]);
+
+  /*
+   * Юнит сотрудника — как в справочнике юнитов (counts.via): свои
+   * `core_business_units_ids`, а нет — юнит его локации, если он там один.
+   */
+  const unitsOfPerson = useMemo(() => {
+    const owner = new Map<string, string>();
+    for (const loc of locations.page.rows) {
+      const list = Array.isArray(loc.core_business_units_ids) ? loc.core_business_units_ids.map(String) : [];
+      if (list.length === 1) owner.set(text(loc.guid), list[0]!);
+    }
+    return (row: Item) => {
+      const own = Array.isArray(row.core_business_units_ids) ? row.core_business_units_ids.map(String) : [];
+      return own.length ? own : [owner.get(text(row.hr_locations_id)) ?? ""].filter(Boolean);
+    };
+  }, [locations.page.rows]);
+
+  return {
+    roots,
+    unitsOfPerson,
+    isLoading: units.isLoading || locations.isLoading,
+    error: units.error ?? locations.error ?? null,
+    refetch: () => {
+      void units.refetch();
+      void locations.refetch();
+    },
+  };
+}
+
+/**
+ * Грейды по должности: только группы, к которой отнесена должность
+ * («Должности» → «Группа грейдов»), а нет своей — ближайшей вышестоящей;
+ * нигде нет — все. Нужен модалке должности и форме вакансии.
+ */
+export function useGradesFor() {
+  const list = { limit: MAX_LIMIT, page: 1, relations: false } as const;
+  const positions = useItems("hr_positions", list);
+  const grades = useItems("hr_grades", list);
+  return useMemo(() => {
+    const groupOf = (position: unknown) => {
+      const seen = new Set<unknown>();
+      for (let id = position; id && !seen.has(id); ) {
+        seen.add(id);
+        const row = positions.page.rows.find((p) => p.guid === id);
+        if (row?.hr_grades_id) return String(row.hr_grades_id);
+        id = row?.hr_positions_id;
+      }
+      return "";
+    };
+    const of = (position: unknown): Item[] => {
+      const group = groupOf(position);
+      return grades.page.rows
+        .filter((g) => g.hr_grades_id && g.is_active !== false && (!group || g.hr_grades_id === group))
+        .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0) || String(a.name).localeCompare(String(b.name)));
+    };
+    return { of, fits: (position: unknown, grade: unknown) => !grade || of(position).some((g) => g.guid === grade) };
+  }, [positions.page.rows, grades.page.rows]);
 }

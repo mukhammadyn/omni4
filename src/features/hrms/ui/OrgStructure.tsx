@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Building2Icon, UsersIcon, type LucideIcon } from "lucide-react";
+import { BriefcaseBusinessIcon, Building2Icon, LandmarkIcon, MapIcon, MapPinIcon, UsersIcon, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   Avatar,
@@ -11,23 +11,34 @@ import {
   type OrgNode,
 } from "@/features/item";
 import type { TranslationKey } from "@/shared/lib/i18n";
-import { CHIP_STYLES, type ChipColor } from "@/shared/ui/chip";
+import { CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
 import { Tabs } from "@/shared/ui/tabs";
 import {
   departmentColors,
+  managerByPosition,
   toPerson,
   useOrgDirectory,
+  useOrgUnits,
+  type UnitNode,
   type Department,
   type Person,
 } from "../api/org";
 
-type Mode = "emp" | "dept";
+type Mode = "emp" | "dept" | "unit";
 
-const MODES: { id: Mode; icon: LucideIcon; label: TranslationKey; hint: TranslationKey }[] = [
-  { id: "emp", icon: UsersIcon, label: "org.mode.emp", hint: "org.hint.emp" },
-  { id: "dept", icon: Building2Icon, label: "org.mode.dept", hint: "org.hint.dept" },
+const MODES: { id: Mode; icon: LucideIcon; label: TranslationKey }[] = [
+  { id: "emp", icon: UsersIcon, label: "org.mode.emp" },
+  { id: "dept", icon: Building2Icon, label: "org.mode.dept" },
+  { id: "unit", icon: LandmarkIcon, label: "org.mode.unit" },
 ];
+
+/* Цвет и значок уровня — `UT` прототипа; свой цвет юнита/локации важнее. */
+const UNIT_KIND: Record<UnitNode["kind"], { icon: LucideIcon; tone: ChipColor; label: TranslationKey }> = {
+  unit: { icon: BriefcaseBusinessIcon, tone: "purple", label: "org.kind.unit" },
+  region: { icon: MapIcon, tone: "orange", label: "org.kind.region" },
+  location: { icon: MapPinIcon, tone: "green", label: "org.kind.location" },
+};
 
 type DeptNode = Department & { members: Person[]; tone: ChipColor };
 
@@ -35,13 +46,13 @@ type DeptNode = Department & { members: Person[]; tone: ChipColor };
  * «Оргструктура» сотрудников HRMS — `drawOrg` прототипа: два дерева
  * на одном холсте.
  *
- *   Сотрудники   — руководитель → подчинённые (`hr_employees.hr_employees_id`);
+ *   Сотрудники   — руководитель → подчинённые (`hr_employees.hr_employees_id`),
+ *                  не указан — по иерархии должностей (`managerByPosition`);
  *   Отделы       — отдел → подотдел (`hr_departments.hr_departments_id`),
  *                  на узле руководитель и аватары людей ветки.
  *
- * Третьего дерева прототипа — «Организация», юрлицо → бизнес-юнит →
- * локация — нет: в схеме v2 бизнес-юнитов нет, а юрлица — только
- * продавец в счетах CRM. Подразделения — верхние узлы дерева отделов.
+ *   Организация  — бизнес-юнит → регион → локация (api/org, useOrgUnits);
+ *                  на узле — сколько людей экрана в его локациях.
  *
  * Люди — строки экрана: отбор и поиск view сужают оба дерева.
  * Справочники — целиком (api/org).
@@ -62,6 +73,7 @@ export function OrgStructure({
   const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("emp");
   const directory = useOrgDirectory();
+  const units = useOrgUnits(mode === "unit");
   const people = useMemo(() => rows.map(toPerson), [rows]);
   const deptColor = useMemo(
     () => departmentColors(directory.departments, colorOf),
@@ -79,10 +91,10 @@ export function OrgStructure({
         ? buildTree(
             people,
             (person) => person.id,
-            (person) => person.managerId,
+            managerByPosition(people, directory.positionParent),
           )
         : [],
-    [mode, people],
+    [mode, people, directory.positionParent],
   );
 
   const deptRoots = useMemo(() => {
@@ -131,9 +143,6 @@ export function OrgStructure({
         onSelect={(id) => setMode(id as Mode)}
         tabs={MODES.map((item) => ({ id: item.id, label: t(item.label), icon: item.icon }))}
       />
-      <span className="text-xs text-fg-subtle max-md:hidden">
-        {t(MODES.find((item) => item.id === mode)!.hint)}
-      </span>
       {!pending && total > rows.length && (
         <span className="text-xs text-fg-muted">{t("org.truncated", { count: rows.length })}</span>
       )}
@@ -147,6 +156,12 @@ export function OrgStructure({
       </p>
     );
   }
+
+  /*
+   * Без иерархии должностей дерево людей вышло бы плоским, а свёрнутые
+   * ветки `OrgChart` считает один раз, при открытии, — ждём справочник.
+   */
+  if (mode === "emp" && directory.isLoading) return null;
 
   if (mode === "emp") {
     const colorOfPerson = (person: Person) =>
@@ -181,29 +196,55 @@ export function OrgStructure({
     );
   }
 
+  if (mode === "unit") {
+    if (units.isLoading) return null;
+    if (units.error) return <Failed bar={bar} error={units.error} onRetry={units.refetch} />;
+    const perLocation = new Map<string, number>();
+    for (const person of people) perLocation.set(person.locationId, (perLocation.get(person.locationId) ?? 0) + 1);
+    const perUnit = new Map<string, number>();
+    for (const row of rows) for (const id of units.unitsOfPerson(row)) perUnit.set(id, (perUnit.get(id) ?? 0) + 1);
+    // Юнит — как в справочнике (свои люди), регион и локация — по локациям.
+    const count = (data: UnitNode) =>
+      data.unitId ? (perUnit.get(data.unitId) ?? 0) : data.locationIds.reduce((sum, id) => sum + (perLocation.get(id) ?? 0), 0);
+    const toneOf = (data: UnitNode) => (data.color ? hexToChipColor(data.color) : UNIT_KIND[data.kind].tone);
+
+    return (
+      <OrgChart
+        key={mode}
+        roots={units.roots}
+        autoFit
+        toolbar={bar}
+        colorOf={(node) => toneOf(node.data)}
+        onOpen={(node) => openHead(node.data.headId)}
+        legend={Object.values(UNIT_KIND).map((kind) => (
+          <OrgLegendItem key={kind.label} color={kind.tone} label={t(kind.label)} />
+        ))}
+        renderNode={({ data }) => (
+          <>
+            <div className="flex items-center gap-2.5">
+              <Tile icon={UNIT_KIND[data.kind].icon} color={toneOf(data)} />
+              <Lines title={data.name || t(data.kind === "region" ? "org.noRegion" : "org.noUnit")} sub={data.sub || t(UNIT_KIND[data.kind].label)} />
+            </div>
+            <Meta>
+              {head(data) ?? <span />}
+              <span className="inline-flex items-center gap-1">
+                <Icon as={UsersIcon} size={12} />
+                {count(data)}
+              </span>
+            </Meta>
+          </>
+        )}
+      />
+    );
+  }
+
   /*
    * Справочник не дали — отказ словами сервера и «Повторить», как
    * у строк экрана. Пустое дерево здесь врало бы: «отделов нет» и
    * «читать отделы нельзя» — разные вещи.
    */
   if (directory.error) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col px-6">
-        <div className="flex shrink-0 flex-wrap items-center gap-2.5 pt-2.5 pb-2">{bar}</div>
-        <div className="grid flex-1 place-items-center p-8 text-center">
-          <div className="flex max-w-sm flex-col items-center gap-3">
-            <p className="text-sm text-fg-muted">{directory.error}</p>
-            <button
-              type="button"
-              onClick={directory.refetch}
-              className="h-8 rounded-md border border-border-strong px-3 text-sm text-fg transition-colors hover:bg-surface-hover"
-            >
-              {t("action.retry")}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <Failed bar={bar} error={directory.error} onRetry={directory.refetch} />;
   }
 
   /* Вписывание мерит дерево при открытии: пустое вписалось бы в 100%. */
@@ -234,6 +275,27 @@ export function OrgStructure({
         </>
       )}
     />
+  );
+}
+
+function Failed({ bar, error, onRetry }: { bar: ReactNode; error: string; onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-h-0 flex-1 flex-col px-6">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5 pt-2.5 pb-2">{bar}</div>
+        <div className="grid flex-1 place-items-center p-8 text-center">
+          <div className="flex max-w-sm flex-col items-center gap-3">
+            <p className="text-sm text-fg-muted">{error}</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="h-8 rounded-md border border-border-strong px-3 text-sm text-fg transition-colors hover:bg-surface-hover"
+            >
+              {t("action.retry")}
+            </button>
+          </div>
+        </div>
+      </div>
   );
 }
 

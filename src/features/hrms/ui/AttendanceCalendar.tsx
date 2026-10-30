@@ -25,7 +25,7 @@ import {
   SHEET_PAGE,
   STATUS_DOT,
   StatusChips,
-  useAttendance,
+  GroupedRows, useAttendance, dayTone,
   useDayHead,
   useStatusFilter,
   type OpenDay,
@@ -60,7 +60,8 @@ export function AttendanceCalendar({ viewId, search, onOpenEmployee }: { viewId:
 
   const openRow = open ? rows.find((row) => row.employee.id === open.employee.id) : undefined;
   const openCell = open ? openRow?.cells.find((cell) => cell.date === open.date) : undefined;
-  const width = month ? "min-w-[44px]" : scale === "week" ? "min-w-[150px]" : "min-w-[320px]";
+  /* Месяц — все дни на экране (как табель прототипа): раскладка fixed, дни делят ширину поровну. */
+  const width = month ? "" : scale === "week" ? "min-w-[150px]" : "min-w-[320px]";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -70,18 +71,19 @@ export function AttendanceCalendar({ viewId, search, onOpenEmployee }: { viewId:
 
       <div className="relative mx-6 mb-4 min-h-0 flex-1 overflow-auto">
         {sheet.fetching && !sheet.loading && <div className="sticky top-0 z-30 h-0.5 animate-pulse bg-accent" />}
-        <table className="min-w-full border-separate border-spacing-0 text-xs">
+        <table className={`border-separate border-spacing-0 text-xs ${month ? "w-full table-fixed" : "min-w-full"}`}>
           <thead>
             <tr>
-              <th className={`${headCell} left-0 z-30 min-w-[230px] px-3 text-left font-normal text-fg-muted`}>
+              <th className={`${headCell} left-0 z-30 px-3 text-left font-normal text-fg-muted ${month ? "w-[200px]" : "min-w-[230px]"}`}>
                 {t("timesheet.employee")} <span className="text-fg-subtle">{sheet.total || ""}</span>
               </th>
               {dates.map((date) => (
                 <th
                   key={date}
                   className={`${headCell} z-20 px-1 font-medium ${width} ${month ? "text-center" : "text-left"} ${
-                    date === today ? "bg-accent-subtle text-accent-text" : isWeekend(date) ? "text-danger" : "text-fg-muted"
+                    dayTone(date, today, sheet.holidays)
                   }`}
+                  title={sheet.holidays.get(date)}
                 >
                   {month ? (
                     <>
@@ -111,7 +113,9 @@ export function AttendanceCalendar({ viewId, search, onOpenEmployee }: { viewId:
                 </td>
               </tr>
             ) : (
-              rows.map(({ employee, cells }) => (
+              <GroupedRows rows={rows} group={view.group} keysOf={({ employee }) => employee} colSpan={dates.length + 1}>
+
+                {({ employee, cells }) => (
                 <tr key={employee.id} className="group">
                   <td className={`${body} sticky left-0 z-10 bg-surface px-3 py-1 group-hover:tint-surface-hover`}>
                     <EmployeeName
@@ -143,7 +147,9 @@ export function AttendanceCalendar({ viewId, search, onOpenEmployee }: { viewId:
                     );
                   })}
                 </tr>
-              ))
+              )}
+
+              </GroupedRows>
             )}
           </tbody>
         </table>
@@ -197,11 +203,11 @@ function useHint() {
 
 function MonthCell({ cell, onOpen }: { cell: SheetCell; onOpen: () => void }) {
   const hint = useHint();
-  if (cell.kind === "outside") return <div className="h-8 rounded-md bg-surface-soft" />;
+  if (cell.kind === "outside") return <div className="mx-auto size-6 rounded-md bg-surface-soft" />;
   // Ухода нет: значок — по приходу, опоздал или нет.
   const look =
     cell.kind === "missing_mark" ? DAY_ICON[cell.lateMinutes > 0 ? "late" : "worked"] : DAY_ICON[cell.kind];
-  if (!look) return <div className="h-8" />;
+  if (!look) return <div className="size-6" />;
   const awaiting = cell.pending.includes("mark");
 
   return (
@@ -209,11 +215,12 @@ function MonthCell({ cell, onOpen }: { cell: SheetCell; onOpen: () => void }) {
       <button
         type="button"
         onClick={onOpen}
-        className={`relative flex h-8 w-full items-center justify-center rounded-md transition hover:ring-2 hover:ring-accent/30 ${
+        /* Квадрат: день узкий, растянутая по высоте плашка смотрелась столбиком. */
+        className={`relative mx-auto flex size-6 items-center justify-center rounded-md transition hover:ring-2 hover:ring-accent/30 ${
           CHIP_STYLES[look.color]
         } ${awaiting ? "border border-dashed border-warning" : ""}`}
       >
-        <Icon as={look.icon} size={16} />
+        <Icon as={look.icon} size={14} />
         {cell.kind === "missing_mark" && <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-warning" />}
       </button>
     </Tooltip>

@@ -83,10 +83,14 @@ export function Anchored({
      * о нём не знает. Карточка чужой записи из редактора связи иначе
      * закрывалась вместе со всем редактором от первого же движения
      * колеса. Метка та же, что у Popover и сайдбара.
+     *
+     * Меню, открытое отсюда (`data-popover`), — тоже: список годов
+     * в календаре — Popover в <body>, и его прокрутка закрывала
+     * календарь вместе со списком.
      */
     const onScroll = (event: Event) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest?.("[data-modal]")) return;
+      if (target?.closest?.("[data-modal],[data-popover]")) return;
       if (!box.current?.contains(target)) onClose();
     };
 
@@ -113,9 +117,14 @@ export function Anchored({
        */}
       <div aria-hidden className="fixed inset-0 z-50" onPointerDown={onClose} onWheel={onClose} />
 
+      {/*
+       * Блок не уже ячейки (minWidth ниже), а карточка редактора бывает
+       * уже — пустая полоса блока сбоку перехватывала клик мимо, и он не
+       * доходил до подложки. Клики ловит только содержимое.
+       */}
       <div
         ref={box}
-        className="fixed z-50"
+        className="pointer-events-none fixed z-50 *:pointer-events-auto"
         style={{
           left: placed?.left ?? anchor.left,
           top: placed?.top ?? anchor.top,

@@ -32,8 +32,12 @@ export const VIEW_TYPES = [
   "SCHEDULE",
   "WORK_SCHEDULES",
   "KNOWLEDGE",
+  "SURVEY_TEMPLATES",
+  "DOCUMENTS",
   "PAYROLL",
   "BUDGET",
+  "KPI",
+  "PBX_CALLS",
   "BOARD",
   "CALENDAR",
   "CHART",
@@ -42,6 +46,7 @@ export const VIEW_TYPES = [
   "SECTION",
   "TIMELINE",
   "TREE",
+  "COMMENTS",
 ] as const;
 
 export type ViewType = (typeof VIEW_TYPES)[number];
@@ -114,6 +119,11 @@ export type ViewTraits = {
    * Показать его вкладкой — значит предложить открыть таблицу, которой нет.
    */
   notATab?: true;
+  /**
+   * Нарисован только вкладкой карточки: экраном его не заводят и не
+   * рисуют (лента комментариев без записи, к которой пишут, пуста).
+   */
+  tabOnly?: true;
 };
 
 /** Экран HRMS под одну таблицу: см. ViewTraits.fixed. */
@@ -174,6 +184,13 @@ const TRAITS: Record<ViewType, ViewTraits> = {
    * дерево страниц и страница с текстом. Грузит базу целиком сама.
    */
   KNOWLEDGE: { ...HRMS, selfLoading: true },
+  /** «Шаблоны» опросов (`surveys.html#tpl`, features/hrms) на `hr_surveys`. */
+  SURVEY_TEMPLATES: { ...HRMS, selfLoading: true },
+  /**
+   * «Документы» (`documents.html`, features/hrms) на `hr_documents`:
+   * папки или сотрудники, файлы сеткой и списком. Грузит всё сама.
+   */
+  DOCUMENTS: { ...HRMS, selfLoading: true },
   /**
    * «Сводная по месяцам» начислений (`payroll.html`, features/hrms) на
    * `hr_payroll_lines`: сотрудник × вид за расчётный месяц.
@@ -184,6 +201,16 @@ const TRAITS: Record<ViewType, ViewTraits> = {
    * и `hr_budget_amounts`: отделы → строки, план и факт по месяцам.
    */
   BUDGET: { ...HRMS, selfLoading: true },
+  /**
+   * Сводная KPI за год (features/hrms, KpiSheet) на `hr_kpi_scorecards`:
+   * отделы → сотрудники → показатели, по кварталам цель, факт и %.
+   */
+  KPI: { ...HRMS, selfLoading: true },
+  /**
+   * Журнал звонков onlinePBX (features/pbx, CallLog) на `pbx_calls`:
+   * сотрудник подписан именем, запись слушается в строке.
+   */
+  PBX_CALLS: { ...HRMS, selfLoading: true },
   BOARD: { implemented: true, inTabs: true, noGrouping: true },
   CALENDAR: { implemented: true, inTabs: true, noGrouping: true },
   CHART: { implemented: true, noGrouping: true },
@@ -192,6 +219,11 @@ const TRAITS: Record<ViewType, ViewTraits> = {
   SECTION: { notATab: true },
   TIMELINE: { implemented: true, inTabs: true },
   TREE: { implemented: true, inTabs: true, noGrouping: true },
+  /*
+   * Лента комментариев — только вкладкой карточки (features/view/ui/
+   * CommentFeed): у неё нет смысла без записи, к которой пишут.
+   */
+  COMMENTS: { implemented: true, inTabs: true, tabOnly: true, columnless: true, noGrouping: true },
 };
 
 /** Раскладки посещаемости: см. View.layout. */
@@ -216,7 +248,9 @@ export const traitsOf = (type: string): ViewTraits =>
 const typesWith = (trait: keyof ViewTraits) => VIEW_TYPES.filter((type) => TRAITS[type][trait]);
 
 /** Экраны, которые действительно есть. Остальные вкладки видны, но пусты. */
-export const IMPLEMENTED_VIEW_TYPES = new Set<string>(typesWith("implemented"));
+export const IMPLEMENTED_VIEW_TYPES = new Set<string>(
+  typesWith("implemented").filter((type) => !TRAITS[type].tabOnly),
+);
 /** Типы, которые не заводят через «+» и не выбирают сменой типа. */
 export const FIXED_VIEW_TYPES = new Set<string>(typesWith("fixed"));
 /** Типы, которыми бывает вкладка связи в карточке записи. */
@@ -387,6 +421,21 @@ export type View = {
    */
   chipsId: string;
   /**
+   * Значение полосы, выбранное при первом открытии
+   * (`attributes.chips_default`, наш ключ): воронка Udevs над доской
+   * сделок, как `pipelineDefault` прототипа. Это посев отбора человека,
+   * а не `default_filters`: те перекрывают выбор, и сменить воронку
+   * было бы нельзя. Пусто — показаны все.
+   */
+  chipsDefault: string;
+  /**
+   * Полоса — выпадающим списком в панели, и выбор в ней один на всю
+   * таблицу, а не на view (`attributes.chips_menu`, наш ключ): воронка
+   * сделок в прототипе одна для доски, списка и календаря. У доски
+   * список всегда — над ней полосе не место.
+   */
+  chipsMenu: boolean;
+  /**
    * Слаг поля, с которого начинается событие календаря и полоса
    * таймлайна (колонка `calendar_from_slug`). Пусто — рисовать нечего.
    *
@@ -439,10 +488,10 @@ export type View = {
   pivot: Partial<Record<"row" | "col" | "value" | "agg" | "sort", string>> & { skipEmpty?: boolean };
   /**
    * Карточка галереи (`attributes.card`): `person` — карточка человека
-   * (фото, статус, контакты; PeopleGallery), пусто — обычная. Читается
-   * только у GALLERY.
+   * (фото, статус, контакты; PeopleGallery), `asset` — карточка имущества
+   * (features/hrms, AssetGallery), пусто — обычная. Читается только у GALLERY.
    */
-  card: "" | "person";
+  card: "" | "person" | "asset";
   /**
    * Раскладка посещаемости (`attributes.layout`). Читается только
    * у ATTENDANCE; пустая и незнакомая — календарь: так view ATTENDANCE,

@@ -14,17 +14,18 @@ import {
   WalletIcon,
   type LucideIcon,
 } from "lucide-react";
-import type { Item } from "@/features/item";
+import { relationDataKey, type Item } from "@/features/item";
 import { localized, type Field, type Relation } from "@/features/table";
 import type { TranslationKey } from "@/shared/lib/i18n";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { CHIP_STYLES } from "@/shared/ui/chip";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { VACANCIES } from "../api/vacancy";
-import { text } from "../api/org";
+import { text, useGradesFor } from "../api/org";
 import { usePipelineStages } from "../api/vacancy-page";
-import { blank, formError, FormBar, FormField, FormSection } from "./record-form";
+import { blank, formError, FormBar, FormField, FormItem, FormSection } from "./record-form";
 import { stageDot } from "./vacancy-parts";
 
 /*
@@ -39,7 +40,7 @@ const SECTIONS: Section[] = [
     icon: FileTextIcon,
     title: "vacancy.form.base",
     hint: "vacancy.form.baseHint",
-    slugs: ["title", "hr_departments_id", "hr_positions_id", "level", "headcount", "priority", "status"],
+    slugs: ["title", "hr_departments_id", "hr_positions_id", "hr_grades_id", "headcount", "priority", "status"],
   },
   { id: "team", icon: UsersIcon, title: "vacancy.page.card.team", hint: "vacancy.form.teamHint", slugs: ["core_users_id", "core_users_id_2"] },
   {
@@ -47,7 +48,7 @@ const SECTIONS: Section[] = [
     icon: WalletIcon,
     title: "vacancy.page.card.terms",
     hint: "vacancy.form.termsHint",
-    slugs: ["hr_locations_id", "work_format", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
+    slugs: ["hr_locations_id", "hr_shift_kinds_id", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
   },
   {
     id: "dates",
@@ -63,7 +64,8 @@ const SECTIONS: Section[] = [
     icon: AlignLeftIcon,
     title: "vacancy.form.desc",
     hint: "vacancy.form.descHint",
-    slugs: ["description", "duties", "requirements", "conditions"],
+    // Один текст: обязанности, требования и условия пишут в нём же (пустые у всех вакансий на 2026-10-23).
+    slugs: ["description"],
   },
   { id: "pub", icon: MegaphoneIcon, title: "vacancy.page.card.pub", hint: "vacancy.form.pubHint", slugs: ["channels", "is_published"] },
 ];
@@ -105,6 +107,7 @@ export function VacancyForm({
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<Item>(row);
+  const grades = useGradesFor();
   const [changed, setChanged] = useState<Set<string>>(new Set());
   const bySlug = new Map(fields.map((f) => [f.slug, f]));
   /* Этапы — выбранной в черновике воронки: сменили — список следом. */
@@ -167,7 +170,25 @@ export function VacancyForm({
         <div className="min-w-0">
           {sections.map((s) => (
             <FormSection key={s.id} id={`vf-${s.id}`} icon={s.icon} title={t(s.title)} hint={t(s.hint)}>
-              {s.fields.map((field) => (
+              {s.fields.map((field) =>
+                /* Грейд — только группы должности (useGradesFor). */
+                field.slug === "hr_grades_id" && field.editable && !field.locked ? (
+                  <FormItem key={field.id} label={localized(field.labels, language, field.label)}>
+                    <Dropdown
+                      value={typeof draft.hr_grades_id === "string" ? draft.hr_grades_id : ""}
+                      placeholder={t("form.pick")}
+                      items={[
+                        { value: "", label: "—" },
+                        ...grades.of(draft.hr_positions_id).map((g) => ({ value: String(g.guid), label: String(g.name ?? "") })),
+                      ]}
+                      onChange={(id) =>
+                        set("hr_grades_id", id || null, {
+                          [relationDataKey("hr_grades_id")]: grades.of(draft.hr_positions_id).find((g) => g.guid === id) ?? null,
+                        })
+                      }
+                    />
+                  </FormItem>
+                ) : (
                 <FormField
                   key={field.id}
                   field={field}
@@ -179,10 +200,16 @@ export function VacancyForm({
                   creating={creating}
                   required={field.slug === "title"}
                   {...(FULL.has(field.slug) ? { wide: true } : {})}
-                  {...(field.slug === "skills" ? { placeholder: t("vacancy.form.tagHint") } : {})}
-                  onChange={(value, extra) => set(field.slug, value, extra)}
+                  dropdown
+                  onChange={(value, extra) => {
+                    set(field.slug, value, extra);
+                    /* Сменили должность — грейд чужой группы снимаем (своим set: сохраняются только изменённые). */
+                    if (field.slug === "hr_positions_id" && !grades.fits(value, draft.hr_grades_id))
+                      set("hr_grades_id", null, { [relationDataKey("hr_grades_id")]: null });
+                  }}
                 />
-              ))}
+                ),
+              )}
               {s.id === "stages" && columns.length > 0 && (
                 /* Этапы — воронки, выбранной у вакансии; правятся в её настройках. */
                 <ol className="col-span-full flex flex-col gap-1.5">

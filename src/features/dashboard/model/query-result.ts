@@ -1,7 +1,7 @@
 import type { Item } from "@/features/item";
 import { toField, type Field } from "@/features/table";
 
-export type QueryColumn = { key: string; type: string };
+export type QueryColumn = { key: string; type: string; label?: string };
 export type QueryResult = { columns: QueryColumn[]; rows: Item[]; limit: number; truncated: boolean };
 const numericTypes = new Set(["int2", "int4", "int8", "numeric", "float4", "float8"]);
 const types = new Set([...numericTypes, "text", "varchar", "bpchar", "uuid", "bool", "date", "timestamp", "timestamptz"]);
@@ -34,7 +34,7 @@ export function toQueryResult(value: unknown): QueryResult {
 
 export function queryFields(result: QueryResult): Field[] {
   return result.columns.map((column) => {
-    const field = toField({ id: `sql:${column.key}`, slug: column.key, label: column.key, attributes: { disabled: true }, type: numericTypes.has(column.type) ? "NUMBER" : column.type === "bool" ? "CHECKBOX" : column.type === "date" ? "DATE" : ["timestamp", "timestamptz"].includes(column.type) ? "DATE_TIME" : "SINGLE_LINE" });
+    const field = toField({ id: `sql:${column.key}`, slug: column.key, label: column.label ?? column.key, attributes: { disabled: true }, type: numericTypes.has(column.type) ? "NUMBER" : column.type === "bool" ? "CHECKBOX" : column.type === "date" ? "DATE" : ["timestamp", "timestamptz"].includes(column.type) ? "DATE_TIME" : "SINGLE_LINE" });
     // Native chart axes use option labels; derive them only from returned SQL cells.
     for (const row of result.rows) {
       const cell = row[column.key]; if (cell === null) continue;
@@ -68,4 +68,21 @@ function canonicalDecimal(value: string): string {
   let exponent = Number(match[4] ?? 0) - (match[3]?.length ?? 0);
   while (digits.endsWith("0")) { digits = digits.slice(0, -1); exponent++; }
   return `${match[1] === "-" ? "-" : ""}${digits}e${exponent}`;
+}
+
+
+/** Display metadata only: never changes returned keys, data cells or manually written SQL. */
+export function labelQueryResult(result: QueryResult, catalog: import("./datasets").DatasetTable[], language = "en"): QueryResult {
+  const word = language.startsWith("ru") ? "Колонка" : language.startsWith("uz") ? "Ustun" : "Column";
+  return { ...result, columns: result.columns.map((column, index) => {
+    const names = [...new Set(catalog.flatMap((table) => table.fields.filter((field) => field.slug === column.key || `t_${field.slug}` === column.key || /^j\d+_/.test(column.key) && column.key.replace(/^j\d+_/, "") === field.slug).map((field) => field.label)))];
+    const technical = /[_.]|^(?:guid|uuid|core|crm|hr|created_at|updated_at)$/i.test(column.key);
+    return { ...column, label: names.length === 1 ? names[0]! : technical ? `${word} ${index + 1}` : column.key };
+  }) };
+}
+
+/** Saved visibility affects only rendering; queries and returned rows keep their original schema. */
+export function visibleQueryColumns(result: QueryResult, selected?: string[]): QueryColumn[] {
+  const visible = selected ? result.columns.filter((column) => selected.includes(column.key)) : result.columns;
+  return visible.length ? visible : result.columns;
 }

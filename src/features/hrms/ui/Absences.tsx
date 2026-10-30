@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckIcon, EyeIcon, PlaneIcon, ShieldCheckIcon } from "lucide-react";
+import { CheckIcon, EyeIcon, PlaneIcon, ShieldCheckIcon, TriangleAlertIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
 import { CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { DynamicIcon } from "@/shared/ui/dynamic-icon";
@@ -8,7 +8,10 @@ import { Icon } from "@/shared/ui/icon";
 import { pageCount } from "@/shared/ui/pagination";
 import { useAbsenceRequests, useDecideRequest, useDecisions, useRoutes, type AbsenceRequest } from "../api/absences";
 import { progressOf, routeFor } from "../model/approval";
-import { Pager, PeriodBar, usePeriod, useScopedPage, type OpenEmployee } from "./attendance-parts";
+import { GroupedRows, Pager, PeriodBar, usePeriod, useScopedPage, type OpenEmployee } from "./attendance-parts";
+import { useScheduleSettings } from "./schedule-settings";
+import { EMPLOYEES } from "../api/employee";
+import { useAll } from "../api/timesheet";
 import { ABSENCES_TAB } from "./employee-tabs";
 
 const PAGE = 20;
@@ -50,6 +53,13 @@ export function Absences({
   const routes = useRoutes();
   const decide = useDecideRequest();
   const [only, setOnly] = useState<Set<Status>>(() => new Set());
+  const settings = useScheduleSettings(viewId);
+  /* Отбор — по полям сотрудника: заявки берутся тех, кто под него попал. */
+  const people = useAll(settings.active ? EMPLOYEES : undefined, settings.where, false);
+  const picked = useMemo(
+    () => (settings.active ? new Set(people.rows.map((row) => String(row.guid))) : null),
+    [settings.active, people.rows],
+  );
 
   const counts = useMemo(() => {
     const result: Record<Status, number> = { pending: 0, approved: 0, rejected: 0 };
@@ -61,11 +71,15 @@ export function Absences({
   const shown = useMemo(
     () =>
       requests.rows
-        .filter((request) => !only.size || only.has(request.status as Status))
+        .filter(
+          (request) =>
+            (!only.size || only.has(request.status as Status)) &&
+            (!picked || picked.has(request.employeeId)),
+        )
         .sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending") || b.from.localeCompare(a.from)),
-    [requests.rows, only],
+    [requests.rows, only, picked],
   );
-  const [page, setPage] = useScopedPage(`${range.from}|${query}|${[...only].join()}`);
+  const [page, setPage] = useScopedPage(`${range.from}|${query}|${[...only].join()}|${settings.active}`);
   const pages = pageCount(shown.length, PAGE);
   const current = Math.min(page, pages);
   const slice = shown.slice((current - 1) * PAGE, current * PAGE);
@@ -135,7 +149,8 @@ export function Absences({
                 </td>
               </tr>
             ) : (
-              slice.map((request) => {
+              <GroupedRows rows={slice} group={settings.group} keysOf={(request) => request} colSpan={COLUMNS.length}>
+              {(request) => {
                 const route = routeFor({ type: "absence", departmentId: request.departmentId, absenceTypeId: request.typeId }, routes);
                 const progress = route ? progressOf(route, decisions.get(request.id) ?? []) : null;
                 const color = hexToChipColor(request.typeColor);
@@ -180,6 +195,7 @@ export function Absences({
                         {route && progress && request.status !== "rejected" && (
                           <Chain name={route.name} done={progress.done} total={progress.total} />
                         )}
+                        <TenureWarning request={request} />
                       </span>
                     </td>
                     <td className={`${td} text-right`} onClick={(event) => event.stopPropagation()}>
@@ -217,7 +233,8 @@ export function Absences({
                     </td>
                   </tr>
                 );
-              })
+              }}
+              </GroupedRows>
             )}
           </tbody>
         </table>
@@ -245,6 +262,18 @@ export function Chain({ name, done, total }: { name: string; done: number; total
       <span className="tabular-nums">
         {done}/{total}
       </span>
+    </span>
+  );
+}
+
+/** Ждущая заявка раньше права по стажу — решающий видит это до «Одобрить». */
+export function TenureWarning({ request }: { request: AbsenceRequest }) {
+  const { t } = useTranslation();
+  if (request.status !== "pending" || !(request.from < request.eligibleFrom)) return null;
+  return (
+    <span className="flex items-center gap-1 text-xs text-warning">
+      <Icon as={TriangleAlertIcon} size={12} className="shrink-0" />
+      {t("employeeAbsences.notEligible", { date: request.eligibleFrom.split("-").reverse().join(".") })}
     </span>
   );
 }

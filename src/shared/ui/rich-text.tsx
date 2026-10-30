@@ -49,6 +49,7 @@ export function RichText({
   placeholder = "",
   readOnly = false,
   autoFocus = false,
+  compact = false,
 }: {
   value: string;
   onChange?: (html: string) => void;
@@ -60,6 +61,8 @@ export function RichText({
   placeholder?: string;
   readOnly?: boolean;
   autoFocus?: boolean;
+  /** Короткий текст (комментарий): поле ниже, растёт по мере ввода. */
+  compact?: boolean;
 }) {
   const editor = useEditor({
     extensions: [
@@ -74,7 +77,7 @@ export function RichText({
     content: value,
     editable: !readOnly,
     autofocus: autoFocus ? "end" : false,
-    editorProps: { attributes: { class: `${CONTENT} ${readOnly ? "" : "min-h-40 px-3.5 py-3"}` } },
+    editorProps: { attributes: { class: `${CONTENT} ${readOnly ? "" : `${compact ? "min-h-16" : "min-h-40"} px-3.5 py-3`}` } },
     onUpdate: ({ editor: e }) => onChange?.(toValue(e)),
   });
 

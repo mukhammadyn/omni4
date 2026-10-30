@@ -28,7 +28,7 @@ import {
   type Relation,
 } from "@/features/table";
 import { Anchored } from "@/shared/ui/anchored";
-import { Chip } from "@/shared/ui/chip";
+import { CHIP_DOT, Chip, hexToChipColor } from "@/shared/ui/chip";
 import { openPreview } from "@/shared/ui/file-preview";
 import { Icon } from "@/shared/ui/icon";
 import { todayInput } from "@/shared/lib/date-value";
@@ -52,7 +52,7 @@ import {
   toTimeInput,
   type DateKind,
 } from "../model/cell-value";
-import { autoFilterValues, isLinkable, relationLabel, relationSelection } from "../model/relation";
+import { autoFilterValues, COLOR, isLinkable, isMany, relationLabel, relationSelection, relationTree, withoutPrefix } from "../model/relation";
 import type { Item } from "../model/types";
 import { cellError } from "../model/validate";
 import { Cell, isStage, optionColor, optionLabel } from "./Cell";
@@ -202,7 +202,9 @@ export function ActiveCell({
   const relational = kind === "relation";
   const linkable = relational && relation && isLinkable(relation.type);
 
-  if (!kind || !guid || (relational && !linkable)) {
+  /* Черновик новой записи guid ещё не имеет — правка уходит в черновик
+     (onEdit, onLink), а не запросом, так что он и не нужен. */
+  if (!kind || (!guid && !creating) || (relational && !linkable)) {
     return (
       <Anchored anchor={anchor} onClose={onClose}>
         <div className={`${card} border-border max-h-72 max-w-md overflow-auto px-2 py-1.5 text-sm`}>
@@ -226,11 +228,12 @@ export function ActiveCell({
         field={field}
         relation={relation}
         row={row}
-        rowGuid={guid}
+        rowGuid={guid ?? ""}
         tableSlug={tableSlug}
         anchor={anchor}
         language={language}
         onLink={onLink}
+        onEdit={edit}
         onClose={onClose}
       />
     );
@@ -379,7 +382,7 @@ export function ActiveCell({
         <ScannerEditor
           field={field}
           value={value}
-          guid={guid}
+          guid={guid ?? ""}
           tableSlug={tableSlug}
           anchor={anchor}
           check={check}
@@ -773,7 +776,9 @@ function DateEditor({
 
   return (
     <Anchored anchor={anchor} onClose={onClose}>
-      <div className={`${card} border-border p-2`}>
+      {/* w-fit: Anchored тянет блок до ширины якоря, а календарю в широком
+          поле формы растягиваться некуда — справа оставалась пустота. */}
+      <div className={`${card} w-fit border-border p-2`}>
         <Suspense fallback={<CalendarFallback />}>
         <div className="flex gap-2">
           <Calendar
@@ -884,6 +889,7 @@ function RelationEditor({
   anchor,
   language,
   onLink,
+  onEdit,
   onClose,
 }: {
   field: Field;
@@ -897,10 +903,13 @@ function RelationEditor({
   language: string;
   /** Есть — выбор не уезжает запросом, а отдаётся вызывающему. */
   onLink?: ((item: Item | null) => void) | undefined;
+  /** Many2Many: список uuid пишется обычной правкой поля (и в черновик, и запросом). */
+  onEdit: (value: unknown) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const many = isMany(relation.type);
   /*
    * Запрос отстаёт от ввода на один кадр: без этого каждая буква
    * порождает свой запрос к чужой таблице. useDeferredValue вместо
@@ -970,14 +979,24 @@ function RelationEditor({
    * пришедших строк отобрать нужные — одна строка кода.
    */
   const needle = search.trim().toLowerCase();
-  const visible = needle
-    ? items.filter((item) => relationLabel(item, slugs, language).toLowerCase().includes(needle))
-    : items;
+  /* Выключенную запись справочника (`is_active: false`) не предлагаем:
+     её выключают вместо удаления. Уже выбранная остаётся в ячейке.
+     ponytail: на клиенте — страница может прийти короче; фильтр на сервер, если начнёт мешать. */
+  const visible = items.filter(
+    (item) => item["is_active"] !== false && (!needle || relationLabel(item, slugs, language).toLowerCase().includes(needle)),
+  );
+  /* Ссылка строки на свою таблицу — варианты деревом (model/relation, relationTree).
+     В каскаде не нужно: там шаги и есть уровни. */
+  const parentKey = `${listSlug}_id`;
+  const options = steps.length ? visible.map((item) => ({ item, depth: 0 as const, header: false })) : relationTree(visible, parentKey);
   const link = useLinkRelation(tableSlug);
   const create = useCreateItem(relation.toSlug);
 
-  const selected = relationSelection(row, field, slugs, language);
+  const selected = relationSelection(row, field, slugs, language, items);
   const selectedGuids = new Set(selected.map((item) => item.guid));
+  /** Many2Many: снять или добавить одно значение, остальные не трогая. */
+  const toggle = (guid: string) =>
+    onEdit(selectedGuids.has(guid) ? [...selectedGuids].filter((one) => one !== guid) : [...selectedGuids, guid]);
 
   /* Уезжает guid, но наружу отдаётся строка целиком: черновику нужна
      и связанная запись — из неё ячейка берёт, что показать. */
@@ -1001,6 +1020,9 @@ function RelationEditor({
       setQuery("");
       return;
     }
+
+    // Список остаётся открытым: выбирают несколько.
+    if (many) return toggle(guid);
 
     // Ссылка одна: повторный выбор того же значения снимает её.
     write(selectedGuids.has(guid) ? null : item);
@@ -1029,6 +1051,7 @@ function RelationEditor({
     const created: Item = { guid: crypto.randomUUID(), [first]: text };
     create.mutate(created, {
       onSuccess: () => {
+        if (many) return onEdit([...selectedGuids, String(created["guid"])]);
         write(created);
         onClose();
       },
@@ -1063,7 +1086,7 @@ function RelationEditor({
         <div className="m-1.5 flex min-h-7.5 flex-wrap items-center gap-1 rounded-md border border-border bg-input px-2 py-1">
           {selected.map((item) => (
             <span key={item.guid} className="inline-flex min-w-0 items-center gap-0.5">
-              <Chip onRemove={() => write(null)} removeLabel={t("cell.remove")}>
+              <Chip color={item.color ? hexToChipColor(item.color) : "gray"} off={item.off} onRemove={() => (many ? toggle(item.guid) : write(null))} removeLabel={t("cell.remove")}>
                 {item.label || item.guid}
               </Chip>
 
@@ -1101,18 +1124,31 @@ function RelationEditor({
           )}
 
           <>
-            {visible.map((item) => {
+            {options.map(({ item, depth, header }) => {
                 const guid = String(item["guid"] ?? "");
-                const label = relationLabel(item, slugs, language);
+                const own = relationLabel(item, slugs, language);
+                const parent = depth ? visible.find((one) => one["guid"] === item[parentKey]) : undefined;
+                const label = parent ? withoutPrefix(own, relationLabel(parent, slugs, language)) : own;
+                const color = typeof item[COLOR] === "string" && item[COLOR] ? hexToChipColor(item[COLOR]) : null;
+
+                // Группа грейдов — подпись, а не вариант: выбирают её грейды (relationTree, GROUP_ONLY).
+                if (header) {
+                  return (
+                    <div key={guid} className="flex h-7 items-center gap-2 px-2.5 pt-1 text-xs font-medium text-fg-muted">
+                      {color && <span className={`size-2 rounded-full ${CHIP_DOT[color]}`} />}
+                      <span className="truncate">{label || guid}</span>
+                    </div>
+                  );
+                }
 
                 return (
                   <button
                     key={guid}
                     type="button"
                     onClick={() => pick(item)}
-                    className="flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-surface-hover"
+                    className={`flex h-7.5 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-surface-hover ${depth ? "pl-6" : ""}`}
                   >
-                    <span className="truncate">{label || guid}</span>
+                    {color ? <Chip color={color}>{label || guid}</Chip> : <span className="truncate">{label || guid}</span>}
                     {selectedGuids.has(guid) && (
                       <Icon as={CheckIcon} size={14} className="ml-auto text-accent-text" />
                     )}
@@ -1472,15 +1508,20 @@ function FileEditor({
     const picked = files ? [...files] : [];
     if (!picked.length) return;
 
-    upload.mutate(
-      {
+    /*
+     * mutateAsync, а не onSuccess у mutate: тот не вызывается, если
+     * редактор успел закрыться (клик мимо, прокрутка, окно выбора файла),
+     * и загруженный файл молча не доезжал до записи — в черновике новой
+     * записи его потом не было. Ошибку уже показал хук.
+     */
+    upload
+      .mutateAsync({
         // Одиночному полю второй файл некуда девать — берём первый.
         files: multiple ? picked : picked.slice(0, 1),
         folder: uploadFolder(field.attributes),
         ratio: uploadRatio(field.attributes),
-      },
-      { onSuccess: (added) => write(multiple ? [...urls, ...added] : added) },
-    );
+      })
+      .then((added) => write(multiple ? [...urls, ...added] : added), () => undefined);
   };
 
   return (

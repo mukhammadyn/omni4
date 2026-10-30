@@ -25,8 +25,9 @@ import { Checkbox } from "@/shared/ui/checkbox";
 import { Icon } from "@/shared/ui/icon";
 import { Tooltip } from "@/shared/ui/tooltip";
 import { cellKind, editorKind } from "../model/cell-kind";
-import { blankItem } from "../model/cell-value";
+import { blankItem, toList } from "../model/cell-value";
 import { columnWindow, type ColumnWindow } from "../model/column-window";
+import { mergeImageColumns } from "../model/image-columns";
 import { groupEntries, visibleEntries } from "../model/group";
 import type { TreeMeta } from "../model/tree";
 import type { Sort, SortDirection } from "../model/query";
@@ -36,6 +37,7 @@ import { ActiveCell } from "./CellEditor";
 import { Cell } from "./Cell";
 import { ColumnMenu, type ColumnActions } from "./ColumnMenu";
 import { fieldIcon } from "./field-icon";
+import { Avatar } from "./PeopleGallery";
 
 /**
  * Таблица строк.
@@ -206,7 +208,7 @@ function pinLayout(
 
 export function DataGrid({
   tableSlug,
-  columns,
+  columns: allColumns,
   extra = NO_EXTRA,
   pinned,
   widths,
@@ -338,6 +340,10 @@ export function DataGrid({
   creating?: boolean;
 }) {
   const { t } = useTranslation();
+  /* Картинка — аватаром у ближайшей текстовой колонки (model/image-columns).
+     Черновик и проверка новой строки — по всем полям: обязательное фото
+     не должно пропасть из проверки оттого, что его не видно отдельной колонкой. */
+  const { columns, imageOf } = useMemo(() => mergeImageColumns(allColumns), [allColumns]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<Active | null>(null);
@@ -360,7 +366,7 @@ export function DataGrid({
    */
   const [showErrors, setShowErrors] = useState(false);
 
-  const errors = draft ? rowErrors(columns, draft) : NO_ERRORS;
+  const errors = draft ? rowErrors(allColumns, draft) : NO_ERRORS;
 
   /** Сообщение админа важнее нашего: он писал его про конкретное поле. */
   const errorText = (error: CellError) =>
@@ -370,7 +376,7 @@ export function DataGrid({
     setDraft((current) => (current ? { ...current, ...values } : current));
 
   const startDraft = () => {
-    setDraft(blankItem(columns, newRowDefaults));
+    setDraft(blankItem(allColumns, newRowDefaults));
     setShowErrors(false);
   };
 
@@ -390,7 +396,7 @@ export function DataGrid({
     const [first] = [...errors];
     if (first) {
       const [slug, error] = first;
-      const field = columns.find((column) => column.slug === slug);
+      const field = allColumns.find((column) => column.slug === slug);
       const label = field ? localized(field.labels, language, field.label) : slug;
 
       setShowErrors(true);
@@ -931,6 +937,7 @@ export function DataGrid({
                         {tree && columnIndex === 0 && (
                           <TreeHandle guid={id} tree={tree} />
                         )}
+                        {imageOf.has(column.id) && <RowAvatar row={row} text={column} image={imageOf.get(column.id)!} />}
                         <Cell
                           field={column}
                           row={row}
@@ -1489,4 +1496,17 @@ function HeaderCell({
 /** Первичный ключ в ucode — guid. Индекс только на случай его отсутствия. */
 function rowKey(row: Item, index = 0): string {
   return typeof row.guid === "string" && row.guid ? row.guid : String(index);
+}
+
+/** Аватар строки: картинка поля-фото, нет её — инициалы по тексту колонки. */
+function RowAvatar({ row, text, image }: { row: Item; text: Field; image: Field }) {
+  const name = typeof row[text.slug] === "string" ? (row[text.slug] as string) : "";
+  const photo = toList(row[image.slug])[0];
+  // Ни фото, ни имени — пустой цветной кружок только шумит.
+  if (!photo && !name.trim()) return null;
+  return (
+    <span className="mr-2 shrink-0">
+      <Avatar name={name} photo={photo} size="md" />
+    </span>
+  );
 }

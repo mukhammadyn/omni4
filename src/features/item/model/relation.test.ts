@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
+import i18n from "@/shared/lib/i18n";
 import type { Field, Relation } from "@/features/table";
-import { autoFilterValues, relationSelection, selfDefaults } from "./relation";
+import { autoFilterValues, relationSelection, relationTree, selfDefaults, withoutPrefix } from "./relation";
 
 /** Связь с настроенным автофильтром: город отбирается по региону строки. */
 function relationWith(autoFilters: unknown): Relation {
@@ -111,4 +112,34 @@ test("цвет связанной записи едет вместе с подп
   expect(
     relationSelection({ stage_id_data: { guid: "s2", name: "Без", color: "" } }, field, fields),
   ).toEqual([{ guid: "s2", label: "Без" }]);
+});
+
+test("relation options as a tree: group header, its children under it, orphan to the root", () => {
+  const items = [
+    { guid: "dev", name: "DEV" },
+    { guid: "d1", name: "DEV D1", hr_grades_id: "dev" },
+    { guid: "pm", name: "PM" },
+    { guid: "x", name: "Lost", hr_grades_id: "gone" },
+    { guid: "d2", name: "DEV D2", hr_grades_id: "dev" },
+  ];
+  expect(relationTree(items, "hr_grades_id").map((o) => `${o.depth}${o.header ? "H" : ""}:${String(o.item.guid)}`)).toEqual([
+    "0H:dev",
+    "1:d1",
+    "1:d2",
+    "0:pm",
+    "0:x",
+  ]);
+  expect(withoutPrefix("DEV D3", "DEV")).toBe("D3");
+  expect(withoutPrefix("DEVOPS", "DEV")).toBe("DEVOPS");
+});
+
+test("relationSelection: Many2Many — подписи из строк целевой таблицы, неизвестный uuid без подписи", () => {
+  const field = { slug: "core_business_units_ids" } as Field;
+  const fields = [{ slug: "name", type: "SINGLE_LINE" }];
+  const known = [{ guid: "u1", name: "Udevs" }, { guid: "u2", name: "Ucode" }];
+
+  expect(relationSelection({ core_business_units_ids: ["u2", "u9"] }, field, fields, "", known)).toEqual([
+    { guid: "u2", label: "Ucode" },
+    { guid: "u9", label: i18n.t("relation.noName") },
+  ]);
 });

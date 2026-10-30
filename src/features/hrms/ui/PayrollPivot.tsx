@@ -1,72 +1,52 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, PanelRightOpenIcon } from "lucide-react";
+import { PanelRightOpenIcon } from "lucide-react";
 import { Avatar } from "@/features/item";
-import { todayInput } from "@/shared/lib/date-value";
 import { Icon } from "@/shared/ui/icon";
-import { useLastPayMonth, usePayMonth } from "../api/payroll";
-import { buildPayPivot, compactSum, type PayPivot } from "../model/payroll";
+import { usePayPeriod } from "../api/payroll";
+import { PayrollExcel } from "./PayrollExcel";
+import { PeriodBar, usePeriod, usePeriodLabel } from "./attendance-parts";
+import { useScheduleSettings } from "./schedule-settings";
+import { buildPayPivot, compactSum } from "../model/payroll";
+import type { Scale } from "../model/timesheet";
 
 const th = "h-9 border-b border-border px-2 text-[13px] font-normal text-fg-muted whitespace-nowrap";
 const td = "h-row border-b border-border px-2 tabular-nums";
 const num = "text-right";
 const cell = `${td} ${num} border-l border-border`;
 
-const shift = (month: string, by: number) => {
-  const date = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + by, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-};
+/** Платят и помесячно, и по неделям — ведомость HRMS (Finance/Salary) умеет оба. */
+const SCALES: readonly Scale[] = ["month", "week"];
 
 /**
  * «Сводная по месяцам» начислений — `pivotView` прототипа (payroll.html):
- * сотрудник × вид за расчётный месяц, начисления и удержания группами,
+ * сотрудник × вид за месяц или неделю, начисления и удержания группами,
  * справа «Всего начислено · Всего удержано · К выплате», внизу «Итого».
+ * Период — строка периода «Посещаемости»; шаблон и загрузка Excel берут его же.
  *
  * Сделано под `hr_payroll_lines` (FIXED_VIEW_TYPES): строки грузит сам
  * (api/payroll), считает model/payroll.
  */
-export function PayrollPivot({ search, onOpenEmployee }: { search: string; onOpenEmployee: (guid: string) => void }) {
-  const { t, i18n } = useTranslation();
-  const last = useLastPayMonth();
-  const [picked, setPicked] = useState("");
-  const month = picked || last.month || todayInput().slice(0, 7);
-  const { lines, loading } = usePayMonth(month, search);
+export function PayrollPivot({ viewId, search, onOpenEmployee }: { viewId: string; search: string; onOpenEmployee: (guid: string) => void }) {
+  const { t } = useTranslation();
+  const period = usePeriod(viewId, SCALES);
+  const title = usePeriodLabel(period);
+  const { where } = useScheduleSettings(viewId);
+  const { lines, loading } = usePayPeriod(period.range, period.scale === "week", search, where);
   const pivot = useMemo(() => buildPayPivot(lines, false), [lines]);
-  const title = new Intl.DateTimeFormat(i18n.language, { month: "long", year: "numeric" }).format(
-    new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1),
-  );
   const columns = [...pivot.accruals, ...pivot.deductions];
   const signed = (id: string, value: number) => (pivot.deductions.some((c) => c.id === id) ? -value : value);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-1.5 px-6 py-2 text-sm">
-        <NavButton label={t("payroll.back")} onClick={() => setPicked(shift(month, -1))} icon={ChevronLeftIcon} />
-        <b className="min-w-[160px] text-center font-semibold first-letter:uppercase">{title}</b>
-        <NavButton label={t("payroll.forward")} onClick={() => setPicked(shift(month, 1))} icon={ChevronRightIcon} />
+      <PeriodBar view={period}>
         {/* ponytail: «Скрыть без начислений» убран — в сводной только сотрудники
-            со строками за месяц, скрывать нечего. Вернуть вместе со всеми
+            со строками за период, скрывать нечего. Вернуть вместе со всеми
             сотрудниками из hr_employees (нулевые строки, как в прототипе). */}
-        <span className="flex-1" />
-        <button
-          type="button"
-          onClick={() =>
-            exportCsv(pivot, title, {
-              employee: t("payroll.employee"),
-              dept: t("payroll.dept"),
-              accruals: t("payroll.accruals"),
-              deductions: t("payroll.deductions"),
-              accrued: t("payroll.accrued"),
-              deducted: t("payroll.deducted"),
-              net: t("payroll.net"),
-            })
-          }
-          className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 text-[13px] text-fg transition-colors hover:bg-surface-hover"
-        >
-          <Icon as={DownloadIcon} size={14} />
-          {t("payroll.export")}
-        </button>
-      </div>
+        <div className="flex justify-end">
+          <PayrollExcel range={period.range} kind={period.scale === "week" ? "week" : "month"} title={title} where={where} />
+        </div>
+      </PeriodBar>
 
       <div className="min-h-0 flex-1 overflow-auto px-6">
         <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
@@ -149,46 +129,4 @@ export function PayrollPivot({ search, onOpenEmployee }: { search: string; onOpe
       </div>
     </div>
   );
-}
-
-function NavButton({ label, onClick, icon }: { label: string; onClick: () => void; icon: typeof ChevronLeftIcon }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="grid size-7 place-items-center rounded-md text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg"
-    >
-      <Icon as={icon} size={16} />
-    </button>
-  );
-}
-
-/** ponytail: CSV с BOM вместо .xlsx — Excel открывает его так же, а библиотека не нужна. */
-function exportCsv(pivot: PayPivot, title: string, label: Record<"employee" | "dept" | "accruals" | "deductions" | "accrued" | "deducted" | "net", string>) {
-  const head = [
-    label.employee,
-    label.dept,
-    ...pivot.accruals.map((c) => `${label.accruals}: ${c.name}`),
-    ...pivot.deductions.map((c) => `${label.deductions}: ${c.name}`),
-    label.accrued,
-    label.deducted,
-    label.net,
-  ];
-  const body = pivot.rows.map((row) => [
-    row.name,
-    row.dept,
-    ...pivot.accruals.map((c) => row.cells[c.id] ?? 0),
-    ...pivot.deductions.map((c) => -(row.cells[c.id] ?? 0)),
-    row.accrued,
-    -row.deducted,
-    row.accrued - row.deducted,
-  ]);
-  const csv = [head, ...body].map((r) => r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(";")).join("\r\n");
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
-  link.download = `${title}.csv`;
-  link.click();
-  URL.revokeObjectURL(link.href);
 }

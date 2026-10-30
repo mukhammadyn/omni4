@@ -16,6 +16,20 @@ export type AbsenceType = {
   limit: number | null;
   /** `limit_period`: week, month, year, none. */
   period: string;
+  /** Мин. стаж для права, месяцев; 0 — с первого дня. */
+  minMonths: number;
+};
+
+/**
+ * С какого дня у сотрудника право на тип: приём + мин. стаж. Пусто — право
+ * есть всегда (стажа не требуется или дата приёма не заполнена). Конец
+ * месяца не перескакивает: 31.08 + 6 мес. — 28.02, а не 3 марта.
+ */
+export const eligibleFrom = (hireDate: string, months: number): string => {
+  if (!months || !hireDate) return "";
+  const [y, m, d] = hireDate.slice(0, 10).split("-").map(Number) as [number, number, number];
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+  return iso(new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))));
 };
 
 export type RequestDays = { typeId: string; status: string; from: string; days: number };

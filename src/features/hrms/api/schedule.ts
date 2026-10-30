@@ -4,9 +4,10 @@ import { MAX_LIMIT, toRequestBody, useItems, type Filters, type Item, type Items
 import { api } from "@/shared/api/client";
 import { keys } from "@/shared/lib/query-keys";
 import { reportError } from "@/shared/lib/toast";
-import { WEEKDAYS, type Shift, type ShiftDraft, type ShiftKindRow, type Template } from "../model/schedule";
-import { EMPLOYEES } from "./employee";
+import { WEEKDAYS, type DaysOffOf, type Shift, type ShiftDraft, type ShiftKindRow, type Template } from "../model/schedule";
+import { EMPLOYEES, useNotDismissed } from "./employee";
 import { firstText, text } from "./org";
+import { useDaysOff } from "./holiday";
 import { useAll } from "./timesheet";
 
 /** График работы: смены, шаблоны и их дни (`ucode/erp/erp.dbml`). */
@@ -163,20 +164,6 @@ export function useScheduleDirectory({ forms = false }: { forms?: boolean } = {}
   }, [departments.rows, locations.rows, positions.rows, projects.rows]);
 }
 
-/**
- * Праздники за период — даты, которые серия пропускает. Пока грузятся
- * (и пока видны праздники прошлого периода — `placeholderData`), писать
- * по ним нельзя: смены лягут на праздник.
- */
-export function useHolidays(from: string, to: string) {
-  const query = useAll(from && to ? "hr_holidays" : undefined, { date: { op: "between", values: [from, to] } }, false);
-  const dates = useMemo(
-    () => new Set(query.rows.filter((row) => text(row.type) !== "working_weekend").map((row) => text(row.date).slice(0, 10))),
-    [query.rows],
-  );
-  return { dates, loading: query.loading || query.fetching };
-}
-
 /*
  * Сотрудники графика едут без связей: из `*_id_data` нужны только
  * названия, а со связями ответ в разы тяжелее (справочник API, §4.3:
@@ -238,6 +225,20 @@ export function useEmployeesById(ids: string[]) {
   return { employees, loading: sorted.length > 0 && people.loading };
 }
 
+/**
+ * Нерабочие дни периода по сотруднику — календарь его филиала. Пока
+ * грузятся, писать смены нельзя: лягут на праздник.
+ */
+export function useEmployeeDaysOff(employeeIds: string[], from: string, to: string) {
+  const people = useEmployeesById(employeeIds);
+  const daysOff = useDaysOff(from, to);
+  const of = useMemo<DaysOffOf>(() => {
+    const location = new Map(people.employees.map((e) => [e.id, e.locationId]));
+    return (id) => daysOff.of(location.get(id) ?? "");
+  }, [people.employees, daysOff.of]);
+  return { of, loading: people.loading || daysOff.loading || daysOff.fetching };
+}
+
 /** Поиск сотрудника в выборе — с сервера порциями, по алфавиту, как сетка. */
 export function useEmployeeSearch(search: string) {
   const names = useNames();
@@ -265,30 +266,28 @@ export function useSchedule({
   to,
   employeeId,
   search = "",
-  departments = [],
-  locations = [],
+  where = {},
   pageSize,
 }: {
   from: string;
   to: string;
   employeeId?: string;
   search?: string;
-  departments?: string[];
-  locations?: string[];
+  /** Отбор сотрудников полосой фильтров (PeopleFilterBar). */
+  where?: Filters;
   /** Сотрудники порциями по столько — прокрутка, как в «Посещаемости». Без него — все. */
   pageSize?: number;
 }) {
   const one = employeeId ? { hr_employees_id: { op: "any" as const, values: [employeeId] } } : {};
-  // «—» (поле пустое) в отбор uuid не передать — такой отбор остаётся на клиенте.
-  const only = (field: string, values: string[]): Filters =>
-    values.length && !values.includes("") ? { [field]: { op: "any", values } } : {};
+  // Уволенных в графике нет; свой фильтр по статусу человека важнее.
+  const working = useNotDismissed();
   const peopleQuery = useItems(EMPLOYEES, {
     limit: pageSize ?? MAX_LIMIT,
     page: 1,
     infinite: true,
     filters: employeeId
       ? { guid: { op: "any", values: [employeeId] } }
-      : { ...only("hr_departments_id", departments), ...only("hr_locations_id", locations) },
+      : { ...working, ...where },
     search,
     // Порции идут по алфавиту — иначе новая порция вставала бы между строк.
     sorts: [{ field: "full_name", direction: "asc" }],
@@ -309,7 +308,7 @@ export function useSchedule({
   const loadingMore = peopleQuery.loadingMore;
   const hasMore = Boolean(pageSize) && peopleMore;
   const shifts = useAll(SHIFTS, { ...one, date: { op: "between", values: [from, to] } }, false);
-  const holidays = useAll("hr_holidays", { date: { op: "between", values: [from, to] } }, false);
+  const daysOff = useDaysOff(from, to);
   const { templates, loading: templatesLoading } = useTemplates();
 
   return useMemo(
@@ -318,13 +317,10 @@ export function useSchedule({
       employees: people.employees.filter((e) => (!e.hireDate || e.hireDate <= to) && (!e.dismissalDate || e.dismissalDate >= from)),
       shifts: shifts.rows.map(toShift),
       templates,
-      // ponytail: праздник общий на всех, как в табеле (api/timesheet).
-      holidays: new Map(
-        holidays.rows
-          .filter((row) => text(row.type) !== "working_weekend")
-          .map((row) => [text(row.date).slice(0, 10), text(row.name)]),
-      ),
-      loading: people.loading || shifts.loading || holidays.loading || templatesLoading,
+      /** Праздники филиала сотрудника; без сотрудника (шапка графика) — общие. */
+      holidays: daysOff.of(employeeId ? (people.employees[0]?.locationId ?? "") : ""),
+      holidaysOf: daysOff.of,
+      loading: people.loading || shifts.loading || daysOff.loading || templatesLoading,
       // Догрузка порции — не обновление: прежние строки не приглушаются.
       fetching: shifts.fetching || (peopleQuery.isFetching && !loadingMore),
       hasMore,
@@ -333,7 +329,7 @@ export function useSchedule({
       /** Сотрудников по серверному отбору всего, а не загруженных. */
       total: peopleQuery.page.count,
     }),
-    [people.employees, people.loading, shifts.rows, holidays.rows, templates, from, to, shifts.loading, holidays.loading, templatesLoading, shifts.fetching, peopleQuery.isFetching, hasMore, loadingMore, loadMore, peopleQuery.page.count],
+    [people.employees, people.loading, shifts.rows, daysOff.of, daysOff.loading, employeeId, templates, from, to, shifts.loading, templatesLoading, shifts.fetching, peopleQuery.isFetching, hasMore, loadingMore, loadMore, peopleQuery.page.count],
   );
 }
 

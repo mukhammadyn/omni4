@@ -4,12 +4,11 @@ import { BriefcaseIcon, ChevronDownIcon, RefreshCwIcon, SparkleIcon, UserIcon, U
 import { Avatar } from "@/features/item";
 import { Icon } from "@/shared/ui/icon";
 import { useSchedule, useScheduleDirectory, type ScheduleEmployee } from "../api/schedule";
-import { byEmployeeDate, type Shift, type ShiftKind, type Template } from "../model/schedule";
+import { byEmployeeDate, type Shift, type ShiftKind } from "../model/schedule";
 import { isWeekend } from "../model/timesheet";
 import { EmployeeName, MoreRows, PeriodBar, SHEET_PAGE, useDayHead, usePeriod, type OpenEmployee } from "./attendance-parts";
 import { SCHEDULE_TAB } from "./employee-tabs";
 import { useScheduleSettings, type ScheduleGroup } from "./schedule-settings";
-import { NO_TEMPLATE } from "./ScheduleTools";
 import { KindIcon, useDuration, useKinds, useShiftTime, type KindLook, type OpenShift } from "./schedule-parts";
 import { ApplyTemplateDialog } from "./ApplyTemplateDialog";
 import { ShiftDialog } from "./ShiftDialog";
@@ -45,8 +44,7 @@ export function ScheduleCalendar({
   const data = useSchedule({
     ...range,
     search: query,
-    departments: settings.values("dept"),
-    locations: settings.values("location"),
+    where: settings.where,
     ...(settings.axis === "employee" ? { pageSize: SHEET_PAGE } : {}),
   });
   const { locations } = useScheduleDirectory();
@@ -61,28 +59,11 @@ export function ScheduleCalendar({
   const month = scale === "month";
 
   const shiftsOf = useMemo(() => byEmployeeDate(data.shifts), [data.shifts]);
-  const templateById = useMemo(() => new Map(data.templates.map((item) => [item.id, item])), [data.templates]);
   const locationName = useMemo(() => new Map(locations.map((item) => [item.id, item.name])), [locations]);
 
-  /** Шаблон сотрудника: по сменам периода, иначе из карточки (`curTpl` прототипа). */
-  const templateOf = useMemo(() => {
-    const bySchedule = new Map<string, string>();
-    for (const shift of data.shifts) if (shift.templateId && !bySchedule.has(shift.employeeId)) bySchedule.set(shift.employeeId, shift.templateId);
-    return (employee: ScheduleEmployee): Template | undefined =>
-      templateById.get(bySchedule.get(employee.id) ?? employee.templateId);
-  }, [data.shifts, templateById]);
-
-  // Поиск — на сервере (api/schedule, useSchedule): второй отбор по имени прятал бы тех,
-  // кого сервер нашёл по другому полю, и итог разошёлся бы со строками.
-  const employees = useMemo(() => {
-    const hit = (values: string[], value: string) => !values.length || values.includes(value);
-    return data.employees.filter(
-      (employee) =>
-        hit(settings.values("dept"), employee.departmentId) &&
-        hit(settings.values("location"), employee.locationId) &&
-        hit(settings.values("template"), templateOf(employee)?.id ?? NO_TEMPLATE),
-    );
-  }, [data.employees, settings, templateOf]);
+  // Поиск и отбор — на сервере (api/schedule, useSchedule): второй отбор на клиенте
+  // прятал бы тех, кого сервер нашёл, и итог разошёлся бы со строками.
+  const employees = data.employees;
 
   const visible = (shift: Shift) => !kinds.size || kinds.has(shift.kind);
 
@@ -96,28 +77,22 @@ export function ScheduleCalendar({
   const stats = useMemo(() => {
     const byKind = new Map<ShiftKind, number>();
     const count = (shift: Shift) => byKind.set(shift.kind, (byKind.get(shift.kind) ?? 0) + 1);
-    let off = 0;
     let minutes = 0;
     if (data.hasMore && !narrowed) {
-      const worked = new Set<string>();
       for (const shift of data.shifts) {
         count(shift);
         minutes += shift.plannedMinutes;
-        worked.add(`${shift.employeeId}|${shift.date}`);
       }
-      off = Math.max(0, data.total * dates.length - worked.size);
-      return { byKind, off, minutes, people: data.total };
+      return { byKind, minutes, people: data.total };
     }
     for (const employee of employees)
       for (const date of dates) {
-        const list = shiftsOf(employee.id, date);
-        if (!list.length) off += 1;
-        for (const shift of list) {
+        for (const shift of shiftsOf(employee.id, date)) {
           count(shift);
           minutes += shift.plannedMinutes;
         }
       }
-    return { byKind, off, minutes, people: employees.length };
+    return { byKind, minutes, people: employees.length };
   }, [employees, dates, shiftsOf, data.hasMore, data.shifts, data.total, narrowed]);
 
   /* Строки: сотрудники или должности, по группам. */
@@ -134,6 +109,7 @@ export function ScheduleCalendar({
     const keyOf: Record<Exclude<ScheduleGroup, "none">, (e: ScheduleEmployee) => [string, string]> = {
       dept: (e) => [e.departmentId, e.department],
       location: (e) => [e.locationId, e.location],
+      position: (e) => [e.positionId, e.position],
     };
     if (settings.group === "none")
       return [{ id: "", label: "", rows: rowsOf(employees) }];
@@ -170,18 +146,21 @@ export function ScheduleCalendar({
     if (!all.length) {
       return month ? null : (
         <div className="flex h-11 items-center justify-center rounded-md border border-dashed border-border-strong text-xs font-medium text-fg-subtle group-hover/cell:border-accent group-hover/cell:text-accent-text">
-          {data.holidays.has(date) ? t("schedule.holiday") : t("schedule.dayOff")}
+          {/* Строка одного сотрудника — праздники его филиала; шапка и заливка — общие. */}
+          {(row.employees.length === 1 ? data.holidaysOf(row.employees[0]!.locationId) : data.holidays).has(date) ? t("schedule.holiday") : t("schedule.dayOff")}
         </div>
       );
     }
     if (!row.position) return shown.map((shift) => <ShiftChip key={shift.id} shift={shift} kind={kindsOf.of(shift.kind)} mini={month} place={place(shift)} onOpen={open(shift)} />);
-    // По должности — одинаковые смены одной плашкой «N из M».
+    // По должности — смены одного вида одной плашкой «N из M»; время у них
+    // может расходиться, на плашке — время самой ранней.
     const same = new Map<string, Shift[]>();
     for (const shift of shown) {
-      const key = `${shift.kind}|${shift.start}|${shift.end}|${shift.plannedMinutes}`;
+      const key = shift.kind;
       same.set(key, [...(same.get(key) ?? []), shift]);
     }
     return [...same.values()]
+      .map((list) => [...list].sort((a, b) => a.start.localeCompare(b.start)))
       .sort((a, b) => a[0]!.start.localeCompare(b[0]!.start))
       .map((list) => {
         const shift = list[0]!;
@@ -232,11 +211,6 @@ export function ScheduleCalendar({
               <b className="font-semibold text-fg tabular-nums">{stats.byKind.get(kind) ?? 0}</b>
             </button>
           ))}
-          <span className="inline-flex h-7 items-center gap-1.5 px-1.5 text-[13px] text-fg-muted">
-            <i className="size-2 rounded-full bg-fg-subtle/50" />
-            {t("schedule.dayOff")}
-            <b className="font-semibold text-fg tabular-nums">{stats.off}</b>
-          </span>
         </div>
       </PeriodBar>
 
@@ -304,8 +278,6 @@ export function ScheduleCalendar({
                             <PositionName
                               name={row.position || "—"}
                               count={row.employees.length}
-                              // В группе по отделу отдел уже в шапке группы.
-                              departments={settings.group === "dept" ? "" : [...new Set(row.employees.map((e) => e.department).filter(Boolean))].join(", ")}
                             />
                           ) : (
                             <EmployeeHead
@@ -416,8 +388,8 @@ function EmployeeHead({
 }
 
 
-/** Должность — `.sg-pos` прототипа: «2 сотр. · Разработка». */
-function PositionName({ name, count, departments }: { name: string; count: number; departments: string }) {
+/** Должность — `.sg-pos` прототипа, без отдела: «2 сотр.». */
+function PositionName({ name, count }: { name: string; count: number }) {
   const { t } = useTranslation();
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -427,7 +399,7 @@ function PositionName({ name, count, departments }: { name: string; count: numbe
       <div className="min-w-0">
         <div className="truncate text-[13px] font-semibold text-fg">{name}</div>
         <div className="truncate text-2xs text-fg-subtle">
-          {[t("schedule.employees", { count }), departments].filter(Boolean).join(" · ")}
+          {t("schedule.employees", { count })}
         </div>
       </div>
     </div>

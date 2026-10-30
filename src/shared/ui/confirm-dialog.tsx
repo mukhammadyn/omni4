@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
 import { Modal } from "@/shared/ui/modal";
@@ -10,6 +11,7 @@ export function ConfirmDialog({
   busy,
   onConfirm,
   onClose,
+  children,
 }: {
   title: string;
   description: string;
@@ -17,6 +19,8 @@ export function ConfirmDialog({
   busy: boolean;
   onConfirm: () => void;
   onClose: () => void;
+  /** Уточнение под текстом — например, галочка «заодно…». */
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
 
@@ -25,6 +29,7 @@ export function ConfirmDialog({
       <div className="flex w-full max-w-sm flex-col gap-3 rounded-xl border border-border bg-surface p-5 shadow-modal">
         <h2 className="text-lg font-semibold">{title}</h2>
         <p className="text-sm text-fg-muted">{description}</p>
+        {children}
 
         <div className="mt-1 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>

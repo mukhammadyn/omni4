@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, GitForkIcon, Trash2Icon } from "lucide-react";
 import {
   ActiveCell,
   Cell,
   blankItem,
   cellKind,
+  isMany,
   type CellKind,
   relationDataKey,
   rowErrors,
@@ -20,6 +21,7 @@ import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { CHIP_COLORS, CHIP_DOT, CHIP_HEX, hexToChipColor } from "@/shared/ui/chip";
 import { DatePicker } from "@/shared/ui/date-picker";
+import { Dropdown, type DropdownItem } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
 import { Input } from "@/shared/ui/input";
 import { Modal } from "@/shared/ui/modal";
@@ -45,8 +47,25 @@ export function DirectoryCreateDialog({
   language,
   row,
   readOnly = false,
+  defaults,
+  parent,
+  note,
+  iconSlug,
+  layout,
+  choices,
+  onDelete,
   onClose,
 }: {
+  /** Связь выбирается из готового списка, а не поиском: группа грейдов — только корни дерева. */
+  choices?: Record<string, DropdownItem[]> | undefined;
+  /**
+   * Раскладка по секциям (`Directory.form`): подзаголовок, порядок полей,
+   * какие встают парой. Нет — все поля подряд в порядке схемы. Поле,
+   * которого нет ни в одной секции, уходит в последнюю.
+   */
+  layout?: { title: string; fields: string[]; half?: string[] }[] | undefined;
+  /** Текстовое поле с именем иконки (`Directory.iconField`) — правится пикером, как поле ICON. */
+  iconSlug?: string | undefined;
   table: string;
   /** Запись на правку; нет — новая. */
   row?: Item | undefined;
@@ -56,15 +75,34 @@ export function DirectoryCreateDialog({
   fields: Field[];
   relations: Relation[];
   language: string;
+  /** Значения новой записи поверх пустых: родитель и его цвет у «Добавить вложенный». */
+  defaults?: Item | undefined;
+  /**
+   * Ссылка на себя — списком дерева, а не поиском связи: в нём нет
+   * самой записи и её потомков, и цикл из окна не собрать.
+   */
+  /**
+   * `topLevel: false` — родитель обязателен: корень дерева уже есть.
+   * `root` — guid единственного корня: запись, поднятая наверх, встаёт
+   * на его место, а он сам уходит под неё.
+   */
+  parent?: { slug: string; options: DropdownItem[]; topLevel?: boolean; root?: string | undefined } | undefined;
+  /** Строка под полями: «Вложенных элементов: 3». */
+  note?: string | undefined;
+  onDelete?: (() => void) | undefined;
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const create = useCreateItem(table);
   const update = useUpdateItem(table);
-  const [draft, setDraft] = useState<Item>(() => row ?? blankItem(fields));
+  // Новая запись справочника — активной, как `def:1` прототипа: выключенную не предлагают в выборе.
+  const [draft, setDraft] = useState<Item>(
+    () => row ?? { ...blankItem(fields), ...(fields.some((f) => f.slug === "is_active") ? { is_active: true } : {}), ...defaults },
+  );
   const [showErrors, setShowErrors] = useState(false);
   const [active, setActive] = useState<{ field: Field; anchor: DOMRect } | null>(null);
   const errors = rowErrors(fields, draft);
+  if (parent?.topLevel === false && !draft[parent.slug]) errors.set(parent.slug, { kind: "required", message: "" });
   const byId = new Map(relations.map((relation) => [relation.id, relation]));
   const set = (slug: string, value: unknown) => setDraft((current) => ({ ...current, [slug]: value }));
 
@@ -74,14 +112,15 @@ export function DirectoryCreateDialog({
       // Уезжает только изменённое: PUT с полной строкой перезаписал бы и то, что правили рядом.
       const values = Object.fromEntries(fields.filter((field) => draft[field.slug] !== row[field.slug]).map((field) => [field.slug, draft[field.slug] ?? null]));
       if (!Object.keys(values).length) return onClose();
+      const guid = String(row["guid"]);
+      const done = () => {
+        toast.success(t("settings.saved"));
+        onClose();
+      };
+      const oldRoot = parent?.root && parent.root !== guid && parent.slug in values && !draft[parent.slug] ? parent.root : "";
       return update.mutate(
-        { guid: String(row["guid"]), values },
-        {
-          onSuccess: () => {
-            toast.success(t("settings.saved"));
-            onClose();
-          },
-        },
+        { guid, values },
+        { onSuccess: () => (oldRoot ? update.mutate({ guid: oldRoot, values: { [parent!.slug]: guid } }, { onSuccess: done }) : done()) },
       );
     }
     create.mutate(draft, {
@@ -93,8 +132,8 @@ export function DirectoryCreateDialog({
   };
 
   // Иконка — слева от названия, как у пункта меню (MenuFormDialog): это часть имени, а не отдельное поле.
-  const iconField = fields.find((field) => cellKind(field.type) === "icon");
-  const titleField = fields.find((field) => cellKind(field.type) === "text");
+  const iconField = fields.find((field) => cellKind(field.type) === "icon" || field.slug === iconSlug);
+  const titleField = fields.find((field) => cellKind(field.type) === "text" && field !== iconField);
   const iconPicker = (field: Field) => (
     <IconPicker value={typeof draft[field.slug] === "string" ? String(draft[field.slug]) : ""} type="ICON" onChange={(icon) => set(field.slug, icon || null)} />
   );
@@ -102,6 +141,26 @@ export function DirectoryCreateDialog({
   const control = (field: Field) => {
     const value = draft[field.slug];
     const text = typeof value === "string" || typeof value === "number" ? String(value) : "";
+    if (field.slug === parent?.slug) {
+      return (
+        <Dropdown
+          value={text}
+          items={parent.topLevel === false ? parent.options : [{ value: "", label: t("dir.topLevel") }, ...parent.options]}
+          onChange={(guid) => setDraft((current) => ({ ...current, [field.slug]: guid || null, [relationDataKey(field.slug)]: undefined }))}
+        />
+      );
+    }
+    const own = choices?.[field.slug];
+    if (own) {
+      return (
+        <Dropdown
+          value={text}
+          items={[{ value: "", label: "—" }, ...own]}
+          onChange={(guid) => setDraft((current) => ({ ...current, [field.slug]: guid || null, [relationDataKey(field.slug)]: undefined }))}
+        />
+      );
+    }
+    if (field === iconField) return iconPicker(field);
     switch (cellKind(field.type)) {
       case "text":
       case "link": {
@@ -180,16 +239,35 @@ export function DirectoryCreateDialog({
     </span>
   );
 
+  const shown = fields
+    .filter((field) => !(field === iconField && titleField))
+    /* Чужая сторона Many2Many (`hr_employees_ids` у юнита): бэкенд её не
+       обновляет (backend-notes, Many2Many), правится она со своей стороны. */
+    .filter((field) => {
+      // relation_id у такого поля бэкенд не отдаёт — тогда по имени: `<чужая таблица>_ids`.
+      const relation =
+        (field.relationId ? byId.get(field.relationId) : undefined) ??
+        relations.find((one) => `${one.toSlug}_ids` === field.slug);
+      return !(relation && isMany(relation.type) && relation.direction === "incoming");
+    })
+    .filter((field) => cellKind(field.type) !== "label" && cellKind(field.type) !== "button" && cellKind(field.type) !== "formula");
+
   return (
     <Modal onClose={onClose}>
       <div className="flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-xl">
         <h2 className="px-5 pt-4 pb-3 text-xl font-semibold">{title}</h2>
 
-        <div className="grid grid-cols-2 gap-x-3 gap-y-3.5 overflow-auto px-5 pb-4">
-          {fields
-            .filter((field) => !(field === iconField && titleField))
-            .filter((field) => cellKind(field.type) !== "label" && cellKind(field.type) !== "button" && cellKind(field.type) !== "formula")
-            .map((field) =>
+        <div className="grid grid-cols-2 items-end gap-x-3 gap-y-3.5 overflow-auto px-5 pb-4">
+          {(layout ? sectioned(shown, layout) : [{ title: "", fields: shown, half: undefined }]).map((section, index) => [
+            section.title && (
+              <h3
+                key={`h-${section.title}`}
+                className={`col-span-2 text-xs font-medium tracking-wide text-fg-subtle uppercase ${index ? "mt-2 border-t border-border pt-4" : ""}`}
+              >
+                {section.title}
+              </h3>
+            ),
+            ...section.fields.map((field) =>
               cellKind(field.type) === "boolean" ? (
                 // Флажок — подписью справа, как «Заменить существующие смены»: рамка поля ему ни к чему.
                 <label key={field.slug} className="flex h-(--spacing-input) cursor-pointer items-center gap-2.5 self-end text-sm text-fg">
@@ -197,7 +275,10 @@ export function DirectoryCreateDialog({
                   {localized(field.labels, language, field.label)}
                 </label>
               ) : (
-                <div key={field.slug} className={`flex flex-col gap-1.5 ${HALF.has(cellKind(field.type)) ? "" : "col-span-2"}`}>
+                <div
+                  key={field.slug}
+                  className={`flex flex-col gap-1.5 ${(section.half ? section.half.includes(field.slug) : HALF.has(cellKind(field.type))) ? "" : "col-span-2"}`}
+                >
                   {label(field)}
                   {control(field)}
                   {showErrors && errors.has(field.slug) && (
@@ -205,10 +286,23 @@ export function DirectoryCreateDialog({
                   )}
                 </div>
               ),
-            )}
+            ),
+          ])}
+          {note && (
+            <p className="col-span-2 flex items-center gap-1.5 text-[13px] text-fg-subtle">
+              <Icon as={GitForkIcon} size={14} />
+              {note}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+          {onDelete && (
+            <Button variant="danger" className="mr-auto" onClick={onDelete}>
+              <Icon as={Trash2Icon} size={14} />
+              {t("action.delete")}
+            </Button>
+          )}
           {showErrors && errors.size > 0 && <span className="mr-auto text-xs text-danger">{t("table.fillRequired", { count: errors.size })}</span>}
           <Button variant="ghost" onClick={onClose}>
             {t("action.cancel")}
@@ -242,4 +336,18 @@ export function DirectoryCreateDialog({
       )}
     </Modal>
   );
+}
+
+/** Поля по секциям раскладки; не попавшие ни в одну — в конец последней. */
+function sectioned(fields: Field[], layout: { title: string; fields: string[]; half?: string[] }[]) {
+  const bySlug = new Map(fields.map((field) => [field.slug, field]));
+  const placed = new Set(layout.flatMap((section) => section.fields));
+  const rest = fields.filter((field) => !placed.has(field.slug));
+  return layout
+    .map((section, index) => ({
+      title: section.title,
+      half: section.half,
+      fields: [...section.fields.flatMap((slug) => bySlug.get(slug) ?? []), ...(index === layout.length - 1 ? rest : [])],
+    }))
+    .filter((section) => section.fields.length);
 }

@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CalendarOffIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon, InboxIcon, PlaneIcon, WalletCardsIcon } from "lucide-react";
+import { CalendarOffIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon, InboxIcon, PlaneIcon, TriangleAlertIcon, WalletCardsIcon } from "lucide-react";
 import { todayInput } from "@/shared/lib/date-value";
 import { CHIP_HEX, CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { DynamicIcon } from "@/shared/ui/dynamic-icon";
 import { Icon } from "@/shared/ui/icon";
 import { useAbsenceTypes, useDecideRequest, useDecisions, useEmployeeRequests, useRoutes, type AbsenceRequest } from "../api/absences";
-import { balanceOf } from "../model/absence-balance";
+import { balanceOf, eligibleFrom } from "../model/absence-balance";
 import { progressOf, routeFor } from "../model/approval";
-import { ActionButton, Chain } from "./Absences";
+import { ActionButton, Chain, TenureWarning } from "./Absences";
 
 type Sub = "balance" | "requests" | "history";
 const STATUS_CHIP: Record<string, ChipColor> = { pending: "yellow", approved: "green", rejected: "red", cancelled: "gray" };
@@ -21,7 +21,7 @@ const LABELED = ["pending", "approved", "rejected", "cancelled"] as const;
  * со статусом и цепочкой согласования, у ждущих — решение, как на экране
  * «Отсутствия»; «История» — одобренные за год, по типам.
  */
-export function EmployeeAbsences({ employeeId }: { employeeId: string }) {
+export function EmployeeAbsences({ employeeId, hireDate }: { employeeId: string; hireDate: string }) {
   const { t } = useTranslation();
   const [sub, setSub] = useState<Sub>("balance");
   const requests = useEmployeeRequests(employeeId);
@@ -68,7 +68,7 @@ export function EmployeeAbsences({ employeeId }: { employeeId: string }) {
         {requests.loading ? (
           <p className="py-8 text-center text-sm text-fg-subtle">{t("common.loading")}</p>
         ) : sub === "balance" ? (
-          <BalanceList requests={requests.rows} />
+          <BalanceList requests={requests.rows} hireDate={hireDate} />
         ) : sub === "requests" ? (
           <RequestList requests={requests.rows} />
         ) : (
@@ -88,9 +88,10 @@ function TypeIcon({ icon, color }: { icon: string; color: string }) {
 }
 
 /** «Баланс» — карточка на тип: осталось из лимита, использовано, ждёт. */
-function BalanceList({ requests }: { requests: AbsenceRequest[] }) {
+function BalanceList({ requests, hireDate }: { requests: AbsenceRequest[]; hireDate: string }) {
   const { t } = useTranslation();
   const types = useAbsenceTypes();
+  const today = todayInput();
   const balances = useMemo(
     () =>
       balanceOf(
@@ -125,6 +126,12 @@ function BalanceList({ requests }: { requests: AbsenceRequest[] }) {
                 style={{ width: `${Math.min(100, (used / type.limit) * 100)}%`, background: CHIP_HEX[hexToChipColor(type.color)] }}
               />
             </span>
+          )}
+          {eligibleFrom(hireDate, type.minMonths) > today && (
+            <p className="mt-2 flex items-center gap-1 text-xs text-warning">
+              <Icon as={TriangleAlertIcon} size={12} />
+              {t("employeeAbsences.eligibleFrom", { date: dmy(eligibleFrom(hireDate, type.minMonths)), count: type.minMonths })}
+            </p>
           )}
           <div className="mt-2 flex gap-3 text-xs text-fg-muted">
             <span>{t("employeeAbsences.used", { count: used })}</span>
@@ -186,6 +193,9 @@ function RequestList({ requests }: { requests: AbsenceRequest[] }) {
                     {request.to !== request.from && ` – ${dmy(request.to)}`} · {t("absences.days", { count: request.days ?? 0 })}
                   </div>
                   {request.reason && <p className="mt-1 text-xs text-fg-muted">{request.reason}</p>}
+                  <div className="mt-1">
+                    <TenureWarning request={request} />
+                  </div>
                   {route && progress && request.status !== "rejected" && (
                     <div className="mt-1">
                       <Chain name={route.name} done={progress.done} total={progress.total} />

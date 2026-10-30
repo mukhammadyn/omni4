@@ -31,6 +31,7 @@ import { SortPanel } from "./SortPanel";
  */
 export function FilterBar({
   columns,
+  hidden = [],
   relations,
   language,
   filters,
@@ -40,6 +41,12 @@ export function FilterBar({
   onSorts,
 }: {
   columns: Field[];
+  /**
+   * Поля таблицы вне колонок вида. К добавлению не предлагаются, но чип
+   * уже заданного по ним фильтра рисуется: иначе его не снять (стартовый
+   * «не уволен» у сотрудников — по скрытому статусу).
+   */
+  hidden?: Field[];
   /**
    * Связи таблицы. Нет их — нет и отбора по связи: выбирать строку
    * не из чего, пока неизвестно, в какой таблице искать и чем подписать.
@@ -73,7 +80,9 @@ export function FilterBar({
     // чего выбрать. Такое поле не предлагаем вовсе.
     return kind !== "relation" || Boolean(relationOf(column)?.toSlug);
   });
-  const byslug = new Map(filterable.map((column) => [column.slug, column]));
+  const byslug = new Map(
+    [...hidden.filter((field) => filterKind(field) !== null && !locked?.has(field.slug)), ...filterable].map((column) => [column.slug, column]),
+  );
   const count = activeFilterCount(filters);
 
   const add = (column: Field) => {

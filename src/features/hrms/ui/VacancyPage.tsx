@@ -50,12 +50,12 @@ export type VacancyTab = "funnel" | "cands" | "info" | "edit";
  * схемы ERP; чего в схеме нет или роли не видно, того и в карточке нет.
  */
 const SIDE: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
-  { icon: BriefcaseIcon, title: "vacancy.page.card.position", slugs: ["title", "hr_positions_id", "level", "headcount"] },
+  { icon: BriefcaseIcon, title: "vacancy.page.card.position", slugs: ["title", "hr_positions_id", "hr_grades_id", "headcount"] },
   { icon: UsersIcon, title: "vacancy.page.card.team", slugs: ["core_users_id", "core_users_id_2"] },
   {
     icon: WalletIcon,
     title: "vacancy.page.card.terms",
-    slugs: ["hr_locations_id", "work_format", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
+    slugs: ["hr_locations_id", "hr_shift_kinds_id", "employment_type", "salary_from", "salary_to", "currency", "show_salary"],
   },
   {
     icon: CalendarIcon,
@@ -67,7 +67,7 @@ const SIDE: { icon: LucideIcon; title: TranslationKey; slugs: string[] }[] = [
 ];
 
 /** Тексты объявления — левая колонка «Информации». */
-const TEXTS = ["description", "duties", "requirements", "conditions"];
+const TEXTS = ["description"];
 
 /**
  * Страница вакансии — `vacancy.html` прототипа: шапка с ходом найма
@@ -113,11 +113,7 @@ export function VacancyPage({
 
   const today = todayInput();
   const label = (field: Field) => localized(field.labels, language, field.label);
-  const option = (slug: string) => {
-    const field = bySlug.get(slug);
-    const found = field && optionOf(field, text(row[slug]));
-    return found ? localized(found.labels, language, found.label || found.value) : text(row[slug]);
-  };
+
   const cell = (field: Field, values: Item = row) => (
     <Cell field={field} row={values} tableSlug={VACANCIES} relations={relations} locale={locale} language={language} wrap />
   );
@@ -177,7 +173,8 @@ export function VacancyPage({
             <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-fg-muted">
               <Meta icon={NetworkIcon} text={text(related(row, "hr_departments_id").name)} />
               <Meta icon={MapPinIcon} text={text(related(row, "hr_locations_id").name)} />
-              <Meta icon={HouseIcon} text={option("work_format")} />
+              {/* Формат — вид смены из настроек HRMS («Виды смен»). */}
+              <Meta icon={HouseIcon} text={text(related(row, "hr_shift_kinds_id").name)} />
               <Meta icon={CalendarIcon} text={opened === null ? "" : t("vacancy.openFor", { count: opened })} />
               <Meta icon={WalletIcon} text={salaryText(row, locale, t) ?? t("vacancy.salaryNegotiable")} />
             </div>

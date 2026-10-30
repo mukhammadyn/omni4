@@ -1,6 +1,9 @@
 import { expect, test } from "vitest";
 import type { Field } from "@/features/table";
 import {
+  columnTotals,
+  formatTotal,
+  moneyField,
   boardColumns,
   boardLanes,
   boardOrderAt,
@@ -280,4 +283,23 @@ test("черновик карточки получает связанную за
   expect(relatedEntry({ slug: "stage", relationId: null } as Field, { stage_data: stage })).toEqual({});
   expect(relatedEntry(relation, undefined)).toEqual({});
   expect(relatedEntry(relation, { stage: null, stage_data: null })).toEqual({});
+});
+
+test("сумма колонки — по валютам, деньги — по типу или слагу", () => {
+  const rows = [
+    { amount: 100, currency: "USD" },
+    { amount: "50.5", currency: "USD" },
+    { amount: 1_000_000, currency: "UZS" },
+    { amount: null, currency: "USD" },
+    { amount: 7 },
+  ];
+  expect(columnTotals(rows, "amount")).toEqual([
+    { currency: "UZS", sum: 1_000_000 },
+    { currency: "USD", sum: 150.5 },
+    { currency: "", sum: 7 },
+  ]);
+  expect(moneyField([{ slug: "title", type: "SINGLE_LINE" }, { slug: "amount", type: "FLOAT" }] as Field[])?.slug).toBe("amount");
+  expect(moneyField([{ slug: "probability", type: "NUMBER" }] as Field[])).toBeUndefined();
+  expect(formatTotal(109_800, "USD", "en")).toBe("$109.8K");
+  expect(formatTotal(5, "XX1", "en")).toBe("5 XX1");
 });

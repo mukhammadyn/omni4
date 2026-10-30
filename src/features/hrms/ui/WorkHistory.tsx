@@ -1,6 +1,8 @@
 import { useState } from "react";
 import {
   BriefcaseIcon,
+  Building2Icon,
+  CalendarRangeIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CopyIcon,
@@ -8,22 +10,28 @@ import {
   PencilIcon,
   PlusIcon,
   Trash2Icon,
+  InfoIcon,
   TriangleAlertIcon,
   WalletIcon,
 } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { ItemDrawer, relationDataKey, rowErrors, type Item } from "@/features/item";
-import type { DataLanguage } from "@/features/workspace";
+import { relationDataKey, useItems, type Item } from "@/features/item";
+import { localized, type Field, type Relation } from "@/features/table";
 import { todayInput } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { Button } from "@/shared/ui/button";
 import { Chip, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
+import { Modal } from "@/shared/ui/modal";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { JOB_HISTORY, useJobHistory, type Choice, type JobEntry } from "../api/job-history";
 import { monthsBetween, toDay, type GradeIssue } from "../model/job-history";
+import { useGradesFor } from "../api/org";
+import { formError, FormField, FormItem, FormSection } from "./record-form";
+import { TemplateSelect } from "./schedule-parts";
 
 /**
  * Не переносятся в новую запись: её начало, конец и причина — то, чем
@@ -36,9 +44,8 @@ const FRESH = new Set(["guid", "date_from", "date_to", "change_reason", "is_curr
  * текущая сверху. Вместо таблицы связи — потому что запись здесь
  * читается целиком (должность, отдел, оклад, период), а не по колонкам.
  *
- * Правят и заводят запись карточкой записи (ItemDrawer): поля, их
- * порядок и права — из раскладки таблицы, как везде. Своей формы
- * у вкладки нет, чтобы не было второго способа править те же поля.
+ * Правят и заводят запись модалкой — `posModal` прототипа (JobDialog):
+ * поля в его порядке, права — из раскладки таблицы.
  */
 export function WorkHistory({
   employee,
@@ -46,8 +53,6 @@ export function WorkHistory({
   menuId,
   locale,
   language,
-  languages,
-  onLanguage,
 }: {
   employee: string;
   /** Колонка-ссылка на сотрудника — из вкладки связи. */
@@ -55,14 +60,12 @@ export function WorkHistory({
   menuId: string;
   locale: string;
   language: string;
-  languages: DataLanguage[];
-  onLanguage: (code: string) => void;
 }) {
   const { t } = useTranslation();
   const job = useJobHistory({ employee, link, menuId, language });
   const [open, setOpen] = useState(true);
   const [draft, setDraft] = useState<Item | null>(null);
-  const [showErrors, setShowErrors] = useState(false);
+  const units = useItems(UNITS_TABLE, { limit: 200, page: 1, relations: false });
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -70,7 +73,6 @@ export function WorkHistory({
   const current = entries.find((entry) => entry.current) ?? entries[0];
   const shown = open || !current ? entries : [current];
   const editRow = entries.find((entry) => entry.id === editing)?.row;
-  const errors = draft ? rowErrors(job.columns, draft) : new Map();
 
   /**
    * Новая запись — копия текущей (или выбранной) без периода и причины:
@@ -85,7 +87,9 @@ export function WorkHistory({
       const data = source[relationDataKey(field.slug)];
       if (data) copy[relationDataKey(field.slug)] = data;
     }
-    setShowErrors(false);
+    /* Выключенный юнит в новое назначение не переносим: его закрыли, а не выбрали. */
+    const off = new Set(units.page.rows.filter((row) => row.is_active === false).map((row) => String(row.guid)));
+    if (Array.isArray(copy[UNITS])) copy[UNITS] = copy[UNITS].filter((guid) => !off.has(String(guid)));
     setDraft({ ...copy, [link]: employee, date_from: todayInput() });
   };
 
@@ -138,76 +142,28 @@ export function WorkHistory({
         </div>
       )}
 
-      {editRow && (
-        <ItemDrawer
-          tableSlug={JOB_HISTORY}
-          columns={job.columns}
-          row={editRow}
+      {(editRow || draft) && (
+        <JobDialog
+          row={editRow ?? draft!}
+          creating={!editRow}
+          fields={job.fields}
           relations={job.relations}
           locale={locale}
           language={language}
-          languages={languages}
-          onLanguage={onLanguage}
-          sections={job.sections}
-          heading=""
-          titlePlaceholder={t("employee.work.entry")}
-          {...(job.can.update ? { onEdit: job.edit } : {})}
-          onClose={() => setEditing(null)}
-        />
-      )}
-
-      {/* Новая запись: правки копятся в черновике и уезжают одним
-          запросом по кнопке — как черновик строки в таблице. */}
-      {draft && (
-        <ItemDrawer
-          tableSlug={JOB_HISTORY}
-          columns={job.columns}
-          row={draft}
-          relations={job.relations}
-          locale={locale}
-          language={language}
-          languages={languages}
-          onLanguage={onLanguage}
-          sections={job.sections}
-          heading=""
-          creating
-          titlePlaceholder={t("employee.work.add")}
-          onEdit={(_guid, slug, value) =>
-            setDraft((prev) => (prev ? { ...prev, [slug]: value } : prev))
-          }
-          onLink={(slug, item) =>
-            setDraft((prev) =>
-              prev ? { ...prev, [slug]: item?.guid ?? null, [relationDataKey(slug)]: item } : prev,
-            )
-          }
-          footer={
-            <>
-              {showErrors && errors.size > 0 && (
-                <span className="mr-auto text-xs text-danger">
-                  {t("table.fillRequired", { count: errors.size })}
-                </span>
-              )}
-              <Button variant="ghost" onClick={() => setDraft(null)}>
-                {t("action.cancel")}
-              </Button>
-              <Button
-                disabled={job.creating}
-                onClick={() => {
-                  if (errors.size) {
-                    setShowErrors(true);
-                    return;
-                  }
-                  job.create(draft, () => {
-                    setDraft(null);
-                    toast.success(t("table.rowCreated"));
-                  });
-                }}
-              >
-                {t("action.create")}
-              </Button>
-            </>
-          }
-          onClose={() => setDraft(null)}
+          busy={job.creating || job.saving}
+          onSave={(values) => {
+            const done = () => {
+              setDraft(null);
+              setEditing(null);
+              toast.success(t(editRow ? "employee.work.saved" : "table.rowCreated"));
+            };
+            if (editRow) job.save(String(editRow.guid), values, done);
+            else job.create(values, done);
+          }}
+          onClose={() => {
+            setDraft(null);
+            setEditing(null);
+          }}
         />
       )}
 
@@ -277,7 +233,7 @@ function Entry({
               <b className="mr-1 text-[17px] font-semibold">{entry.position || "—"}</b>
               {entry.current && <Chip color="green">{t("employee.work.current")}</Chip>}
               {entry.employment && <Chip color="blue">{entry.employment.label}</Chip>}
-              {entry.issue && (
+              {entry.issue && entry.issue.kind !== "otherCurrency" && (
                 <Chip color="orange">
                   <span className="inline-flex items-center gap-1">
                     <Icon as={TriangleAlertIcon} size={12} />
@@ -292,12 +248,18 @@ function Entry({
               </div>
             )}
             {meta && <div className="text-[13.5px] text-fg-subtle">{meta}</div>}
-            {entry.issue && (
-              <div className="mt-2 flex items-start gap-2 rounded-lg bg-warning-subtle px-3 py-2.25 text-[13.5px] leading-[1.45] text-warning">
-                <Icon as={TriangleAlertIcon} size={15} className="mt-0.5 shrink-0" />
-                <span>{issueText(entry, entry.issue, locale, t)}</span>
-              </div>
-            )}
+            {entry.issue &&
+              (entry.issue.kind === "otherCurrency" ? (
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-surface-hover px-3 py-2.25 text-[13.5px] leading-[1.45] text-fg-muted">
+                  <Icon as={InfoIcon} size={15} className="mt-0.5 shrink-0" />
+                  <span>{issueText(entry, entry.issue, locale, t)}</span>
+                </div>
+              ) : (
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-warning-subtle px-3 py-2.25 text-[13.5px] leading-[1.45] text-warning">
+                  <Icon as={TriangleAlertIcon} size={15} className="mt-0.5 shrink-0" />
+                  <span>{issueText(entry, entry.issue, locale, t)}</span>
+                </div>
+              ))}
           </div>
           {(onEdit || onCopy || onDelete) && (
             <Popover
@@ -391,6 +353,8 @@ function issueText(entry: JobEntry, issue: GradeIssue, locale: string, t: TFunct
       return t("employee.work.noGrade", { position: entry.position, grades: issue.allowed.join(", ") });
     case "notAllowed":
       return t("employee.work.notAllowed", { grade: entry.grade, position: entry.position });
+    case "otherCurrency":
+      return t("employee.work.otherCurrency", { currency: entry.currency });
     case "overCeiling":
       return t("employee.work.overCeiling", {
         salary: new Intl.NumberFormat(locale).format(entry.salary ?? 0),
@@ -420,4 +384,178 @@ function monthYear(date: Date, locale: string) {
     .map((part) => part.value)
     .join(" ");
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+const UNITS_TABLE = "core_business_units";
+const UNITS = `${UNITS_TABLE}_ids`;
+
+/*
+ * Поля модалки по секциям: что за должность и почему сменилась, где
+ * человек работает, сколько получает, с какого по какое. Чего нет
+ * в схеме или скрыто правами роли, того и в форме нет; пустая секция
+ * не рисуется.
+ */
+const JOB_SECTIONS = [
+  { id: "role", icon: BriefcaseIcon, fields: ["hr_positions_id", "hr_grades_id", "employment_type", "change_reason", "comment"] },
+  { id: "place", icon: Building2Icon, fields: ["core_business_units_ids", "hr_departments_id", "hr_locations_id", "hr_work_schedules_id"] },
+  { id: "pay", icon: WalletIcon, fields: ["salary", "currency"] },
+  { id: "period", icon: CalendarRangeIcon, fields: ["date_from", "date_to"] },
+] as const;
+const JOB_FIELDS: string[] = JOB_SECTIONS.flatMap((section) => section.fields);
+const JOB_WIDE = new Set(["core_business_units_ids", "hr_work_schedules_id", "comment"]);
+const JOB_REQUIRED = new Set(["hr_positions_id", "date_from"]);
+
+/** «Добавить / Редактировать должность» — `posModal` прототипа. */
+function JobDialog({
+  row,
+  creating,
+  fields,
+  relations,
+  locale,
+  language,
+  busy,
+  onSave,
+  onClose,
+}: {
+  row: Item;
+  creating: boolean;
+  fields: Field[];
+  relations: Relation[];
+  locale: string;
+  language: string;
+  busy: boolean;
+  onSave: (values: Item) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [form, setForm] = useState<Item>(row);
+  /* Грейды — по должности (useGradesFor): её группы или вышестоящей. */
+  const grades = useGradesFor();
+  const gradeOptions = grades.of;
+  const [error, setError] = useState<string | null>(null);
+  const bySlug = new Map(fields.map((field) => [field.slug, field]));
+  const byId = new Map(relations.map((relation) => [relation.id, relation]));
+  const shown = JOB_FIELDS.flatMap((slug) => bySlug.get(slug) ?? []);
+
+  const submit = () => {
+    const required = shown.map((field) => (JOB_REQUIRED.has(field.slug) ? { ...field, required: true } : field));
+    const why = formError(required, form, language, t);
+    if (why) {
+      setError(why);
+      return;
+    }
+    // В запрос — только поля формы; ключи `<слаг>_data` нужны лишь подписям.
+    const values: Item = Object.fromEntries(
+      Object.entries(form).filter(([key]) => key !== "guid" && !key.endsWith("_data")),
+    );
+    onSave(values);
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <form
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-border bg-surface shadow-modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
+        <div className="px-5 pt-5">
+          <h2 className="text-xl font-semibold">{t(creating ? "employee.work.addTitle" : "employee.work.editTitle")}</h2>
+          <p className="mt-0.5 text-[13.5px] text-fg-muted">
+            {t(creating ? "employee.work.addHint" : "employee.work.editHint")}
+          </p>
+        </div>
+
+        <div className="min-h-0 overflow-y-auto px-5 pt-4">
+          {JOB_SECTIONS.map((section) => {
+            const own = shown.filter((field) => (section.fields as readonly string[]).includes(field.slug));
+            if (!own.length) return null;
+            return (
+              <FormSection
+                key={section.id}
+                icon={section.icon}
+                title={t(`employee.work.sec.${section.id}`)}
+                hint={t(`employee.work.sec.${section.id}Hint`)}
+              >
+          {own.map((field) =>
+            field.slug === "hr_grades_id" && field.editable && !field.locked ? (
+              <FormItem key={field.slug} label={localized(field.labels, language, field.label)}>
+                <Dropdown
+                  value={typeof form.hr_grades_id === "string" ? form.hr_grades_id : ""}
+                  placeholder={t("form.pick")}
+                  items={[
+                    { value: "", label: "—" },
+                    ...gradeOptions(form.hr_positions_id).map((g) => ({ value: String(g.guid), label: String(g.name ?? "") })),
+                  ]}
+                  onChange={(id) => {
+                    setError(null);
+                    const g = gradeOptions(form.hr_positions_id).find((one) => one.guid === id);
+                    setForm((prev) => ({ ...prev, hr_grades_id: id || null, [relationDataKey("hr_grades_id")]: g ?? null }));
+                  }}
+                />
+              </FormItem>
+            ) : /* График — со сводкой шаблона в каждой строке, а не одним названием. */
+            field.slug === "hr_work_schedules_id" && field.editable && !field.locked ? (
+              <FormItem key={field.slug} label={localized(field.labels, language, field.label)} wide>
+                <TemplateSelect
+                  value={typeof form.hr_work_schedules_id === "string" ? form.hr_work_schedules_id : ""}
+                  placeholder={t("form.pick")}
+                  onChange={(id, name) => {
+                    setError(null);
+                    setForm((prev) => ({
+                      ...prev,
+                      hr_work_schedules_id: id,
+                      [relationDataKey("hr_work_schedules_id")]: id ? { guid: id, name } : null,
+                    }));
+                  }}
+                />
+              </FormItem>
+            ) : (
+            <FormField
+              key={field.slug}
+              field={field}
+              row={form}
+              tableSlug={JOB_HISTORY}
+              relations={byId}
+              locale={locale}
+              language={language}
+              creating={creating}
+              required={JOB_REQUIRED.has(field.slug) || Boolean(field.required)}
+              wide={JOB_WIDE.has(field.slug)}
+              dropdown={field.slug === "employment_type" || field.slug === "currency"}
+                    rows={field.slug === "comment" ? 2 : 4}
+              {...(field.slug === "date_to" ? { placeholder: t("employee.work.toHint") } : {})}
+              onChange={(value, extra) => {
+                setError(null);
+                setForm((prev) => {
+                  const next = { ...prev, [field.slug]: value, ...extra };
+                  /* Сменили должность — грейд чужой группы снимаем: его в выборе уже нет. */
+                  if (field.slug === "hr_positions_id" && !grades.fits(value, next.hr_grades_id)) {
+                    next.hr_grades_id = null;
+                    next[relationDataKey("hr_grades_id")] = null;
+                  }
+                  return next;
+                });
+              }}
+            />
+            ),
+          )}
+              </FormSection>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2 border-t border-border px-5 py-3">
+          {error && <span className="mr-auto text-xs text-danger">{error}</span>}
+          <Button type="button" variant="ghost" className="ml-auto" onClick={onClose}>
+            {t("action.cancel")}
+          </Button>
+          <Button type="submit" disabled={busy}>
+            {t("action.save")}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
 }

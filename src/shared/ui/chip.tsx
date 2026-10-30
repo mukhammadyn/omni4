@@ -51,15 +51,15 @@ export const CHIP_STYLES: Record<ChipColor, string> = {
  */
 /** Точка цвета — у полосы таймлайна (`.tl-bar .dot` прототипа). */
 export const CHIP_DOT: Record<ChipColor, string> = {
-  gray: "bg-chip-gray-fg",
-  blue: "bg-chip-blue-fg",
-  green: "bg-chip-green-fg",
-  yellow: "bg-chip-yellow-fg",
-  orange: "bg-chip-orange-fg",
-  red: "bg-chip-red-fg",
-  purple: "bg-chip-purple-fg",
-  pink: "bg-chip-pink-fg",
-  brown: "bg-chip-brown-fg",
+  gray: "bg-chip-gray-dot",
+  blue: "bg-chip-blue-dot",
+  green: "bg-chip-green-dot",
+  yellow: "bg-chip-yellow-dot",
+  orange: "bg-chip-orange-dot",
+  red: "bg-chip-red-dot",
+  purple: "bg-chip-purple-dot",
+  pink: "bg-chip-pink-dot",
+  brown: "bg-chip-brown-dot",
 };
 
 export const CHIP_SURFACE: Record<ChipColor, string> = {
@@ -180,9 +180,12 @@ export function Chip({
   dot,
   onRemove,
   removeLabel,
+  off,
   children,
 }: {
   color?: ChipColor | undefined;
+  /** Значение выключено (запись справочника неактивна): зачёркнуто и бледнее. */
+  off?: boolean | undefined;
   /** Точка слева — признак Status: у него значение всегда одно. */
   dot?: boolean | undefined;
   /** Крестик справа. Без обработчика не рисуется. */
@@ -205,7 +208,7 @@ export function Chip({
          «метки» раньше, чем прочитан текст. */
       className={`inline-flex h-5 max-w-full min-w-0 items-center text-xs ${
         dot ? "gap-[5px] rounded-full pr-2 pl-[7px]" : "gap-1 rounded-sm px-1.5"
-      } ${CHIP_STYLES[color]}`}
+      } ${CHIP_STYLES[color]} ${off ? "line-through opacity-60" : ""}`}
     >
       {/* Цвет точки — сам текст чипа: третий токен на каждый оттенок
           пришлось бы держать в двух темах ради четырёх пикселей. */}

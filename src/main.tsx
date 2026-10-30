@@ -7,6 +7,7 @@ import { installRefreshHandler } from "./features/auth";
 import { clearLegacyMirror } from "./features/microfrontend";
 import { session } from "./shared/api/session";
 import { queryClient } from "./app/query-client";
+import { ErrorPage } from "./app/error-page";
 import { applyTheme, useUi } from "./shared/lib/ui-store";
 import { routeTree } from "./routeTree.gen";
 import "./shared/lib/i18n";
@@ -28,7 +29,7 @@ clearLegacyMirror();
 applyTheme(useUi.getState().theme);
 useUi.subscribe((state) => applyTheme(state.theme));
 
-const router = createRouter({ routeTree, context: { queryClient } });
+const router = createRouter({ routeTree, context: { queryClient }, defaultErrorComponent: ErrorPage });
 
 declare module "@tanstack/react-router" {
   interface Register {

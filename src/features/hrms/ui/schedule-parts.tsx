@@ -1,12 +1,13 @@
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CircleIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, CircleIcon, ClockIcon, CoffeeIcon } from "lucide-react";
 import { DynamicIcon } from "@/shared/ui/dynamic-icon";
 import { Icon } from "@/shared/ui/icon";
 import { Modal } from "@/shared/ui/modal";
+import { Popover } from "@/shared/ui/popover";
 import { CHIP_STYLES, hexToChipColor, type ChipColor } from "@/shared/ui/chip";
-import { useShiftKinds } from "../api/schedule";
-import { isFlexible, type Shift, type ShiftKind, type ShiftKindRow, type Template } from "../model/schedule";
+import { useShiftKinds, useTemplates } from "../api/schedule";
+import { isFlexible, weekMinutesOf, type Shift, type ShiftKind, type ShiftKindRow, type Template } from "../model/schedule";
 
 /* Общее у экранов графика: календаря, окна смены, вкладки сотрудника. */
 
@@ -196,5 +197,91 @@ export function Segments<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+/**
+ * Выбор шаблона графика с его данными в каждой строке — как карточка
+ * на экране шаблонов: «Недельный · пн–пт · 09:00–17:00», часы в неделю,
+ * перерыв. По одному названию «Офис» и «Офис-2» не различить.
+ */
+export function TemplateSelect({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  placeholder: string;
+  /** `name` — подпись для черновика, пока запись не перечитана. */
+  onChange: (id: string | null, name: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { templates } = useTemplates();
+  const summary = useTemplateSummary();
+  const duration = useDuration();
+  const current = templates.find((template) => template.id === value);
+  /* Выключенный шаблон не предлагаем, но выбранный остаётся виден. */
+  const shown = templates.filter((template) => template.active || template.id === value);
+  const line = (template: Template) => `${t(`template.type.${template.type}`)} · ${summary(template)}`;
+
+  return (
+    <Popover
+      className="w-full"
+      trigger={({ toggle }) => (
+        <button
+          type="button"
+          onClick={toggle}
+          className="flex h-(--spacing-input) w-full min-w-0 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-left text-sm transition-colors hover:border-fg-subtle"
+        >
+          {current ? (
+            <>
+              <span className={`size-2 shrink-0 rounded-full ${templateDot(current)}`} />
+              <span className="truncate">{current.name}</span>
+              <span className="truncate text-fg-subtle">{line(current)}</span>
+            </>
+          ) : (
+            <span className="flex-1 text-fg-subtle">{placeholder}</span>
+          )}
+          <Icon as={ChevronDownIcon} size={14} className="ml-auto shrink-0 text-fg-subtle" />
+        </button>
+      )}
+    >
+      {(close) => (
+        <div className="max-h-80 w-96 overflow-y-auto p-1">
+          {shown.map((template) => {
+            const picked = template.id === value;
+            return (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => {
+                  onChange(picked ? null : template.id, template.name);
+                  close();
+                }}
+                className="flex w-full cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-surface-hover"
+              >
+                <span className={`mt-1.5 size-2 shrink-0 rounded-full ${templateDot(template)}`} />
+                <span className="min-w-0 flex-1">
+                  <b className="block truncate text-sm font-medium">{template.name || "—"}</b>
+                  <small className="block truncate text-xs text-fg-subtle">{line(template)}</small>
+                  <span className="mt-1 flex gap-3 text-xs text-fg-muted">
+                    <span className="inline-flex items-center gap-1">
+                      <Icon as={ClockIcon} size={12} className="text-fg-subtle" />
+                      {t("template.perWeek", { hours: duration(weekMinutesOf(template)) })}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Icon as={CoffeeIcon} size={12} className="text-fg-subtle" />
+                      {template.breakMinutes ? t("template.break", { minutes: template.breakMinutes }) : t("template.noBreak")}
+                    </span>
+                  </span>
+                </span>
+                {picked && <Icon as={CheckIcon} size={14} className="mt-1 shrink-0 text-accent-text" />}
+              </button>
+            );
+          })}
+          {!shown.length && <p className="px-2.5 py-2 text-xs text-fg-subtle">{t("table.noOptions")}</p>}
+        </div>
+      )}
+    </Popover>
   );
 }

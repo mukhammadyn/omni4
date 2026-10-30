@@ -195,6 +195,10 @@ export type MenuPermission = {
   write: boolean;
   update: boolean;
   delete: boolean;
+  /** Настройки пункта (`menu_settings`). У модуля — его вкладка в настройках. */
+  settings: boolean;
+  /** Папка-модуль ERP (`attributes.is_tab`, ADR-0010). */
+  isModule: boolean;
 };
 
 type MenuPermissionDto = {
@@ -204,7 +208,13 @@ type MenuPermissionDto = {
   /** Подписи по языкам: `label_ru`, `label_cyr`. У половины пунктов
       колонка `label` пуста, и без них в списке остаётся голый uuid. */
   attributes?: Record<string, unknown>;
-  permission?: { read?: boolean; write?: boolean; update?: boolean; delete?: boolean };
+  permission?: {
+    read?: boolean;
+    write?: boolean;
+    update?: boolean;
+    delete?: boolean;
+    menu_settings?: boolean;
+  };
 };
 
 /**
@@ -250,6 +260,8 @@ export function useMenuPermissions(roleId: string, parentId: string) {
           write: dto.permission?.write !== false,
           update: dto.permission?.update !== false,
           delete: dto.permission?.delete !== false,
+          settings: dto.permission?.menu_settings !== false,
+          isModule: dto.attributes?.["is_tab"] === true,
         })),
   });
 
@@ -281,6 +293,13 @@ export function useUpdateMenuPermissions(roleId: string) {
               write: menu.write,
               update: menu.update,
               delete: menu.delete,
+              /*
+               * Уезжает всегда: бэкенд пишет колонку безусловно
+               * (`menu_settings = EXCLUDED.menu_settings`,
+               * ob/storage/postgres/permission.go:1563), и без неё каждое
+               * сохранение прав меню снимало право на настройки пункта.
+               */
+              menu_settings: menu.settings,
             },
           })),
           project_id: projectId,

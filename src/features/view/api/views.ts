@@ -482,7 +482,7 @@ function toViews(data: ViewsResponseDto): View[] {
   return (data.views ?? []).filter((dto) => dto.id).map(toView);
 }
 
-const toCard = (value: unknown): View["card"] => (value === "person" ? "person" : "");
+const toCard = (value: unknown): View["card"] => (value === "person" || value === "asset" ? value : "");
 
 const toLayout = (value: unknown): AttendanceLayout =>
   ATTENDANCE_LAYOUTS.find((layout) => layout === value) ?? "calendar";
@@ -523,6 +523,9 @@ export function toView(dto: ViewDto): View {
         : "",
     chipsId:
       typeof dto.attributes?.["chips_by_id"] === "string" ? dto.attributes["chips_by_id"] : "",
+    chipsDefault:
+      typeof dto.attributes?.["chips_default"] === "string" ? dto.attributes["chips_default"] : "",
+    chipsMenu: dto.attributes?.["chips_menu"] === true,
     dateFromSlug: toDateSlug(dto.calendar_from_slug, dto.attributes, "calendar_from_slug"),
     dateToSlug: toDateSlug(dto.calendar_to_slug, dto.attributes, "calendar_to_slug"),
     statusFieldSlug: dto.status_field_slug?.trim() ?? "",

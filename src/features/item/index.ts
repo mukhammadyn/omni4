@@ -1,5 +1,5 @@
 export { patchRow, useDeleteItems, useItem, useItemCounts, useItems, useUpdateItem } from "./api/items";
-export { BOARD_ORDER, groupValue } from "./model/board";
+export { BOARD_ORDER, groupValue, relatedEntry } from "./model/board";
 export { Board } from "./ui/Board";
 export { useDisabledDays } from "./api/calendar";
 export { CalendarView } from "./ui/Calendar";
@@ -56,7 +56,7 @@ export {
   withMine,
 } from "./model/query";
 export type { Filter, FilterOperator, Filters, ItemsQuery, Sort, SortDirection } from "./model/query";
-export { selfDefaults, valueLabelOf } from "./model/relation";
+export { isMany, selfDefaults, valueLabelOf } from "./model/relation";
 export { relationDataKey } from "./model/types";
 export type { Item } from "./model/types";
 export { rowErrors } from "./model/validate";

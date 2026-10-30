@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CheckIcon, LayoutGridIcon } from "lucide-react";
+import { MODULE_PILL } from "@/shared/ui/module-pill";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem } from "@/shared/ui/popover";
 import { Tooltip } from "@/shared/ui/tooltip";
@@ -32,7 +33,7 @@ import { MenuIcon } from "./MenuIcon";
 const ICON_WIDTH = 30;
 
 /** Вкладка модуля с подписью — `.sb-mod.active` прототипа по размерам. */
-const TAB = "inline-flex h-8 items-center gap-1.25 rounded-lg pr-2.25 pl-1.75 text-sm";
+const TAB = MODULE_PILL;
 
 export function ModuleSwitcher({
   modules,

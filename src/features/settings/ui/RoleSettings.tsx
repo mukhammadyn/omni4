@@ -91,7 +91,7 @@ export function RoleSettings() {
   const [draft, setDraft] = useState<RolePermissions | null>(null);
   useEffect(() => setDraft(permissions ?? null), [permissions]);
 
-  const [tab, setTab] = useState<"tables" | "global" | "menu" | "custom">("tables");
+  const [tab, setTab] = useState<"tables" | "global" | "menu" | "modules" | "custom">("tables");
   /** Таблиц в живом проекте полторы сотни — без поиска это стена. */
   const [query, setQuery] = useState("");
 
@@ -209,6 +209,9 @@ export function RoleSettings() {
                 <Tab active={tab === "menu"} onClick={() => setTab("menu")}>
                   {t("roles.menu")}
                 </Tab>
+                <Tab active={tab === "modules"} onClick={() => setTab("modules")}>
+                  {t("roles.modules")}
+                </Tab>
                 <Tab active={tab === "global"} onClick={() => setTab("global")}>
                   {t("roles.global")}
                 </Tab>
@@ -234,6 +237,7 @@ export function RoleSettings() {
                   дерево грузится по уровню, и класть его в общий черновик
                   прав на таблицы нечем. */}
               {tab === "menu" && <MenuRights roleId={active} />}
+              {tab === "modules" && <ModuleRights roleId={active} />}
               {/* Свои права — тоже своя ручка и своё дерево: право живёт
                   у типа клиента роли, а не у неё самой. */}
               {tab === "custom" && (
@@ -243,7 +247,7 @@ export function RoleSettings() {
                 />
               )}
 
-              {tab !== "menu" && tab !== "custom" && (
+              {tab !== "menu" && tab !== "modules" && tab !== "custom" && (
                 <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-t border-border px-3">
                   <p className="text-xs text-fg-subtle">{t("roles.hint")}</p>
 
@@ -717,6 +721,94 @@ function MenuLevel({
 
       {!menus.length && <p className="px-2 py-1 text-xs text-fg-subtle">{t("roles.menuEmpty")}</p>}
     </div>
+  );
+}
+
+/**
+ * Доступ роли к модулям ERP. Модуль — папка в корне меню с `is_tab`
+ * (ADR-0010), поэтому его права — это права роли на эту папку, той же
+ * ручкой, что и вкладка «Меню»:
+ *
+ * - «Доступ» — `read`: без него сайдбар не показывает модуль вовсе
+ *   (features/sidebar, `node.can.read`);
+ * - «Настройки» — `menu_settings` папки.
+ *
+ * «Аналитики» и «Экспорта» прототипа здесь нет: хранить их бэкенду негде.
+ */
+function ModuleRights({ roleId }: { roleId: string }) {
+  const { t } = useTranslation();
+  const { menus, isLoading } = useMenuPermissions(roleId, ROOT_MENU);
+  const update = useUpdateMenuPermissions(roleId);
+  const [changed, setChanged] = useState<Record<string, MenuPermission>>({});
+
+  const modules = menus.filter((menu) => menu.isModule);
+  const columns = [
+    { key: "read", label: t("roles.moduleAccess") },
+    { key: "settings", label: t("roles.moduleSettings") },
+  ] as const;
+
+  return (
+    <>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <div className="sticky top-0 z-10 flex h-9 items-center gap-2 border-b border-border bg-surface px-4 text-xs text-fg-muted">
+          <span className="min-w-0 flex-1">{t("roles.module")}</span>
+          {columns.map((column) => (
+            <span key={column.key} className="w-36 shrink-0 text-center">
+              {column.label}
+            </span>
+          ))}
+        </div>
+
+        {isLoading && <p className="p-4 text-sm text-fg-muted">{t("common.loading")}</p>}
+
+        <div className="p-2">
+          {modules.map((menu) => {
+            const value = changed[menu.id] ?? menu;
+
+            return (
+              <div key={menu.id} className="flex h-10 items-center gap-2 rounded-md px-2 hover:bg-surface-hover">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{menu.label}</span>
+                {columns.map((column) => (
+                  <span key={column.key} className="flex w-36 shrink-0 justify-center">
+                    <Checkbox
+                      checked={value[column.key]}
+                      aria-label={`${menu.label}: ${column.label}`}
+                      onChange={(event) =>
+                        setChanged((current) => ({
+                          ...current,
+                          /* Без доступа настройки модуля бессмысленны,
+                             а настройки без доступа не открыть. */
+                          [menu.id]:
+                            column.key === "read"
+                              ? { ...value, read: event.target.checked, settings: event.target.checked && value.settings }
+                              : { ...value, settings: event.target.checked, read: event.target.checked || value.read },
+                        }))
+                      }
+                    />
+                  </span>
+                ))}
+              </div>
+            );
+          })}
+
+          {!isLoading && !modules.length && (
+            <p className="px-2 py-1 text-xs text-fg-subtle">{t("roles.modulesEmpty")}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-t border-border px-3">
+        <p className="text-xs text-fg-subtle">{t("roles.modulesHint")}</p>
+
+        <Button
+          size="sm"
+          disabled={!Object.keys(changed).length || update.isPending}
+          onClick={() => update.mutate(Object.values(changed), { onSuccess: () => setChanged({}) })}
+        >
+          {update.isPending ? t("common.saving") : t("action.save")}
+        </Button>
+      </div>
+    </>
   );
 }
 

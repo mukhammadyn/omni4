@@ -1,10 +1,9 @@
 import { useMemo } from "react";
 import { useTablePermissions } from "@/features/auth";
-import { MAX_LIMIT, PEOPLE, useItem, useItems, useUpdateItem, type Item } from "@/features/item";
+import { MAX_LIMIT, PEOPLE, useItem, useItems, useUpdateItem, type Filters, type Item } from "@/features/item";
 import { ALL_VIEW_RIGHTS, localized, useTableDetails, useTableSchema, useTableSettings } from "@/features/table";
 import { useTableMenuId } from "@/features/sidebar";
 import { relationTabs, useMenuViews } from "@/features/view";
-import { todayInput } from "@/shared/lib/date-value";
 import { firstText, related, text, toPerson } from "./org";
 
 /**
@@ -29,8 +28,11 @@ export function useEmployee(menuId: string, guid: string, language: string) {
   const { viewRights } = useTableDetails(EMPLOYEES);
   const permissionOf = useTablePermissions();
   const update = useUpdateItem(EMPLOYEES);
-  /* Регион — PICK_LIST локации: в записи ключ варианта, подпись — в схеме. */
-  const { schema: locations } = useTableSchema("hr_locations");
+  /* Регион — у локации сотрудника, связью на справочник `core_regions`. */
+  const locationId = record.item ? firstText(record.item.hr_locations_id) : "";
+  const location = useItem("hr_locations", locationId || undefined, Boolean(locationId));
+  /* Юниты локации (Many2Many — без `_data`): подпись и цвет из справочника. */
+  const units = useItems(locationId ? "core_business_units" : undefined, { limit: MAX_LIMIT, page: 1, relations: false });
   /* Пользователь этого сотрудника: бот и последний вход — его. Может не быть. */
   const user = useItems(PEOPLE, {
     limit: 1,
@@ -70,13 +72,24 @@ export function useEmployee(menuId: string, guid: string, language: string) {
       );
   }, [views, schema.relations, users.relations, language, permissionOf, viewRights]);
 
-  const regionKey = record.item ? firstText(related(record.item, "hr_locations_id").region) : "";
-  const region = locations.fields.find((field) => field.slug === "region")?.options.get(regionKey);
 
   return {
     row: record.item,
     user: user.page.rows[0],
-    region: region ? localized(region.labels, language, region.label || regionKey) : regionKey,
+    region: location.item ? text(related(location.item, "core_regions_id").name) : "",
+    /**
+     * Юниты локации. Пока своих у сотрудника нет, единственный юнит локации —
+     * его юнит по умолчанию (CONTEXT, Business unit); у локации их несколько —
+     * угадывать нельзя, `defaultUnit` пуст. Вычисляется, а не пишется
+     * в сотрудника: поменяют юнит офиса — у людей поменяется сам.
+     */
+    locationUnits: Array.isArray(location.item?.core_business_units_ids) ? location.item.core_business_units_ids.length : 0,
+    defaultUnit: (() => {
+      const ids = location.item?.core_business_units_ids;
+      if (!Array.isArray(ids) || ids.length !== 1) return null;
+      const unit = units.page.rows.find((row) => row.guid === ids[0]);
+      return unit ? { name: text(unit.name), color: text(unit.color) } : null;
+    })(),
     isLoading: record.isLoading || schemaLoading,
     error: record.error,
     fields: schema.fields,
@@ -86,14 +99,13 @@ export function useEmployee(menuId: string, guid: string, language: string) {
     orgViewId: views.find((view) => view.type === "ORG")?.id,
     can: permissionOf(EMPLOYEES),
     edit: (slug: string, value: unknown) => update.mutate({ guid, values: { [slug]: value } }),
-    /**
-     * Увольнение: статус «Уволен» и дата — сегодня в поясе пользователя
-     * («ГГГГ-ММ-ДД», как пишет поле DATE). Причину и прочее правят полями.
-     */
-    dismiss: () =>
+    /** Несколько полей одной записью: «Разобрать» ФИО, «Заполнить по ПИНФЛ». */
+    editMany: (values: Item, onSuccess?: () => void) => update.mutate({ guid, values }, { onSuccess: () => onSuccess?.() }),
+    /** Увольнение: статус «Уволен», дата («ГГГГ-ММ-ДД», как пишет поле DATE) и причина. */
+    dismiss: (date: string, reasonId: string) =>
       update.mutate({
         guid,
-        values: { status: "dismissed", dismissal_date: todayInput() },
+        values: { status: "dismissed", dismissal_date: date, hr_dismissal_reasons_id: reasonId },
       }),
   };
 }
@@ -145,4 +157,49 @@ export function useNeighbours(guid: string) {
   const at = ids.indexOf(guid);
   if (at < 0 || ids.length < 2) return null;
   return { prev: ids[(at - 1 + ids.length) % ids.length]!, next: ids[(at + 1) % ids.length]! };
+}
+
+/**
+ * Отбор «не уволен»: статус — любой вариант, кроме `dismissed`. Положительным
+ * списком, потому что «не равно» бэкенд не умеет (`$ne`/`$nin` — ошибка SQL).
+ * Варианты из схемы: появится «Отпуск» — попадёт сам. Сотрудник без статуса
+ * в него не попадает.
+ */
+export function useNotDismissed(): Filters {
+  const { schema } = useTableSchema(EMPLOYEES);
+  return useMemo(() => {
+    const status = schema.fields.find((field) => field.slug === "status");
+    const values = [...(status?.options.keys() ?? [])].filter((value) => value !== "dismissed");
+    return values.length ? { status: { op: "any", values } } : {};
+  }, [schema.fields]);
+}
+
+const DISMISSAL_REASONS = "hr_dismissal_reasons";
+
+/**
+ * Причины увольнения и их типы. Тип — поле причины (`dismissal_type`),
+ * у сотрудника хранится только причина: тип в форме лишь сужает список.
+ */
+export function useDismissalReasons(language: string) {
+  const { page } = useItems(DISMISSAL_REASONS, { limit: MAX_LIMIT, page: 1 });
+  const { schema } = useTableSchema(DISMISSAL_REASONS);
+  const options = schema.fields.find((field) => field.slug === "dismissal_type")?.options;
+
+  return useMemo(
+    () => ({
+      types: [...(options ?? new Map()).entries()].map(([value, option]) => ({
+        value,
+        label: localized(option.labels, language, option.label || value),
+        color: option.color,
+      })),
+      /* Своего цвета у причины нет — берёт цвет типа, как в настройках. */
+      reasons: page.rows
+        .filter((row) => row.is_active !== false)
+        .map((row) => {
+          const type = firstText(row.dismissal_type);
+          return { value: text(row.guid), label: text(row.name), type, color: options?.get(type)?.color ?? null };
+        }),
+    }),
+    [options, page.rows, language],
+  );
 }

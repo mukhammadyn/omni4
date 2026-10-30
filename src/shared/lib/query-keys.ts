@@ -81,7 +81,7 @@ export const keys = {
     loginTables: (projectId: string) => [...keys.settings.all, "login-tables", projectId] as const,
     /**
      * Таблицы аудитории: что приложение заказчика показывает этому типу
-     * клиента. Не путать с `connections` ниже — там внешние базы.
+     * клиента.
      */
     clientConnections: (projectId: string, clientTypeId: string) =>
       [...keys.settings.all, "client-connections", projectId, clientTypeId] as const,
@@ -104,19 +104,6 @@ export const keys = {
     /** Справочник: LANGUAGE, TIMEZONE, CURRENCY. Общий на проект. */
     options: (projectId: string, type: string) =>
       [...keys.settings.all, "options", projectId, type] as const,
-    /**
-     * Люди проекта. Список приходит по ОДНОМУ типу клиента — так его
-     * отдаёт ручка, — поэтому тип в ключе. Поиск и страница тоже:
-     * это и есть запрос, а не отбор в памяти.
-     */
-    usersAll: () => [...keys.settings.all, "users"] as const,
-    users: (
-      projectId: string,
-      clientTypeId: string,
-      search: string,
-      page: number,
-      limit: number,
-    ) => [...keys.settings.usersAll(), projectId, clientTypeId, search, page, limit] as const,
     /**
      * API-ключи. Ключ выдаётся в ОДНОМ окружении (`environment_id`
      * берётся из заголовка запроса), поэтому окружение в ключе кэша:
@@ -186,13 +173,6 @@ export const keys = {
     /** Свои эндпоинты (`/x-api/...`): список на проект и окружение. */
     endpoints: (projectId: string, envId: string) =>
       [...keys.settings.all, "endpoints", projectId, envId] as const,
-    /**
-     * Внешние базы: подключения проекта и таблицы одного подключения.
-     * Окружение в ключе — подключение заводится в его ресурсе.
-     */
-    connections: (envId: string) => [...keys.settings.all, "connections", envId] as const,
-    connectionTables: (envId: string, connectionId: string) =>
-      [...keys.settings.connections(envId), connectionId] as const,
     /**
      * Сохранённые запросы SQL-консоли. Лежат в базе того же ресурса,
      * что и сами данные, — то есть у каждого окружения свои.

@@ -1,14 +1,15 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { BriefcaseIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { BriefcaseIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Cell, type Item } from "@/features/item";
 import { localized, optionOf, type Field } from "@/features/table";
 import { formatDate, todayInput } from "@/shared/lib/date-value";
 import { CHIP_STYLES } from "@/shared/ui/chip";
 import { Icon } from "@/shared/ui/icon";
+import { Tooltip } from "@/shared/ui/tooltip";
 import { related, text } from "../api/org";
 import { VACANCIES, useVacancyPlan } from "../api/vacancy";
-import { cellState, monthOf, sumRows, type CellState, type Month, type PlanRow } from "../model/vacancy-plan";
+import { cellState, monthFigures, monthOf, sumRows, type CellState, type Month, type PlanRow } from "../model/vacancy-plan";
 import { usePlanSettings, type PlanGroup, type PlanHeight } from "./plan-settings";
 import { GROUP_ICON } from "./VacancyPlanTools";
 
@@ -42,7 +43,8 @@ const NO_RELATIONS = new Map();
 /**
  * «Планирование» найма — `planView` прототипа (vacancies.html): группы
  * (филиал по умолчанию) → вакансии, по месяцам «нанято / план», справа
- * «План · Работают · Нанято · Уходят · Нужно нанять», внизу «Итого».
+ * только месяцы. План, факт, наём и уходы — в подсказке ячейки месяца;
+ * отдельными колонками, сводкой и легендой не дублируются.
  *
  * Группировку, вид строки и высоту правят кнопки в строке вкладок
  * (VacancyPlanTools), период — подшапка здесь же; всё помнится
@@ -99,8 +101,6 @@ export function VacancyPlan({
       .sort((a, b) => b.sum.total.need - a.sum.total.need || a.key.localeCompare(b.key));
   }, [plans, rows, group, fields, language]);
 
-  const all = useMemo(() => sumRows(groups.map((g) => g.sum)), [groups]);
-
   /** Подпись под названием: что включено в «Строке». Группа в ней не повторяется. */
   const details = (row: Item) =>
     [
@@ -113,14 +113,12 @@ export function VacancyPlan({
       .filter(Boolean)
       .join(" · ");
 
-  /** Ячейки месяцев и итоги строки. `strong` — строка группы и «Итого». */
+  /** Ячейки месяцев и итоги строки. `strong` — строка группы. */
   const cells = (plan: PlanRow, strong = false) => (
     <>
       {months.map((month) => {
-        const p = plan.plan.get(month) ?? 0;
-        const h = plan.hired.get(month) ?? 0;
-        const state = cellState(p, h, month, now);
-        const need = p - h;
+        const f = monthFigures(plan, month);
+        const state = cellState(f, month, now);
         return (
           <td
             key={month}
@@ -129,40 +127,22 @@ export function VacancyPlan({
             {state === "empty" ? (
               <span className="text-border-strong">·</span>
             ) : (
-              <span
-                title={t("vacancy.plan.cellHint", { plan: p, hired: h })}
-                className="inline-flex items-center gap-1"
+              <Tooltip
+                label={
+                  <span className="flex flex-col">
+                    <span>{t("vacancy.plan.planFormula", f)}</span>
+                    <span>{t("vacancy.plan.factFormula", f)}</span>
+                  </span>
+                }
               >
-                <Fraction state={state} hired={h} plan={p} strong={strong} />
-                {need > 0 && month <= now && (
-                  <em className="text-2xs font-semibold text-danger not-italic">−{need}</em>
-                )}
-              </span>
+                <span className="inline-flex items-center gap-1">
+                  <Fraction state={state} fact={f.fact} plan={f.plan} strong={strong} />
+                </span>
+              </Tooltip>
             )}
           </td>
         );
       })}
-      <td className={`${td} ${tail} font-semibold`}>{plan.total.plan}</td>
-      <td className={`${td} ${tail}`}>{plan.total.staff}</td>
-      <td className={`${td} ${tail}`}>
-        {plan.total.hired ? (
-          <span className="font-medium text-success">{plan.total.hired}</span>
-        ) : (
-          <span className="text-fg-subtle">0</span>
-        )}
-      </td>
-      <td className={`${td} ${tail}`}>
-        {plan.total.leave ? <Pill color="red">{plan.total.leave}</Pill> : <span className="text-fg-subtle">0</span>}
-      </td>
-      <td className={`${td} ${tail}`}>
-        {plan.total.need ? (
-          <Pill color="orange">{plan.total.need}</Pill>
-        ) : (
-          <span className={`inline-grid size-5 place-items-center rounded-full ${CHIP_STYLES.green}`}>
-            <Icon as={CheckIcon} size={12} />
-          </span>
-        )}
-      </td>
     </>
   );
 
@@ -193,16 +173,6 @@ export function VacancyPlan({
         >
           {t("vacancy.plan.today")}
         </button>
-
-        <span className="mx-2 h-4 w-px bg-border" />
-
-        <div className="flex flex-wrap items-center gap-4 text-[13px] text-fg-muted">
-          <Stat color="blue" label={t("vacancy.plan.plan")} value={all.total.plan} />
-          <Stat color="gray" label={t("vacancy.plan.working")} value={all.total.staff} />
-          <Stat color="green" label={t("vacancy.plan.hired")} value={all.total.hired} />
-          <Stat color="red" label={t("vacancy.plan.leaving")} value={all.total.leave} />
-          <Stat color="orange" label={t("vacancy.plan.need")} value={all.total.need} />
-        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6">
@@ -228,24 +198,19 @@ export function VacancyPlan({
                   </small>
                 </th>
               ))}
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.plan")}</th>
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.working")}</th>
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.hired")}</th>
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.leaving")}</th>
-              <th className={`${th} ${tail} whitespace-nowrap`}>{t("vacancy.plan.need")}</th>
             </tr>
           </thead>
 
           <tbody>
             {!plans ? (
               <tr>
-                <td colSpan={WINDOW + 6} className="py-8 text-center text-fg-subtle">
+                <td colSpan={WINDOW + 1} className="py-8 text-center text-fg-subtle">
                   {t("common.loading")}
                 </td>
               </tr>
             ) : !groups.length ? (
               <tr>
-                <td colSpan={WINDOW + 6} className="py-8 text-center text-fg-subtle">
+                <td colSpan={WINDOW + 1} className="py-8 text-center text-fg-subtle">
                   {t("table.noRows")}
                 </td>
               </tr>
@@ -323,24 +288,9 @@ export function VacancyPlan({
             )}
           </tbody>
 
-          {plans && groups.length > 0 && (
-            <tfoot className="sticky bottom-0 z-10 bg-surface">
-              <tr className="h-row font-semibold [&>td]:border-t [&>td]:border-t-border-strong">
-                <td className={td}>{t("vacancy.plan.total")}</td>
-                {cells(all, true)}
-              </tr>
-            </tfoot>
-          )}
         </table>
 
-        <div className="flex flex-wrap items-center gap-4 py-3 text-xs text-fg-muted">
-          <Legend state="ok" label={t("vacancy.plan.legend.ok")} />
-          <Legend state="current" label={t("vacancy.plan.legend.current")} />
-          <Legend state="overdue" label={t("vacancy.plan.legend.overdue")} />
-          <Legend state="planned" label={t("vacancy.plan.legend.planned")} />
-          <span className="text-fg-subtle">{t("vacancy.plan.legend.hint")}</span>
-          {pending && <span className="text-warning">{t("vacancy.plan.partial", { count: rows.length })}</span>}
-        </div>
+        {pending && <p className="py-3 text-xs text-warning">{t("vacancy.plan.partial", { count: rows.length })}</p>}
       </div>
     </div>
   );
@@ -354,7 +304,6 @@ export function VacancyPlan({
 const thBox = "h-12 border-b border-border px-2 text-[13px] leading-tight";
 const th = `${thBox} font-normal text-fg-muted`;
 const td = "border-b border-border px-2";
-const tail = "min-w-[64px] border-l border-border px-3 text-right tabular-nums";
 
 const capitalize = (value: string) => value.charAt(0).toLocaleUpperCase() + value.slice(1);
 
@@ -382,14 +331,14 @@ function groupKey(group: PlanGroup, fields: Field[], language: string, row: Item
 }
 
 /** «нанято / план» плашкой. */
-function Fraction({ state, hired, plan, strong }: { state: CellState; hired: number; plan: number; strong?: boolean }) {
+function Fraction({ state, fact, plan, strong }: { state: CellState; fact: number; plan: number; strong?: boolean }) {
   return (
     <span
       className={`inline-flex items-baseline rounded-[5px] px-1.5 py-px text-xs tabular-nums ${CELL_STYLE[state]} ${
         strong ? "font-medium" : ""
       }`}
     >
-      <b className="font-semibold">{hired}</b>
+      <b className="font-semibold">{fact}</b>
       <i className="mx-0.5 not-italic opacity-60">/</i>
       {plan}
     </span>
@@ -410,45 +359,4 @@ function NavButton({ label, onClick, children }: { label: string; onClick: () =>
   );
 }
 
-/** Бейдж `.pl-need` / `.pl-lv`: число в цветной капсуле. */
-function Pill({ color, children }: { color: "red" | "orange"; children: ReactNode }) {
-  return (
-    <span
-      className={`inline-grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-semibold ${CHIP_STYLES[color]}`}
-    >
-      {children}
-    </span>
-  );
-}
 
-/*
- * Точка итога — смысловым цветом: `CHIP_DOT` в тёмной теме белый.
- * «Нанято» зелёное, как его числа и выполненные ячейки; «Работают» —
- * нейтральные, это не результат найма, а исходная численность.
- */
-const STAT_DOT = {
-  blue: "bg-accent",
-  gray: "bg-fg-subtle",
-  green: "bg-success",
-  red: "bg-danger",
-  orange: "bg-warning",
-};
-
-function Stat({ color, label, value }: { color: keyof typeof STAT_DOT; label: string; value: number }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <i className={`size-2 rounded-full ${STAT_DOT[color]}`} />
-      {label}
-      <b className="font-semibold text-fg tabular-nums">{value}</b>
-    </span>
-  );
-}
-
-function Legend({ state, label }: { state: CellState; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <Fraction state={state} hired={state === "ok" ? 2 : 0} plan={state === "ok" ? 2 : 1} />
-      {label}
-    </span>
-  );
-}

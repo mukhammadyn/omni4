@@ -9,12 +9,18 @@ import { BrandSettings } from "./BrandSettings";
 import { ClientTypeSettings } from "./ClientTypeSettings";
 import { CodeSettings } from "./CodeSettings";
 import { CompanySettings } from "./CompanySettings";
-import { ConnectionSettings } from "./ConnectionSettings";
 import { DatabaseSettings } from "./DatabaseSettings";
 import { DirectorySettings } from "./DirectorySettings";
 import { EndpointSettings } from "./EndpointSettings";
-import { LocaleSettings } from "./LocaleSettings";
 import { ProfileSettings } from "./ProfileSettings";
+import { HrFilesSettings } from "./HrFilesSettings";
+import { HrFinesSettings } from "./HrFinesSettings";
+import { HrSalarySettings } from "./HrSalarySettings";
+import { HrHolidaySettings } from "./HrHolidaySettings";
+import { HrScheduleSettings } from "./HrScheduleSettings";
+import { HrPipelineSettings } from "./HrPipelineSettings";
+import { HrCareerSettings } from "./HrCareerSettings";
+import { OptionsSettings } from "./OptionsSettings";
 import { RecordSettings } from "./RecordSettings";
 import { RoleSettings } from "./RoleSettings";
 import { UserSettings } from "./UserSettings";
@@ -43,18 +49,23 @@ const CONTENT: Record<string, () => React.JSX.Element> = {
   profile: ProfileSettings,
   company: CompanySettings,
   brand: BrandSettings,
-  locale: LocaleSettings,
   clientTypes: ClientTypeSettings,
   users: UserSettings,
   roles: RoleSettings,
   api: ApiSettings,
   endpoints: EndpointSettings,
   code: CodeSettings,
-  connections: ConnectionSettings,
   database: DatabaseSettings,
   billing: BillingSettings,
   resources: ResourceSettings,
   activity: ActivityLog,
+  "hr-files": HrFilesSettings,
+  "hr-fines": HrFinesSettings,
+  "hr-salary": HrSalarySettings,
+  "hr-holidays": HrHolidaySettings,
+  "hr-sched": HrScheduleSettings,
+  "hr-rec-pipe": HrPipelineSettings,
+  "hr-career": HrCareerSettings,
 };
 
 /**
@@ -73,6 +84,8 @@ export function SettingsPage({ section }: { section: string | undefined }) {
     <DirectorySettings directory={active.directory} />
   ) : active?.record ? (
     <RecordSettings section={active.record} />
+  ) : active?.options ? (
+    <OptionsSettings section={active.options} />
   ) : (
     Content && <Content />
   );

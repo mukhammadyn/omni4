@@ -47,6 +47,7 @@ import type { RelationTab } from "../model/relation-tabs";
 import { tabGroupField } from "../api/tab-group";
 import { useExportExcel } from "../api/excel";
 import { CalendarSetup } from "./CalendarFields";
+import { CommentFeed } from "./CommentFeed";
 import { ExcelImportDialog } from "./ExcelImportDialog";
 import { ViewOptions } from "./ViewOptions";
 
@@ -97,7 +98,16 @@ export type TabSettings = {
  * в нём означал бы либо префиксы у каждого ключа, либо путаницу «чья
  * это страница». Ссылка открывает вкладку с начала — это и есть та цена.
  */
-export function RelationView({
+/** Вкладка связи: лента комментариев своим видом, остальное — RelationTabView. */
+export function RelationView(props: Parameters<typeof RelationTabView>[0]) {
+  return props.tab.view.type === "COMMENTS" ? (
+    <CommentFeed tab={props.tab} parentGuid={props.parentGuid} locale={props.locale} language={props.language} />
+  ) : (
+    <RelationTabView {...props} />
+  );
+}
+
+function RelationTabView({
   tab,
   parentGuid,
   parentValue,
@@ -107,6 +117,7 @@ export function RelationView({
   languages = EMPTY_LANGUAGES,
   onLanguage,
   trail,
+  onOpenRow,
   settings,
   saving = false,
 }: {
@@ -141,6 +152,11 @@ export function RelationView({
    * собой всё остальное, и без крошек непонятно, где мы оказались.
    */
   trail?: { label: string; onClick: () => void }[] | undefined;
+  /**
+   * Открыть строку своей страницей вместо карточки. true — открыто,
+   * карточка не нужна.
+   */
+  onOpenRow?: ((row: Item) => boolean) | undefined;
   /**
    * Правки настроек вкладки. Не заданы — панели «⋯» нет вовсе: настройки
    * лежат в раскладке карточки, и правит их тот, у кого есть права
@@ -449,6 +465,7 @@ export function RelationView({
       rows.rows.find((item) => item.guid === guid) ??
       undated.find((item) => item.guid === guid);
     if (openRowUrl(tab.view, row)) return;
+    if (row && onOpenRow?.(row)) return;
 
     setOpenGuid(guid);
   };

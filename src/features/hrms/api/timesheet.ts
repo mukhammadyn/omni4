@@ -2,8 +2,9 @@ import { useEffect, useMemo } from "react";
 import { MAX_LIMIT, useItems, type Filters, type Item } from "@/features/item";
 import { toDateValue, wallClock } from "@/shared/lib/date-value";
 import { plusDays, type AttendanceDay, type Leave, type RowInput } from "../model/timesheet";
-import { EMPLOYEES } from "./employee";
+import { EMPLOYEES, useNotDismissed } from "./employee";
 import { related, text } from "./org";
+import { useDaysOff } from "./holiday";
 
 /** Табель — дни посещаемости, посчитанные сервером (`ucode/erp/erp.dbml`). */
 export const ATTENDANCE_DAYS = "hr_attendance_days";
@@ -38,6 +39,10 @@ const num = (value: unknown): number | null => (typeof value === "number" && Num
 /**
  * Все строки по отбору, порциями по MAX_LIMIT. Месяц табеля — это
  * сотрудники × дни, и в июне их уже было больше одной порции.
+ *
+ * Строки прежнего отбора (placeholderData у useItems) — тоже загрузка:
+ * иначе при смене периода расчёт шёл по строкам прошлого, и «Заполнить»
+ * успевало включиться с планом и днями чужого месяца.
  */
 export function useAll(tableSlug: string | undefined, filters: Filters, relations?: false) {
   const query = useItems(tableSlug, { limit: MAX_LIMIT, page: 1, infinite: true, filters, relations });
@@ -45,23 +50,32 @@ export function useAll(tableSlug: string | undefined, filters: Filters, relation
   useEffect(() => {
     if (hasMore) loadMore();
   }, [hasMore, loadMore]);
-  return { rows: query.page.rows, loading: query.isLoading || hasMore || query.loadingMore, fetching: query.isFetching };
+  return { rows: query.page.rows, loading: query.isLoading || query.isPlaceholderData || hasMore || query.loadingMore, fetching: query.isFetching };
 }
 
 export type SheetEmployee = {
   id: string;
   name: string;
+  /** Фамилия, имя, отчество — для ведомости, как ФИО в HRMS. */
+  legalName?: string;
   photo: string;
   position: string;
+  positionId: string;
+  departmentId: string;
+  locationId: string;
   hireDate: string;
   dismissalDate: string;
 };
 
-const toEmployee = (row: Item): SheetEmployee => ({
+export const toEmployee = (row: Item): SheetEmployee => ({
   id: text(row.guid),
   name: text(row.full_name) || [text(row.last_name), text(row.first_name)].filter(Boolean).join(" ") || "—",
+  legalName: [text(row.last_name), text(row.first_name), text(row.middle_name)].filter(Boolean).join(" ") || text(row.full_name) || "—",
   photo: text(row.photo),
   position: text(related(row, "hr_positions_id").name),
+  positionId: text(row.hr_positions_id),
+  departmentId: text(row.hr_departments_id),
+  locationId: text(row.hr_locations_id),
   hireDate: text(row.hire_date).slice(0, 10),
   dismissalDate: text(row.dismissal_date).slice(0, 10),
 });
@@ -75,6 +89,7 @@ export const toAttendanceDay = (row: Item): AttendanceDay => ({
   lastOut: text(row.last_out),
   workedMinutes: num(row.worked_minutes),
   lateMinutes: num(row.late_minutes) ?? 0,
+  earlyMinutes: num(row.early_leave_minutes) ?? 0,
   requestId: text(row.hr_requests_id),
   comment: text(row.comment),
 });
@@ -88,11 +103,13 @@ const toLeave = (row: Item): Leave | null => {
   const kind = related(row, "hr_absence_types_id");
   return {
     id: text(row.guid),
+    typeId: text(row.hr_absence_types_id),
     title: text(kind.name),
     code: text(kind.code),
     icon: text(kind.icon),
     color: text(kind.color),
     status,
+    paid: kind.is_paid === true,
     from,
     to: text(row.date_to).slice(0, 10) || from,
   };
@@ -102,6 +119,8 @@ export type Timesheet = {
   employees: SheetEmployee[];
   /** Вход строки табеля по сотруднику. */
   inputOf: (employee: SheetEmployee) => RowInput;
+  /** Праздники компании за период: дата → название. Шапке дня. */
+  holidays: ReadonlyMap<string, string>;
   /** Типы отсутствий — для обозначений. */
   absenceTypes: { title: string; code: string; icon: string; color: string }[];
   loading: boolean;
@@ -127,6 +146,8 @@ export function useTimesheet({
   search,
   employeeId,
   pageSize,
+  where = {},
+  dismissed = false,
 }: {
   from: string;
   to: string;
@@ -137,12 +158,20 @@ export function useTimesheet({
   employeeId?: string;
   /** Сотрудники порциями по столько — прокрутка табеля, как в HRMS. Без него — все. */
   pageSize?: number;
+  /** Отбор сотрудников полосой фильтров (PeopleFilterBar). */
+  where?: Filters;
+  /** И уволенных — ведомости: уволенный в месяце за него получает. */
+  dismissed?: boolean;
 }): Timesheet {
+  // Уволенных нет ни в каком периоде; свой фильтр по статусу человека важнее.
+  const working = useNotDismissed();
   const peopleQuery = useItems(EMPLOYEES, {
     limit: pageSize ?? MAX_LIMIT,
     page: 1,
     infinite: true,
-    filters: employeeId ? { guid: { op: "any", values: [employeeId] } } : {},
+    filters: employeeId
+      ? { guid: { op: "any", values: [employeeId] } }
+      : dismissed ? where : { ...working, ...where },
     search,
     // Порции идут по алфавиту — иначе новая порция вставала бы между строк.
     sorts: [{ field: "full_name", direction: "asc" }],
@@ -169,10 +198,10 @@ export function useTimesheet({
     date_to: { op: "after", values: [plusDays(from, -1)] },
   });
   const types = useAll("hr_absence_types", {});
-  const holidays = useAll("hr_holidays", range);
+  const daysOff = useDaysOff(from, to);
 
   const loading =
-    peopleQuery.isLoading || (!pageSize && (peopleMore || peopleQuery.loadingMore)) || days.loading || shifts.loading || requests.loading || types.loading;
+    peopleQuery.isLoading || (!pageSize && (peopleMore || peopleQuery.loadingMore)) || days.loading || shifts.loading || requests.loading || types.loading || daysOff.loading;
   // Догрузка порции — не обновление: прежние строки не приглушаются.
   const loadingMore = peopleQuery.loadingMore;
   const fetching = (peopleQuery.isFetching && !loadingMore) || days.fetching || shifts.fetching || requests.fetching;
@@ -210,13 +239,6 @@ export function useTimesheet({
       leaveIndex.set(employee, [...(leaveIndex.get(employee) ?? []), leave]);
     }
 
-    // ponytail: праздник общий на всех; у `hr_holidays` есть `hr_locations_id`,
-    // делить по филиалам — когда праздники филиалов разойдутся.
-    const holidayIndex = new Map(
-      holidays.rows
-        .filter((row) => text(row.type) !== "working_weekend")
-        .map((row) => [text(row.date).slice(0, 10), text(row.name)]),
-    );
 
     return {
       employees,
@@ -228,8 +250,10 @@ export function useTimesheet({
         planByDate: planIndex.get(employee.id) ?? new Map(),
         dayByDate: dayIndex.get(employee.id) ?? new Map(),
         leaves: leaveIndex.get(employee.id) ?? [],
-        holidays: holidayIndex,
+        holidays: daysOff.of(employee.locationId),
       }),
+      /** Праздники компании — шапке дня; у сотрудника свои, по филиалу (`inputOf`). */
+      holidays: daysOff.of(""),
       absenceTypes: types.rows
         .filter((row) => row.is_active !== false)
         .map((row) => ({ title: text(row.name), code: text(row.code), icon: text(row.icon), color: text(row.color) })),
@@ -240,7 +264,7 @@ export function useTimesheet({
       loadMore: peopleNext,
       total: peopleQuery.page.count,
     };
-  }, [peopleQuery.page.count, peopleQuery.page.rows, hasMore, loadingMore, peopleNext, days.rows, shifts.rows, requests.rows, types.rows, holidays.rows, from, to, dates, today, loading, fetching]);
+  }, [peopleQuery.page.count, peopleQuery.page.rows, hasMore, loadingMore, peopleNext, days.rows, shifts.rows, requests.rows, types.rows, daysOff.of, from, to, dates, today, loading, fetching]);
 }
 
 /** Отметки сотрудника за день — окну дня. */

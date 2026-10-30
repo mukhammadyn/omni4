@@ -20,7 +20,17 @@ export { relationLabel };
  * строках, и «связать» там значит незаметно переписать чужую ячейку.
  */
 export function isLinkable(type: string): boolean {
-  return type.toLowerCase() === "many2one";
+  return type.toLowerCase() === "many2one" || isMany(type);
+}
+
+/**
+ * Many2Many правится только со СВОЕЙ стороны: список uuid лежит колонкой
+ * `<таблица>_ids` в строке, и обычный PUT его пишет. Вторую сторону бэкенд
+ * не обновляет (docs/backend-notes.md, «Many2Many пишется только при
+ * вставке»), поэтому читать такую связь можно только отсюда же.
+ */
+export function isMany(type: string): boolean {
+  return type.toLowerCase() === "many2many";
 }
 
 export type RelationEdit = {
@@ -57,10 +67,17 @@ export function relationSelection(
   fields: ViewField[] | undefined,
   /** Язык ДАННЫХ: им отбирается колонка мультиязычного поля показа. */
   language = "",
-): { guid: string; label: string; color?: string }[] {
+  /**
+   * Строки целевой таблицы — для Many2Many: бэкенд отдаёт в строке только
+   * список uuid, без `_data`, и подписи берутся отсюда.
+   */
+  known: Item[] = [],
+): { guid: string; label: string; color?: string; off?: true }[] {
   if (!fields?.length) return [];
 
-  const related = row[relationDataKey(field.slug)];
+  const own = row[field.slug];
+  const related = row[relationDataKey(field.slug)] ??
+    (Array.isArray(own) ? own.map((guid) => known.find((item) => item["guid"] === guid) ?? { guid }) : undefined);
 
   // Связанная строка бывает и списком: у поля-связи с той стороны,
   // где строк несколько, бэкенд отдаёт массив.
@@ -70,6 +87,8 @@ export function relationSelection(
       guid: String(item["guid"] ?? ""),
       label: relationLabel(item, fields, language),
       ...(typeof item[COLOR] === "string" && item[COLOR] ? { color: item[COLOR] } : {}),
+      // Выключенная запись справочника: показываем, но помечаем.
+      ...(item["is_active"] === false ? { off: true as const } : {}),
     }))
     .filter((item) => item.guid || item.label);
 }
@@ -195,3 +214,44 @@ export function selfDefaults(relations: Relation[], me: SelfIdentity): Item {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+export type TreeOption = { item: Item; depth: 0 | 1; header: boolean };
+
+/**
+ * Варианты связи деревом — как справочник в настройках («Грейды»:
+ * группа → грейды). Дерево — когда у строк есть ссылка на свою же
+ * таблицу (`parentKey`, `hr_grades` → `hr_grades_id`). Родитель с детьми
+ * в списке — заголовок, выбирают его детей; родителя нет в списке
+ * (отсеял поиск) — ребёнок стоит в корне. Два уровня, как в настройках.
+ *
+ * Заголовок — только там, где родитель лишь группа (группа грейдов —
+ * не грейд). Юнит, отдел, должность с детьми — сами по себе вариант:
+ * головной юнит Udevs выбирают наравне с дочерними.
+ */
+const GROUP_ONLY = new Set(["hr_grades_id"]);
+
+export function relationTree(items: Item[], parentKey: string): TreeOption[] {
+  const ids = new Set(items.map((item) => String(item["guid"] ?? "")));
+  const parentOf = (item: Item) => {
+    const parent = item[parentKey];
+    return typeof parent === "string" && ids.has(parent) ? parent : "";
+  };
+  const children = new Map<string, Item[]>();
+  for (const item of items) {
+    const parent = parentOf(item);
+    if (parent) children.set(parent, [...(children.get(parent) ?? []), item]);
+  }
+  return items
+    .filter((item) => !parentOf(item))
+    .flatMap((root) => {
+      const kids = children.get(String(root["guid"] ?? "")) ?? [];
+      return [
+        { item: root, depth: 0 as const, header: kids.length > 0 && GROUP_ONLY.has(parentKey) },
+        ...kids.map((item) => ({ item, depth: 1 as const, header: false })),
+      ];
+    });
+}
+
+/** «DEV D3» под заголовком «DEV» — «D3»: группа уже видна строкой выше. */
+export const withoutPrefix = (label: string, prefix: string) =>
+  prefix && label.startsWith(`${prefix} `) ? label.slice(prefix.length + 1) : label;
