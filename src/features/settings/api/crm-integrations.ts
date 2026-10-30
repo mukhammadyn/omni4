@@ -457,3 +457,61 @@ export function useMetaPageRoutes(connected: boolean) {
   );
   return { routes, loading: query.isLoading, save };
 }
+
+/* ---------------- Meta Ads: какие кампании пускаются в воронку ---------------- */
+
+export type MetaCampaign = { id: string; name: string; active: boolean };
+type CampaignsDto = { campaigns?: { id?: string; name?: string; effective_status?: string }[] };
+
+/**
+ * Кампании воронки (`/v1/meta-ads/pipeline-campaigns`, как доска ARMADA):
+ * лид страницы попадает в воронку, только если его объявление из выбранной
+ * кампании. Рекламный аккаунт шлюз подбирает сам — по страницам воронки
+ * (`/v1/meta-ads/selected-account`).
+ *
+ * Пустой ответ — «все кампании»: списка ещё нет. Сохранённый пустой список
+ * шлюз читает как «никого» и убрать его не даёт — поэтому пустым не пишем.
+ */
+export function useMetaPipelineCampaigns(pipelineId: string) {
+  const envId = useSession().getEnvironmentId() ?? "";
+  const queryClient = useQueryClient();
+  const base = [...keys.settings.integration(envId, "meta-ads"), pipelineId];
+
+  const account = useQuery({
+    queryKey: [...base, "account"],
+    queryFn: () => api.get<{ account?: { id?: string } }>("/v1/meta-ads/selected-account", { params: { pipeline_value: pipelineId } }),
+    enabled: Boolean(pipelineId),
+    retry: false,
+  });
+  const accountId = account.data?.account?.id ?? "";
+  const campaigns = useQuery({
+    queryKey: [...base, "campaigns", accountId],
+    queryFn: () => api.get<CampaignsDto>("/v1/meta-ads/campaigns", { params: { account_id: accountId } }),
+    enabled: Boolean(accountId),
+    retry: false,
+  });
+  const selected = useQuery({
+    queryKey: [...base, "selected"],
+    queryFn: () => api.get<{ campaign_ids?: string[] }>("/v1/meta-ads/pipeline-campaigns", { params: { pipeline_value: pipelineId } }),
+    enabled: Boolean(pipelineId),
+  });
+  const save = useMutation({
+    mutationFn: (ids: string[]) => api.put<unknown>("/v1/meta-ads/pipeline-campaigns", { pipeline_value: pipelineId, campaign_ids: ids }),
+    onError: (error) => reportError(error, "common.saveFailed"),
+    onSuccess: () => {
+      toast.success(i18n.t("settings.saved"));
+      return queryClient.invalidateQueries({ queryKey: [...base, "selected"] });
+    },
+  });
+
+  return {
+    campaigns: (campaigns.data?.campaigns ?? []).map(
+      (c): MetaCampaign => ({ id: c.id ?? "", name: c.name ?? c.id ?? "", active: c.effective_status === "ACTIVE" }),
+    ),
+    selected: selected.data?.campaign_ids ?? [],
+    loading: account.isLoading || campaigns.isLoading || selected.isLoading,
+    /** Нет рекламного аккаунта или он не видит страниц воронки. */
+    unavailable: account.isError || campaigns.isError,
+    save,
+  };
+}
