@@ -6,6 +6,12 @@ export type QueryResult = { columns: QueryColumn[]; rows: Item[]; limit: number;
 const numericTypes = new Set(["int2", "int4", "int8", "numeric", "float4", "float8"]);
 const types = new Set([...numericTypes, "text", "varchar", "bpchar", "uuid", "bool", "date", "timestamp", "timestamptz"]);
 
+/** SQL AVG/MIN/MAX of an empty population is NULL, not a measured zero. */
+export function hasQueryStatistic(result: QueryResult, key: string): boolean {
+  return result.columns.some((column) => column.key === key && numericTypes.has(column.type))
+    && result.rows.some((row) => row[key] !== null && row[key] !== undefined);
+}
+
 /** Decode the ordered server schema and tuples; persisted menu columns are not trusted. */
 export function toQueryResult(value: unknown): QueryResult {
   if (!value || typeof value !== "object") throw new Error("Invalid dashboard query response");

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { chartSeries, newChart, valueLabelOf } from "@/features/item";
-import { queryChartRows, queryFields, toQueryResult } from "./query-result";
+import { hasQueryStatistic, queryChartRows, queryFields, toQueryResult } from "./query-result";
 
 test("ordered SQL output becomes native table items and chart fields", () => {
   const result = toQueryResult({ columns: [{ key: "label", type: "text" }, { key: "total", type: "numeric" }], rows: [["Alice", "12.34"], ["Bob", "20.66"]], limit: 100, truncated: false });
@@ -33,5 +33,8 @@ test("empty SQL results retain schema and nullable values", () => {
   const result = toQueryResult({ columns: [{ key: "total", type: "numeric" }], rows: [], limit: 100, truncated: false });
   expect(queryFields(result)).toHaveLength(1);
   expect(queryChartRows(result)).toEqual([]);
+  expect(hasQueryStatistic(result, "total")).toBe(false);
+  expect(hasQueryStatistic(toQueryResult({ ...result, rows: [[null]] }), "total")).toBe(false);
+  expect(hasQueryStatistic(toQueryResult({ ...result, rows: [["0"]] }), "total")).toBe(true);
   expect(toQueryResult({ ...result, rows: [[null]] }).rows).toEqual([{ total: null }]);
 });
