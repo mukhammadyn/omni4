@@ -252,13 +252,66 @@ export function fetchWebRtcCredentials(): Promise<WebRtcCredentials> {
   });
 }
 
-/** Звонок из браузера закончился — строка в журнал (`pbx_calls`). */
-export function logWebRtcCall(input: { phone: string; duration: number; status: string }) {
-  return invoke<unknown>("pbx_log_call", {
-    client_phone: input.phone,
-    duration: Math.max(0, Math.round(input.duration)),
-    status: input.status,
+/**
+ * Звонок из браузера закончился — строка в журнал (`pbx_calls`).
+ *
+ * Пишем сами, мимо `pbx_log_call`: та не сохраняет ни направления, ни
+ * `call_uuid` (pbx-fn, functions/pbx_webrtc.go, PBXLogCall), а без
+ * `call_uuid` `pbx_get_recording` звонка не найдёт. Id звонка Verto —
+ * он же uuid звонка в onlinePBX (так в new-crm, `savePbxCallHistory`).
+ * Оператор — тот же `users_id`, что функция берёт из токена.
+ */
+export function logCall(input: {
+  callId: string;
+  phone: string;
+  direction: "incoming" | "outgoing";
+  status: string;
+  duration: number;
+}) {
+  return api.post<unknown>("/v2/items/pbx_calls", {
+    data: {
+      call_uuid: input.callId,
+      idempotency_key: input.callId,
+      /* Только цифры и ведущий «+», как нормализует функция для своих
+         строк (pbxNormalizeDial): иначе один номер в журнале в трёх видах. */
+      client_phone: input.phone.trim().replace(/(?!^\+)\D/g, ""),
+      direction: input.direction,
+      status: input.status,
+      duration: Math.max(0, Math.round(input.duration)),
+      users_id: session.getUserId(),
+    },
   });
+}
+
+/**
+ * Запись разговора: адрес в CDN проекта или пусто, пока onlinePBX её
+ * не отдал (`pending`). Функция сама кладёт адрес в строку журнала.
+ */
+export function fetchRecording(callUuid: string): Promise<string> {
+  return invoke<{ status?: string; recording_url?: string }>("pbx_get_recording", { call_uuid: callUuid }).then(
+    (dto) => dto.recording_url ?? "",
+  );
+}
+
+/**
+ * Свои принятые звонки за сутки без записи — дотянуть после
+ * перезагрузки: вкладку могли закрыть, пока onlinePBX готовил файл.
+ */
+export async function callsWithoutRecording(): Promise<string[]> {
+  const dto = await api.post<ListDto>("/v2/object/get-list/pbx_calls", {
+    data: { limit: 20, offset: 0, users_id: session.getUserId(), status: "answered" },
+  });
+  const since = Date.now() - 24 * 3600_000;
+  return (dto.data?.response ?? [])
+    /* Короче 5 с записи обычно нет вовсе — не спрашивать её каждую загрузку. */
+    .filter(
+      (row) =>
+        !str(row, "recording_url") &&
+        Number(row["duration"]) >= 5 &&
+        Date.parse(str(row, "created_at")) > since,
+    )
+    .map((row) => str(row, "call_uuid"))
+    .filter(Boolean);
 }
 
 /* ---------------- Журнал ---------------- */
@@ -332,28 +385,8 @@ export function useCallLog(page: number, search: string) {
  */
 export function useCallRecording() {
   return useMutation({
-    mutationFn: (callUuid: string) =>
-      invoke<{ status?: string; recording_url?: string }>("pbx_get_recording", { call_uuid: callUuid }),
+    mutationFn: fetchRecording,
     onError: (error) => reportError(error, "pbx.recordingFailed"),
-  });
-}
-
-/**
- * Входящий звонок — строка в журнал напрямую, мимо функции:
- * `pbx_log_call` пишет только `client_phone/status/duration` и
- * направления не знает (pbx-fn, functions/pbx_webrtc.go, PBXLogCall),
- * а пропущенный от исходящего иначе не отличить. Оператор — тот же
- * `users_id`, что функция берёт из токена.
- */
-export function logIncomingCall(input: { phone: string; duration: number; status: string }) {
-  return api.post<unknown>("/v2/items/pbx_calls", {
-    data: {
-      client_phone: input.phone,
-      direction: "incoming",
-      status: input.status,
-      duration: Math.max(0, Math.round(input.duration)),
-      users_id: session.getUserId(),
-    },
   });
 }
 
