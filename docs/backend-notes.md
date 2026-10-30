@@ -1822,3 +1822,11 @@ pkg/helper/relation.go:855`): удалили табель — его строк�
 пространства» и где он назначается — в локальной копии шлюза
 (от 2026-09-01) ручки `moizvonki` нет, проверить не по чему. Экран
 говорит об этом прямо (`crmInt.forbidden`), а не «недоступно».
+
+## `pbx_log_call` не пишет направление (2026-10-30)
+
+pbx-fn, `functions/pbx_webrtc.go`, `PBXLogCall`: в `pbx_calls` уходят
+только `client_phone`, `status`, `duration`, `users_id`. `direction`
+нет — входящий от исходящего не отличить. Обход: входящие omni4 пишет
+сам через `POST /v2/items/pbx_calls` (`features/pbx/api/pbx.ts`,
+`logIncomingCall`); исходящие из браузера остаются без направления.

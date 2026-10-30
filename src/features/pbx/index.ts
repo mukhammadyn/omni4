@@ -9,3 +9,4 @@ export {
 } from "./api/pbx";
 export { CallButton } from "./ui/CallButton";
 export { CallLog } from "./ui/CallLog";
+export { SoftphoneProvider } from "./ui/Softphone";
