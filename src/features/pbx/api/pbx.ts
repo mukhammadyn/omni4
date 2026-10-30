@@ -331,11 +331,18 @@ export type PbxCall = {
 
 const PAGE = 50;
 
-export function useCallLog(page: number, search: string) {
+/**
+ * Отбор журнала. Пусто — без отбора. Текстовый фильтр get-list ищет
+ * подстроку, но значения здесь из закрытого списка (`incoming`,
+ * `no_answer`, guid), и ложных совпадений между ними нет.
+ */
+export type CallLogFilter = { direction: string; status: string; userId: string };
+
+export function useCallLog(page: number, search: string, filter: CallLogFilter) {
   const envId = useSession().getEnvironmentId() ?? "";
 
   const calls = useQuery({
-    queryKey: [...keys.settings.integration(envId, "pbx"), "calls", page, search],
+    queryKey: [...keys.settings.integration(envId, "pbx"), "calls", page, search, filter],
     queryFn: () =>
       api.post<{ data?: { count?: number; response?: Row[] | null } }>("/v2/object/get-list/pbx_calls", {
         data: {
@@ -345,6 +352,9 @@ export function useCallLog(page: number, search: string) {
              по одному created_at роняет запрос (backend-notes,
              «Сортировка по created_at в get-list»). */
           ...(search.trim() ? { search: search.trim() } : {}),
+          ...(filter.direction ? { direction: filter.direction } : {}),
+          ...(filter.status ? { status: filter.status } : {}),
+          ...(filter.userId ? { users_id: filter.userId } : {}),
         },
       }),
     placeholderData: (previous) => previous,
@@ -359,7 +369,18 @@ export function useCallLog(page: number, search: string) {
   });
   const names = new Map((users.data ?? []).map((user) => [str(user, "guid"), str(user, "full_name")]));
 
+  /* Кого предложить в отборе «Сотрудник» — операторов, а не всех людей. */
+  const operators = useQuery({
+    queryKey: [...keys.settings.integration(envId, "pbx"), "operators"],
+    queryFn: () => listRows("pbx_operators", 1000),
+    staleTime: 5 * 60_000,
+  });
+
   return {
+    operators: (operators.data ?? [])
+      .map((op) => ({ value: str(op, "users_id"), label: names.get(str(op, "users_id")) ?? "" }))
+      .filter((op) => op.value && op.label)
+      .sort((a, b) => a.label.localeCompare(b.label)),
     calls: (calls.data?.data?.response ?? []).map(
       (row): PbxCall => ({
         guid: str(row, "guid"),

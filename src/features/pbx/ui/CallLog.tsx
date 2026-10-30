@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { session } from "@/shared/api/session";
 import { toast } from "@/shared/lib/toast";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Icon } from "@/shared/ui/icon";
-import { useCallLog, useCallRecording, type PbxCall } from "../api/pbx";
+import { useCallLog, useCallRecording, type CallLogFilter, type PbxCall } from "../api/pbx";
+
+const STATUSES = ["answered", "no_answer", "busy", "failed", "canceled", "initiated"] as const;
 
 /**
  * Журнал звонков onlinePBX — строки `pbx_calls`, новыми вперёд. Пишет
@@ -16,48 +20,95 @@ import { useCallLog, useCallRecording, type PbxCall } from "../api/pbx";
 export function CallLog({ search }: { search: string }) {
   const { t, i18n } = useTranslation();
   const [page, setPage] = useState(1);
-  const { calls, count, pageSize, isLoading } = useCallLog(page, search);
+  const [filter, setFilter] = useState<CallLogFilter>({ direction: "", status: "", userId: "" });
+  const { calls, operators, count, pageSize, isLoading } = useCallLog(page, search, filter);
   const pages = Math.max(1, Math.ceil(count / pageSize));
 
-  if (isLoading) return <p className="p-4 text-sm text-fg-muted">{t("common.loading")}</p>;
-  if (!calls.length) return <p className="p-7 text-center text-sm text-fg-subtle">{t("pbx.logEmpty")}</p>;
-
+  const pick = (key: keyof CallLogFilter) => (value: string) => {
+    setFilter((current) => ({ ...current, [key]: value }));
+    setPage(1);
+  };
+  const me = session.getUserId();
   const time = new Intl.DateTimeFormat(i18n.language, { dateStyle: "short", timeStyle: "short" });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-surface text-left text-xs text-fg-muted">
-            <tr className="border-b border-border">
-              <th className="px-3 py-2 font-medium">{t("pbx.col.at")}</th>
-              <th className="px-3 py-2 font-medium">{t("pbx.col.user")}</th>
-              <th className="px-3 py-2 font-medium">{t("pbx.col.phone")}</th>
-              <th className="px-3 py-2 font-medium">{t("pbx.col.status")}</th>
-              <th className="px-3 py-2 text-right font-medium">{t("pbx.col.duration")}</th>
-              <th className="px-3 py-2 font-medium">{t("pbx.col.recording")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {calls.map((call) => (
-              <tr key={call.guid} className="border-b border-border hover:bg-surface-hover">
-                <td className="px-3 py-2 whitespace-nowrap text-fg-muted">
-                  {call.at ? time.format(new Date(call.at)) : "—"}
-                </td>
-                <td className="px-3 py-2">{call.userName || "—"}</td>
-                <td className="px-3 py-2 tabular-nums">{call.phone || "—"}</td>
-                <td className="px-3 py-2 text-fg-muted">
-                  {call.status ? t(`pbx.status.${call.status}`, { defaultValue: call.status }) : "—"}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">{duration(call.duration)}</td>
-                <td className="px-3 py-2">
-                  <Recording call={call} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+        <Dropdown
+          size="control"
+          className="w-40"
+          ariaLabel={t("pbx.filter.direction")}
+          value={filter.direction}
+          onChange={pick("direction")}
+          items={[
+            { value: "", label: t("pbx.filter.anyDirection") },
+            { value: "incoming", label: t("pbx.direction.incoming") },
+            { value: "outgoing", label: t("pbx.direction.outgoing") },
+          ]}
+        />
+        <Dropdown
+          size="control"
+          className="w-40"
+          ariaLabel={t("pbx.col.status")}
+          value={filter.status}
+          onChange={pick("status")}
+          items={[
+            { value: "", label: t("pbx.filter.anyStatus") },
+            ...STATUSES.map((status) => ({ value: status, label: t(`pbx.status.${status}`) })),
+          ]}
+        />
+        <Dropdown
+          size="control"
+          className="w-48"
+          ariaLabel={t("pbx.col.user")}
+          value={filter.userId}
+          onChange={pick("userId")}
+          items={[
+            { value: "", label: t("pbx.filter.anyUser") },
+            ...(me ? [{ value: me, label: t("pbx.filter.mine") }] : []),
+            ...operators.filter((op) => op.value !== me),
+          ]}
+        />
       </div>
+
+      {isLoading ? (
+        <p className="p-4 text-sm text-fg-muted">{t("common.loading")}</p>
+      ) : !calls.length ? (
+        <p className="p-7 text-center text-sm text-fg-subtle">{t("pbx.logEmpty")}</p>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-surface text-left text-xs text-fg-muted">
+              <tr className="border-b border-border">
+                <th className="px-3 py-2 font-medium">{t("pbx.col.at")}</th>
+                <th className="px-3 py-2 font-medium">{t("pbx.col.user")}</th>
+                <th className="px-3 py-2 font-medium">{t("pbx.col.phone")}</th>
+                <th className="px-3 py-2 font-medium">{t("pbx.col.status")}</th>
+                <th className="px-3 py-2 text-right font-medium">{t("pbx.col.duration")}</th>
+                <th className="px-3 py-2 font-medium">{t("pbx.col.recording")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {calls.map((call) => (
+                <tr key={call.guid} className="border-b border-border hover:bg-surface-hover">
+                  <td className="px-3 py-2 whitespace-nowrap text-fg-muted">
+                    {call.at ? time.format(new Date(call.at)) : "—"}
+                  </td>
+                  <td className="px-3 py-2">{call.userName || "—"}</td>
+                  <td className="px-3 py-2 tabular-nums">{call.phone || "—"}</td>
+                  <td className="px-3 py-2 text-fg-muted">
+                    {call.status ? t(`pbx.status.${call.status}`, { defaultValue: call.status }) : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{duration(call.duration)}</td>
+                  <td className="px-3 py-2">
+                    <Recording call={call} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {pages > 1 && (
         <div className="flex h-11 shrink-0 items-center justify-end gap-2 border-t border-border px-3 text-xs text-fg-muted">
