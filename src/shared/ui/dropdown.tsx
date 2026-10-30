@@ -1,4 +1,4 @@
-import type { ReactNode, UIEvent } from "react";
+import { Fragment, useRef, type ReactNode, type UIEvent, type KeyboardEvent } from "react";
 import { CheckIcon, ChevronDownIcon, SearchIcon } from "lucide-react";
 import { Icon } from "./icon";
 import { Popover, PopoverItem } from "./popover";
@@ -8,7 +8,7 @@ import { Popover, PopoverItem } from "./popover";
  * графика узнаётся по нему быстрее, чем по названию. Список без значков
  * от этого не меняется — отступа под пустое место не появляется.
  */
-export type DropdownItem = { value: string; label: string; icon?: ReactNode };
+export type DropdownItem = { value: string; label: string; icon?: ReactNode; group?: string };
 
 /**
  * Выпадающий список в нашем оформлении.
@@ -75,6 +75,24 @@ export function Dropdown({
   onSearch?: (query: string) => void;
   onLoadMore?: () => void;
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const focusOption = (last = false) => requestAnimationFrame(() => {
+    const options = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+    (last ? options?.[options.length - 1] : options?.[0])?.focus();
+  });
+  const navigate = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") { triggerRef.current?.focus(); return; }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    // Home/End still edit text normally while the search input has focus.
+    if (event.target instanceof HTMLInputElement && ["Home", "End"].includes(event.key)) return;
+    const options = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    if (!options.length) return;
+    event.preventDefault();
+    const current = options.indexOf(document.activeElement as HTMLButtonElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : current < 0 ? event.key === "ArrowUp" ? options.length - 1 : 0 : (current + (event.key === "ArrowUp" ? -1 : 1) + options.length) % options.length;
+    options[next]?.focus();
+  };
   const chosen = items.find((item) => item.value === value);
 
   /*
@@ -103,7 +121,12 @@ export function Dropdown({
       className={className}
       trigger={({ open, toggle }) => (
         <button
+          ref={triggerRef}
           type="button"
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+            event.preventDefault(); if (!open) toggle(); focusOption(event.key === "ArrowUp");
+          }}
           onClick={toggle}
           disabled={disabled}
           aria-expanded={open}
@@ -133,7 +156,7 @@ export function Dropdown({
       )}
     >
       {(close) => (
-        <>
+        <div ref={menuRef} onKeyDown={navigate} className="flex min-h-0 flex-col">
           {/* Поиск снаружи прокрутки: он ищет по всему списку, а не
               по видимой его части, и уезжать вверх вместе со строками
               ему незачем. */}
@@ -154,7 +177,9 @@ export function Dropdown({
               Высоту задаёт Popover по месту на экране; здесь берём остаток
               после поиска, чтобы тот остался на виду. */}
           <div className="max-h-64 min-h-0 flex-1 overflow-y-auto" onScroll={onScroll}>
-            {items.map((item) => (
+            {items.map((item, index) => (
+              <Fragment key={item.value}>
+              {item.group && item.group !== items[index - 1]?.group && <p className="px-2.5 pt-2 pb-1 text-2xs font-medium text-fg-subtle">{item.group}</p>}
               <PopoverItem
                 key={item.value}
                 active={item.value === value}
@@ -166,10 +191,12 @@ export function Dropdown({
                   onChange(item.value);
                   // Выбор одиночный: после него выбирать больше нечего.
                   close();
+                  triggerRef.current?.focus();
                 }}
               >
                 {item.label}
               </PopoverItem>
+              </Fragment>
             ))}
 
             {/* «Загружаю» ниже строк, а не вместо них: догрузка не должна
@@ -180,7 +207,7 @@ export function Dropdown({
               <p className="px-2 py-2 text-2xs text-fg-subtle">{emptyText}</p>
             )}
           </div>
-        </>
+        </div>
       )}
     </Popover>
   );

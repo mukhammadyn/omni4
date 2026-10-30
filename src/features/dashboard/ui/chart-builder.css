@@ -1,11 +1,6 @@
 [data-chart-builder] { font-size: 13.5px; }
 [data-chart-builder] > header { min-height:52px; gap:8px; }
 [data-chart-builder] .builder-data:not([hidden]) { display:flex;flex-direction:column; }
-[data-chart-builder] .builder-data > nav { flex-shrink:0;gap:0;padding:10px 16px;border-bottom:1px solid var(--color-border); }
-[data-chart-builder] .builder-data > nav button { border:1px solid var(--color-border);padding:6px 13px; }
-[data-chart-builder] .builder-data > nav button:first-child { border-radius:7px 0 0 7px; }
-[data-chart-builder] .builder-data > nav button:last-child { border-radius:0 7px 7px 0; }
-[data-chart-builder] .builder-data > nav button[aria-pressed=true] { background:var(--color-accent-subtle);color:var(--color-accent); }
 [data-chart-builder] .builder-source { padding-top:26px; }
 [data-chart-builder] .builder-settings > :not(.builder-slots) { margin-left:12px;margin-right:12px; }
 [data-chart-builder] .builder-settings > label { margin-top:12px; }
@@ -13,22 +8,17 @@
 [data-chart-builder] .builder-source-link { display:none; }
 [data-chart-builder] .builder-slot { border-bottom:1px solid var(--color-border); }
 [data-chart-builder] .builder-slot-placeholder { display:block;width:100%;text-align:center;border:1px dashed var(--color-border);border-radius:6px;padding:8px;font-size:12px; }
-[data-chart-builder] .builder-chip-dimension { background:#edf4ee;color:#355745; }
-[data-chart-builder] .builder-chip-measure { background:#e7f3f8;color:#31586c; }
+.builder-chip-dimension { background:#edf4ee;color:#355745; }
+.builder-chip-measure { background:#e7f3f8;color:#31586c; }
 [data-chart-builder] .builder-dimension svg { color:#4e8b6c; }
 [data-chart-builder] .builder-measure svg { color:#3087ae; }
 [data-chart-builder] .dashboard-widget-preview { padding:20px; }
 [data-chart-builder] .builder-footer { padding:6px 12px; }
 @media(min-width:768px) { [data-chart-builder] .builder-footer { display:none; } }
 [data-chart-builder] { --color-chart-1:#2383e2; }
-[data-chart-builder] .builder-settings > label:first-of-type { margin:0;border-bottom:1px solid var(--color-border);padding:8px 12px; }
-[data-chart-builder] .builder-settings > label:first-of-type select { border:0;font-weight:600;padding:6px 0; }
 [data-chart-builder] .builder-settings > button { border:0;border-bottom:1px solid var(--color-border);border-radius:0;width:auto;justify-content:flex-start;padding:12px;margin:0; }
 
 
-[data-chart-builder] .builder-source-kind button { border-radius:0; }
-[data-chart-builder] .builder-source-kind button[aria-pressed=true] { background:var(--color-accent-subtle);color:var(--color-accent-text); }
-@media(max-width:767px) { [data-chart-builder] .builder-data > nav { flex-wrap:wrap;gap:4px; } }
 @media(min-width:768px) {
   [data-chart-builder] .builder-source > label { display:grid;grid-template-columns:170px 1fr;align-items:center; }
   [data-chart-builder] .builder-source-kind > span { min-width:170px;margin-right:0; }
@@ -37,4 +27,20 @@
 
 [data-chart-builder] .builder-settings { position:relative; }
 [data-chart-builder] .builder-settings > .builder-chart-options { position:absolute;top:8px;right:8px;margin:0;z-index:1; }
-[data-chart-builder] .builder-settings > label:first-of-type { padding-right:44px; }
+
+[data-chart-builder] .builder-data-toolbar { position:sticky;top:0;z-index:2;flex-shrink:0;background:var(--color-surface); }
+[data-chart-builder] .builder-data:has(.builder-fields-pane) { overflow:hidden; }
+[data-chart-builder] .builder-settings > .builder-visualization-picker { margin:12px 44px 12px 12px; }
+[data-chart-builder] .builder-field-select > button { border-color:transparent;background:transparent; }
+[data-chart-builder] .builder-slot-select > button { border-style:dashed;background:transparent; }
+[data-chart-builder] .builder-aggregation { border-radius:6px; }
+[data-chart-builder] .builder-aggregation > button { border:0;background:transparent;color:inherit; }
+[data-chart-builder] .builder-aggregation > button:disabled { opacity:1; }
+@media(max-width:767px) {
+  [data-chart-builder] .builder-data-toolbar { gap:8px;padding:8px; }
+  [data-chart-builder] .builder-field-toolbar { width:100%;margin-left:0;gap:6px; }
+  [data-chart-builder] .builder-field-toolbar > div:last-child { flex:1;min-width:130px; }
+  [data-chart-builder] [data-builder-rows] { height:40%;min-height:160px; }
+}
+
+@media(min-width:768px) { [data-chart-builder] .builder-field-toolbar { flex-wrap:nowrap; } }

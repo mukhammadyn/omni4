@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { AlignLeftIcon, GaugeIcon, PercentIcon, SearchIcon, TableIcon, TablePropertiesIcon } from "lucide-react";
+import { ChartColumnIcon, ChartBarIcon, ChartLineIcon, ChartPieIcon, ChartAreaIcon, ChartColumnStackedIcon, ChartBarStackedIcon, ChartScatterIcon, ChartNoAxesCombinedIcon, LayoutGridIcon, MapPinIcon, DonutIcon, FunnelIcon, WavesIcon, HashIcon, CircleDotIcon, AlignLeftIcon, GaugeIcon, PercentIcon, SearchIcon, TableIcon, TablePropertiesIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ChartCard, Stat, type ChartConfig, type ChartKind, type Item } from "@/features/item";
 import type { Field } from "@/features/table";
 import { Icon } from "@/shared/ui/icon";
+import { Dropdown } from "@/shared/ui/dropdown";
 import { Input } from "@/shared/ui/input";
 import type { Visualization } from "../model/widget-editor";
 
@@ -18,7 +19,7 @@ export function VisualizationPicker({ value, onChange, allowed, compact = false 
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const name = (kind: Visualization) => kind === "records" ? t("dashboard.plainTable") : t((["records", "pivot", "ratio", "goal", "heading"].includes(kind) ? `dashboard.widget.${kind}` : `chart.kind.${kind}`) as "chart.kind.bar");
-  if (compact) return <label className="flex flex-col gap-2 text-sm font-medium"><span className="sr-only">{t("dashboard.visualization")}</span><select aria-label={t("dashboard.visualization")} value={value} onChange={(event) => onChange(event.target.value as Visualization)} className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm">{groups.map((group) => <optgroup key={group.key} label={group.key === "common" ? t("dashboard.visualization") : t(`dashboard.visualizations.${group.key}` as const)}>{group.kinds.filter((kind) => !allowed || allowed.includes(kind)).map((kind) => <option key={kind} value={kind}>{name(kind)}</option>)}</optgroup>)}</select></label>;
+  if (compact) return <div className="builder-visualization-picker"><Dropdown ariaLabel={t("dashboard.visualization")} value={value} items={groups.flatMap((group) => group.kinds.filter((kind) => !allowed || allowed.includes(kind)).map((kind) => ({ value: kind, label: name(kind), group: group.key === "common" ? t("dashboard.visualization") : t(`dashboard.visualizations.${group.key}` as const), icon: <VisualizationThumbnail kind={kind} compact /> })))} onChange={(kind) => onChange(kind as Visualization)} /></div>;
   const tiles = (kinds: Visualization[]) => <div className="grid grid-cols-2 gap-1.5">{kinds.map((kind) => <button type="button" key={kind} role="radio" aria-checked={value === kind} aria-label={name(kind)} title={name(kind)} onClick={() => onChange(kind)} className={`flex h-11 min-w-0 items-center gap-2 rounded-lg border px-2 py-0.5 text-left text-xs transition-colors ${value === kind ? "border-accent bg-accent-subtle text-fg" : "border-border text-fg-muted hover:bg-surface-hover hover:text-fg"}`}><VisualizationThumbnail kind={kind} /><span className="line-clamp-2 min-w-0 leading-snug">{kind === "bar" ? t("dashboard.visualizations.bar") : kind === "donut" ? t("dashboard.visualizations.donut") : name(kind)}</span></button>)}</div>;
   return <section className="flex flex-col gap-2" aria-label={t("dashboard.visualization")}>
     <span className="text-sm font-medium">{t("dashboard.visualization")}</span>
@@ -38,7 +39,11 @@ const rows: Item[] = values.flatMap((value, index) => Array.from({ length: value
 const fields = ["category", "split", "x", "y", "size", "latitude", "longitude", "amount"].map((slug) => ({ id: slug, slug, label: slug, labels: {}, type: ["category", "split"].includes(slug) ? "SINGLE_LINE" : "NUMBER", options: new Map() }) as Field);
 
 /** The actual renderer, scaled down: bar stays horizontal; pie/donut, bands and axes stay distinct. */
-function VisualizationThumbnail({ kind }: { kind: Visualization }) {
+function VisualizationThumbnail({ kind, compact = false }: { kind: Visualization; compact?: boolean }) {
+  if (compact) {
+    const icons = { ...specialIcons, stat: HashIcon, column: ChartColumnIcon, bar: ChartBarIcon, line: ChartLineIcon, donut: DonutIcon, pie: ChartPieIcon, stack: ChartBarStackedIcon, column100: ChartColumnStackedIcon, area100: ChartAreaIcon, treemap: LayoutGridIcon, funnel: FunnelIcon, stream: WavesIcon, area: ChartAreaIcon, combo: ChartNoAxesCombinedIcon, heatmap: LayoutGridIcon, scatter: ChartScatterIcon, bubble: CircleDotIcon, map: MapPinIcon };
+    return <span aria-hidden="true" data-visualization-icon={kind} className="inline-grid size-5 shrink-0 place-items-center text-chart-1"><Icon as={icons[kind]} size={18} /></span>;
+  }
   if (kind === "stat") return <span aria-hidden="true" className="dashboard-metric-thumbnail grid h-9 w-14 shrink-0 place-items-center rounded bg-surface-soft"><Stat value={128} locale="en" compact /></span>;
   if (kind in specialIcons) return <span aria-hidden="true" className="grid h-9 w-14 shrink-0 place-items-center rounded bg-surface-soft text-chart-1"><Icon as={specialIcons[kind as keyof typeof specialIcons]} size={30} /></span>;
   const config: ChartConfig = { id: `preview-${kind}`, kind: kind as ChartKind, title: "", groupSlug: "category", groupBucket: "", splitSlug: ["stack", "column100", "area100", "heatmap"].includes(kind) ? "split" : "", splitBucket: "", aggregation: "count", valueSlug: "", width: 12, height: 1, xSlug: "x", ySlug: "y", ...(kind === "bubble" || kind === "map" ? { sizeSlug: "size" } : {}), latitudeSlug: "latitude", longitudeSlug: "longitude", ...(kind === "combo" ? { measures: [{ id: "n", field: "", aggregation: "count", display: "column" }, { id: "a", field: "amount", aggregation: "sum", display: "line", axis: "right" }] } : {}) };
