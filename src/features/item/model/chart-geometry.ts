@@ -88,3 +88,11 @@ export function stackedBands(series: ChartSeries) {
     return { bands, min: negative, max: positive };
   });
 }
+
+/** A readable dynamic scale; never fixes the report to today's maximum. */
+export function niceChartTicks(minimum: number, maximum: number): number[] {
+  const span = Math.max(maximum - minimum, 1), raw = span / 5, power = 10 ** Math.floor(Math.log10(raw)), ratio = raw / power;
+  const step = (ratio < 1.5 ? 1 : ratio < 3.5 ? 2 : ratio < 7.5 ? 5 : 10) * power;
+  const min = Math.floor(minimum / step) * step, max = Math.ceil(maximum / step) * step;
+  return Array.from({ length: Math.max(2, Math.round((max - min) / step) + 1) }, (_, index) => Number((min + index * step).toPrecision(12)));
+}

@@ -88,6 +88,7 @@ export type ChartMeasure = {
 };
 
 export type ChartConfig = {
+  appearance?: { neutral?: boolean; axisTicks?: boolean; rounded?: boolean; columnWidth?: number; decimals?: number; titleSize?: number; padding?: number; radius?: number };
   sorts?: Sort[];
   showLegend?: boolean;
   showGrid?: boolean;
@@ -477,7 +478,10 @@ export function chartSeries(
 
   if (config.sorts?.length) all.sort((a, b) => {
     for (const sort of config.sorts!) {
-      const comparison = sort.field === config.groupSlug ? a.label.localeCompare(b.label, undefined, { numeric: true }) : sort.field === config.valueSlug ? a.value - b.value : 0;
+      const rawA = !config.groupBucket ? rows.find((row) => String(row[config.groupSlug]) === a.key)?.[sort.field] : undefined;
+      const rawB = !config.groupBucket ? rows.find((row) => String(row[config.groupSlug]) === b.key)?.[sort.field] : undefined;
+      const byField = typeof rawA === "number" && typeof rawB === "number" ? rawA - rawB : rawA !== undefined && rawB !== undefined ? String(rawA).localeCompare(String(rawB), undefined, { numeric: true }) : 0;
+      const comparison = sort.field === config.groupSlug ? a.label.localeCompare(b.label, undefined, { numeric: true }) : sort.field === config.valueSlug ? a.value - b.value : byField;
       if (comparison) return sort.direction === "desc" ? -comparison : comparison;
     }
     return 0;
@@ -861,6 +865,7 @@ export function toCharts(value: unknown): ChartConfig[] {
          * дописанной руками в базу. Порядковый номер годится: список
          * короткий и переписывается целиком при каждой правке.
          */
+        ...(raw["appearance"] && typeof raw["appearance"] === "object" ? { appearance: parseChartAppearance(raw["appearance"]) } : {}),
         id: typeof raw["id"] === "string" && raw["id"] ? raw["id"] : `chart-${index}`,
         kind,
         title: typeof raw["title"] === "string" ? raw["title"] : "",
@@ -919,6 +924,7 @@ export function toChartsAttribute(charts: ChartConfig[]): Record<string, unknown
     value_slug: chart.valueSlug,
     width: chart.width,
     height: chart.height,
+    ...(chart.appearance ? { appearance: chart.appearance } : {}),
     ...(chart.showLegend !== undefined ? { show_legend: chart.showLegend } : {}),
     ...(chart.showGrid !== undefined ? { show_grid: chart.showGrid } : {}),
     ...(chart.stacked !== undefined ? { stacked: chart.stacked } : {}),
@@ -931,4 +937,9 @@ export function toChartsAttribute(charts: ChartConfig[]): Record<string, unknown
     ...(chart.longitudeSlug ? { longitude_slug: chart.longitudeSlug } : {}),
     ...(chart.interaction ? { interaction: chart.interaction } : {}),
   }));
+}
+
+function parseChartAppearance(raw: object): NonNullable<ChartConfig["appearance"]> {
+  const value = raw as Record<string, unknown>;
+  return { ...Object.fromEntries(([ ["titleSize", 12, 24], ["padding", 8, 28], ["radius", 0, 24] ] as const).flatMap(([key, min, max]) => typeof value[key] === "number" && Number.isFinite(value[key]) ? [[key, Math.max(min, Math.min(max, value[key]))]] : [])), ...Object.fromEntries(["neutral", "axisTicks", "rounded"].flatMap((key) => typeof value[key] === "boolean" ? [[key, value[key]]] : [])), ...(typeof value.columnWidth === "number" && Number.isFinite(value.columnWidth) ? { columnWidth: Math.max(10, Math.min(90, value.columnWidth)) } : {}), ...(typeof value.decimals === "number" && Number.isFinite(value.decimals) ? { decimals: Math.max(0, Math.min(4, Math.round(value.decimals))) } : {}) };
 }

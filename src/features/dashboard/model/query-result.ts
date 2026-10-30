@@ -89,6 +89,22 @@ export function labelQueryResult(result: QueryResult, catalog: import("./dataset
 
 /** Saved visibility affects only rendering; queries and returned rows keep their original schema. */
 export function visibleQueryColumns(result: QueryResult, selected?: string[]): QueryColumn[] {
-  const visible = selected ? result.columns.filter((column) => selected.includes(column.key)) : result.columns;
+  const visible = selected ? selected.flatMap((key) => result.columns.find((column) => column.key === key) ?? []) : result.columns;
   return visible.length ? visible : result.columns;
+}
+
+/** Date-only SQL cells are calendar dates, independent of the viewer's timezone. */
+export function formatQueryCell(value: unknown, type: string, language: string): string {
+  if (value === null || value === undefined) return "—";
+  if (type === "date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+    if (!Number.isNaN(date.getTime())) return date.toLocaleDateString(language, { timeZone: "UTC" });
+  }
+  return String(value);
+}
+
+/** Navigation stays on this app; interpolated record identifiers cannot become URL syntax. */
+export function queryRecordHref(template: string | undefined, value: unknown): string | undefined {
+  if (!template?.startsWith("/") || template.startsWith("//") || Array.from(template).some((char) => char.charCodeAt(0) <= 32 || char === "\\") || !template.includes("{value}") || value === null || value === undefined) return undefined;
+  return template.replaceAll("{value}", encodeURIComponent(String(value)));
 }
