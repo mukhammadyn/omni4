@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AGGREGATIONS, CHART_BUCKETS, ChartRoles, RAW_CHART_KINDS, aggregationAllowed, needsSplit, fieldIcon, type Aggregation, type ChartBucket } from "@/features/item";
+import { AGGREGATIONS, CHART_BUCKETS, ChartRoles, RAW_CHART_KINDS, aggregationAllowed, needsSplit, type Aggregation, type ChartBucket } from "@/features/item";
 import { localized, type Field as TableField } from "@/features/table";
 import { Dropdown } from "@/shared/ui/dropdown";
-import { Icon } from "@/shared/ui/icon";
+import { builderFieldOption } from "./BuilderFieldOption";
 import { Field } from "@/shared/ui/input";
 import type { Widget } from "../model/dashboard";
 import { isDateField } from "../model/widget-editor";
@@ -14,7 +14,7 @@ export function WidgetFields({ widget, fields, language, onChange }: { widget: W
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const numeric = fields.filter((field) => ["NUMBER", "FLOAT", "FLOAT_NOLIMIT", "MONEY", "PROGRESS", "RATING", "INCREMENT_ID"].includes(field.type));
-  const options = (items: TableField[]) => items.map((field) => ({ value: field.slug, label: localized(field.labels, language, field.label), icon: <Icon as={fieldIcon(field.type)} size={15} className="text-fg-muted" /> }));
+  const options = (items: TableField[]) => items.map((field) => builderFieldOption(field, language));
   if (widget.type === "records") return <RecordProperties fields={fields} selected={widget.columns ?? fields.slice(0, 5).map((field) => field.slug)} language={language} onChange={(columns) => onChange({ columns })} />;
   if (widget.type && widget.type !== "chart") return <AdvancedWidgetSetup widget={widget} fields={fields} language={language} onChange={onChange} />;
   if (RAW_CHART_KINDS.has(widget.kind)) return <ChartRoles config={widget} columns={fields} language={language} onChange={onChange} />;

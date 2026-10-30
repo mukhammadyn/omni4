@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AGGREGATIONS, type Aggregation } from "@/features/item";
 import type { Field } from "@/features/table";
+import { Dropdown } from "@/shared/ui/dropdown";
+import { PlusIcon, SigmaIcon, FunctionSquareIcon } from "lucide-react";
+import { Icon } from "@/shared/ui/icon";
 import { Button } from "@/shared/ui/button";
 import { Popover } from "@/shared/ui/popover";
 import type { Widget } from "../model/dashboard";
@@ -21,7 +24,7 @@ export function CalculatedFieldEditor({ widget, fields, onChange, compact = fals
   const definitions = widget.calculatedFields ?? [];
   const base = fields.filter((field) => !definitions.some((definition) => definition.slug === field.slug));
 
-  return <Popover trigger={({ open, toggle }) => <Button type="button" size="sm" variant="secondary" aria-label={copy.add} aria-expanded={open} onClick={toggle}>{compact ? "+" : `ƒ ${copy.add}`}</Button>}>
+  return <Popover trigger={({ open, toggle }) => <Button type="button" size="sm" variant="secondary" aria-label={copy.add} aria-expanded={open} onClick={toggle}><Icon as={PlusIcon} size={14} />{!compact && copy.add}</Button>}>
     {(close) => <form className="flex w-[330px] max-w-[85vw] flex-col gap-3 p-4" onSubmit={(event) => {
       event.preventDefault();
       try {
@@ -35,13 +38,13 @@ export function CalculatedFieldEditor({ widget, fields, onChange, compact = fals
       } catch (exception) { setError(exception instanceof Error ? exception.message : "Invalid formula"); }
     }}>
       <strong className="text-sm">{copy.title}</strong>
-      <select aria-label={copy.title} className="rounded border border-border bg-surface p-2 text-sm" value={selected} onChange={(event) => {
-        const value = event.target.value, field = definitions.find((definition) => definition.slug === value);
+      <Dropdown ariaLabel={copy.title} value={selected} items={[{ value: "", label: copy.new, icon: <Icon as={FunctionSquareIcon} size={15} /> }, ...definitions.map((field) => ({ value: field.slug, label: field.label, icon: <Icon as={FunctionSquareIcon} size={15} /> }))]} onChange={(value) => {
+        const field = definitions.find((definition) => definition.slug === value);
         setSelected(value); setAggregation(widget.fieldPresentation?.[value]?.aggregation ?? "sum"); setName(field?.label ?? ""); setExpression(field?.expression ?? ""); setError("");
-      }}><option value="">{copy.new}</option>{definitions.map((field) => <option key={field.slug} value={field.slug}>{field.label}</option>)}</select>
+      }} />
       <input aria-label={copy.name} className="rounded border border-border bg-surface p-2 text-sm" placeholder={copy.name} value={name} onChange={(event) => setName(event.target.value)} />
       <input aria-label={copy.formula} className="rounded border border-border bg-surface p-2 font-mono text-sm" placeholder="[amount] * 1.12" value={expression} onChange={(event) => setExpression(event.target.value)} />
-      <label className="text-xs text-fg-muted">{ru ? "Агрегация по умолчанию" : "Default aggregation"}<select aria-label={ru ? "Агрегация по умолчанию" : "Default aggregation"} className="mt-1 w-full rounded border border-border bg-surface p-2 text-sm text-fg" value={aggregation} onChange={(event) => setAggregation(event.target.value as Aggregation)}>{AGGREGATIONS.map((value) => <option key={value} value={value}>{value.toUpperCase()}</option>)}</select></label>
+      <div className="text-xs text-fg-muted">{ru ? "Агрегация по умолчанию" : "Default aggregation"}<Dropdown ariaLabel={ru ? "Агрегация по умолчанию" : "Default aggregation"} className="mt-1" value={aggregation} onChange={(value) => setAggregation(value as Aggregation)} items={AGGREGATIONS.map((value) => ({ value, label: value.toUpperCase(), icon: <Icon as={SigmaIcon} size={15} /> }))} /></div>
       <p className="text-xs text-fg-muted">{copy.hint}</p>
       <Button type="submit" size="sm">{copy.apply}</Button>
       {selected && <Button type="button" size="sm" variant="secondary" onClick={() => {

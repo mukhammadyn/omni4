@@ -13,7 +13,7 @@ if (!import.meta.env.DEV) throw new Error('QA fixture is development-only');
 await i18n.changeLanguage('en');
 session.set({ access: 'qa.' + btoa(JSON.stringify({ user_id: 'qa-user', tables: [{ table_slug: 'employees', object_id: 'employee-1' }] })) + '.synthetic', refresh: 'synthetic-only', environmentId: 'qa-env', projectId: 'qa-project', userId: 'qa-user' });
 session.setProfile({ name: 'Synthetic analyst', role: 'ANALYST', company: 'QA' });
-session.setPermissions({ events: { read: true }, employees: { read: true }, confidential: { read: false } });
+session.setPermissions({ events: { read: true }, employees: { read: true }, notes: { read: true }, confidential: { read: false } });
 const fields = [
   { id: 'time', slug: 'time', label: 'Time', type: 'DATE_TIME' },
   { id: 'event', slug: 'event', label: 'Event', type: 'SINGLE_LINE' },
@@ -27,13 +27,14 @@ const fields = [
   { id: 'secret', slug: 'private_amount', label: 'Private amount', type: 'NUMBER' },
   { id: 'password', slug: 'password', label: 'Password', type: 'PASSWORD' },
 ];
+const notes = [{ guid: 'note-1', title: 'Synthetic general note' }];
 const employees = [{ guid: 'employee-1', full_name: 'Aziza Karimova' }, { guid: 'employee-2', full_name: 'Rustam Aliyev' }];
 const relation = { id: 'rel-employees', type: 'Many2One', table_from: { id: 'table-events', slug: 'events' }, table_to: { id: 'table-employees', slug: 'employees', label: 'People' }, field_from: 'employees_id', view_fields: [{ id: 'name', slug: 'full_name', type: 'SINGLE_LINE', table_id: 'table-employees' }] };
 const rows = Array.from({ length: 2001 }, (_, n) => ({ guid: `00000000-0000-4000-8000-${String(n + 1).padStart(12, '0')}`, time: `2026-10-${String(n % 12 + 1).padStart(2, '0')}T${String(n % 24).padStart(2, '0')}:00:00Z`, event: `Synthetic event ${n + 1}`, stage: n % 50 === 0 ? '' : ['New', 'Working', 'Done'][n % 3], employees_id: employees[n % 2].guid, employees_id_data: [employees[n % 2]], amount: n % 100 + 1, latitude: n === 0 ? 95 : 40 + (n % 10) / 10, longitude: 69 + (n % 10) / 10, quantity: n % 20 + 1, currency: n % 2 ? 'UZS' : 'USD', private_amount: 999999, password: 'SYNTHETIC-DO-NOT-RENDER' }));
 const widget = (patch: object) => ({ ...newChart(), table_slug: 'events', filters: {}, answers: { period: { field: 'time' }, employees: { field: 'employees_id' } }, ...patch });
 const initial = { folders: [{ id: 'folder', module_id: 'crm', title: 'Sales', dashboards: [{ id: 'overview', title: 'Sales overview', emoji: '📊', description: 'Synthetic data. All API calls are intercepted locally.', filters: [{ kind: 'period', label: 'Date' }, { kind: 'record', label: 'Person', table: 'employees', source_table: 'events', source_field: 'employees_id' }], widgets: [widget({ id: 'table', widget_type: 'records', title: 'Recent events', columns: ['time', 'event', 'stage', 'employees_id', 'amount'], sorts: [{ field: 'time', direction: 'desc' }], width: 12, height: 2, page_size: 20 }), widget({ id: 'count', kind: 'stat', title: 'Record count', width: 3 }), widget({ id: 'revenue', kind: 'stat', title: 'Revenue by currency', aggregation: 'sum', value_slug: 'amount', currency_slug: 'currency', width: 3 }), widget({ id: 'bar', kind: 'bar', title: 'Current stage distribution', group_slug: 'stage', width: 6 }), widget({ id: 'hidden', kind: 'stat', title: 'Hidden field widget', aggregation: 'sum', value_slug: 'private_amount', width: 3 })] }] }] };
 let tree = JSON.parse(localStorage.getItem('omni4.qa.tree') || 'null') || initial;
-let failure = false, saveFailure = false;
+let failure = false, saveFailure = false, emptyRows = false, delayReads = false;
 const store = () => ({ id: 'store', label: 'Dashboards', type: 'LINK', attributes: { screen: 'dashboards', dashboards: tree }, data: { permission: { read: true, update: true } } });
 const compare = (a: unknown, b: unknown) => typeof a === 'number' ? a - Number(b) : String(a).localeCompare(String(b));
 type RequestEntry = { id: number; at: string; method: string; path: string; table: string | null; fields: string[]; deniedTable: boolean };
@@ -47,7 +48,7 @@ const recordRequest = (config: any, payload: any): RequestEntry => {
   const table = /^\/v2\/(?:collections|fields|relations|object\/get-list)\/([^/]+)(?:\/|$)/.exec(path)?.[1] ?? null;
   const query = path.startsWith('/v2/object/get-list/') ? payload?.data ?? {} : {};
   const fields = [...new Set([...Object.keys(query).filter((key) => !['limit', 'offset', 'order', 'with_relations', 'search'].includes(key)), ...Object.keys(query.order ?? {})])].sort();
-  const entry: RequestEntry = { id: requestTrace.length + 1, at: new Date().toISOString(), method: String(config.method ?? 'get').toUpperCase(), path, table, fields, deniedTable: Boolean(table && !['events', 'employees'].includes(table)) };
+  const entry: RequestEntry = { id: requestTrace.length + 1, at: new Date().toISOString(), method: String(config.method ?? 'get').toUpperCase(), path, table, fields, deniedTable: Boolean(table && !['events', 'employees', 'notes'].includes(table)) };
   requestTrace = [...requestTrace, entry]; notifyTrace(); return entry;
 };
 function RequestTrace() {
@@ -63,18 +64,21 @@ const adapter = async (config: any) => {
   let data: any;
   if (url === '/v3/menus' && method === 'put') { if (saveFailure) throw new Error('Synthetic save interruption'); tree = payload.attributes.dashboards; localStorage.setItem('omni4.qa.tree', JSON.stringify(tree)); data = store(); }
   else if (url === '/v3/menus/store') data = store();
-  else if (url === '/v3/menus') data = { menus: [{ id: 'crm', label: 'CRM', type: 'FOLDER', attributes: { is_tab: true }, data: { permission: { read: true, update: true } } }, store()] };
+  else if (url === '/v3/menus') data = { menus: config.params?.parent_id === 'crm' ? [{ id: 'events-menu', label: 'Events', type: 'TABLE', table_id: 'table-events', data: { permission: { read: true } } }] : config.params?.parent_id === 'hrms' ? [{ id: 'people-menu', label: 'People', type: 'TABLE', table_id: 'table-employees', data: { permission: { read: true } } }] : [{ id: 'crm', label: 'CRM', type: 'FOLDER', attributes: { is_tab: true }, data: { permission: { read: true, update: true } } }, { id: 'hrms', label: 'HRMS', type: 'FOLDER', attributes: { is_tab: true }, data: { permission: { read: true, update: true } } }, store()] };
   else if (url.startsWith('/v1/company-project/')) data = { language: [{ short_name: 'en', name: 'English' }] };
-  else if (url === '/v2/collections') data = { tables: [{ id: 'table-events', slug: 'events', label: 'Events' }, { id: 'table-employees', slug: 'employees', label: 'People' }, { id: 'table-secret', slug: 'confidential', label: 'Confidential' }] };
-  else if (url.startsWith('/v2/collections/') && url.includes('/layout/')) data = { tabs: [{ type: 'section', sections: [{ fields: (url.includes('/events/') ? fields : [{ slug: 'full_name' }]).map((f) => ({ slug: f.slug, attributes: { field_permission: { view_permission: f.slug !== 'private_amount', edit_permission: false } } })) }] }] };
+  else if (url === '/v2/collections') data = { tables: [{ id: 'table-events', slug: 'events', label: 'Events' }, { id: 'table-employees', slug: 'employees', label: 'People' }, { id: 'table-notes', slug: 'notes', label: 'Notes' }, { id: 'table-secret', slug: 'confidential', label: 'Confidential' }] };
+  else if (url.startsWith('/v2/collections/') && url.includes('/layout/')) data = { tabs: [{ type: 'section', sections: [{ fields: (url.includes('/events/') ? fields : url.includes('/notes/') ? [{ slug: 'title' }] : [{ slug: 'full_name' }]).map((f) => ({ slug: f.slug, attributes: { field_permission: { view_permission: f.slug !== 'private_amount', edit_permission: false } } })) }] }] };
   else if (url === '/v2/fields/events') data = { fields };
+  else if (url === '/v2/fields/notes') data = { fields: [{ id: 'note-title', slug: 'title', label: 'Title', type: 'SINGLE_LINE' }] };
+  else if (url.startsWith('/v2/relations/notes')) data = { relations: [] };
   else if (url === '/v2/fields/employees') data = { fields: [{ id: 'name', slug: 'full_name', label: 'Name', type: 'SINGLE_LINE' }] };
   else if (url.startsWith('/v2/relations/events')) data = url.includes('/rel-employees') ? relation : { relations: [relation] };
   else if (url.startsWith('/v2/relations/employees')) data = { relations: [] };
   else if (url.startsWith('/v2/object/get-list/')) {
+    if (delayReads) await new Promise((resolve) => setTimeout(resolve, 1500));
     if (failure) throw new Error('Synthetic network interruption');
     const slug = url.split('/').at(-1), query = payload.data;
-    let found = (slug === 'events' ? rows : employees).filter((row: any) => Object.entries(query).every(([field, value]: any) => {
+    let found = (emptyRows ? [] : slug === 'events' ? rows : slug === 'notes' ? notes : employees).filter((row: any) => Object.entries(query).every(([field, value]: any) => {
       if (['limit', 'offset', 'order', 'with_relations', 'search'].includes(field)) return true;
       if (Array.isArray(value)) return value.includes(String(row[field]));
       if (value && typeof value === 'object') return Object.entries(value).every(([operator, bound]) => { const c = compare(row[field], bound); return operator === '$gte' ? c >= 0 : operator === '$lte' ? c <= 0 : operator === '$gt' ? c > 0 : c < 0; });
@@ -89,6 +93,6 @@ http.defaults.adapter = adapter; httpAuth.defaults.adapter = async (config) => {
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 function Lab() {
  const [id, setId] = useState('overview'), [values, setValues] = useState<Record<string, string[]>>({}), [dark, setDark] = useState(false);
- return <QueryClientProvider client={queryClient}><div className='flex h-screen flex-col bg-surface text-fg'><div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2 text-xs"><strong>Synthetic QA · 2,001 records · external requests blocked</strong><button onClick={() => { setDark(!dark); document.documentElement.classList.toggle('dark', !dark); }}>Theme</button><button onClick={() => { void i18n.changeLanguage(i18n.language === 'en' ? 'ru' : 'en'); }}>Language</button><button onClick={() => { failure = !failure; void queryClient.invalidateQueries(); }}>Toggle interruption</button><button onClick={() => { saveFailure = !saveFailure; }}>Toggle save interruption</button><button onClick={() => { localStorage.removeItem('omni4.qa.tree'); location.reload(); }}>Reset fixture</button></div><RequestTrace /><DashboardsPage dashboardId={id} moduleId="crm" values={values} onValues={setValues} onOpen={setId} /></div></QueryClientProvider>;
+ return <QueryClientProvider client={queryClient}><div className='flex h-screen flex-col bg-surface text-fg'><div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2 text-xs"><strong>Synthetic QA · 2,001 records · external requests blocked</strong><button onClick={() => { setDark(!dark); document.documentElement.classList.toggle('dark', !dark); }}>Theme</button><button onClick={() => { void i18n.changeLanguage(i18n.language === 'en' ? 'ru' : 'en'); }}>Language</button><button onClick={() => { failure = !failure; void queryClient.invalidateQueries(); }}>Toggle interruption</button><button onClick={() => { saveFailure = !saveFailure; }}>Toggle save interruption</button><button onClick={() => { emptyRows = !emptyRows; void queryClient.invalidateQueries(); }}>Toggle empty rows</button><button onClick={() => { delayReads = !delayReads; }}>Toggle slow reads</button><button onClick={() => { localStorage.removeItem('omni4.qa.tree'); location.reload(); }}>Reset fixture</button></div><RequestTrace /><DashboardsPage dashboardId={id} moduleId="crm" values={values} onValues={setValues} onOpen={setId} /></div></QueryClientProvider>;
 }
 createRoot(document.getElementById('root')!).render(<Lab />);

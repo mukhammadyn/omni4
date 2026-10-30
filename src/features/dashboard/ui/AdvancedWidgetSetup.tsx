@@ -1,15 +1,16 @@
 import { useTranslation } from "react-i18next";
 import { AGGREGATIONS, type Aggregation, type ChartMeasure } from "@/features/item";
-import { localized, type Field as TableField } from "@/features/table";
+import { type Field as TableField } from "@/features/table";
 import { Button } from "@/shared/ui/button";
 import { Field, Input } from "@/shared/ui/input";
 import { Dropdown } from "@/shared/ui/dropdown";
+import { builderFieldOption } from "./BuilderFieldOption";
 import type { Widget } from "../model/dashboard";
 
 export function AdvancedWidgetSetup({ widget, fields, language, onChange }: { widget: Widget; fields: TableField[]; language: string; onChange: (patch: Partial<Widget>) => void }) {
   const { t } = useTranslation();
-  const options = fields.map((field) => ({ value: field.slug, label: localized(field.labels, language, field.label) }));
-  const numeric = fields.filter((field) => ["NUMBER", "FLOAT", "FLOAT_NOLIMIT", "MONEY", "PROGRESS", "RATING", "INCREMENT_ID"].includes(field.type)).map((field) => ({ value: field.slug, label: localized(field.labels, language, field.label) }));
+  const options = fields.map((field) => builderFieldOption(field, language));
+  const numeric = fields.filter((field) => ["NUMBER", "FLOAT", "FLOAT_NOLIMIT", "MONEY", "PROGRESS", "RATING", "INCREMENT_ID"].includes(field.type)).map((field) => builderFieldOption(field, language));
   if (widget.type === "heading") return <Field label={t("dashboard.headingText")}><textarea aria-label={t("dashboard.headingText")} className="min-h-32 rounded-md border border-border bg-surface p-2 text-sm" value={widget.body ?? ""} onChange={(event) => onChange({ body: event.target.value })} /></Field>;
   if (widget.type === "ratio") return <div className="flex flex-col gap-3">{(["numerator", "denominator"] as const).map((role) => {
     const measure = widget.ratio?.[role] ?? { id: role, field: "", aggregation: "count" as const };
