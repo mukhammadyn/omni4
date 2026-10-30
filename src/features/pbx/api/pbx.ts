@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fileUrl } from "@/features/item";
 import { api } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { useSession } from "@/shared/api/use-session";
@@ -322,7 +323,7 @@ export function logCall(input: {
  */
 export function fetchRecording(callUuid: string): Promise<string> {
   return invoke<{ status?: string; recording_url?: string }>("pbx_get_recording", { call_uuid: callUuid }).then(
-    (dto) => dto.recording_url ?? "",
+    (dto) => fileUrl(dto.recording_url ?? ""),
   );
 }
 
@@ -396,7 +397,8 @@ const toCall = (row: Row, names: Map<string, string>): PbxCall => ({
   status: str(row, "status"),
   duration: typeof row["duration"] === "number" ? row["duration"] : 0,
   callUuid: str(row, "call_uuid"),
-  recording: str(row, "recording_url"),
+  /* Функция кладёт путь в CDN проекта без хоста (`<проект>/Media/<файл>`). */
+  recording: fileUrl(str(row, "recording_url")),
   transcript: parseTranscript(row["transcript"]),
 });
 
