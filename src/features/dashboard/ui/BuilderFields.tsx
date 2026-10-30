@@ -1,0 +1,40 @@
+import { useState } from "react";
+import { DatabaseIcon, SearchIcon, XIcon } from "lucide-react";
+import { fieldIcon } from "@/features/item";
+import { localized, type Field } from "@/features/table";
+import { Icon } from "@/shared/ui/icon";
+import type { Widget } from "../model/dashboard";
+import { assignBuilderField, builderRoles, numericField, type BuilderRole } from "../model/builder-fields";
+
+export function builderCopy(language: string) {
+  if (language.startsWith("ru")) return { count: "Количество записей", remove: "Убрать", editor: "Конструктор чарта", data: "Данные", viz: "Визуализация", source: "Источник", fields: "Поля", table: "Таблица", dimensions: "Измерения", measures: "Показатели", search: "Поиск по имени", group: "Группировка", value: "Показатель", split: "Цвета / серии", columns: "Столбцы", assign: "Добавить в", empty: "Нет полей", fullscreen: "На весь экран", restore: "Свернуть", drop: "Перетащите поле сюда", schemaHint: "Доступные поля источника. Типы и права определяются источником данных." };
+  if (language.startsWith("uz")) return { count: "Yozuvlar soni", remove: "Olib tashlash", editor: "Chart konstruktori", data: "Ma’lumotlar", viz: "Vizualizatsiya", source: "Manba", fields: "Maydonlar", table: "Jadval", dimensions: "O‘lchamlar", measures: "Ko‘rsatkichlar", search: "Nomi bo‘yicha qidirish", group: "Guruhlash", value: "Ko‘rsatkich", split: "Ranglar / seriyalar", columns: "Ustunlar", assign: "Qo‘shish", empty: "Maydonlar yo‘q", fullscreen: "To‘liq ekran", restore: "Kichraytirish", drop: "Maydonni shu yerga tashlang", schemaHint: "Manbaning mavjud maydonlari. Turlar va huquqlar ma’lumot manbasidan olinadi." };
+  return { count: "Record count", remove: "Remove", editor: "Chart builder", data: "Data", viz: "Visualization", source: "Source", fields: "Fields", table: "Table", dimensions: "Dimensions", measures: "Measures", search: "Search by name", group: "Grouping", value: "Measure", split: "Colors / series", columns: "Columns", assign: "Add to", empty: "No fields", fullscreen: "Full screen", restore: "Restore", drop: "Drop a field here", schemaHint: "Available source fields. Types and permissions are defined by the data source." };
+}
+type Labels = ReturnType<typeof builderCopy>;
+type Props = { fields: Field[]; language: string; labels: Labels };
+export function BuilderFields({ widget, fields, language, labels, sql, onChange }: Props & { widget: Widget; sql: boolean; onChange: (patch: Partial<Widget>) => void }) {
+  const [search, setSearch] = useState("");
+  const [chosen, setChosen] = useState<BuilderRole>("group");
+  const roles = builderRoles(widget, sql);
+  const role = roles.includes(chosen) ? chosen : roles[0];
+  const name = (field: Field) => localized(field.labels, language, field.label);
+  const visible = fields.filter((field) => name(field).toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+  const assign = (field: Field, target = role) => { if (!target) return; const patch = assignBuilderField(widget, field, target, sql); if (patch) onChange(patch); };
+  return <aside className="flex min-h-0 flex-col border-r border-border" aria-label={labels.fields}>
+    <h2 className="flex items-center justify-between border-b border-border p-4 text-sm font-semibold">{labels.fields}<span className="font-normal text-fg-muted">{fields.length}</span></h2>
+    <label className="m-3 flex items-center gap-2 rounded border border-border px-2"><Icon as={SearchIcon} size={14} /><input className="min-w-0 w-full bg-transparent py-2 text-sm outline-none" aria-label={labels.search} placeholder={labels.search} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+    {role && <label className="mx-3 mb-3 text-xs text-fg-muted">{labels.assign}<select className="mt-1 w-full rounded border border-border bg-surface p-2 text-sm text-fg" aria-label={labels.assign} value={role} onChange={(event) => setChosen(event.target.value as BuilderRole)}>{roles.map((item) => <option key={item} value={item}>{labels[item]}</option>)}</select></label>}
+    <div className="min-h-0 flex-1 overflow-auto pb-3">{[false, true].map((numeric) => <div key={String(numeric)}><h3 className="px-4 py-2 text-xs text-fg-muted">{numeric ? labels.measures : labels.dimensions}</h3>{visible.filter((field) => numericField(field) === numeric).map((field) => <button type="button" key={field.slug} draggable={Boolean(role && assignBuilderField(widget, field, role, sql))} onDragStart={(event) => { event.dataTransfer.setData("application/x-omni4-field", field.slug); event.dataTransfer.effectAllowed = "copy"; }} disabled={!role || !assignBuilderField(widget, field, role, sql)} onClick={() => assign(field)} title={role ? `${labels.assign}: ${labels[role]}` : name(field)} className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-surface-hover disabled:cursor-default disabled:opacity-60 ${numeric ? "text-accent" : ""}`}><Icon as={fieldIcon(field.type)} size={14} /><span className="truncate">{name(field)}</span></button>)}</div>)}{!visible.length && <p className="p-4 text-sm text-fg-muted">{labels.empty}</p>}</div>
+
+  </aside>;
+}
+export function BuilderSlots({ widget, fields, language, labels, sql, onChange }: Props & { widget: Widget; sql: boolean; onChange: (patch: Partial<Widget>) => void }) {
+  const roles = builderRoles(widget, sql);
+  const name = (field: Field) => localized(field.labels, language, field.label);
+  const assign = (field: Field, target: BuilderRole) => { const patch = assignBuilderField(widget, field, target, sql); if (patch) onChange(patch); };
+  return <>{roles.length > 0 && <div className="space-y-3">{roles.map((target) => { const selected = target === "columns" ? widget.columns ?? [] : [target === "group" ? widget.groupSlug : target === "value" ? widget.valueSlug : widget.splitSlug]; return <div key={target} onDragOver={(event) => { if (event.dataTransfer.types.includes("application/x-omni4-field")) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); const field = fields.find((item) => item.slug === event.dataTransfer.getData("application/x-omni4-field")); if (field) assign(field, target); }} className="rounded border border-dashed border-border p-2 text-xs"><strong className="font-medium">{labels[target]}</strong><div className="mt-2 flex flex-wrap gap-1">{selected.filter(Boolean).map((slug) => { const field = fields.find((item) => item.slug === slug); if (!field) return null; return <span key={slug} className="flex max-w-full items-center gap-1 rounded border border-border bg-surface-hover px-2 py-1"><span className="truncate">{name(field)}</span><button type="button" aria-label={`${labels.remove}: ${name(field)}`} onClick={() => onChange(target === "columns" ? { columns: widget.columns?.filter((item) => item !== slug) ?? [] } : target === "group" ? { groupSlug: "", groupBucket: "" } : target === "split" ? { splitSlug: "", splitBucket: "" } : { valueSlug: "", ...(!sql ? { aggregation: "count" } : {}) })} className="shrink-0 rounded hover:bg-surface"><Icon as={XIcon} size={12} /></button></span>; })}{!selected.some(Boolean) && <span className="text-fg-muted">{target === "value" && !sql && widget.aggregation === "count" ? labels.count : labels.drop}</span>}</div></div>; })}</div>}</>;
+}
+export function BuilderSchema({ fields, language, labels }: Props) {
+  return <div className="p-6"><p className="mb-5 text-sm text-fg-muted">{labels.schemaHint}</p>{fields.length ? <div className="overflow-auto rounded-lg border border-border"><table className="w-full text-left text-sm"><thead className="bg-surface-hover"><tr><th className="p-3">{labels.fields}</th><th className="p-3">ID</th><th className="p-3">{labels.source}</th></tr></thead><tbody>{fields.map((field) => <tr key={field.slug} className="border-t border-border"><td className="p-3">{localized(field.labels, language, field.label)}</td><td className="p-3 font-mono text-xs">{field.slug}</td><td className="p-3 text-fg-muted">{field.type}</td></tr>)}</tbody></table></div> : <p className="flex gap-2 text-sm text-fg-muted"><Icon as={DatabaseIcon} size={16} />{labels.empty}</p>}</div>;
+}
