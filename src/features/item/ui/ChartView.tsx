@@ -1225,10 +1225,10 @@ function AxisBars({ series, config, locale, onPick, selectedKey }: { selectedKey
   const valueText=(value:number)=>format(value)+(config.appearance?.barValueLabels === 'both' ? `  (${percent(value)}%)` : '');
   const valueGutter=labels ? `max(${config.appearance?.plotRight ?? 0}px,calc(${Math.max(...series.points.map(point=>valueText(point.value).length),1)}ch + 12px))` : undefined;
   const unit=series.splits[0]?.unit;
-  const tickAxis=useRef<HTMLDivElement>(null),[staggerTicks,setStaggerTicks]=useState(false);
+  const tickAxis=useRef<HTMLDivElement>(null),[staggerTicks,setStaggerTicks]=useState(false),[tickLineHeight,setTickLineHeight]=useState(18);
   useLayoutEffect(()=>{
     const element=tickAxis.current;if(!element)return;
-    const measure=()=>{const labels=[...element.querySelectorAll<HTMLElement>('[data-axis-tick]')].map(el=>el.getBoundingClientRect());setStaggerTicks(labels.some((label,index)=>index>0 && label.left<labels[index-1]!.right+2));};
+    const measure=()=>{const labels=[...element.querySelectorAll<HTMLElement>('[data-axis-tick]')].map(el=>el.getBoundingClientRect());setTickLineHeight(Math.ceil(Math.max(...labels.map(label=>label.height),1)));setStaggerTicks(labels.some((label,index)=>index>0 && label.left<labels[index-1]!.right+2));};
     const observer=new ResizeObserver(measure);observer.observe(element);element.querySelectorAll('[data-axis-tick]').forEach(el=>observer.observe(el));measure();return()=>observer.disconnect();
   },[min,max,ticks.length,locale]);
   return <div style={{"--bar-label-width":`min(${labelWidth}px,42%)`,...(labels ? {paddingRight:valueGutter,fontSize:13} : {}),...(config.appearance?.barRowHeight ? {height:Math.max(config.appearance.minPlotHeight ?? 220,series.points.length*config.appearance.barRowHeight),flexShrink:0} : {})} as CSSProperties} className={`flex h-full min-h-0 flex-col gap-3 ${labels ? "" : "pr-3"}`} data-axis-bars>
@@ -1239,7 +1239,7 @@ function AxisBars({ series, config, locale, onPick, selectedKey }: { selectedKey
         {labels && <span data-bar-value-label className="pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[13px] font-bold text-fg" style={{left:`${x(point.value)}%`,marginLeft:12}}>{valueText(point.value)}</span>}
       </div>
     </div>)}</div>
-    <div ref={tickAxis} data-axis-staggered={staggerTicks || undefined} style={{marginLeft:"calc(var(--bar-label-width) + 12px)",height:staggerTicks?36:24}} className="relative shrink-0 border-t border-chart-grid text-2xs text-fg-muted">{ticks.map((tick,index)=><span data-axis-tick key={tick} className="absolute -translate-x-1/2" style={{left:`${x(tick)}%`,top:staggerTicks && index%2 ? 20 : 4}}>{format(tick)}</span>)}</div>
+    <div ref={tickAxis} data-axis-staggered={staggerTicks || undefined} style={{marginLeft:"calc(var(--bar-label-width) + 12px)",height:staggerTicks?tickLineHeight*2+10:Math.max(24,tickLineHeight+8)}} className="relative shrink-0 border-t border-chart-grid text-2xs text-fg-muted">{ticks.map((tick,index)=><span data-axis-tick key={tick} className="absolute -translate-x-1/2" style={{left:`${x(tick)}%`,top:staggerTicks && index%2 ? tickLineHeight+6 : 4}}>{format(tick)}</span>)}</div>
   </div>;
 }
 
