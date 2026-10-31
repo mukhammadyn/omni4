@@ -31,15 +31,15 @@ export function sqlSupportIssue(sql: string): SQLSupportIssue | null {
       if (aggregates.has(name)) continue;
       // Calendar expressions only; do not enable arbitrary or schema-qualified calls.
       if (dateFunctions.has(name)) {
-        if (name === "extract" && !["year", "month"].some((part) => keyword(index + 2, part))) return "function";
+        if (name === "extract" && !["year", "month", "day", "dow", "isodow"].some((part) => keyword(index + 2, part))) return "function";
         continue;
       }
-      // A single literal calendar dimension supplies zero months/bands. No variable,
+      // A single literal calendar dimension supplies zero months/days/bands. No variable,
       // timestamp, step or unbounded series can pass this client-side guidance.
       if (name === "generate_series" && ++series === 1) {
         const close = tokens.findIndex((item, at) => at > index && item.text === ")");
         const args = close < 0 ? null : /^\(\s*(\d{1,2})\s*,\s*(\d{1,2})\s*\)$/.exec(sql.slice(tokens[index + 1]!.start, tokens[close]!.end));
-        if (args && Number(args[1]) >= 1 && Number(args[2]) <= 12 && Number(args[1]) <= Number(args[2])) continue;
+        if (args && Number(args[1]) >= 1 && Number(args[2]) <= 31 && Number(args[1]) <= Number(args[2])) continue;
       }
       return "function";
     }

@@ -6,6 +6,10 @@ import { queryImageHref } from "../model/query-result";
 import { SqlResultView } from "./SqlDatasetRunner";
 vi.mock("react-i18next", async original => ({ ...await original<typeof import("react-i18next")>(), useTranslation: () => ({t:(key:string)=>key,i18n:{language:"en"}}) }));
 const fields=[{slug:"label",type:"SINGLE_LINE"},{slug:"hires",type:"NUMBER"},{slug:"total",type:"NUMBER"}];
+test("compact numeric cards without suffixes honor the same responsive statistic renderer",()=>{
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:"n",type:"int8"}],rows:[{n:"14"}],limit:100,truncated:false}} presentation={{type:"chart",kind:"stat",group:"",value:"n",split:"",appearance:{valueSize:24,decimals:0}}}/>);
+ expect(html).toContain("data-sql-stat-value");expect(html).toContain("font-size:24px");expect(html).not.toContain("min-h-[150px]");expect(html).toContain(">14<");
+});
 test("SQL measures validate every selected result column",()=>{
  expect(sqlMeasuresReady({valueSlug:"hires",measures:[{id:"h",field:"hires",aggregation:"sum"},{id:"t",field:"total",aggregation:"max"}]},fields)).toBe(true);
  expect(sqlMeasuresReady({valueSlug:"hires",measures:[{id:"h",field:"label",aggregation:"sum"}]},fields)).toBe(false);
