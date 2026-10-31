@@ -50,14 +50,17 @@ export function CartesianChart({ config, series, locale, onPick, selectedKey }: 
   </div>;
 }
 
-export function PieChart({ series, locale, showLegend = true }: { series: ChartSeries; locale: string; showLegend?: boolean }) {
+export function PieChart({ series, locale, showLegend = true, appearance, onPick, selectedKey }: { series: ChartSeries; locale: string; showLegend?: boolean; appearance?: ChartConfig["appearance"] | undefined; onPick?: ((key: string) => void) | undefined; selectedKey?: string | undefined }) {
   let start = -Math.PI / 2;
-  return <div data-chart-pie className="flex flex-wrap items-center gap-4"><svg viewBox="0 0 100 100" className="size-36 shrink-0" role="img" aria-label="Pie chart">{series.points.filter((point) => point.value > 0).map((point, index) => {
-    const angle = point.value / series.total * Math.PI * 2, end = start + angle;
+  const bottom = appearance?.legendPosition === "bottom", size = appearance?.pieSize ?? 144;
+  const paint = (index: number, key: string) => selectedKey !== undefined && selectedKey !== key ? "var(--color-border-strong)" : appearance?.palette === "cool" && index < 3 ? `var(--color-chart-cool-${index + 1})` : `var(--color-chart-${index < 7 ? index + 1 : "other"})`;
+  const pick = (key: string) => onPick?.(key);
+  return <div data-chart-pie className={`flex h-full min-w-0 items-center justify-center gap-4 ${bottom ? "flex-col" : "flex-wrap"}`}><svg viewBox="0 0 100 100" style={{ width: size, maxWidth: "100%", maxHeight: bottom ? "calc(100% - 40px)" : "100%", aspectRatio: "1", flexShrink: 1 }} role="img" aria-label="Pie chart">{series.points.filter((point) => point.value > 0).map((point) => {
+    const index = series.points.indexOf(point), angle = point.value / series.total * Math.PI * 2, end = start + angle;
     const path = `M50,50 L${50 + 48 * Math.cos(start)},${50 + 48 * Math.sin(start)} A48,48 0 ${angle > Math.PI ? 1 : 0},1 ${50 + 48 * Math.cos(end)},${50 + 48 * Math.sin(end)} Z`; start = end;
     const title = `${point.label}: ${show(point.value, locale)} (${show(point.value / series.total * 100, locale)}%)`;
-    return <Tooltip as="g" key={point.key} label={title}>{angle >= Math.PI * 2 - 1e-8 ? <circle cx="50" cy="50" r="48" className={color(index)} /> : <path d={path} className={color(index)} strokeWidth="0.5" />}</Tooltip>;
-  })}</svg><ul className={showLegend ? "min-w-0 flex-1 text-xs text-fg-muted" : "sr-only"}>{series.points.map((point) => <li key={point.key} className="flex justify-between gap-2"><span className="truncate">{point.label}</span><span className="tabular-nums">{show(point.value, locale)}</span></li>)}</ul></div>;
+    return <Tooltip as="g" key={point.key} label={title}><g role={onPick ? "button" : undefined} tabIndex={0} aria-label={title} aria-pressed={onPick ? selectedKey === point.key : undefined} onClick={() => pick(point.key)} onKeyDown={event => { if (onPick && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); pick(point.key); } }} className="outline-none focus-visible:stroke-accent" style={{ fill: paint(index, point.key), cursor: onPick ? "pointer" : undefined }}>{angle >= Math.PI * 2 - 1e-8 ? <circle cx="50" cy="50" r="48" /> : <path d={path} />}</g></Tooltip>;
+  })}</svg><ul className={showLegend ? `min-w-0 text-sm text-fg-muted ${bottom ? "flex flex-wrap justify-center gap-x-5 gap-y-2" : "flex-1"}` : "sr-only"}>{series.points.map((point, index) => <li key={point.key}><button type="button" disabled={!onPick} aria-pressed={onPick ? selectedKey === point.key : undefined} onClick={() => pick(point.key)} className="flex items-center gap-2 text-left disabled:opacity-100"><span className="size-2.5 shrink-0 rounded-full" style={{ background: paint(index, point.key) }} /><span>{point.label}</span><span className="tabular-nums">{appearance?.legendPercent ? `${(series.total ? point.value / series.total * 100 : 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : show(point.value, locale)}</span></button></li>)}</ul></div>;
 }
 
 export function TreemapChart({ series, locale }: { series: ChartSeries; locale: string }) {
