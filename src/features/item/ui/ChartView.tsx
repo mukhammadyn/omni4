@@ -808,7 +808,7 @@ export function ChartCard({
         ) : config.kind === "donut" ? (
           <Donut series={series} locale={i18n.language} showLegend={config.showLegend !== false} />
         ) : config.kind === "pie" ? (
-          <PieChart series={series} locale={i18n.language} showLegend={config.showLegend !== false} />
+          <PieChart series={series} locale={i18n.language} showLegend={config.showLegend !== false} appearance={config.appearance} onPick={onPick} selectedKey={selectedKey} />
         ) : config.kind === "treemap" ? (
           <TreemapChart series={series} locale={i18n.language} />
         ) : ["column", "column100", "area", "area100", "combo"].includes(config.kind) ? (

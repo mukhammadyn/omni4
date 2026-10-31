@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { toField } from "@/features/table";
 import { chartSeries, newChart, toCharts, toChartsAttribute } from "../model/chart";
 import { stackedBands } from "../model/chart-geometry";
-import { CartesianChart } from "./ChartExtra";
+import { CartesianChart, PieChart } from "./ChartExtra";
 import { ChartCard } from "./ChartView";
 
 vi.mock("react-i18next", async (importOriginal) => ({ ...await importOriginal<typeof import("react-i18next")>(), useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }) }));
@@ -46,4 +46,17 @@ test("hidden legends stay available to screen readers and chart values remain un
   expect(shown).toContain('data-chart-legend="true"');
   expect(hidden).toContain('class="sr-only" data-chart-legend="true"');
   expect(hidden).toContain("First"); expect(hidden).toContain("Second");
+});
+
+test("pie appearance survives save and rejects malformed settings", () => {
+  const appearance = { legendPosition: "bottom" as const, legendPercent: true, pieSize: 240, palette: "cool" as const };
+  expect(toCharts(toChartsAttribute([{ ...config, appearance }]))[0]?.appearance).toEqual(appearance);
+  expect(toCharts([{ ...toChartsAttribute([config])[0], appearance: { legendPosition: "absolute", pieSize: 9000, legendPercent: "true", palette: "url(secret)" } }])[0]?.appearance).toEqual({ pieSize: 400 });
+});
+test("pie legend percentages preserve zero categories and selection remains accessible", () => {
+  const pie = chartSeries([{ category: "A", amount: 3 }, { category: "B", amount: 1 }, { category: "C", amount: 0 }], { ...config, splitSlug: "", kind: "pie" });
+  const html = renderToStaticMarkup(<PieChart series={pie} locale="en" appearance={{ legendPosition: "bottom", legendPercent: true, pieSize: 240, palette: "cool" }} onPick={noop} selectedKey="A" />);
+  expect(html).toContain("75.00%"); expect(html).toContain("25.00%"); expect(html).toContain("0.00%");
+  expect(html).toContain('aria-pressed="true"'); expect(html).toContain("var(--color-border-strong)"); expect(html).toContain("var(--color-chart-cool-1)");
+  expect(html).toContain("data-tooltip-anchor"); expect(html).not.toContain("NaN");
 });
