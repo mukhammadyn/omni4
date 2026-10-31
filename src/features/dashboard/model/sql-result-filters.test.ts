@@ -36,3 +36,18 @@ test("axis appearance and date formatting survive saved configuration", async ()
   const tree = { folders: [{ ...newFolder('module', 'Reports'), dashboards: [{ ...newDashboard('Example'), widgets: [widget] }] }] };
   expect(toTree(toTreeAttribute(tree))).toEqual(tree);
 });
+
+test("date selections match calendar months and known employment intervals without inventing missing starts", () => {
+  const dates: QueryResult = { columns: [{ key: "start",type:"date" },{key:"end",type:"date"}], rows: [{start:"2026-03-01",end:null},{start:"2026-01-01",end:"2026-03-31"},{start:null,end:null},{start:"2026-05-01",end:"2026-02-01"}],limit:100,truncated:false };
+  expect(filterSqlResult(dates,{},[{field:"start",value:"2026-03-31",operator:"month"}]).rows).toEqual([dates.rows[0]]);
+  expect(filterSqlResult(dates,{},[{field:"start",endField:"end",value:"2026-03-31",operator:"activeAt"}]).rows).toEqual([dates.rows[0]]);
+  expect(filterSqlResult(dates,{},[{field:"start",endField:"missing",value:"2026-03-31",operator:"activeAt"}]).rows).toEqual([]);
+  expect(filterSqlResult(dates,{},[{field:"start",value:"2026-02-30",operator:"month"}]).rows).toEqual([]);
+  expect(filterSqlResult(dates,{}).rows).toHaveLength(4);
+});
+
+test("editable grouped records and series date rules survive dashboard reload",()=>{
+ const widget={...newChart(),tableSlug:"",answers:{},filters:{},type:"records" as const,sqlRecords:{layout:"cards" as const,titleField:"name",groupField:"month",autoHeight:true,groupFilter:true,allLabel:"All months"},sqlTitleField:"title",sqlQuickFilterField:"status",sqlDetailField:"people",sqlDetailPlacement:"inline" as const,sqlDetailSuffix:"people",sqlDetailSeparator:"|",sqlSelectionValueField:"date",sqlSelectionRules:{total:{field:"start",operator:"activeAt" as const,endField:"end"}},appearance:{axisTitleLeft:"People",axisTitleRight:"Headcount",headerIcon:"calendar" as const,frameless:true,titleBelow:true},aggregation:"avg" as const};
+ const tree={folders:[{...newFolder("module","Reports"),dashboards:[{...newDashboard("Example"),widgets:[widget]}]}]};
+ expect(toTree(toTreeAttribute(tree))).toEqual(tree);
+});

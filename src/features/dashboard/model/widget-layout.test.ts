@@ -60,3 +60,13 @@ test("cards without explicit placement are packed safely once a canvas is enable
   const widgets=placeWidgets([card('existing',1,1,3,9),auto]);
   expect(widgets[1]?.layout).toBeDefined();noOverlap(widgets);
 });
+
+test("flow lists expand without clipping and move following cards without changing the saved layout", () => {
+  const widgets:Widget[]=[{...card("list",1,1,3,12),type:"records",sqlRecords:{layout:"cards",autoHeight:true,titleField:"name"}},card("after",1,4,1,12)];
+  const viewed=placeWidgets(widgets,undefined,{list:3000});
+  noOverlap(viewed);
+  expect(viewed[0]!.layout!.rows).toBeGreaterThan(12);
+  expect(viewed[1]!.layout!.row).toBeGreaterThan(20);
+  expect(widgets[0]!.layout!.rows).toBe(3);
+  expect(placeWidgets(widgets)[0]!.layout!.rows).toBe(3);
+});

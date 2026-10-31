@@ -1,14 +1,15 @@
-import { newChart, type ChartKind, type ChartConfig, type Sort } from "@/features/item";
+import { newChart, type ChartKind, type ChartConfig, type Sort, type ChartMeasure, type Aggregation } from "@/features/item";
+import type { SqlRecordOptions } from "./sql-record-options";
 import type { Dataset } from "./datasets";
 import type { Widget } from "./dashboard";
 
-export type SqlPresentation = { fitContent?: boolean | undefined; comfortable?: boolean | undefined; rowHeight?: number | undefined; columnWidths?: Record<string, number> | undefined; linkField?: string | undefined; linkLabel?: string | undefined; linkTemplate?: string | undefined; appearance?: ChartConfig["appearance"] | undefined; type: "table" | "chart"; kind: ChartKind; group: string; value: string; split: string; sorts?: Sort[] | undefined; pageSize?: number | undefined; paginationTop?: boolean | undefined; detailField?: string | undefined; suffix?: string | undefined; suffixBelow?: boolean | undefined; columns?: string[] | undefined; showLegend?: boolean | undefined; showGrid?: boolean | undefined; stacked?: boolean | undefined };
+export type SqlPresentation = { suffixJoined?: boolean | undefined; detailSuffixFractional?: string | undefined; detailDecimals?: number | undefined; quickFilterField?: string | undefined; selectionValueField?: string | undefined; records?: SqlRecordOptions | undefined; aggregation?: Aggregation | undefined; detailPlacement?: "above" | "inline" | "below" | undefined; detailSuffix?: string | undefined; detailSeparator?: string | undefined; measures?: ChartMeasure[] | undefined; fitContent?: boolean | undefined; comfortable?: boolean | undefined; rowHeight?: number | undefined; columnWidths?: Record<string, number> | undefined; linkField?: string | undefined; linkLabel?: string | undefined; linkTemplate?: string | undefined; appearance?: ChartConfig["appearance"] | undefined; type: "table" | "chart"; kind: ChartKind; group: string; value: string; split: string; sorts?: Sort[] | undefined; pageSize?: number | undefined; paginationTop?: boolean | undefined; detailField?: string | undefined; suffix?: string | undefined; suffixBelow?: boolean | undefined; columns?: string[] | undefined; showLegend?: boolean | undefined; showGrid?: boolean | undefined; stacked?: boolean | undefined };
 export function sqlWidgetFrom(dataset: Dataset, presentation?: SqlPresentation): Widget {
-  return { ...newChart(), title: dataset.name, tableSlug: "", datasetId: dataset.id, filters: {}, answers: {}, type: presentation?.type === "chart" ? "chart" : "records", kind: presentation?.kind ?? "bar", groupSlug: presentation?.group ?? "", valueSlug: presentation?.value ?? "", splitSlug: presentation?.split ?? "", aggregation: "sum", ...(presentation?.showLegend !== undefined ? { showLegend: presentation.showLegend } : {}), ...(presentation?.showGrid !== undefined ? { showGrid: presentation.showGrid } : {}), ...(presentation?.stacked !== undefined ? { stacked: presentation.stacked } : {}), width: 12, height: 2, ...(presentation?.sorts ? { sorts: presentation.sorts } : {}), ...(presentation?.columns ? { columns: presentation.columns } : {}) };
+  return { ...newChart(), title: dataset.name, tableSlug: "", datasetId: dataset.id, filters: {}, answers: {}, type: presentation?.type === "chart" ? "chart" : "records", kind: presentation?.kind ?? "bar", ...(presentation?.measures ? { measures: presentation.measures } : {}), groupSlug: presentation?.group ?? "", valueSlug: presentation?.value ?? "", splitSlug: presentation?.split ?? "", aggregation: presentation?.aggregation ?? "sum", ...(presentation?.showLegend !== undefined ? { showLegend: presentation.showLegend } : {}), ...(presentation?.showGrid !== undefined ? { showGrid: presentation.showGrid } : {}), ...(presentation?.stacked !== undefined ? { stacked: presentation.stacked } : {}), width: 12, height: 2, ...(presentation?.sorts ? { sorts: presentation.sorts } : {}), ...(presentation?.columns ? { columns: presentation.columns } : {}) };
 }
 
 /** SQL results use the shared picker with the renderers supported for returned columns. */
-export const SQL_VISUALIZATIONS = ["records", "stat", "column", "bar", "line", "donut", "pie", "area"] as const;
+export const SQL_VISUALIZATIONS = ["records", "stat", "column", "bar", "line", "donut", "pie", "area", "combo"] as const;
 
 export function stageSqlWidget(datasets: Dataset[], widget: Widget, dataset: Dataset) {
   const previous = datasets.find((item) => item.id === widget.datasetId);
@@ -22,7 +23,12 @@ export function stageSqlWidget(datasets: Dataset[], widget: Widget, dataset: Dat
 /** A new result schema keeps valid choices and replaces stale chart/visibility keys. */
 export function reconcileSqlFields(widget: Widget, fields: { slug: string; type: string }[]): Widget {
   const exists = (slug: string) => fields.some((field) => field.slug === slug);
-  const next = { ...widget, groupSlug: exists(widget.groupSlug) ? widget.groupSlug : fields.find((field) => field.type !== "NUMBER")?.slug ?? fields[0]?.slug ?? "", valueSlug: fields.some((field) => field.slug === widget.valueSlug && field.type === "NUMBER") ? widget.valueSlug : fields.find((field) => field.type === "NUMBER")?.slug ?? "", splitSlug: exists(widget.splitSlug) ? widget.splitSlug : "" };
+  const next = { ...widget, ...(widget.measures ? { measures: widget.measures.filter(measure => measure.aggregation === "count" || fields.some(field => field.slug === measure.field && field.type === "NUMBER")) } : {}), groupSlug: exists(widget.groupSlug) ? widget.groupSlug : fields.find((field) => field.type !== "NUMBER")?.slug ?? fields[0]?.slug ?? "", valueSlug: fields.some((field) => field.slug === widget.valueSlug && field.type === "NUMBER") ? widget.valueSlug : fields.find((field) => field.type === "NUMBER")?.slug ?? "", splitSlug: exists(widget.splitSlug) ? widget.splitSlug : "" };
   if (widget.columns) { const selected = widget.columns.filter(exists); if (selected.length) next.columns = selected; else delete next.columns; }
   return next;
+}
+
+/** SQL measures refer only to numeric columns returned by the permitted query. */
+export function sqlMeasuresReady(widget: { measures?: ChartMeasure[] | undefined; valueSlug: string }, fields: { slug: string; type: string }[]) {
+  return widget.measures?.length ? widget.measures.every(measure => measure.aggregation === "count" || fields.some(field => field.slug === measure.field && field.type === "NUMBER")) : fields.some(field => field.slug === widget.valueSlug && field.type === "NUMBER");
 }

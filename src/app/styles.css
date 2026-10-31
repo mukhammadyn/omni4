@@ -833,9 +833,22 @@ main:has(> [data-fullbleed]) {
   stroke-width: 5px;
 }
 
-/* Pie slices reference palette tokens dynamically; retain every color in production. */
+/* Optional semantic series palette, scoped to one editable chart. */
+[data-chart-palette="movement"] {
+  --color-chart-1: var(--color-chart-increase);
+  --color-chart-2: var(--color-chart-decrease);
+  --color-chart-3: var(--color-chart-total);
+}
+
+/* Dynamic report palettes must retain every token in production. */
 @theme static {
+  --color-chart-increase: #6bcb77;
+  --color-chart-decrease: #e76f51;
+  --color-chart-total: #6b8fe3;
   --color-chart-cool-1: #74a8c9;
   --color-chart-cool-2: #6b8fe3;
   --color-chart-cool-3: #666dcf;
+  --color-chart-cool-4: #a78bfa;
+  --color-chart-cool-5: #f59e0b;
+  --color-chart-cool-6: #22c55e;
 }

@@ -3,6 +3,8 @@ import { MAX_LAYOUT_ROW, layoutRows, placeWidgets } from "./widget-layout";
 import { parseCalculatedFields, type CalculatedField } from "./calculated-fields";
 import { parseFieldPresentation, type FieldPresentation } from "./field-presentation";
 import { toDatasets, type Dataset } from "./datasets";
+import { parseSqlSelectionRules, type SqlSelectionRule } from "./sql-result-filters";
+import { parseSqlRecordOptions, type SqlRecordOptions } from "./sql-record-options";
 import type { Answer, DashFilter } from "./filters";
 
 /**
@@ -15,7 +17,15 @@ export type WidgetType = typeof WIDGET_TYPES[number];
 export type Widget = ChartConfig & {
   refreshInterval?: number;
   layout?: { column: number; row: number; rows: number } | undefined;
+  sqlRecords?: SqlRecordOptions | undefined;
+  sqlTitleField?: string;
   sqlDetailField?: string;
+  sqlDetailPlacement?: "above" | "inline" | "below";
+  sqlDetailSuffix?: string;
+  sqlDetailSuffixFractional?: string;
+  sqlDetailDecimals?: number;
+  sqlSuffixJoined?: boolean;
+  sqlDetailSeparator?: string;
   sqlSuffix?: string;
   sqlSuffixBelow?: boolean;
   sqlShowViewerFilters?: boolean;
@@ -23,6 +33,9 @@ export type Widget = ChartConfig & {
   sqlLinkLabel?: string;
   sqlLinkTemplate?: string;
   sqlSelectionField?: string;
+  sqlSelectionValueField?: string;
+  sqlQuickFilterField?: string;
+  sqlSelectionRules?: Record<string,SqlSelectionRule>;
   sqlReceiveSelections?: boolean;
   sqlPaginationTop?: boolean;
   sqlTableFitContent?: boolean;
@@ -90,9 +103,13 @@ export function toTree(value: unknown): Tree {
             ? [
                 {
                   ...chart,
+                  ...(item["sqlSelectionRules"] ? { sqlSelectionRules: parseSqlSelectionRules(item["sqlSelectionRules"]) } : {}),
+                  ...(parseSqlRecordOptions(item["sqlRecords"]) ? { sqlRecords: parseSqlRecordOptions(item["sqlRecords"])! } : {}),
                   ...(isObject(item["layout"]) ? { layout: parseLayout(item["layout"]) } : {}),
-                  ...Object.fromEntries(["sqlDetailField", "sqlSuffix", "sqlSelectionField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
-                  ...Object.fromEntries(["sqlSuffixBelow", "sqlShowViewerFilters"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
+                  ...Object.fromEntries(["sqlTitleField", "sqlDetailField", "sqlDetailSuffix", "sqlDetailSuffixFractional", "sqlDetailSeparator", "sqlSuffix", "sqlSelectionField", "sqlSelectionValueField", "sqlQuickFilterField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
+                  ...Object.fromEntries(["sqlSuffixJoined", "sqlSuffixBelow", "sqlShowViewerFilters"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
+                  ...(["above", "inline", "below"].includes(item["sqlDetailPlacement"] as string) ? { sqlDetailPlacement: item["sqlDetailPlacement"] as "above" | "inline" | "below" } : {}),
+                  ...(typeof item["sqlDetailDecimals"] === "number" && Number.isFinite(item["sqlDetailDecimals"]) ? {sqlDetailDecimals:Math.max(0,Math.min(4,Math.round(item["sqlDetailDecimals"])))} : {}),
                   ...(typeof item["sqlTableFitContent"] === "boolean" ? { sqlTableFitContent: item["sqlTableFitContent"] } : {}),
                   ...(typeof item["sqlTableComfortable"] === "boolean" ? { sqlTableComfortable: item["sqlTableComfortable"] } : {}),
                   ...(typeof item["sqlRowHeight"] === "number" ? { sqlRowHeight: Math.max(28, Math.min(120, item["sqlRowHeight"])) } : {}),
@@ -154,14 +171,25 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
         ),
         widgets: placeWidgets(dashboard.widgets).map((widget) => ({
           ...toChartsAttribute([widget])[0],
+          ...(widget.sqlRecords ? { sqlRecords: widget.sqlRecords } : {}),
           table_slug: widget.tableSlug,
           ...(widget.layout ? { layout: widget.layout } : {}),
+          ...(widget.sqlTitleField !== undefined ? { sqlTitleField: widget.sqlTitleField } : {}),
           ...(widget.sqlDetailField !== undefined ? { sqlDetailField: widget.sqlDetailField } : {}),
+          ...(widget.sqlDetailPlacement ? { sqlDetailPlacement: widget.sqlDetailPlacement } : {}),
+          ...(widget.sqlDetailSuffix !== undefined ? { sqlDetailSuffix: widget.sqlDetailSuffix } : {}),
+          ...(widget.sqlDetailSuffixFractional !== undefined ? { sqlDetailSuffixFractional: widget.sqlDetailSuffixFractional } : {}),
+          ...(widget.sqlDetailDecimals !== undefined ? { sqlDetailDecimals: widget.sqlDetailDecimals } : {}),
+          ...(widget.sqlSuffixJoined !== undefined ? { sqlSuffixJoined: widget.sqlSuffixJoined } : {}),
+          ...(widget.sqlDetailSeparator !== undefined ? { sqlDetailSeparator: widget.sqlDetailSeparator } : {}),
           ...(widget.sqlLinkField !== undefined ? { sqlLinkField: widget.sqlLinkField } : {}),
           ...(widget.sqlLinkLabel !== undefined ? { sqlLinkLabel: widget.sqlLinkLabel } : {}),
           ...(widget.sqlLinkTemplate !== undefined ? { sqlLinkTemplate: widget.sqlLinkTemplate } : {}),
           ...(widget.sqlSuffix !== undefined ? { sqlSuffix: widget.sqlSuffix } : {}),
           ...(widget.sqlSelectionField !== undefined ? { sqlSelectionField: widget.sqlSelectionField } : {}),
+          ...(widget.sqlSelectionValueField !== undefined ? { sqlSelectionValueField: widget.sqlSelectionValueField } : {}),
+          ...(widget.sqlQuickFilterField !== undefined ? { sqlQuickFilterField: widget.sqlQuickFilterField } : {}),
+          ...(widget.sqlSelectionRules ? { sqlSelectionRules: widget.sqlSelectionRules } : {}),
           ...(widget.sqlSuffixBelow !== undefined ? { sqlSuffixBelow: widget.sqlSuffixBelow } : {}),
           ...(widget.sqlShowViewerFilters !== undefined ? { sqlShowViewerFilters: widget.sqlShowViewerFilters } : {}),
           ...(widget.sqlTableFitContent !== undefined ? { sqlTableFitContent: widget.sqlTableFitContent } : {}),
