@@ -764,7 +764,7 @@ export function ChartCard({
             className="h-7 min-w-0 flex-1 text-sm"
           />
         ) : (
-          <h3 style={config.appearance?.titleSize ? { fontSize: config.appearance.titleSize, lineHeight: config.appearance.titleSize >= 18 ? "28px" : "20px", fontWeight: config.appearance.titleWeight ?? (config.appearance.titleSize > 14 ? 600 : 500) } : undefined} className={`min-w-0 flex-1 truncate text-fg ${plain ? "text-lg font-semibold" : "text-sm font-medium"}`}>
+          <h3 style={config.appearance?.titleSize ? { fontSize: config.appearance.titleSize, lineHeight: config.appearance.titleSize >= 18 ? "28px" : "20px", fontWeight: config.appearance.titleWeight ?? (config.appearance.titleSize > 14 ? 600 : 500) } : undefined} className={`min-w-0 flex-1 ${config.appearance?.titleBelow ? "whitespace-normal break-words" : "truncate"} text-fg ${plain ? "text-lg font-semibold" : "text-sm font-medium"}`}>
             {config.title || derived}
           </h3>
         )}
