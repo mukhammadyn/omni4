@@ -75,3 +75,11 @@ test('compact statistic line height is an explicit editable presentation value',
  const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'months',type:'numeric'}],rows:[{months:'8.2'}],limit:100,truncated:false}} presentation={{type:'chart',kind:'stat',group:'',value:'months',split:'',suffix:'mo.',appearance:{valueSize:24,valueLineHeight:1}}}/>);
  expect(html).toContain('font-size:24px;line-height:1');expect(html).toContain('8.2');
 });
+
+test('combo lines do not inherit a fill class that overrides SVG fill=none',()=>{
+ for(const smoothLine of [true,false]) {
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'month',type:'text'},{key:'hires',type:'int4'},{key:'total',type:'int4'}],rows:[{month:'A',hires:2,total:9},{month:'B',hires:3,total:10}],limit:100,truncated:false}} presentation={{type:'chart',kind:'combo',group:'month',value:'hires',split:'',measures:[{id:'hires',field:'hires',aggregation:'sum',display:'column'},{id:'total',field:'total',aggregation:'sum',display:'line',axis:'right'}],appearance:{smoothLine}}}/>);
+ const line=(html.match(/<(?:path|polyline)[^>]+>/g)??[]).find(tag=>tag.includes('stroke-chart-2'));
+ expect(line).toBeDefined();expect(line).toContain('fill="none"');expect(line).not.toContain('fill-chart-2');
+ }
+});
