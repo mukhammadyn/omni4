@@ -1217,8 +1217,7 @@ function Bars({ series, locale, config, onPick, selectedKey }: { selectedKey?: s
 function AxisBars({ series, config, locale, onPick, selectedKey }: { selectedKey?: string | undefined; series: ChartSeries; config: ChartConfig; locale: string; onPick?: ((key: string, series?: string) => void) | undefined }) {
   const domain=linearDomain(series.points.map(point=>point.value)), headroom=config.appearance?.axisHeadroom ?? 0;
   const upper=headroom ? Math.max(1,Math.ceil(Math.max(...series.points.map(point=>point.value),0)*(1+headroom/100))) : domain.max;
-  const nice=niceChartTicks(domain.min,upper), min=nice[0]!, max=headroom ? upper : nice.at(-1)!;
-  const ticks=headroom ? [...nice.filter(tick=>tick<=max),...(!nice.includes(max)?[max]:[])] : nice;
+  const ticks=niceChartTicks(domain.min,upper), min=ticks[0]!, max=ticks.at(-1)!;
   const x=(value:number)=>(value-min)/(max-min||1)*100, labelWidth=config.appearance?.barLabelWidth ?? 160;
   const format=(value:number)=>value.toLocaleString(locale,{maximumFractionDigits:config.appearance?.decimals ?? 2});
   const labels=config.appearance?.barValueLabels && config.appearance.barValueLabels!=="none";
@@ -1234,7 +1233,7 @@ function AxisBars({ series, config, locale, onPick, selectedKey }: { selectedKey
         {labels && <span data-bar-value-label className="pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[13px] font-bold text-fg" style={{left:`${x(point.value)}%`,marginLeft:12}}>{valueText(point.value)}</span>}
       </div>
     </div>)}</div>
-    <div style={{marginLeft:"calc(var(--bar-label-width) + 12px)"}} className="relative h-6 shrink-0 border-t border-chart-grid text-2xs text-fg-muted">{ticks.map(tick=><span key={tick} className="absolute -translate-x-1/2 pt-1" style={{left:`${x(tick)}%`}}>{format(tick)}</span>)}</div>
+    <div style={{marginLeft:"calc(var(--bar-label-width) + 12px)"}} className="relative h-6 shrink-0 border-t border-chart-grid text-2xs text-fg-muted">{ticks.map(tick=><span data-axis-tick key={tick} className="absolute -translate-x-1/2 pt-1" style={{left:`${x(tick)}%`}}>{format(tick)}</span>)}</div>
   </div>;
 }
 

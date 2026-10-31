@@ -45,6 +45,10 @@ test("bar annotations show real category shares and support natural row height",
  const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:"category",type:"text"},{key:"n",type:"int4"}],rows:[{category:"A",n:3},{category:"B",n:1}],limit:100,truncated:false}} presentation={{type:"chart",kind:"bar",group:"category",value:"n",split:"",fitContent:true,appearance:{axisTicks:true,distributed:true,barValueLabels:"both",barRowHeight:46,minPlotHeight:220,axisHeadroom:28}}}/>);
  expect(html).toContain("75%");expect(html).toContain("25%");expect(html).toContain("height:220px");expect(html).toContain("--color-chart-cool-2");
 });
+test('bar headroom ends on a regular numeric tick instead of adding a crowded last tick',()=>{
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'category',type:'text'},{key:'n',type:'int4'}],rows:[{category:'A',n:85},{category:'B',n:86}],limit:100,truncated:false}} presentation={{type:'chart',kind:'bar',group:'category',value:'n',split:'',appearance:{axisTicks:true,barValueLabels:'both',axisHeadroom:28}}}/>);
+ expect(html).toMatch(/data-axis-tick[^>]+>120<\/span>/);expect(html).not.toMatch(/data-axis-tick[^>]+>111<\/span>/);
+});
 
 test("a completely empty grouped dataset shows its configured empty state",()=>{
  const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:"name",type:"text"},{key:"month",type:"int4"}],rows:[{name:null,month:1},{name:null,month:2}],limit:100,truncated:false}} presentation={{type:"table",kind:"bar",group:"",value:"",split:"",records:{layout:"cards",titleField:"name",groupField:"month",emptyDatasetLabel:"Nobody has a birth date"}}}/>);

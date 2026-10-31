@@ -52,7 +52,7 @@ export function swapWidgetPositions(widgets: Widget[], from: string, to: string)
 export function widgetDisplayHeight(widget: Widget, naturalHeight: number | undefined, editing: boolean) {
   const configured = widget.layout ? layoutHeight(widget.layout.rows) : widget.height*260;
   if (editing || !naturalHeight || !(widget.sqlTableFitContent || widgetAutoHeight(widget))) return configured;
-  return widget.kind === 'pie' ? Math.max(configured,naturalHeight) : widgetAutoHeight(widget) ? Math.max(80,naturalHeight) : Math.min(configured,Math.max(80,naturalHeight));
+  return widget.kind === 'pie' && widget.type !== 'records' ? Math.max(configured,naturalHeight) : widgetAutoHeight(widget) ? Math.max(80,naturalHeight) : Math.min(configured,Math.max(80,naturalHeight));
 }
 
 export function widgetAutoHeight(widget: Widget) {
