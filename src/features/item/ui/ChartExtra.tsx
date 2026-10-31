@@ -57,7 +57,7 @@ export function CartesianChart({ config, series, locale, onPick, selectedKey, se
 export function PieChart({ series, locale, showLegend = true, appearance, onPick, selectedKey }: { series: ChartSeries; locale: string; showLegend?: boolean; appearance?: ChartConfig["appearance"] | undefined; onPick?: ((key: string, series?: string) => void) | undefined; selectedKey?: string | undefined }) {
   let start = -Math.PI / 2;
   const bottom = appearance?.legendPosition === "bottom", size = appearance?.pieSize ?? 144;
-  const paint = (index: number, key: string) => selectedKey !== undefined && selectedKey !== key ? "var(--color-border-strong)" : appearance?.palette === "cool" && index < 6 ? `var(--color-chart-cool-${index + 1})` : `var(--color-chart-${index < 7 ? index + 1 : "other"})`;
+  const paint = (index: number, key: string) => selectedKey !== undefined && selectedKey !== key ? "var(--color-border-strong)" : appearance?.palette === "cool" ? `var(--color-chart-cool-${index % 6 + 1})` : `var(--color-chart-${index < 7 ? index + 1 : "other"})`;
   const pick = (key: string) => onPick?.(key);
   return <div data-chart-pie className={`flex h-full min-w-0 items-center justify-center gap-4 ${bottom ? "flex-col" : "flex-wrap"}`}><svg viewBox="0 0 100 100" style={{ width: size, maxWidth: "100%", maxHeight: bottom ? "calc(100% - 40px)" : "100%", aspectRatio: "1", flexShrink: 1 }} role="img" aria-label="Pie chart">{series.points.filter((point) => point.value > 0).map((point) => {
     const index = series.points.indexOf(point), angle = point.value / series.total * Math.PI * 2, end = start + angle;
