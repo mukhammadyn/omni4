@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { Field } from "@/features/table";
 import { CHART_KINDS, chartReady, chartSeries, newChart, toCharts, toChartsAttribute } from "./chart";
-import { chartRoleIssue, linearDomain, normalizedBands, partValuesValid, treemapRects, xyPoints } from "./chart-geometry";
+import { smoothChartPath, chartRoleIssue, linearDomain, normalizedBands, partValuesValid, treemapRects, xyPoints } from "./chart-geometry";
 const config = { ...newChart(), groupSlug: "category", aggregation: "sum" as const, valueSlug: "amount" };
 test("all 18 shapes serialize while legacy eight configurations remain compatible", () => {
   expect(CHART_KINDS).toHaveLength(18);
@@ -43,4 +43,12 @@ test("nice calendar/count axis ticks", async () => {
   const { niceChartTicks } = await import("./chart-geometry");
   expect(niceChartTicks(0, 27)).toEqual([0, 5, 10, 15, 20, 25, 30]);
   expect(niceChartTicks(0, 9)).toEqual([0, 2, 4, 6, 8, 10]);
+});
+
+test("monotone line smoothing preserves endpoints and a zero plateau without overshoot",()=>{
+ const path=smoothChartPath([{x:0,y:100},{x:10,y:0},{x:20,y:0}]);
+ expect(path.startsWith("M0,100")).toBe(true);expect(path.endsWith("20,0")).toBe(true);expect(path).toContain(" C");expect(path).not.toContain("NaN");
+ const coordinates=[...path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(match=>Number(match[2]));
+ expect(coordinates.every(y=>y>=0 && y<=100)).toBe(true);
+ expect(smoothChartPath([])).toBe("");
 });

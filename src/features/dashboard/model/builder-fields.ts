@@ -8,7 +8,7 @@ export const numericField = (field: Pick<Field, "type">) => ["NUMBER", "FLOAT", 
 export function builderRoles(widget: Widget, sql: boolean): BuilderRole[] {
   if (widget.type === "records") return sql ? ["columns"] : ["columns", "sort"];
   if ((widget.type && widget.type !== "chart") || RAW_CHART_KINDS.has(widget.kind)) return [];
-  return [...(widget.kind === "stat" ? [] : ["group" as const]), ...(!widget.measures?.length ? ["value" as const] : []), ...(widget.kind !== "stat" && splittable(widget.kind) && !widget.measures?.length ? ["split" as const] : []), ...(["bar", "column", "line", "area", "pie", "donut"].includes(widget.kind) && !widget.measures?.length ? ["sort" as const] : [])];
+  return [...(widget.kind === "stat" ? [] : ["group" as const]), ...(!widget.measures?.length ? ["value" as const] : []), ...(widget.kind !== "stat" && splittable(widget.kind) && !widget.measures?.length ? ["split" as const] : []), ...(["bar", "column", "line", "area", "pie", "donut", "combo"].includes(widget.kind) ? ["sort" as const] : [])];
 }
 /** Translate the field library into the existing widget contract; no separate builder state. */
 export function assignBuilderField(widget: Widget, field: Field, role: BuilderRole, sql: boolean): Partial<Widget> | null {

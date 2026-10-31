@@ -1,0 +1,7 @@
+@container (min-width: 600px) {
+  .sql-record-card-grid[data-sql-card-cols="2"], .sql-record-card-grid[data-sql-card-cols="3"], .sql-record-card-grid[data-sql-card-cols="4"] { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@container (min-width: 900px) {
+  .sql-record-card-grid[data-sql-card-cols="3"] { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .sql-record-card-grid[data-sql-card-cols="4"] { grid-template-columns: repeat(4,minmax(0,1fr)); }
+}

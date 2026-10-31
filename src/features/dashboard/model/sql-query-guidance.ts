@@ -24,10 +24,12 @@ export function sqlSupportIssue(sql: string): SQLSupportIssue | null {
     if (token.kind === "name" && !token.quoted && ["or", "in", "having", "offset", "union", "over", "distinct", "cross", "for", "fetch"].includes(token.text.toLowerCase())) return "clause";
     if (token.kind === "name" && tokens[index + 1]?.text === "(") {
       const name = token.text.toLowerCase();
-      if (token.quoted) return "function";
+      if (token.quoted || tokens[index - 1]?.text === ".") return "function";
+      // Reserved SQL syntax may introduce a parenthesized expression, not a
+      // function call. Nested calls are still visited and checked independently.
+      if (["select", "from", "when", "then", "else", "and", "on", "where"].includes(name)) continue;
       if (aggregates.has(name)) continue;
       // Calendar expressions only; do not enable arbitrary or schema-qualified calls.
-      if (tokens[index - 1]?.text === ".") return "function";
       if (dateFunctions.has(name)) {
         if (name === "extract" && !["year", "month"].some((part) => keyword(index + 2, part))) return "function";
         continue;

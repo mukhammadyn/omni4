@@ -96,3 +96,13 @@ export function niceChartTicks(minimum: number, maximum: number): number[] {
   const min = Math.floor(minimum / step) * step, max = Math.ceil(maximum / step) * step;
   return Array.from({ length: Math.max(2, Math.round((max - min) / step) + 1) }, (_, index) => Number((min + index * step).toPrecision(12)));
 }
+
+/** Monotone cubic interpolation: smoothing never invents extrema between data points. */
+export function smoothChartPath(points: { x: number; y: number }[]): string {
+  if (!points.length) return "";
+  if (points.length === 1) return `M${points[0]!.x},${points[0]!.y}`;
+  const delta=points.slice(1).map((point,index)=>(point.y-points[index]!.y)/(point.x-points[index]!.x || 1));
+  const slopes=points.map((_,index)=>index===0 ? delta[0]! : index===points.length-1 ? delta.at(-1)! : delta[index-1]!*delta[index]! <= 0 ? 0 : 2/(1/delta[index-1]!+1/delta[index]!));
+  delta.forEach((d,index)=>{if(d===0){slopes[index]=0;slopes[index+1]=0;}else{const a=slopes[index]!/d,b=slopes[index+1]!/d,squared=a*a+b*b;if(squared>9){const scale=3/Math.sqrt(squared);slopes[index]=scale*a*d;slopes[index+1]=scale*b*d;}}});
+  return `M${points[0]!.x},${points[0]!.y}`+points.slice(1).map((point,index)=>{const previous=points[index]!,third=(point.x-previous.x)/3;return ` C${previous.x+third},${previous.y+slopes[index]!*third} ${point.x-third},${point.y-slopes[index+1]!*third} ${point.x},${point.y}`;}).join("");
+}

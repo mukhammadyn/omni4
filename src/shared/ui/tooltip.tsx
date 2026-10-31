@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, isValidElement, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, isValidElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -18,6 +18,7 @@ import { createPortal } from "react-dom";
  */
 
 /** Через сколько появляется. Меньше — мигает при проходе курсора мимо. */
+export const TooltipToneContext = createContext<"dark"|"surface">("dark");
 const DELAY = 300;
 
 /** Зазор между подсказкой и тем, к чему она относится. */
@@ -38,6 +39,7 @@ export function Tooltip({
   /** SVG marks need an SVG group, not an HTML span inside an SVG. */
   as?: "span" | "g";
 }) {
+  const tone=useContext(TooltipToneContext);
   const anchor = useRef<Element | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const timer = useRef<number>(0);
@@ -133,7 +135,7 @@ export function Tooltip({
           <div
             ref={box}
             role="tooltip"
-            className="text-2xs pointer-events-none fixed z-60 max-w-64 rounded-md bg-fg px-2 py-1 font-medium text-bg shadow-popover"
+            className={`text-2xs pointer-events-none fixed z-60 max-w-64 rounded-md px-2 py-1 shadow-popover ${tone === "surface" ? "border border-border bg-surface text-fg" : "bg-fg font-medium text-bg"}`}
             style={{
               left: placed?.left ?? at.left,
               top: placed?.top ?? at.top,

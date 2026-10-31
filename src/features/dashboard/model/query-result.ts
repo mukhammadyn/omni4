@@ -108,3 +108,13 @@ export function queryRecordHref(template: string | undefined, value: unknown): s
   if (!template?.startsWith("/") || template.startsWith("//") || Array.from(template).some((char) => char.charCodeAt(0) <= 32 || char === "\\") || !template.includes("{value}") || value === null || value === undefined) return undefined;
   return template.replaceAll("{value}", encodeURIComponent(String(value)));
 }
+
+/** Images stay on the existing app/CDN origins; SQL output cannot add a tracking destination. */
+export function queryImageHref(value:unknown,cdnBase:string,appOrigin:string):string|undefined {
+  if(typeof value!=="string" || !value.trim()) return;
+  try {
+    const base=new URL(cdnBase),app=new URL(appOrigin),url=new URL(value,base.href.endsWith("/")?base.href:base.href+"/");
+    if(url.username || url.password || !["https:","http:"].includes(url.protocol) || ![base.origin,app.origin].includes(url.origin)) return;
+    return url.href;
+  } catch { return; }
+}

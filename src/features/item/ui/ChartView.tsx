@@ -1,7 +1,9 @@
 import { linearDomain, niceChartTicks, stackedBands } from "../model/chart-geometry";
-import { Fragment, useEffect, useLayoutEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useLayoutEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { startPointerDrag } from "@/shared/lib/pointer-drag";
 import {
+  CakeIcon,
+  CalendarDaysIcon,
   AudioWaveformIcon,
   BinaryIcon,
   ChartColumnIcon,
@@ -25,7 +27,7 @@ import { CommitInput } from "@/shared/ui/commit-input";
 import { Dropdown } from "@/shared/ui/dropdown";
 import { Field as LabeledField } from "@/shared/ui/input";
 import { Icon } from "@/shared/ui/icon";
-import { Tooltip } from "@/shared/ui/tooltip";
+import { Tooltip, TooltipToneContext } from "@/shared/ui/tooltip";
 import type { DateKind } from "@/shared/lib/date-value";
 import {
   CHART_BUCKETS,
@@ -510,12 +512,14 @@ export function ChartCard({
   scrollContent = true,
   onPick,
   selectedKey,
+  selectedSeries,
   naturalContentHeight,
   onAutoHeight,
   sizeRows,
 }: {
-  onPick?: ((key: string) => void) | undefined;
+  onPick?: ((key: string, series?: string) => void) | undefined;
   selectedKey?: string | undefined;
+  selectedSeries?: string | undefined;
   naturalContentHeight?: number | undefined;
   onAutoHeight?: ((height: number) => void) | undefined;
   sizeRows?: { value: number; min?: number; max: number; unit: number; gap: number } | undefined;
@@ -626,8 +630,9 @@ export function ChartCard({
   }, [naturalContentHeight, onAutoHeight]);
 
   return (
-    <section
+    <TooltipToneContext.Provider value={config.appearance?.tooltipSurface ? "surface" : "dark"}><section
       ref={card}
+      data-chart-palette={config.appearance?.palette}
       aria-label={config.title || derived}
       draggable={editing}
       /*
@@ -637,7 +642,7 @@ export function ChartCard({
        * Не поместилось — прокручивается внутри, как и положено плитке
        * на панели.
        */
-      style={plain ? undefined : { height: `${sizeRows ? height * sizeRows.unit + (height - 1) * sizeRows.gap : height * ROW_HEIGHT}px`, ...(config.appearance?.headerGap !== undefined ? { gap: config.appearance.headerGap } : {}), ...(config.appearance?.padding !== undefined ? { padding: config.appearance.padding } : {}), ...(config.appearance?.radius !== undefined ? { borderRadius: config.appearance.radius } : {}) }}
+      style={plain ? undefined : { height: `${sizeRows ? height * sizeRows.unit + (height - 1) * sizeRows.gap : height * ROW_HEIGHT}px`, ...(!editing && config.appearance?.frameless ? { backgroundColor: "transparent", borderColor: "transparent" } : {}), ...(config.appearance?.headerGap !== undefined ? { gap: config.appearance.headerGap } : {}), ...(config.appearance?.padding !== undefined ? { padding: config.appearance.padding } : {}), ...(config.appearance?.radius !== undefined ? { borderRadius: config.appearance.radius } : {}) }}
       /* Выделение текста в заголовке — не бросок карточки: у поля ввода
          внутри draggable-родителя браузер начинает перетаскивание
          вместо выделения. */
@@ -705,7 +710,7 @@ export function ChartCard({
           />
         </>
       )}
-      {!hideHeader && (!config.appearance?.hideTitle || editing) && <header className="flex min-w-0 items-center gap-1.5">
+      {!hideHeader && (!config.appearance?.hideTitle || editing) && <header style={{ ...(config.appearance?.titleBelow ? { order: 1 } : {}), ...(config.appearance?.headerPadding !== undefined ? { padding: config.appearance.headerPadding } : {}), ...(config.appearance?.headerPaddingX !== undefined ? {paddingLeft:config.appearance.headerPaddingX,paddingRight:config.appearance.headerPaddingX} : {}) }} className={`flex min-w-0 items-center ${config.appearance?.headerIcon && config.appearance.headerIcon !== "none" ? "gap-2" : "gap-1.5"} ${config.appearance?.headerDivider ? "border-b border-border" : ""}`}>
         {editing && (
           <button
             type="button"
@@ -723,6 +728,7 @@ export function ChartCard({
           </button>
         )}
 
+          {config.appearance?.headerIcon && config.appearance.headerIcon !== "none" && <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-accent-subtle bg-accent-subtle text-accent-text"><Icon as={config.appearance.headerIcon === "cake" ? CakeIcon : CalendarDaysIcon} size={14}/></span>}
         {editing && inlineSetup ? (
           <CommitInput
             value={config.title}
@@ -733,7 +739,7 @@ export function ChartCard({
             className="h-7 min-w-0 flex-1 text-sm"
           />
         ) : (
-          <h3 style={config.appearance?.titleSize ? { fontSize: config.appearance.titleSize, lineHeight: config.appearance.titleSize >= 18 ? "28px" : "20px", fontWeight: config.appearance.titleSize > 14 ? 600 : 500 } : undefined} className={`min-w-0 flex-1 truncate text-fg ${plain ? "text-lg font-semibold" : "text-sm font-medium"}`}>
+          <h3 style={config.appearance?.titleSize ? { fontSize: config.appearance.titleSize, lineHeight: config.appearance.titleSize >= 18 ? "28px" : "20px", fontWeight: config.appearance.titleWeight ?? (config.appearance.titleSize > 14 ? 600 : 500) } : undefined} className={`min-w-0 flex-1 truncate text-fg ${plain ? "text-lg font-semibold" : "text-sm font-medium"}`}>
             {config.title || derived}
           </h3>
         )}
@@ -812,7 +818,7 @@ export function ChartCard({
         ) : config.kind === "treemap" ? (
           <TreemapChart series={series} locale={i18n.language} />
         ) : ["column", "column100", "area", "area100", "combo"].includes(config.kind) ? (
-          <CartesianChart config={config} series={series} locale={i18n.language} onPick={onPick} selectedKey={selectedKey} />
+          <CartesianChart selectedSeries={selectedSeries} config={config} series={series} locale={i18n.language} onPick={onPick} selectedKey={selectedKey} />
         ) : config.kind === "heatmap" ? (
           <Heatmap series={series} locale={i18n.language} />
         ) : config.kind === "funnel" ? (
@@ -831,7 +837,7 @@ export function ChartCard({
       {/* Легенда обязательна, как только серий больше одной: опознавать
           их цветом и только цветом нельзя. У кольца она своя — там доли
           и есть серии. */}
-      {content === undefined && series.splits.length > 1 && config.kind !== "heatmap" && <div className={config.showLegend === false ? "sr-only" : undefined} data-chart-legend><Legend splits={series.splits} /></div>}
+      {content === undefined && series.splits.length > 1 && config.kind !== "heatmap" && <div className={config.showLegend === false ? "sr-only" : undefined} data-chart-legend><Legend splits={series.splits} appearance={config.appearance} /></div>}
 
       {/* Сколько значений осталось за кадром. Молча обрезанный рейтинг
           выглядит как весь список. */}
@@ -845,7 +851,7 @@ export function ChartCard({
             .join(" · ")}
         </p>
       )}
-    </section>
+    </section></TooltipToneContext.Provider>
   );
 }
 
@@ -1129,7 +1135,7 @@ export function ChartSetup({
  * своей: иначе полосы разных серий нельзя было бы сравнить глазами,
  * а ради этого график и рисуют.
  */
-function Bars({ series, locale, config, onPick, selectedKey }: { selectedKey?: string | undefined; onPick?: ((key: string) => void) | undefined; series: ChartSeries; locale: string; config: ChartConfig }) {
+function Bars({ series, locale, config, onPick, selectedKey }: { selectedKey?: string | undefined; onPick?: ((key: string, series?: string) => void) | undefined; series: ChartSeries; locale: string; config: ChartConfig }) {
   const grouped = series.splits.length > 1;
   const top = grouped
     ? Math.max(...series.points.flatMap((point) => [...point.cells.values()]), 0)
@@ -1142,7 +1148,7 @@ function Bars({ series, locale, config, onPick, selectedKey }: { selectedKey?: s
    * ponytail: двусторонняя ось — когда попросят min по полю с минусами.
    */
   if (config.stacked === true) return <AbsoluteBars series={series} locale={locale} showGrid={config.showGrid === true} />;
-  if (config.appearance?.axisTicks && !grouped) return <AxisBars series={series} config={config} locale={locale} onPick={onPick} selectedKey={selectedKey} />;
+  if ((config.appearance?.axisTicks || config.appearance?.barRowHeight) && !grouped) return <AxisBars series={series} config={config} locale={locale} onPick={onPick} selectedKey={selectedKey} />;
   const width = (value: number) => `${top > 0 ? Math.max(0, value / top) * 100 : 0}%`;
 
   return (
@@ -1183,18 +1189,25 @@ function Bars({ series, locale, config, onPick, selectedKey }: { selectedKey?: s
   );
 }
 
-function AxisBars({ series, config, locale, onPick, selectedKey }: { selectedKey?: string | undefined; series: ChartSeries; config: ChartConfig; locale: string; onPick?: ((key: string) => void) | undefined }) {
-  const domain = linearDomain(series.points.map((point) => point.value)), ticks = niceChartTicks(domain.min, domain.max), min = ticks[0]!, max = ticks.at(-1)!;
-  const x = (value: number) => (value - min) / (max - min || 1) * 100;
-  const format = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: config.appearance?.decimals ?? 2 });
-  return <div className="flex h-full min-h-0 flex-col gap-3 pr-3" data-axis-bars>
-    <div className="flex min-h-0 flex-1 flex-col">{series.points.map((point) => <div key={point.key} className="flex min-h-0 flex-1 items-center gap-3">
-      <button type="button" disabled={!onPick} title={point.label} className="w-40 shrink-0 truncate text-right text-xs text-fg-muted disabled:cursor-default" onClick={() => onPick?.(point.key)}>{point.label}</button>
-      <div style={{ height: `${config.appearance?.columnWidth ?? 56}%` }} className="relative min-w-0 flex-1">{config.showGrid && ticks.map((tick) => <span key={tick} className="absolute inset-y-0 border-l border-dashed border-chart-grid" style={{ left: `${x(tick)}%` }} />)}
-        <Tooltip label={`${point.label}: ${format(point.value)}`}><button type="button" aria-disabled={!onPick} tabIndex={0} aria-pressed={onPick ? selectedKey === point.key : undefined} aria-label={`${point.label}: ${format(point.value)}`} onClick={() => onPick?.(point.key)} className={`absolute inset-y-0 outline-none focus-visible:outline-2 focus-visible:outline-accent ${selectedKey !== undefined && selectedKey !== point.key ? "bg-border-strong" : config.appearance?.neutral ? "bg-fg" : "bg-chart-1"} ${config.appearance?.rounded ? "rounded-md" : ""} disabled:cursor-default`} style={{ left: `${x(Math.min(0, point.value))}%`, width: `${Math.abs(x(point.value) - x(0))}%` }} /></Tooltip>
+function AxisBars({ series, config, locale, onPick, selectedKey }: { selectedKey?: string | undefined; series: ChartSeries; config: ChartConfig; locale: string; onPick?: ((key: string, series?: string) => void) | undefined }) {
+  const domain=linearDomain(series.points.map(point=>point.value)), headroom=config.appearance?.axisHeadroom ?? 0;
+  const upper=headroom ? Math.max(1,Math.ceil(Math.max(...series.points.map(point=>point.value),0)*(1+headroom/100))) : domain.max;
+  const nice=niceChartTicks(domain.min,upper), min=nice[0]!, max=headroom ? upper : nice.at(-1)!;
+  const ticks=headroom ? [...nice.filter(tick=>tick<=max),...(!nice.includes(max)?[max]:[])] : nice;
+  const x=(value:number)=>(value-min)/(max-min||1)*100, labelWidth=config.appearance?.barLabelWidth ?? 160;
+  const format=(value:number)=>value.toLocaleString(locale,{maximumFractionDigits:config.appearance?.decimals ?? 2});
+  const labels=config.appearance?.barValueLabels && config.appearance.barValueLabels!=="none";
+  const percent=(value:number)=>(series.total ? value/series.total*100 : 0).toLocaleString(locale,{maximumFractionDigits:1});
+  const unit=series.splits[0]?.unit;
+  return <div style={{"--bar-label-width":`min(${labelWidth}px,42%)`,...(config.appearance?.barRowHeight ? {height:Math.max(config.appearance.minPlotHeight ?? 220,series.points.length*config.appearance.barRowHeight),flexShrink:0} : {})} as CSSProperties} className={`flex h-full min-h-0 flex-col gap-3 ${labels ? "" : "pr-3"}`} data-axis-bars>
+    <div className="flex min-h-0 flex-1 flex-col">{series.points.map((point,index)=><div key={point.key} className="flex min-h-0 flex-1 items-center gap-3">
+      <button type="button" style={{width:"var(--bar-label-width)"}} disabled={!onPick} title={point.label} className="shrink-0 truncate text-right text-xs text-fg-muted disabled:cursor-default" onClick={()=>onPick?.(point.key)}>{point.label}</button>
+      <div style={{height:`${config.appearance?.columnWidth ?? 56}%`}} className="relative min-w-0 flex-1">{config.showGrid && ticks.map(tick=><span key={tick} className="absolute inset-y-0 border-l border-dashed border-chart-grid" style={{left:`${x(tick)}%`}}/>)}
+        <Tooltip label={`${point.label}: ${format(point.value)}${unit ? ` ${unit}` : ""}${config.appearance?.barValueLabels === "both" ? ` (${percent(point.value)}%)` : ""}`}><button type="button" aria-disabled={!onPick} tabIndex={0} aria-pressed={onPick ? selectedKey===point.key : undefined} aria-label={`${point.label}: ${format(point.value)}`} onClick={()=>onPick?.(point.key)} className={`absolute inset-y-0 outline-none focus-visible:outline-2 focus-visible:outline-accent ${selectedKey!==undefined && selectedKey!==point.key ? "bg-border-strong" : config.appearance?.neutral ? "bg-fg" : "bg-chart-1"} ${config.appearance?.rounded ? "rounded-md" : ""}`} style={{left:`${x(Math.min(0,point.value))}%`,width:`${Math.abs(x(point.value)-x(0))}%`,...(config.appearance?.distributed && (selectedKey===undefined || selectedKey===point.key) ? {backgroundColor:`var(--color-chart-cool-${index%6+1})`} : {})}}/></Tooltip>
+        {labels && <span className="pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[13px] font-bold text-fg" style={{left:`${x(point.value)}%`,marginLeft:12}}>{format(point.value)}{config.appearance?.barValueLabels === "both" ? `  (${percent(point.value)}%)` : ""}</span>}
       </div>
     </div>)}</div>
-    <div className="relative ml-[172px] h-6 shrink-0 border-t border-chart-grid text-2xs text-fg-muted">{ticks.map((tick) => <span key={tick} className="absolute -translate-x-1/2 pt-1" style={{ left: `${x(tick)}%` }}>{format(tick)}</span>)}</div>
+    <div style={{marginLeft:"calc(var(--bar-label-width) + 12px)"}} className="relative h-6 shrink-0 border-t border-chart-grid text-2xs text-fg-muted">{ticks.map(tick=><span key={tick} className="absolute -translate-x-1/2 pt-1" style={{left:`${x(tick)}%`}}>{format(tick)}</span>)}</div>
   </div>;
 }
 
@@ -1638,16 +1651,16 @@ function Donut({ series, locale, showLegend = true }: { series: ChartSeries; loc
  * по цвету, а цвет — не единственный канал: под дальтонизмом соседние
  * оттенки сходятся, и остаётся подпись.
  */
-function Legend({ splits }: { splits: ChartSplit[] }) {
+function Legend({ splits, appearance }: { splits: ChartSplit[]; appearance?: ChartConfig["appearance"] }) {
   const { t } = useTranslation();
 
   return (
-    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1">
+    <ul className={`flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 ${appearance?.legendPosition === "bottom" ? "justify-center" : ""}`}>
       {splits.map((split, index) => (
-        <li key={split.key} className="flex min-w-0 items-center gap-1.5 text-2xs">
+        <li key={split.key} className={`flex min-w-0 items-center gap-1.5 ${appearance?.legendPosition === "bottom" ? "text-sm" : "text-2xs"}`}>
           <span className={`size-2 shrink-0 rounded-full ${seriesDot(split.key, index)}`} />
           <span className="truncate text-fg-muted">
-            {split.key === OTHER_KEY ? t("chart.other") : split.label}{splits.some((split) => split.axis === "right") ? ` · ${t(split.axis === "right" ? "chart.axisRight" : "chart.axisLeft")}` : ""}{split.unit ? ` · ${split.unit}` : ""}
+            {split.key === OTHER_KEY ? t("chart.other") : split.label}<span className={appearance?.legendDetails === false ? "sr-only" : undefined}>{splits.some((split) => split.axis === "right") ? ` · ${t(split.axis === "right" ? "chart.axisRight" : "chart.axisLeft")}` : ""}{split.unit ? ` · ${split.unit}` : ""}</span>
           </span>
         </li>
       ))}

@@ -52,3 +52,9 @@ test("SQL widget and dataset survive real menu serialization without query outpu
   expect(sqlWidgetFrom(dataset).type).toBe("records");
   expect(sqlWidgetFrom(dataset, { type: "chart", kind: "column", group: "month", value: "total", split: "", sorts: [{ field: "month", direction: "asc" }] }).sorts).toEqual([{ field: "month", direction: "asc" }]);
 });
+
+test("reserved syntax groups pure expressions but never permits qualified or nested arbitrary calls",()=>{
+ expect(sqlSupportIssue("SELECT (1 + 2) AS value FROM people WHERE (age > 20) AND (age < 30)")).toBeNull();
+ expect(sqlSupportIssue("SELECT CASE WHEN (age > 20) THEN (age + 1) ELSE (0) END FROM people")).toBeNull();
+ for(const sql of ["SELECT CASE WHEN (pg_sleep(1)) THEN 1 ELSE 0 END FROM people", "SELECT public.when(1) FROM people", "SELECT public.count(*) FROM people", "SELECT (pg_catalog.age(now(), birth_date)) FROM people", 'SELECT "when"(1) FROM people']) expect(sqlSupportIssue(sql)).toBe("function");
+});
