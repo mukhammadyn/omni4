@@ -39,6 +39,7 @@ import { DashNav, ModuleMark } from "./DashNav";
 import type { Dataset } from "../model/datasets";
 import { DatasetEditor } from "./DatasetEditor";
 import { WidgetGrid } from "./WidgetGrid";
+import { SqlMonthControls } from "./SqlMonthControls";
 
 /**
  * Экран дашбордов (ADR-0013): свой сайдбар с деревом «модуль → папка →
@@ -345,6 +346,7 @@ export function DashboardsPage({
                 onValues={onValues}
                 onFilters={(filters) => editing && setLayout({ ...layout, filters })}
               />
+              <SqlMonthControls datasets={editing ? layout.datasets ?? tree.datasets ?? [] : tree.datasets ?? []} widgets={editing ? layout.widgets : current.dashboard.widgets} values={values} onValues={onValues}>
               <WidgetGrid
                 key={current.dashboard.id}
                 menuId={menuId}
@@ -362,6 +364,7 @@ export function DashboardsPage({
                 }
                 onSourceSave={(widgets, datasets) => editing ? setLayout({ ...layout, widgets, datasets }) : void apply(patchDashboard({ ...tree, datasets }, current.dashboard.id, (dashboard) => ({ ...dashboard, widgets })))}
               />
+              </SqlMonthControls>
             </div>
           </div>
         )}

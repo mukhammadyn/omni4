@@ -19,6 +19,7 @@ import type { Dataset } from "../model/datasets";
 import type { Widget } from "../model/dashboard";
 import { type DashFilter, type FilterValues } from "../model/filters";
 import { WidgetEditor } from "./WidgetEditor";
+import { useDashboardSqlScope } from "./SqlMonthControls";
 import { stageSqlWidget } from "../model/sql-widget";
 
 /**
@@ -53,6 +54,7 @@ export function WidgetGrid({
   const { t } = useTranslation();
   const onWidgets = (next: Widget[], preferred?: string) => persistWidgets(placeWidgets(next, preferred));
   const onSourceSave = (next: Widget[], sources: Dataset[], preferred?: string) => persistSource(placeWidgets(next, preferred), sources);
+  const sqlParameterScope = useDashboardSqlScope();
   const [sqlCross, setSqlCross] = useState<Record<string, SqlSelection>>({});
   const [contentHeights, setContentHeights] = useState<Record<string, number>>({});
   const [wide,setWide]=useState(false);
@@ -65,7 +67,7 @@ export function WidgetGrid({
   const canvas = sectionCanvas(placed,heightFor,!editing && wide);
   const canvasHeight = canvas.height;
   const widgetIds = widgets.map((widget) => widget.id).join(",");
-  useEffect(() => { setSqlCross({}); }, [menuId, widgetIds]);
+  useEffect(() => { setSqlCross({}); }, [menuId, widgetIds, sqlParameterScope]);
   const [cross, setCross] = useState<Record<string, Filters>>({});
   const [dragged, setDragged] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);

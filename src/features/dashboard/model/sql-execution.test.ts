@@ -29,12 +29,14 @@ test("calendar reports allow complete age and zero-filled months without arbitra
     "SELECT EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date::date)) AS age FROM hr_employees",
     "SELECT ROUND(AVG(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date::date))), 1) AS age FROM hr_employees",
     "SELECT m, COUNT(e.guid) FROM generate_series(1, 12) AS m LEFT JOIN hr_employees AS e ON EXTRACT(MONTH FROM e.birth_date) = m GROUP BY m",
+    "SELECT d, EXTRACT(DAY FROM CURRENT_DATE), EXTRACT(ISODOW FROM CURRENT_DATE) FROM generate_series(1,31) AS d",
     "SELECT CASE WHEN birth_date IS NULL THEN 'Unknown' WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date)) <= 25 THEN '≤25' ELSE '26+' END AS band FROM hr_employees",
   ]) expect(sqlSupportIssue(sql), sql).toBeNull();
   for (const sql of [
     "SELECT pg_sleep(10)", "SELECT evil.age(birth_date) FROM hr_employees", 'SELECT "age"(birth_date) FROM hr_employees',
     "SELECT EXTRACT(EPOCH FROM birth_date) FROM hr_employees", "SELECT generate_series(0,12)",
     "SELECT generate_series(1,10000000)", "SELECT generate_series(1,:last)", "SELECT generate_series(1,12,1)",
+    "SELECT generate_series(1,32)",
     "SELECT generate_series(12,1)", "SELECT generate_series(1,12), generate_series(1,12)",
     "SELECT generate_series(1,12 /* hidden */)",
   ]) expect(sqlSupportIssue(sql), sql).toBe("function");
