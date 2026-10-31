@@ -7,7 +7,7 @@ import { sqlWidgetFrom } from "./sql-widget";
 test("advanced guidance names unsupported cases and leaves typed names alone", () => {
   for (const [sql, issue] of [
     ["WITH q AS (SELECT amount FROM deals) SELECT amount FROM q", "cte"],
-    ["SELECT COALESCE(amount, 0) FROM deals", "function"], ["SELECT amount FROM (SELECT amount FROM deals) d", "nested"],
+    ["SELECT COALESCE(amount, 0) FROM deals", "function"], ["SELECT (SELECT amount FROM deals)", "nested"],
     ["DELETE FROM deals", "write"], ["SELECT amount FROM deals WHERE amount IN (:value)", "clause"],
   ] as const) expect(sqlSupportIssue(sql)).toBe(issue);
   for (const sql of ["SELECT * FROM chats", "SELECT currency FROM deals WHERE currency = 'USD'", "SELECT COUNT(*) FROM deals", "SELECT SUM(amount) AS total FROM deals WHERE amount >= :update AND currency = :or", 'SELECT "update" FROM "with"', "SELECT amount FROM deals -- DROP TABLE deals"]) expect(sqlSupportIssue(sql)).toBeNull();
@@ -40,6 +40,16 @@ test("calendar reports allow complete age and zero-filled months without arbitra
     "SELECT generate_series(12,1)", "SELECT generate_series(1,12), generate_series(1,12)",
     "SELECT generate_series(1,12 /* hidden */)",
   ]) expect(sqlSupportIssue(sql), sql).toBe("function");
+});
+
+test("bounded derived aggregates preserve grain without enabling scalar queries or arbitrary functions", () => {
+  expect(sqlSupportIssue('SELECT COUNT(DISTINCT CASE WHEN q.left_days=0 THEN q.employee END) FROM (SELECT employee, SUM(days) AS left_days FROM requests GROUP BY employee) AS q')).toBeNull();
+  expect(sqlSupportIssue('SELECT SUM(x.n) FROM employees AS e LEFT JOIN (SELECT employee, COUNT(*) AS n FROM (SELECT employee, date FROM attendance) AS d GROUP BY employee) AS x ON e.guid=x.employee')).toBeNull();
+  for (const sql of ['SELECT (SELECT 1)', 'SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT 1) a) b) c']) expect(sqlSupportIssue(sql)).toBe('nested');
+  for (const sql of ['SELECT DISTINCT guid FROM employees', 'SELECT SUM(DISTINCT days) FROM requests']) expect(sqlSupportIssue(sql)).toBe('clause');
+  expect(sqlSupportIssue('SELECT COUNT(DISTINCT pg_sleep(1)) FROM employees')).toBe('function');
+  expect(sqlSupportIssue('SELECT q.n FROM (SELECT pg_sleep(1) AS n) q')).toBe('function');
+  expect(sqlSupportIssue('SELECT q.n FROM (DELETE FROM employees RETURNING guid) q')).toBe('write');
 });
 
 test("SQL widget and dataset survive real menu serialization without query output or values", () => {

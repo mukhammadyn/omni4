@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { newChart } from "@/features/item";
 import { newDashboard, newFolder, toTree, toTreeAttribute, type Widget } from "./dashboard";
-import { boxesOverlap, placeWidgets } from "./widget-layout";
+import { boxesOverlap, placeWidgets, layoutRows, layoutHeight } from "./widget-layout";
 
 const card = (id: string, column: number, row: number, rows: number, width: number): Widget => ({ ...newChart(), id, title: id, tableSlug: "", filters: {}, answers: {}, width, layout: { column, row, rows } });
 function noOverlap(widgets: Widget[]) {
@@ -31,10 +31,16 @@ test("moving to an occupied slot resolves all overlaps and stays stable after sa
 test("invalid dimensions are bounded and legacy flow stays unchanged", () => {
   const legacy = [{ ...newChart(), tableSlug: "", filters: {}, answers: {} }];
   expect(placeWidgets(legacy)).toBe(legacy);
-  const clamped = placeWidgets([card("large", 12, 0, 30, 99), card("small", 12, 1, 1, 3)]);
+  const clamped = placeWidgets([card("large", 12, 0, 300, 99), card("small", 12, 1, 1, 3)]);
   expect(clamped[0]?.width).toBe(12);
-  expect(clamped[0]?.layout).toEqual({ column: 1, row: 1, rows: 12 });
+  expect(clamped[0]?.layout).toEqual({ column: 1, row: 1, rows: 48 });
   noOverlap(clamped);
+});
+test("a complete fifty-row table can retain its configured height after save and packing",()=>{
+ const widgets=placeWidgets([card("table",1,1,layoutRows(3300),12),card("following",1,4,2,12)],"table");
+ expect(layoutHeight(widgets[0]!.layout!.rows)).toBe(3300);noOverlap(widgets);
+ const tree={folders:[{...newFolder("module","Reports"),dashboards:[{...newDashboard("Report"),widgets}]}]};
+ expect(toTree(toTreeAttribute(tree))).toEqual(tree);
 });
 
 test("moving a large chart into a small card's position retains each card's dimensions", async () => {

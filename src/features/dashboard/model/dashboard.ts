@@ -1,5 +1,5 @@
 import { parseFilters, toCharts, toChartsAttribute, toAggregation, type ChartConfig, type ChartMeasure, type Filters, type Sort } from "@/features/item";
-import { MAX_LAYOUT_ROW, layoutRows, placeWidgets } from "./widget-layout";
+import { MAX_LAYOUT_ROW, MAX_LAYOUT_ROWS, layoutRows, placeWidgets } from "./widget-layout";
 import { parseWidgetSection, type WidgetSection } from "./widget-sections";
 import { parseCalculatedFields, type CalculatedField } from "./calculated-fields";
 import { parseFieldPresentation, type FieldPresentation } from "./field-presentation";
@@ -43,6 +43,9 @@ export type Widget = ChartConfig & {
   sqlReceiveSelections?: boolean;
   sqlPaginationTop?: boolean;
   sqlTableFitContent?: boolean;
+  sqlProgressField?: string;
+  sqlProgressMax?: number;
+  sqlProgressSuffix?: string;
   sqlTableFrame?: boolean;
   sqlTableComfortable?: boolean;
   sqlRowHeight?: number;
@@ -113,10 +116,11 @@ export function toTree(value: unknown): Tree {
                   ...(item["sqlSelectionRules"] ? { sqlSelectionRules: parseSqlSelectionRules(item["sqlSelectionRules"]) } : {}),
                   ...(parseSqlRecordOptions(item["sqlRecords"]) ? { sqlRecords: parseSqlRecordOptions(item["sqlRecords"])! } : {}),
                   ...(isObject(item["layout"]) ? { layout: parseLayout(item["layout"]) } : {}),
-                  ...Object.fromEntries(["sqlTitleField", "sqlDetailField", "sqlDetailSuffix", "sqlDetailSuffixFractional", "sqlDetailSeparator", "sqlSuffix", "sqlSelectionField", "sqlSelectionValueField", "sqlQuickFilterField", "sqlSearchField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
+                  ...Object.fromEntries(["sqlProgressField", "sqlProgressSuffix", "sqlTitleField", "sqlDetailField", "sqlDetailSuffix", "sqlDetailSuffixFractional", "sqlDetailSeparator", "sqlSuffix", "sqlSelectionField", "sqlSelectionValueField", "sqlQuickFilterField", "sqlSearchField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
                   ...Object.fromEntries(["sqlSuffixJoined", "sqlSuffixBelow", "sqlShowViewerFilters", "sqlTableFrame"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
                   ...(["above", "inline", "below"].includes(item["sqlDetailPlacement"] as string) ? { sqlDetailPlacement: item["sqlDetailPlacement"] as "above" | "inline" | "below" } : {}),
                   ...(typeof item["sqlDetailDecimals"] === "number" && Number.isFinite(item["sqlDetailDecimals"]) ? {sqlDetailDecimals:Math.max(0,Math.min(4,Math.round(item["sqlDetailDecimals"])))} : {}),
+                  ...(typeof item["sqlProgressMax"] === "number" && Number.isFinite(item["sqlProgressMax"]) ? {sqlProgressMax:Math.max(0.000001,Math.min(1e12,item["sqlProgressMax"]))} : {}),
                   ...(typeof item["sqlTableFitContent"] === "boolean" ? { sqlTableFitContent: item["sqlTableFitContent"] } : {}),
                   ...(typeof item["sqlTableComfortable"] === "boolean" ? { sqlTableComfortable: item["sqlTableComfortable"] } : {}),
                   ...(typeof item["sqlRowHeight"] === "number" ? { sqlRowHeight: Math.max(28, Math.min(120, item["sqlRowHeight"])) } : {}),
@@ -202,6 +206,9 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...(widget.sqlSelectionRules ? { sqlSelectionRules: widget.sqlSelectionRules } : {}),
           ...(widget.sqlSuffixBelow !== undefined ? { sqlSuffixBelow: widget.sqlSuffixBelow } : {}),
           ...(widget.sqlShowViewerFilters !== undefined ? { sqlShowViewerFilters: widget.sqlShowViewerFilters } : {}),
+          ...(widget.sqlProgressField !== undefined ? {sqlProgressField:widget.sqlProgressField} : {}),
+          ...(widget.sqlProgressMax !== undefined ? {sqlProgressMax:widget.sqlProgressMax} : {}),
+          ...(widget.sqlProgressSuffix !== undefined ? {sqlProgressSuffix:widget.sqlProgressSuffix} : {}),
           ...(widget.sqlTableFrame !== undefined ? {sqlTableFrame:widget.sqlTableFrame} : {}),
           ...(widget.sqlTableFitContent !== undefined ? { sqlTableFitContent: widget.sqlTableFitContent } : {}),
           ...(widget.sqlTableComfortable !== undefined ? { sqlTableComfortable: widget.sqlTableComfortable } : {}),
@@ -360,5 +367,5 @@ function toRatio(value: unknown): Widget["ratio"] | null {
 
 function parseLayout(value: Record<string, unknown>): { column: number; row: number; rows: number } {
   const bounded = (key: string, max: number) => typeof value[key] === "number" && Number.isFinite(value[key]) ? Math.max(1, Math.min(max, value[key])) : 1;
-  return { column: Math.round(bounded("column", 12)), row: bounded("row", MAX_LAYOUT_ROW), rows: Math.max(layoutRows(80), typeof value.rows === "number" && Number.isFinite(value.rows) ? Math.min(12, value.rows) : 1) };
+  return { column: Math.round(bounded("column", 12)), row: bounded("row", MAX_LAYOUT_ROW), rows: Math.max(layoutRows(80), typeof value.rows === "number" && Number.isFinite(value.rows) ? Math.min(MAX_LAYOUT_ROWS, value.rows) : 1) };
 }

@@ -17,17 +17,22 @@ export function sqlSupportIssue(sql: string): SQLSupportIssue | null {
   if (semicolons.length > 1 || (semicolons.length === 1 && tokens.at(-1)?.text !== ";")) return "write";
   if (tokens.some((token) => token.kind === "name" && !token.quoted && ["insert", "update", "delete", "create", "alter", "drop", "truncate", "grant", "revoke", "call", "copy", "into"].includes(token.text.toLowerCase()))) return "write";
   if (tokens.some((_, index) => keyword(index, "with"))) return "cte";
-  if (tokens.filter((_, index) => keyword(index, "select")).length > 1) return "nested";
+  const selections = tokens.flatMap((_, index) => keyword(index, "select") ? [index] : []);
+  // Two bounded derived-table layers support aggregation at employee/day grain
+  // followed by report totals. Scalar subqueries, CTEs and unions stay excluded;
+  // every token in every layer still passes the same function/write checks.
+  if (selections.length > 3 || selections.slice(1).some(index => tokens[index - 1]?.text !== "(" || !["from", "join"].some(word => keyword(index - 2, word)))) return "nested";
   let series = 0;
   for (let index = 0; index < tokens.length; index++) {
     const token = tokens[index]!;
-    if (token.kind === "name" && !token.quoted && ["or", "in", "having", "offset", "union", "over", "distinct", "cross", "for", "fetch"].includes(token.text.toLowerCase())) return "clause";
+    if (keyword(index, "distinct") && !(tokens[index - 1]?.text === "(" && keyword(index - 2, "count"))) return "clause";
+    if (token.kind === "name" && !token.quoted && ["or", "in", "having", "offset", "union", "over", "cross", "for", "fetch"].includes(token.text.toLowerCase())) return "clause";
     if (token.kind === "name" && tokens[index + 1]?.text === "(") {
       const name = token.text.toLowerCase();
       if (token.quoted || tokens[index - 1]?.text === ".") return "function";
       // Reserved SQL syntax may introduce a parenthesized expression, not a
       // function call. Nested calls are still visited and checked independently.
-      if (["select", "from", "when", "then", "else", "and", "on", "where"].includes(name)) continue;
+      if (["select", "from", "join", "when", "then", "else", "and", "on", "where"].includes(name)) continue;
       if (aggregates.has(name)) continue;
       // Calendar expressions only; do not enable arbitrary or schema-qualified calls.
       if (dateFunctions.has(name)) {

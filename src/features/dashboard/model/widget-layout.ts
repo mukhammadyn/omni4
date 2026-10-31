@@ -1,6 +1,8 @@
 import type { Widget } from "./dashboard";
 
 export const MAX_LAYOUT_ROW = 10000;
+/** Up to 100 comfortable table rows can use page flow instead of an inner scrollbar. */
+export const MAX_LAYOUT_ROWS = 48;
 export const LAYOUT_CELL = 135;
 export const LAYOUT_GAP = 16;
 type Box = { column: number; row: number; rows: number; width: number };
@@ -17,7 +19,7 @@ export function placeWidgets(widgets: Widget[], preferredId?: string, naturalHei
   const occupied: Box[] = [], placed = new Map<string, Widget>();
   const order = [...widgets].sort((a, b) => Number(Boolean(b.layout)) - Number(Boolean(a.layout)) || Number(b.id === preferredId && Boolean(b.layout)) - Number(a.id === preferredId && Boolean(a.layout)) || (a.layout?.row ?? MAX_LAYOUT_ROW) - (b.layout?.row ?? MAX_LAYOUT_ROW) || (a.layout?.column ?? 1) - (b.layout?.column ?? 1));
   for (const widget of order) {
-    const width = Math.round(bounded(widget.width, 3, 12)), box: Box = { width, column: Math.round(bounded(widget.layout?.column ?? 1, 1, 13 - width)), row: bounded(widget.layout?.row ?? 1, 1, MAX_LAYOUT_ROW), rows: widgetAutoHeight(widget) && naturalHeights?.[widget.id] ? layoutRows(widgetDisplayHeight(widget,naturalHeights[widget.id],false)) : bounded(widget.layout?.rows ?? layoutRows(widget.height * 260), layoutRows(80), 12) };
+    const width = Math.round(bounded(widget.width, 3, 12)), box: Box = { width, column: Math.round(bounded(widget.layout?.column ?? 1, 1, 13 - width)), row: bounded(widget.layout?.row ?? 1, 1, MAX_LAYOUT_ROW), rows: widgetAutoHeight(widget) && naturalHeights?.[widget.id] ? layoutRows(widgetDisplayHeight(widget,naturalHeights[widget.id],false)) : bounded(widget.layout?.rows ?? layoutRows(widget.height * 260), layoutRows(80), MAX_LAYOUT_ROWS) };
     const fit = (start: number) => {
       let row = start;
       for (let attempt = 0; attempt <= occupied.length && row <= MAX_LAYOUT_ROW; attempt++) {
