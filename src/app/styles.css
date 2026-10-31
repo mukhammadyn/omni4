@@ -214,9 +214,6 @@ body {
   --color-chart-6: #008300;
   --color-chart-7: #4a3aa7;
   --color-chart-8: #e34948;
-  --color-chart-cool-1: #74a8c9;
-  --color-chart-cool-2: #6b8fe3;
-  --color-chart-cool-3: #666dcf;
   --color-chart-other: #898781;
   /* Сетка и ось: на шаг от подложки, тоньше границы таблицы. */
   --color-chart-grid: #e1e0d9;
@@ -834,4 +831,11 @@ main:has(> [data-fullbleed]) {
 .dashboard-chart-thumbnail[data-kind="scatter"] svg circle {
   r: 9px;
   stroke-width: 5px;
+}
+
+/* Pie slices reference palette tokens dynamically; retain every color in production. */
+@theme static {
+  --color-chart-cool-1: #74a8c9;
+  --color-chart-cool-2: #6b8fe3;
+  --color-chart-cool-3: #666dcf;
 }
