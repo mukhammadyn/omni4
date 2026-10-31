@@ -70,3 +70,10 @@ test("flow lists expand without clipping and move following cards without changi
   expect(widgets[0]!.layout!.rows).toBe(3);
   expect(placeWidgets(widgets)[0]!.layout!.rows).toBe(3);
 });
+
+test('bottom-legend pies grow for dense labels and retain their configured minimum after filtering',async()=>{
+ const {widgetDisplayHeight,layoutRows}=await import('./widget-layout');
+ const pie:Widget={...card('pie',1,1,layoutRows(369),6),kind:'pie',appearance:{legendPosition:'bottom'}};
+ expect(widgetDisplayHeight(pie,560,false)).toBe(560);expect(widgetDisplayHeight(pie,290,false)).toBe(369);expect(widgetDisplayHeight(pie,560,true)).toBe(369);
+ const viewed=placeWidgets([pie,card('after',1,4,1,12)],undefined,{pie:560});noOverlap(viewed);expect(viewed[0]!.layout!.rows).toBe(layoutRows(560));
+});

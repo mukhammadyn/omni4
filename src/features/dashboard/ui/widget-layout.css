@@ -1,9 +1,11 @@
 .dashboard-section-frame { display:none; }
 /* Opt-in reusable canvas; widths follow the shared twelve-column grid. */
-@media (min-width: 1024px) {
-  .dashboard-positioned-grid { position: relative; display: block; height: var(--dashboard-height); column-gap: var(--dashboard-row-gap); }
-  .dashboard-positioned-widget { position: absolute; left: calc(var(--widget-inset, 0px) + (100% - 2 * var(--widget-inset, 0px) + var(--dashboard-row-gap)) * var(--widget-left)); width: calc((100% - 2 * var(--widget-inset, 0px) + var(--dashboard-row-gap)) * var(--widget-width) - var(--dashboard-row-gap)); top: var(--widget-top); height: var(--widget-height); }
-  .dashboard-section-frame { display:block; position: absolute; left: 0; width: 100%; }
-  .dashboard-positioned-widget > section { height: 100% !important; min-height: 0; }
-  .dashboard-positioned-grid > [data-dashboard-add] { position: absolute; top: var(--dashboard-add-top); left: 0; width: calc((100% - var(--dashboard-row-gap)) / 2); }
-}
+
+  .dashboard-grid-wide { position: relative; display: block; height: var(--dashboard-height); column-gap: var(--dashboard-row-gap); }
+  .dashboard-grid-wide > .dashboard-positioned-widget { position: absolute; left: calc(var(--widget-inset, 0px) + (100% - 2 * var(--widget-inset, 0px) + var(--dashboard-row-gap)) * var(--widget-left)); width: calc((100% - 2 * var(--widget-inset, 0px) + var(--dashboard-row-gap)) * var(--widget-width) - var(--dashboard-row-gap)); top: var(--widget-top); height: var(--widget-height); }
+  .dashboard-grid-wide > .dashboard-section-frame { display:block; position: absolute; left: 0; width: 100%; }
+  .dashboard-grid-wide > .dashboard-positioned-widget > section { height: 100% !important; min-height: 0; }
+  .dashboard-grid-wide > [data-dashboard-add] { position: absolute; top: var(--dashboard-add-top); left: 0; width: calc((100% - var(--dashboard-row-gap)) / 2); }
+
+.dashboard-positioned-grid:not(.dashboard-grid-wide) { grid-template-columns:minmax(0,1fr); }
+.dashboard-positioned-grid:not(.dashboard-grid-wide) > [data-dashboard-add] { grid-column:1 / -1; }

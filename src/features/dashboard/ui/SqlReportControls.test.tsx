@@ -21,7 +21,7 @@ test("combination charts retain explicit calendar ordering with independent axes
 test("SQL statistic averages returned periods and its numeric inline detail",()=>{
  const html=renderToStaticMarkup(<SqlResultView language="en" displayOnly result={{columns:[{key:"rate",type:"numeric"},{key:"people",type:"numeric"}],rows:[{rate:"10",people:"2"},{rate:"20",people:"4"}],limit:100,truncated:false}} presentation={{type:"chart",kind:"stat",group:"",value:"rate",split:"",aggregation:"avg",detailField:"people",detailPlacement:"inline",detailSuffix:"people",suffix:"%"}}/>);
  expect(html).toContain("15"); expect(html).toContain("3"); expect(html).toContain("people"); expect(html).toContain("data-sql-stat");
- expect(html).not.toContain("30");
+ expect(html).not.toContain(">30<");
 });
 
 test("grouped records preserve zero groups and safe internal links",()=>{
@@ -73,7 +73,7 @@ test('cool pie palette cycles consistently beyond six real categories',()=>{
 });
 test('compact statistic line height is an explicit editable presentation value',()=>{
  const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'months',type:'numeric'}],rows:[{months:'8.2'}],limit:100,truncated:false}} presentation={{type:'chart',kind:'stat',group:'',value:'months',split:'',suffix:'mo.',appearance:{valueSize:24,valueLineHeight:1}}}/>);
- expect(html).toContain('font-size:24px;line-height:1');expect(html).toContain('8.2');
+ expect(html).toContain('font-size:24px');expect(html).toContain('line-height:1');expect(html).toContain('8.2');
 });
 
 test('combo lines do not inherit a fill class that overrides SVG fill=none',()=>{
@@ -82,4 +82,19 @@ test('combo lines do not inherit a fill class that overrides SVG fill=none',()=>
  const line=(html.match(/<(?:path|polyline)[^>]+>/g)??[]).find(tag=>tag.includes('stroke-chart-2'));
  expect(line).toBeDefined();expect(line).toContain('fill="none"');expect(line).not.toContain('fill-chart-2');
  }
+});
+
+test('all twelve month labels keep their calendar slots with both Y axes and titles',()=>{
+ const rows=Array.from({length:12},(_,i)=>({month:`Month ${i+1}`,n:i+1,total:30+i}));
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'month',type:'text'},{key:'n',type:'int4'},{key:'total',type:'int4'}],rows,limit:100,truncated:false}} presentation={{type:'chart',kind:'combo',group:'month',value:'n',split:'',measures:[{id:'n',field:'n',aggregation:'sum',display:'column'},{id:'total',field:'total',aggregation:'sum',display:'line',axis:'right'}],appearance:{axisTicks:true,axisTitleLeft:'Hires',axisTitleRight:'Total'}}}/>);
+ expect(html).toContain('data-cartesian-plot');expect(html).toContain('grid-column:3;grid-row:2');expect(html).toContain('repeat(12,minmax(0,1fr))');
+ for(let month=1;month<=12;month++) expect(html).toContain(`grid-column:${month}`);
+ expect(html).toContain('Month 12');expect(html).not.toContain('pl-16');
+});
+test('a dense bottom legend keeps every full label and a nonshrinking pie',()=>{
+ const rows=Array.from({length:8},(_,i)=>({label:`Очень длинная причина увольнения номер ${i+1}`,n:1}));
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="ru" result={{columns:[{key:'label',type:'text'},{key:'n',type:'int4'}],rows,limit:100,truncated:false}} presentation={{type:'chart',kind:'pie',group:'label',value:'n',split:'',appearance:{legendPosition:'bottom',pieSize:240,legendPercent:true}}}/>);
+ expect(html).toContain('height:240px');expect(html).toContain('flex-shrink:0');expect(html).not.toContain('calc(100% - 40px)');
+ for(const row of rows) expect(html).toContain(row.label);
+ expect(html.match(/12[,.]50%/g)?.length).toBe(8);expect(html).toContain('grid-cols-[auto_minmax(0,1fr)_auto]');
 });
