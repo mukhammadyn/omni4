@@ -5,7 +5,7 @@ export type SqlSelectionRule = { field: string; operator: "equals" | "month" | "
 export type SqlSelection = { field: string; value: string; key?: string; series?: string; operator?: SqlSelectionRule["operator"]; endField?: string };
 export function parseSqlSelectionRules(raw: unknown): Record<string,SqlSelectionRule> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  return Object.fromEntries(Object.entries(raw).slice(0,7).flatMap(([key,value])=>{
+  return Object.fromEntries(Object.entries(raw).slice(0,8).flatMap(([key,value])=>{
     if (["__proto__","constructor","prototype"].includes(key) || !value || typeof value!=="object") return [];
     const rule=value as Record<string,unknown>;
     return typeof rule.field==="string" && ["equals","month","activeAt"].includes(rule.operator as string) ? [[key,{field:rule.field.slice(0,200),operator:rule.operator,...(typeof rule.endField==="string"?{endField:rule.endField.slice(0,200)}:{})}]] : [];

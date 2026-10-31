@@ -1,5 +1,6 @@
+import { sectionCanvas } from "../model/widget-sections";
 import type { CSSProperties } from "react";
-import { widgetAutoHeight, widgetDisplayHeight, LAYOUT_CELL, LAYOUT_GAP, MAX_LAYOUT_ROW, layoutHeight, layoutTop, layoutRows, placeWidgets, swapWidgetPositions } from "../model/widget-layout";
+import { widgetAutoHeight, widgetDisplayHeight, LAYOUT_CELL, LAYOUT_GAP, MAX_LAYOUT_ROW, layoutHeight, layoutRows, placeWidgets, swapWidgetPositions } from "../model/widget-layout";
 import type { SqlSelection } from "../model/sql-result-filters";
 import "./widget-layout.css";
 import { useEffect, useState } from "react";
@@ -54,11 +55,14 @@ export function WidgetGrid({
   const onSourceSave = (next: Widget[], sources: Dataset[], preferred?: string) => persistSource(placeWidgets(next, preferred), sources);
   const [sqlCross, setSqlCross] = useState<Record<string, SqlSelection>>({});
   const [contentHeights, setContentHeights] = useState<Record<string, number>>({});
-  const placed = placeWidgets(widgets, undefined, editing ? undefined : contentHeights);
+  const [wide,setWide]=useState(false);
+  useEffect(()=>{const media=window.matchMedia('(min-width: 1024px)');const update=()=>setWide(media.matches);update();media.addEventListener('change',update);return()=>media.removeEventListener('change',update);},[]);
+  const placed = placeWidgets(widgets, undefined, editing || widgets.some(w=>w.section) ? undefined : contentHeights);
   const heightFor = (widget: Widget) => widgetDisplayHeight(widget,contentHeights[widget.id],editing);
   const positioned = widgets.some((widget) => widget.layout);
   const arranged = positioned ? [...placed].sort((a, b) => (a.layout?.row ?? MAX_LAYOUT_ROW) - (b.layout?.row ?? MAX_LAYOUT_ROW) || (a.layout?.column ?? 1) - (b.layout?.column ?? 1)) : widgets;
-  const canvasHeight = Math.max(0, ...placed.map((widget) => widget.layout ? layoutTop(widget.layout.row) + heightFor(widget) : 0));
+  const canvas = sectionCanvas(placed,heightFor,!editing && wide);
+  const canvasHeight = canvas.height;
   const widgetIds = widgets.map((widget) => widget.id).join(",");
   useEffect(() => { setSqlCross({}); }, [menuId, widgetIds]);
   const [cross, setCross] = useState<Record<string, Filters>>({});
@@ -97,7 +101,7 @@ export function WidgetGrid({
 
   const save = (widget: Widget, dataset?: Dataset) => {
     const next = dataset ? stageSqlWidget(datasets, widget, dataset) : { widget, datasets };
-    const widgetsNext = widgets.some((w) => w.id === widget.id) ? widgets.map((w) => w.id === widget.id ? next.widget : w) : [...widgets, next.widget];
+    const widgetsNext = (widgets.some((w) => w.id === widget.id) ? widgets.map((w) => w.id === widget.id ? next.widget : w) : [...widgets, next.widget]).map(w=>next.widget.section && w.section?.id===next.widget.section.id ? {...w,section:next.widget.section} : w);
     if (dataset) onSourceSave(widgetsNext, next.datasets, widget.id); else onWidgets(widgetsNext, widget.id);
     setEditor(null);
   };
@@ -130,15 +134,16 @@ export function WidgetGrid({
 
   return (
     <>{Object.keys(sqlCross).length > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-fg-muted" aria-label="SQL selections">{Object.entries(sqlCross).map(([id, selection]) => <Button key={id} type="button" size="sm" variant="secondary" onClick={() => setSqlCross((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)))}>{selection.field}: {selection.key ?? selection.value} ×</Button>)}<Button type="button" size="sm" variant="secondary" onClick={() => setSqlCross({})}>{t("dashboard.clearCrossFilters")}</Button></div>}{Object.keys(cross).length > 0 && <div className="mb-2 flex items-center gap-2 text-xs text-fg-muted"><span>{t("dashboard.crossFilterActive")}</span><Button type="button" size="sm" variant="secondary" onClick={() => setCross({})}>{t("dashboard.clearCrossFilters")}</Button></div>}<div className="mb-3 flex items-center justify-between gap-2">{editing ? <p role="status" className="text-xs text-fg-muted">{t("dashboard.draftHint")}</p> : <span />}{editable && <Button type="button" size="sm" variant="secondary" onClick={add}><Icon as={PlusIcon} size={14} />{t("dashboard.addWidget")}</Button>}</div><div data-chart-grid-layout style={{ "--dashboard-row-unit": `${LAYOUT_CELL}px`, "--dashboard-row-gap": `${LAYOUT_GAP}px`, "--dashboard-height": `${canvasHeight + (editing ? 276 : 0)}px`, "--dashboard-add-top": `${canvasHeight + LAYOUT_GAP}px` } as CSSProperties} className={`grid grid-cols-1 gap-3 lg:grid-cols-12 ${positioned ? "dashboard-positioned-grid" : ""}`}>
-      {arranged.map((widget) => { const card = <WidgetCard
+      {canvas.frames.map(frame=><div key={frame.id} aria-hidden="true" data-dashboard-section={frame.id} className="dashboard-section-frame pointer-events-none rounded-2xl border border-border bg-surface" style={{top:frame.top,height:frame.height}}/>)}
+      {arranged.map((widget) => { const box=canvas.cards[widget.id]!; const card = <WidgetCard
           key={widget.id}
           widget={widget}
           sqlSelectedSeries={sqlCross[widget.id]?.series}
           sqlSelectedKey={sqlCross[widget.id]?.key ?? sqlCross[widget.id]?.value}
-          fittedHeight={heightFor(widget)}
+          fittedHeight={box.height}
           onAutoHeight={(height) => setContentHeights(current => current[widget.id] === height ? current : { ...current, [widget.id]: height })}
           sqlSelections={Object.entries(sqlCross).filter(([id]) => id !== widget.id).map(([, selection]) => selection)}
-          onSqlPick={(value, series, key) => { const rule = series ? widget.sqlSelectionRules?.[series] : undefined; const field = rule?.field || widget.sqlSelectionField; if (field) setSqlCross(current => current[widget.id]?.value === value && current[widget.id]?.series === series ? Object.fromEntries(Object.entries(current).filter(([id]) => id !== widget.id)) : { ...current, [widget.id]: { ...rule, field, value, ...(series ? { series } : {}), ...(key ? { key } : {}) } }); }}
+          onSqlPick={(value, series, key) => { const rule = (series ? widget.sqlSelectionRules?.[series] : undefined) || widget.sqlSelectionRules?.["$category"]; const field = rule?.field || widget.sqlSelectionField; if (field) setSqlCross(current => current[widget.id]?.value === value && current[widget.id]?.series === series ? Object.fromEntries(Object.entries(current).filter(([id]) => id !== widget.id)) : { ...current, [widget.id]: { ...rule, field, value, ...(series ? { series } : {}), ...(key ? { key } : {}) } }); }}
           datasets={datasets}
           selection={cross[widget.datasetId ? datasets.find((d) => d.id === widget.datasetId)?.source.kind === "table" ? (datasets.find((d) => d.id === widget.datasetId)!.source as { tableSlug: string }).tableSlug : widget.tableSlug : widget.tableSlug] ?? {}}
           onSelect={(table, filter) => setCross((current) => ({ ...current, [table]: filter }))}
@@ -156,6 +161,7 @@ export function WidgetGrid({
           onDragOver={() => setOver(widget.id)}
           onDrop={() => drop(widget.id)}
           onMove={(delta) => move(widget.id, delta)}
+          onMoveTo={(target) => { if (!swapPlacement(widget.id,target)) reorder(moveBefore(widgets.map(w=>w.id),widget.id,target)); setDragged(null); setOver(null); }}
           onChange={(patch) => onWidgets(placed.map((w) => (w.id === widget.id ? w.layout && patch.height !== undefined ? { ...w, ...Object.fromEntries(Object.entries(patch).filter(([key]) => key !== "height")), layout: { ...w.layout, rows: layoutRows(patch.height) } } : { ...w, ...patch } : w)), widget.id)}
           onRemove={() => onWidgets(placed.filter((w) => w.id !== widget.id))}
           onEdit={() => setEditor({ widget, isNew: false })}
@@ -164,7 +170,7 @@ export function WidgetGrid({
             const copy = { ...widget, ...(widget.layout ? { layout: { ...widget.layout, row: Math.min(MAX_LAYOUT_ROW, Math.max(...widgets.map((item) => item.layout ? item.layout.row + item.layout.rows : 1))) } } : {}), id: crypto.randomUUID(), title: widget.title && `${widget.title} (${t("dashboard.copy")})` };
             onWidgets([...placed.slice(0, at), copy, ...placed.slice(at)]);
           }}
-        />; return positioned ? <div key={widget.id} className="dashboard-positioned-widget min-w-0" style={{ "--widget-left": `${((widget.layout?.column ?? 1) - 1) / 12}`, "--widget-width": `${widget.width / 12}`, "--widget-top": `${widget.layout ? layoutTop(widget.layout.row) : 0}px`, "--widget-height": `${heightFor(widget)}px` } as CSSProperties}>{card}</div> : card; })}
+        />; return positioned ? <div key={widget.id} className="dashboard-positioned-widget min-w-0" style={{ "--widget-left": `${((widget.layout?.column ?? 1) - 1) / 12}`, "--widget-width": `${widget.width / 12}`, "--widget-inset": `${box.inset}px`, "--widget-top": `${box.top}px`, "--widget-height": `${box.height}px` } as CSSProperties}>{card}</div> : card; })}
 
       {/* Место под следующий виджет — в самой сетке, размером с новый:
           видно, куда он встанет. */}
@@ -188,7 +194,7 @@ export function WidgetGrid({
 function WidgetCard({ widget, fittedHeight, onAutoHeight, sqlSelectedKey, sqlSelectedSeries, sqlSelections, onSqlPick, datasets, menuId, selection, onSelect, filters, values, editing, onChange, onEdit, onDuplicate, ...card }: {
   widget: Widget; fittedHeight: number; onAutoHeight: (height: number) => void; sqlSelectedKey?: string | undefined; sqlSelectedSeries?: string | undefined; sqlSelections: SqlSelection[]; onSqlPick: (value: string, series?: string, label?: string) => void; datasets: Dataset[]; selection: Filters; onSelect: (table: string, filter: Filters) => void; menuId: string; filters: DashFilter[]; values: FilterValues; editing: boolean;
   dragged: boolean; over: boolean; onDragStart: () => void; onDragEnd: () => void; onDragOver: () => void; onDrop: () => void;
-  onMove: (delta: number) => void; onChange: (patch: Partial<Widget>) => void; onRemove: () => void; onEdit: () => void; onDuplicate: () => void;
+  onMove: (delta: number) => void; onMoveTo: (target:string) => void; onChange: (patch: Partial<Widget>) => void; onRemove: () => void; onEdit: () => void; onDuplicate: () => void;
 }) {
   const { t } = useTranslation();
   const { current: language } = useDataLanguages();

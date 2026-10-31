@@ -56,3 +56,13 @@ test("record photos stay within the app's existing image destinations",()=>{
  expect(queryImageHref("https://tracker.example/photo.jpg","https://cdn.example/","https://app.example")).toBeUndefined();
  expect(queryImageHref("javascript:alert(1)","https://cdn.example/","https://app.example")).toBeUndefined();
 });
+
+test('record badges highlight only explicit boolean values and keep keyboard tooltip anchors',()=>{
+ const result={columns:[{key:'name',type:'text'},{key:'today',type:'bool'},{key:'when',type:'text'}],rows:[{name:'A',today:true,when:'Today'},{name:'B',today:false,when:'Tomorrow'}],limit:100,truncated:false};
+ const html=renderToStaticMarkup(<SqlResultView result={result} displayOnly language="en" presentation={{type:'table',kind:'bar',group:'',value:'',split:'',records:{layout:'list',titleField:'name',highlightField:'today',badgeField:'when',badgeStyle:'pill'}}}/>);
+ expect(html.match(/bg-accent-solid/g)).toHaveLength(1);expect(html).toContain('rounded-full');expect(html).toContain('data-tooltip-anchor');expect(html).toContain('tabindex="0"');expect(html).toContain('Tomorrow');
+});
+test('SQL table cells retain accessible tooltips after field projection',()=>{
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'name',type:'text'}],rows:[{name:'A long table label'}],limit:100,truncated:false}} presentation={{type:'table',kind:'bar',group:'',value:'',split:'',tableFrame:true}}/>);
+ expect(html).toContain('rounded-2xl border border-border');expect(html).toContain('data-tooltip-anchor');expect(html).toContain('A long table label');expect(html).toContain('tabindex="0"');
+});
