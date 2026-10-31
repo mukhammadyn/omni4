@@ -66,3 +66,20 @@ test('SQL table cells retain accessible tooltips after field projection',()=>{
  const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'name',type:'text'}],rows:[{name:'A long table label'}],limit:100,truncated:false}} presentation={{type:'table',kind:'bar',group:'',value:'',split:'',tableFrame:true}}/>);
  expect(html).toContain('rounded-2xl border border-border');expect(html).toContain('data-tooltip-anchor');expect(html).toContain('A long table label');expect(html).toContain('tabindex="0"');
 });
+
+test('cool pie palette cycles consistently beyond six real categories',()=>{
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'label',type:'text'},{key:'n',type:'int4'}],rows:Array.from({length:8},(_,i)=>({label:`Group${i}`,n:1})),limit:100,truncated:false}} presentation={{type:'chart',kind:'pie',group:'label',value:'n',split:'',appearance:{palette:'cool'}}}/>);
+ expect(html.match(/fill:var\(--color-chart-cool-1\)/g)).toHaveLength(2);expect(html.match(/fill:var\(--color-chart-cool-2\)/g)).toHaveLength(2);expect(html).not.toContain('fill:var(--color-chart-7)');
+});
+test('compact statistic line height is an explicit editable presentation value',()=>{
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'months',type:'numeric'}],rows:[{months:'8.2'}],limit:100,truncated:false}} presentation={{type:'chart',kind:'stat',group:'',value:'months',split:'',suffix:'mo.',appearance:{valueSize:24,valueLineHeight:1}}}/>);
+ expect(html).toContain('font-size:24px;line-height:1');expect(html).toContain('8.2');
+});
+
+test('combo lines do not inherit a fill class that overrides SVG fill=none',()=>{
+ for(const smoothLine of [true,false]) {
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'month',type:'text'},{key:'hires',type:'int4'},{key:'total',type:'int4'}],rows:[{month:'A',hires:2,total:9},{month:'B',hires:3,total:10}],limit:100,truncated:false}} presentation={{type:'chart',kind:'combo',group:'month',value:'hires',split:'',measures:[{id:'hires',field:'hires',aggregation:'sum',display:'column'},{id:'total',field:'total',aggregation:'sum',display:'line',axis:'right'}],appearance:{smoothLine}}}/>);
+ const line=(html.match(/<(?:path|polyline)[^>]+>/g)??[]).find(tag=>tag.includes('stroke-chart-2'));
+ expect(line).toBeDefined();expect(line).toContain('fill="none"');expect(line).not.toContain('fill-chart-2');
+ }
+});
