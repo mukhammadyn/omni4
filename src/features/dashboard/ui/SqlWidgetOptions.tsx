@@ -45,6 +45,7 @@ export function SqlWidgetOptions({ widget, fields, onChange }: { widget: Widget;
     {widget.type === "records" ? <>
       <SqlRecordOptionsEditor widget={widget} fields={fields} onChange={onChange} />
       {!widget.sqlRecords ? <>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={widget.sqlTableFrame ?? false} onChange={event=>onChange({sqlTableFrame:event.target.checked})}/>{ru?"Отдельная рамка таблицы":"Separate table frame"}</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={widget.sqlTableFitContent ?? false} onChange={(event) => onChange({ sqlTableFitContent: event.target.checked })} />{ru ? "Высота по содержимому (размер карточки — максимум)" : "Fit content (card height is the maximum)"}</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={widget.sqlTableComfortable ?? false} onChange={(event) => onChange({ sqlTableComfortable: event.target.checked })} />{ru ? "Свободный стиль таблицы" : "Comfortable table style"}</label>
       <Field label={ru ? "Высота строки таблицы, px" : "Table row height, px"}><Input type="number" aria-label={ru ? "Высота строки таблицы, px" : "Table row height, px"} min={28} max={120} value={widget.sqlRowHeight ?? (widget.sqlTableComfortable ? 61 : 37)} onChange={(event) => onChange({ sqlRowHeight: Math.max(28, Math.min(120, Number(event.target.value) || 28)) })} /></Field>

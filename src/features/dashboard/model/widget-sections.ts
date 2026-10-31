@@ -14,7 +14,7 @@ type CardBox={top:number;height:number;inset:number};
 type Frame={id:string;top:number;height:number};
 /** Derived viewer layout only: original positions are retained for editing and saving. */
 export function sectionCanvas(widgets:Widget[],heightFor:(w:Widget)=>number,viewing:boolean) {
-  const cards:Record<string,CardBox>={},frames:Frame[]=[];
+  const cards=Object.create(null) as Record<string,CardBox>,frames:Frame[]=[];
   const top=(w:Widget)=>w.layout ? layoutTop(w.layout.row) : 0;
   const configured=(w:Widget)=>w.layout ? layoutHeight(w.layout.rows) : w.height*260;
   const sections=new Map<string,Widget[]>();

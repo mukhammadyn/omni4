@@ -43,6 +43,7 @@ export type Widget = ChartConfig & {
   sqlReceiveSelections?: boolean;
   sqlPaginationTop?: boolean;
   sqlTableFitContent?: boolean;
+  sqlTableFrame?: boolean;
   sqlTableComfortable?: boolean;
   sqlRowHeight?: number;
   calculatedFields?: CalculatedField[];
@@ -113,7 +114,7 @@ export function toTree(value: unknown): Tree {
                   ...(parseSqlRecordOptions(item["sqlRecords"]) ? { sqlRecords: parseSqlRecordOptions(item["sqlRecords"])! } : {}),
                   ...(isObject(item["layout"]) ? { layout: parseLayout(item["layout"]) } : {}),
                   ...Object.fromEntries(["sqlTitleField", "sqlDetailField", "sqlDetailSuffix", "sqlDetailSuffixFractional", "sqlDetailSeparator", "sqlSuffix", "sqlSelectionField", "sqlSelectionValueField", "sqlQuickFilterField", "sqlSearchField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
-                  ...Object.fromEntries(["sqlSuffixJoined", "sqlSuffixBelow", "sqlShowViewerFilters"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
+                  ...Object.fromEntries(["sqlSuffixJoined", "sqlSuffixBelow", "sqlShowViewerFilters", "sqlTableFrame"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
                   ...(["above", "inline", "below"].includes(item["sqlDetailPlacement"] as string) ? { sqlDetailPlacement: item["sqlDetailPlacement"] as "above" | "inline" | "below" } : {}),
                   ...(typeof item["sqlDetailDecimals"] === "number" && Number.isFinite(item["sqlDetailDecimals"]) ? {sqlDetailDecimals:Math.max(0,Math.min(4,Math.round(item["sqlDetailDecimals"])))} : {}),
                   ...(typeof item["sqlTableFitContent"] === "boolean" ? { sqlTableFitContent: item["sqlTableFitContent"] } : {}),
@@ -201,6 +202,7 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...(widget.sqlSelectionRules ? { sqlSelectionRules: widget.sqlSelectionRules } : {}),
           ...(widget.sqlSuffixBelow !== undefined ? { sqlSuffixBelow: widget.sqlSuffixBelow } : {}),
           ...(widget.sqlShowViewerFilters !== undefined ? { sqlShowViewerFilters: widget.sqlShowViewerFilters } : {}),
+          ...(widget.sqlTableFrame !== undefined ? {sqlTableFrame:widget.sqlTableFrame} : {}),
           ...(widget.sqlTableFitContent !== undefined ? { sqlTableFitContent: widget.sqlTableFitContent } : {}),
           ...(widget.sqlTableComfortable !== undefined ? { sqlTableComfortable: widget.sqlTableComfortable } : {}),
           ...(widget.sqlRowHeight !== undefined ? { sqlRowHeight: widget.sqlRowHeight } : {}),

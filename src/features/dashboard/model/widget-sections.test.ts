@@ -32,10 +32,14 @@ test('frameless flow follows a shrinking list without changing saved coordinates
  expect(sectionCanvas(widgets,w=>layoutHeight(w.layout!.rows),false).cards.months!.top).toBe(676);
 });
 test('section and toolbar/badge selections survive normal dashboard round trips',()=>{
- const widget={...card('kpi',131.5,102.5),section,sqlSearchField:'name',sqlQuickFilterStyle:'select' as const,sqlRecords:{layout:'list' as const,badgeStyle:'pill' as const,highlightField:'today'},sqlSelectionRules:{$category:{field:'start',operator:'activeAt' as const,endField:'end'}}};
+ const widget={...card('kpi',131.5,102.5),section,sqlSearchField:'name',sqlQuickFilterStyle:'select' as const,sqlTableFrame:true,sqlRecords:{layout:'list' as const,badgeStyle:'pill' as const,highlightField:'today'},sqlSelectionRules:{$category:{field:'start',operator:'activeAt' as const,endField:'end'}}};
  const tree={folders:[{...newFolder('m','Reports'),dashboards:[{...newDashboard('Report'),widgets:[widget]}]}]};
  const restored=toTree(toTreeAttribute(tree)).folders[0]!.dashboards[0]!.widgets[0]!;
- expect(restored.section).toEqual(section);expect(restored.sqlRecords).toEqual(widget.sqlRecords);expect(restored.sqlSearchField).toBe('name');expect(restored.sqlQuickFilterStyle).toBe('select');expect(restored.sqlSelectionRules).toEqual(widget.sqlSelectionRules);
+ expect(restored.section).toEqual(section);expect(restored.sqlRecords).toEqual(widget.sqlRecords);expect(restored.sqlSearchField).toBe('name');expect(restored.sqlQuickFilterStyle).toBe('select');expect(restored.sqlTableFrame).toBe(true);expect(restored.sqlSelectionRules).toEqual(widget.sqlSelectionRules);
  expect(layoutTop(restored.layout!.row)).toBe(131.5);expect(layoutHeight(restored.layout!.rows)).toBe(102.5);
  expect(parseWidgetSection({id:'',paddingX:Infinity})).toBeUndefined();expect(parseWidgetSection({id:'Safe',paddingX:-10,paddingY:100})).toMatchObject({paddingX:0,paddingY:40});
+});
+test('untrusted widget IDs cannot alter the derived card dictionary prototype',()=>{
+ const result=sectionCanvas([card('__proto__',0,100),card('constructor',116,100)],()=>100,true);
+ expect(Object.getPrototypeOf(result.cards)).toBeNull();expect(Object.keys(result.cards)).toEqual(['__proto__','constructor']);expect(result.cards['__proto__']).toEqual({top:0,height:100,inset:0});expect(result.height).toBe(216);
 });

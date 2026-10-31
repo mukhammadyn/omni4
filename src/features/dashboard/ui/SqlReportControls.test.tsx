@@ -63,6 +63,6 @@ test('record badges highlight only explicit boolean values and keep keyboard too
  expect(html.match(/bg-accent-solid/g)).toHaveLength(1);expect(html).toContain('rounded-full');expect(html).toContain('data-tooltip-anchor');expect(html).toContain('tabindex="0"');expect(html).toContain('Tomorrow');
 });
 test('SQL table cells retain accessible tooltips after field projection',()=>{
- const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'name',type:'text'}],rows:[{name:'A long table label'}],limit:100,truncated:false}} presentation={{type:'table',kind:'bar',group:'',value:'',split:''}}/>);
- expect(html).toContain('data-tooltip-anchor');expect(html).toContain('A long table label');expect(html).toContain('tabindex="0"');
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:'name',type:'text'}],rows:[{name:'A long table label'}],limit:100,truncated:false}} presentation={{type:'table',kind:'bar',group:'',value:'',split:'',tableFrame:true}}/>);
+ expect(html).toContain('rounded-2xl border border-border');expect(html).toContain('data-tooltip-anchor');expect(html).toContain('A long table label');expect(html).toContain('tabindex="0"');
 });
