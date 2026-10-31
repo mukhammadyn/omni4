@@ -1,3 +1,4 @@
+import { WidgetSectionOptions } from "./WidgetSectionOptions";
 import { SqlSelectionOptions } from "./SqlSelectionOptions";
 import { SqlRecordOptionsEditor } from "./SqlRecordOptionsEditor";
 import { useTranslation } from "react-i18next";
@@ -66,10 +67,11 @@ export function SqlWidgetOptions({ widget, fields, onChange }: { widget: Widget;
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(widget.layout)} onChange={(event) => onChange({ layout: event.target.checked ? { column: 1, row: 1, rows: 3 } : undefined })} />{ru ? "Точное размещение в сетке" : "Explicit grid placement"}</label>
       {widget.layout && <>
         <Field label={ru ? "Начальная колонка" : "Start column"}><Input type="number" aria-label={ru ? "Начальная колонка" : "Start column"} min={1} max={12} value={widget.layout.column} onChange={(event) => onChange({ layout: { ...widget.layout!, column: Math.max(1, Math.min(12, Math.round(Number(event.target.value)) || 1)) } })} /></Field>
-        <Field label={ru ? "Положение сверху, px" : "Top position, px"}><Input type="number" aria-label={ru ? "Положение сверху, px" : "Top position, px"} min={0} max={layoutTop(MAX_LAYOUT_ROW)} value={layoutTop(widget.layout.row)} onChange={(event) => onChange({ layout: { ...widget.layout!, row: layoutRow(Math.max(0, Math.min(layoutTop(MAX_LAYOUT_ROW), Number(event.target.value) || 0))) } })} /></Field>
-        <Field label={ru ? "Высота, px" : "Height, px"}><Input type="number" aria-label={ru ? "Высота, px" : "Height, px"} min={80} max={layoutHeight(12)} value={layoutHeight(widget.layout.rows)} onChange={(event) => onChange({ layout: { ...widget.layout!, rows: layoutRows(Math.max(80, Math.min(layoutHeight(12), Number(event.target.value) || 80))) } })} /></Field>
+        <Field label={ru ? "Положение сверху, px" : "Top position, px"}><Input type="number" step={0.5} aria-label={ru ? "Положение сверху, px" : "Top position, px"} min={0} max={layoutTop(MAX_LAYOUT_ROW)} value={layoutTop(widget.layout.row)} onChange={(event) => onChange({ layout: { ...widget.layout!, row: layoutRow(Math.max(0, Math.min(layoutTop(MAX_LAYOUT_ROW), Number(event.target.value) || 0))) } })} /></Field>
+        <Field label={ru ? "Высота, px" : "Height, px"}><Input type="number" step={0.5} aria-label={ru ? "Высота, px" : "Height, px"} min={80} max={layoutHeight(12)} value={layoutHeight(widget.layout.rows)} onChange={(event) => onChange({ layout: { ...widget.layout!, rows: layoutRows(Math.max(80, Math.min(layoutHeight(12), Number(event.target.value) || 80))) } })} /></Field>
       </>}
       <Field label={ru ? "Ширина в колонках" : "Width in columns"}><Input type="number" aria-label={ru ? "Ширина в колонках" : "Width in columns"} min={3} max={12} value={widget.width} onChange={(event) => onChange({ width: Math.max(3, Math.min(12, Math.round(Number(event.target.value)) || 3)) })} /></Field>
     </div></details>
+    <WidgetSectionOptions widget={widget} onChange={onChange}/>
   </div>;
 }

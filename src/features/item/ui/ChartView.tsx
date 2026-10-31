@@ -315,7 +315,8 @@ function SizeHandle({
   onCommit: (value: number) => void;
   onCancel: () => void;
 }) {
-  const clamp = (next: number) => Math.round(Math.min(max, Math.max(min, next)));
+  const precision=stepPx===1?100:1;
+  const clamp = (next: number) => Math.round(Math.min(max, Math.max(min, next))*precision)/precision;
   const drag = useRef<ReturnType<typeof startPointerDrag> | null>(null);
   useEffect(() => () => drag.current?.dispose(), []);
 
@@ -331,9 +332,10 @@ function SizeHandle({
     event.currentTarget.focus({ preventScroll: true });
     drag.current?.cancel();
 
+    const inset=element.parentElement ? Number.parseFloat(getComputedStyle(element.parentElement).getPropertyValue("--widget-inset")) || 0 : 0;
     const step =
       edge === "right"
-        ? (grid.getBoundingClientRect().width + (Number.parseFloat(getComputedStyle(grid).columnGap) || GRID_GAP)) / MAX_SPAN
+        ? (grid.getBoundingClientRect().width - 2*inset + (Number.parseFloat(getComputedStyle(grid).columnGap) || GRID_GAP)) / MAX_SPAN
         : stepPx ?? ROW_HEIGHT;
 
     const sizeAt = (point: globalThis.PointerEvent) =>
@@ -497,6 +499,7 @@ export function ChartCard({
   onDragOver,
   onDrop,
   onMove,
+  onMoveTo,
   onChange,
   onRemove,
   aside,
@@ -536,6 +539,7 @@ export function ChartCard({
   onDragOver: () => void;
   onDrop: () => void;
   onMove: (delta: number) => void;
+  onMoveTo?: ((targetId: string) => void) | undefined;
   onChange: (patch: Partial<ChartConfig>) => void;
   onRemove: () => void;
   /** Над настройками графика: дашборд кладёт сюда выбор таблицы. */
@@ -621,6 +625,22 @@ export function ChartCard({
   const width = sizing?.width ?? config.width;
   const height = sizing?.height ?? sizeRows?.value ?? config.height;
   const card = useRef<HTMLElement>(null);
+  const moveDrag = useRef<ReturnType<typeof startPointerDrag> | null>(null);
+  useEffect(()=>()=>moveDrag.current?.dispose(),[]);
+  const startMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!onMoveTo || event.button !== 0 || !event.isPrimary) return;
+    event.preventDefault(); event.stopPropagation(); event.currentTarget.focus({preventScroll:true});
+    moveDrag.current?.cancel();
+    const grid=card.current?.closest('[data-chart-grid-layout]'),doc=event.currentTarget.ownerDocument;
+    const start={x:event.clientX,y:event.clientY}; let moved=false;
+    moveDrag.current=startPointerDrag(event.currentTarget,event,{cursor:'grabbing',preview:point=>{
+      if(!moved && Math.hypot(point.clientX-start.x,point.clientY-start.y)>6){moved=true;onDragStart();}
+    },commit:point=>{
+      const target=doc.elementFromPoint(point.clientX,point.clientY)?.closest<HTMLElement>('[data-chart-card-id]');
+      if(moved && target && target.closest('[data-chart-grid-layout]')===grid && target.dataset.chartCardId!==config.id) onMoveTo(target.dataset.chartCardId!);
+      onDragEnd();
+    },cancel:onDragEnd});
+  };
   useLayoutEffect(() => {
     const element = card.current, body = element?.querySelector<HTMLElement>("[data-chart-body]");
     if (!element || !body || !naturalContentHeight || !onAutoHeight) return;
@@ -633,6 +653,7 @@ export function ChartCard({
     <TooltipToneContext.Provider value={config.appearance?.tooltipSurface ? "surface" : "dark"}><section
       ref={card}
       data-chart-palette={config.appearance?.palette}
+      data-chart-card-id={plain ? undefined : config.id}
       aria-label={config.title || derived}
       draggable={editing}
       /*
@@ -642,7 +663,7 @@ export function ChartCard({
        * Не поместилось — прокручивается внутри, как и положено плитке
        * на панели.
        */
-      style={plain ? undefined : { height: `${sizeRows ? height * sizeRows.unit + (height - 1) * sizeRows.gap : height * ROW_HEIGHT}px`, ...(!editing && config.appearance?.frameless ? { backgroundColor: "transparent", borderColor: "transparent" } : {}), ...(config.appearance?.headerGap !== undefined ? { gap: config.appearance.headerGap } : {}), ...(config.appearance?.padding !== undefined ? { padding: config.appearance.padding } : {}), ...(config.appearance?.radius !== undefined ? { borderRadius: config.appearance.radius } : {}) }}
+      style={plain ? undefined : { height: `${sizeRows ? height * sizeRows.unit + (height - 1) * sizeRows.gap : height * ROW_HEIGHT}px`, ...(!editing && config.appearance?.frameless ? { backgroundColor: "transparent", borderColor: "transparent", borderWidth: 0 } : {}), ...(config.appearance?.headerGap !== undefined ? { gap: config.appearance.headerGap } : {}), ...(config.appearance?.padding !== undefined ? { padding: config.appearance.padding } : {}), ...(config.appearance?.radius !== undefined ? { borderRadius: config.appearance.radius } : {}) }}
       /* Выделение текста в заголовке — не бросок карточки: у поля ввода
          внутри draggable-родителя браузер начинает перетаскивание
          вместо выделения. */
@@ -651,6 +672,8 @@ export function ChartCard({
           event.preventDefault();
           return;
         }
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", config.id);
         onDragStart();
       }}
       onDragEnd={onDragEnd}
@@ -714,6 +737,8 @@ export function ChartCard({
         {editing && (
           <button
             type="button"
+            draggable={editing && !onMoveTo}
+            onPointerDown={startMove}
             aria-label={t("chart.move")}
             title={t("chart.move")}
             onKeyDown={(event) => {
@@ -722,7 +747,7 @@ export function ChartCard({
               event.preventDefault();
               onMove(event.key === "ArrowLeft" ? -1 : 1);
             }}
-            className="grid size-5 shrink-0 cursor-grab place-items-center rounded text-fg-subtle transition-colors hover:text-fg"
+            className="grid size-5 shrink-0 touch-none cursor-grab place-items-center rounded text-fg-subtle transition-colors hover:text-fg"
           >
             <Icon as={GripVerticalIcon} size={14} />
           </button>
