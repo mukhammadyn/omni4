@@ -1,5 +1,7 @@
 export type SqlRecordOptions = {
-  layout: "list" | "cards";
+  layout: "list" | "cards" | "metrics";
+  progressValueField?: string; progressMaxField?: string; footerField?: string;
+  progressCaption?: string; progressUnit?: string; progressDecimals?: number;
   columns?: number;
   badgeStyle?: "plain"|"pill";
   highlightField?: string;
@@ -13,9 +15,10 @@ export type SqlRecordOptions = {
 export function parseSqlRecordOptions(raw: unknown): SqlRecordOptions | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
   const value = raw as Record<string, unknown>;
-  if (value.layout !== "list" && value.layout !== "cards") return;
+  if (value.layout !== "list" && value.layout !== "cards" && value.layout !== "metrics") return;
   return { layout: value.layout, ...(value.badgeStyle === "pill" || value.badgeStyle === "plain" ? {badgeStyle:value.badgeStyle} : {}), ...(typeof value.columns === "number" && Number.isFinite(value.columns) ? { columns: Math.max(1,Math.min(4,Math.round(value.columns))) } : {}),
-    ...Object.fromEntries(["highlightField", "photoField", "titleField", "subtitleField", "badgeField", "secondaryField", "groupField", "groupLabelField", "filterLabelField", "emptyDatasetLabel", "emptyLabel", "allLabel"].flatMap(key => typeof value[key] === "string" ? [[key, value[key].slice(0,200)]] : [])),
+    ...(typeof value.progressDecimals === "number" && Number.isFinite(value.progressDecimals) ? {progressDecimals:Math.max(0,Math.min(4,Math.round(value.progressDecimals)))} : {}),
+    ...Object.fromEntries(["progressValueField", "progressMaxField", "footerField", "progressCaption", "progressUnit", "highlightField", "photoField", "titleField", "subtitleField", "badgeField", "secondaryField", "groupField", "groupLabelField", "filterLabelField", "emptyDatasetLabel", "emptyLabel", "allLabel"].flatMap(key => typeof value[key] === "string" ? [[key, value[key].slice(0,200)]] : [])),
     ...Object.fromEntries(["avatar", "groupFilter", "autoHeight", "calendarIcon"].flatMap(key => typeof value[key] === "boolean" ? [[key,value[key]]] : [])),
   };
 }

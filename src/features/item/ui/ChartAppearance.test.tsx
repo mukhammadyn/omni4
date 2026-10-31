@@ -21,6 +21,12 @@ test("appearance flags round trip and absent flags retain legacy defaults", () =
   expect(toCharts(toChartsAttribute([next]))[0]).toMatchObject({ showGrid: true, showLegend: false, stacked: true });
   expect(toCharts([{ ...toChartsAttribute([config])[0], show_grid: "yes", show_legend: 0, stacked: "true" }])[0]).toEqual(legacy);
 });
+test("comparison palettes and axis titles remain editable for ordinary columns", () => {
+  const appearance = {palette:"warm" as const,axisTicks:true,axisTitleLeft:"Минуты",axisTitleX:"Сотрудник"};
+  expect(toCharts(toChartsAttribute([{...config,appearance}]))[0]?.appearance).toEqual(appearance);
+  const html=renderToStaticMarkup(<CartesianChart config={{...config,appearance}} series={series} locale="ru"/>);
+  expect(html).toContain("Минуты");expect(html).toContain("Сотрудник");
+});
 test("grid is opt-in and absolute stacks retain values and separate negative bands", () => {
   const plain = renderToStaticMarkup(<CartesianChart config={config} series={series} locale="en" />);
   const grid = renderToStaticMarkup(<CartesianChart config={{ ...config, showGrid: true }} series={series} locale="en" />);
