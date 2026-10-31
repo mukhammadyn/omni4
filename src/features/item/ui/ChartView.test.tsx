@@ -21,3 +21,9 @@ test("selection preserves data and marks the selected category while muting othe
   expect(html).toContain("Beta");
   expect(render("column")).not.toContain("fill-border-strong stroke-border-strong");
 });
+
+test("a statistic label below its value wraps instead of losing text", () => {
+  const html = renderToStaticMarkup(<ChartCard config={{ ...config, kind: "stat", title: "Average tenure before dismissal", appearance: { titleBelow: true } }} columns={fields} relations={[]} rows={rows} language="en" editing={false} dragged={false} over={false} onDragStart={noop} onDragEnd={noop} onDragOver={noop} onDrop={noop} onMove={noop} onChange={noop} onRemove={noop} onPick={noop} plain />);
+  expect(html).toMatch(/<h3[^>]*whitespace-normal break-words[^>]*>Average tenure before dismissal<\/h3>/);
+  expect(html).not.toMatch(/<h3[^>]*truncate/);
+});
