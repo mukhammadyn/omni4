@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import { widgetAutoHeight, widgetDisplayHeight, LAYOUT_CELL, LAYOUT_GAP, MAX_LAYOUT_ROW, layoutHeight, layoutRows, placeWidgets, swapWidgetPositions } from "../model/widget-layout";
 import type { SqlSelection } from "../model/sql-result-filters";
 import "./widget-layout.css";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChartColumnIcon, CopyIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ChartCard, FilterBar, newChart, type Filters, type Sort } from "@/features/item";
@@ -56,7 +56,8 @@ export function WidgetGrid({
   const [sqlCross, setSqlCross] = useState<Record<string, SqlSelection>>({});
   const [contentHeights, setContentHeights] = useState<Record<string, number>>({});
   const [wide,setWide]=useState(false);
-  useEffect(()=>{const media=window.matchMedia('(min-width: 1024px)');const update=()=>setWide(media.matches);update();media.addEventListener('change',update);return()=>media.removeEventListener('change',update);},[]);
+  const gridRoot=useRef<HTMLDivElement>(null);
+  useEffect(()=>{const element=gridRoot.current;if(!element)return;const update=()=>setWide(element.clientWidth>=760 && window.innerWidth>=1024);const observer=new ResizeObserver(update);observer.observe(element);window.addEventListener('resize',update);update();return()=>{observer.disconnect();window.removeEventListener('resize',update);};},[]);
   const placed = placeWidgets(widgets, undefined, editing || widgets.some(w=>w.section) ? undefined : contentHeights);
   const heightFor = (widget: Widget) => widgetDisplayHeight(widget,contentHeights[widget.id],editing);
   const positioned = widgets.some((widget) => widget.layout);
@@ -133,7 +134,7 @@ export function WidgetGrid({
   }
 
   return (
-    <>{Object.keys(sqlCross).length > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-fg-muted" aria-label="SQL selections">{Object.entries(sqlCross).map(([id, selection]) => <Button key={id} type="button" size="sm" variant="secondary" onClick={() => setSqlCross((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)))}>{selection.field}: {selection.key ?? selection.value} ×</Button>)}<Button type="button" size="sm" variant="secondary" onClick={() => setSqlCross({})}>{t("dashboard.clearCrossFilters")}</Button></div>}{Object.keys(cross).length > 0 && <div className="mb-2 flex items-center gap-2 text-xs text-fg-muted"><span>{t("dashboard.crossFilterActive")}</span><Button type="button" size="sm" variant="secondary" onClick={() => setCross({})}>{t("dashboard.clearCrossFilters")}</Button></div>}<div className="mb-3 flex items-center justify-between gap-2">{editing ? <p role="status" className="text-xs text-fg-muted">{t("dashboard.draftHint")}</p> : <span />}{editable && <Button type="button" size="sm" variant="secondary" onClick={add}><Icon as={PlusIcon} size={14} />{t("dashboard.addWidget")}</Button>}</div><div data-chart-grid-layout style={{ "--dashboard-row-unit": `${LAYOUT_CELL}px`, "--dashboard-row-gap": `${LAYOUT_GAP}px`, "--dashboard-height": `${canvasHeight + (editing ? 276 : 0)}px`, "--dashboard-add-top": `${canvasHeight + LAYOUT_GAP}px` } as CSSProperties} className={`grid grid-cols-1 gap-3 lg:grid-cols-12 ${positioned ? "dashboard-positioned-grid" : ""}`}>
+    <>{Object.keys(sqlCross).length > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-fg-muted" aria-label="SQL selections">{Object.entries(sqlCross).map(([id, selection]) => <Button key={id} type="button" size="sm" variant="secondary" onClick={() => setSqlCross((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)))}>{selection.field}: {selection.key ?? selection.value} ×</Button>)}<Button type="button" size="sm" variant="secondary" onClick={() => setSqlCross({})}>{t("dashboard.clearCrossFilters")}</Button></div>}{Object.keys(cross).length > 0 && <div className="mb-2 flex items-center gap-2 text-xs text-fg-muted"><span>{t("dashboard.crossFilterActive")}</span><Button type="button" size="sm" variant="secondary" onClick={() => setCross({})}>{t("dashboard.clearCrossFilters")}</Button></div>}<div className="mb-3 flex items-center justify-between gap-2">{editing ? <p role="status" className="text-xs text-fg-muted">{t("dashboard.draftHint")}</p> : <span />}{editable && <Button type="button" size="sm" variant="secondary" onClick={add}><Icon as={PlusIcon} size={14} />{t("dashboard.addWidget")}</Button>}</div><div ref={gridRoot} data-chart-grid-layout style={{ "--dashboard-row-unit": `${LAYOUT_CELL}px`, "--dashboard-row-gap": `${LAYOUT_GAP}px`, "--dashboard-height": `${canvasHeight + (editing ? 276 : 0)}px`, "--dashboard-add-top": `${canvasHeight + LAYOUT_GAP}px` } as CSSProperties} className={`grid grid-cols-1 gap-3 lg:grid-cols-12 ${positioned ? `dashboard-positioned-grid ${wide ? "dashboard-grid-wide" : ""}` : ""}`}>
       {canvas.frames.map(frame=><div key={frame.id} aria-hidden="true" data-dashboard-section={frame.id} className="dashboard-section-frame pointer-events-none rounded-2xl border border-border bg-surface" style={{top:frame.top,height:frame.height}}/>)}
       {arranged.map((widget) => { const box=canvas.cards[widget.id]!; const card = <WidgetCard
           key={widget.id}
