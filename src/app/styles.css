@@ -845,7 +845,7 @@ main:has(> [data-fullbleed]) {
   --color-chart-3: var(--color-chart-total);
 }
 [data-chart-palette="comparison"] {
-  --color-chart-1: var(--color-chart-cool-2);
+  --color-chart-1: var(--color-chart-usage);
   --color-chart-2: var(--color-chart-cool-5);
   --color-chart-3: var(--color-chart-total);
 }
@@ -858,6 +858,7 @@ main:has(> [data-fullbleed]) {
 /* Dynamic report palettes must retain every token in production. */
 @theme static {
   --color-chart-coral: #f97066;
+  --color-chart-usage: #8b5cf6;
   --color-chart-increase: #6bcb77;
   --color-chart-decrease: #e76f51;
   --color-chart-total: #6b8fe3;

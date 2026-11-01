@@ -5,7 +5,7 @@ export const MAX_LAYOUT_ROW = 10000;
 export const MAX_LAYOUT_ROWS = 48;
 export const LAYOUT_CELL = 135;
 export const LAYOUT_GAP = 16;
-type Box = { column: number; row: number; rows: number; width: number };
+type Box = { tabGroup?:string|undefined; column: number; row: number; rows: number; width: number };
 export const layoutTop = (row: number) => Math.round((row - 1) * (LAYOUT_CELL + LAYOUT_GAP)*100)/100;
 export const layoutHeight = (rows: number) => Math.round((rows * (LAYOUT_CELL + LAYOUT_GAP) - LAYOUT_GAP)*100)/100;
 export const layoutRow = (top: number) => top / (LAYOUT_CELL + LAYOUT_GAP) + 1;
@@ -16,14 +16,19 @@ export const boxesOverlap = (a: Box, b: Box) => a.column < b.column + b.width - 
 /** The edited card keeps its requested slot; collisions move other cards down, never over them. */
 export function placeWidgets(widgets: Widget[], preferredId?: string, naturalHeights?: Record<string,number>): Widget[] {
   if (!widgets.some((widget) => widget.layout)) return widgets;
+  const anchors=new Map<string,Widget>();
+  for(const widget of widgets) if(widget.tabGroup && (!anchors.has(widget.tabGroup) || widget.id===preferredId)) anchors.set(widget.tabGroup,widget);
+  widgets=widgets.map(widget=>{const anchor=widget.tabGroup ? anchors.get(widget.tabGroup) : undefined;return anchor?.layout ? {...widget,width:anchor.width,layout:{...widget.layout,...anchor.layout,rows:widget.layout?.rows ?? anchor.layout.rows}} : widget;});
   const occupied: Box[] = [], placed = new Map<string, Widget>();
   const order = [...widgets].sort((a, b) => Number(Boolean(b.layout)) - Number(Boolean(a.layout)) || Number(b.id === preferredId && Boolean(b.layout)) - Number(a.id === preferredId && Boolean(a.layout)) || (a.layout?.row ?? MAX_LAYOUT_ROW) - (b.layout?.row ?? MAX_LAYOUT_ROW) || (a.layout?.column ?? 1) - (b.layout?.column ?? 1));
   for (const widget of order) {
     const width = Math.round(bounded(widget.width, 3, 12)), box: Box = { width, column: Math.round(bounded(widget.layout?.column ?? 1, 1, 13 - width)), row: bounded(widget.layout?.row ?? 1, 1, MAX_LAYOUT_ROW), rows: widgetAutoHeight(widget) && naturalHeights?.[widget.id] ? layoutRows(widgetDisplayHeight(widget,naturalHeights[widget.id],false)) : bounded(widget.layout?.rows ?? layoutRows(widget.height * 260), layoutRows(80), MAX_LAYOUT_ROWS) };
+    const ownRows=box.rows;
+    if(widget.tabGroup) box.rows=Math.max(...widgets.filter(w=>w.tabGroup===widget.tabGroup).map(w=>widgetAutoHeight(w) && naturalHeights?.[w.id] ? layoutRows(widgetDisplayHeight(w,naturalHeights[w.id],false)) : bounded(w.layout?.rows ?? layoutRows(w.height*260),layoutRows(80),MAX_LAYOUT_ROWS)));
     const fit = (start: number) => {
       let row = start;
       for (let attempt = 0; attempt <= occupied.length && row <= MAX_LAYOUT_ROW; attempt++) {
-        const collisions = occupied.filter((other) => boxesOverlap({ ...box, row }, other));
+        const collisions = occupied.filter((other) => !(widget.tabGroup && other.tabGroup===widget.tabGroup) && boxesOverlap({ ...box, row }, other));
         if (!collisions.length) return row;
         row = Math.max(...collisions.map((other) => other.row + other.rows));
       }
@@ -37,8 +42,8 @@ export function placeWidgets(widgets: Widget[], preferredId?: string, naturalHei
     }
     // If the explicit grid is full, CSS auto-placement still keeps the card visible and separate.
     if (row === null) { const next = { ...widget }; delete next.layout; placed.set(widget.id, next); continue; }
-    const next = { ...widget, width, layout: { column: box.column, row, rows: box.rows } };
-    occupied.push({ ...box, row }); placed.set(widget.id, next);
+    const next = { ...widget, width, layout: { column: box.column, row, rows: ownRows } };
+    occupied.push({ ...box, row,tabGroup:widget.tabGroup }); placed.set(widget.id, next);
   }
   return widgets.map((widget) => placed.get(widget.id)!);
 }

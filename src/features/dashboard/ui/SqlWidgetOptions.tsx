@@ -1,3 +1,4 @@
+import {SqlFilterPresetOptions} from "./SqlFilterPresetOptions";
 import { WidgetSectionOptions } from "./WidgetSectionOptions";
 import { SqlSelectionOptions } from "./SqlSelectionOptions";
 import { SqlRecordOptionsEditor } from "./SqlRecordOptionsEditor";
@@ -15,9 +16,12 @@ export function SqlWidgetOptions({ widget, fields, onChange }: { widget: Widget;
   const { i18n, t } = useTranslation(), ru = i18n.language.startsWith("ru");
   const options = [{ value: "", label: "—" }, ...fields.map((field) => ({ value: field.slug, label: field.label }))];
   return <div className="flex flex-col gap-3">
+    <details><summary className="cursor-pointer text-sm text-fg-muted">{ru?"Вкладки виджетов":"Widget tabs"}</summary><div className="mt-2 flex flex-col gap-2"><Field label={ru?"Группа вкладок":"Tab group"}><Input aria-label={ru?"Группа вкладок":"Tab group"} maxLength={80} value={widget.tabGroup ?? ""} onChange={e=>onChange({tabGroup:e.target.value})}/></Field><Field label={ru?"Название вкладки":"Tab label"}><Input aria-label={ru?"Название вкладки":"Tab label"} maxLength={80} value={widget.tabLabel ?? ""} onChange={e=>onChange({tabLabel:e.target.value})}/></Field></div></details>
     <Field label={ru ? "Заголовок из поля" : "Title field"}><Dropdown ariaLabel={ru ? "Заголовок из поля" : "Title field"} value={widget.sqlTitleField ?? ""} items={options} onChange={value=>onChange({sqlTitleField:value})}/></Field>
     <Field label={ru ? "Описание виджета" : "Widget description"}><Input aria-label={ru ? "Описание виджета" : "Widget description"} value={widget.body ?? ""} onChange={(event) => onChange({ body: event.target.value })} /></Field>
     {widget.kind === "stat" && widget.type !== "records" && <>
+      <Field label={ru?"Дополнительная подпись из поля":"Caption field"}><Dropdown ariaLabel={ru?"Дополнительная подпись из поля":"Caption field"} value={widget.sqlCaptionField ?? ""} items={options} onChange={value=>onChange({sqlCaptionField:value})}/></Field>
+      <Field label={ru?"Текст отсутствующего значения":"Missing value text"}><Input aria-label={ru?"Текст отсутствующего значения":"Missing value text"} maxLength={200} value={widget.sqlEmptyLabel ?? ""} onChange={event=>onChange({sqlEmptyLabel:event.target.value})}/></Field>
       <Field label={ru ? "Сведение результата" : "Result aggregation"}><Dropdown ariaLabel={ru ? "Сведение результата" : "Result aggregation"} value={widget.aggregation} items={AGGREGATIONS.map(value => ({ value, label: t(`pivot.aggregation.${value}`) }))} onChange={value => onChange({ aggregation: value as Aggregation })} /></Field>
       <Field label={ru ? "Подпись из поля" : "Detail field"}><Dropdown ariaLabel={ru ? "Подпись из поля" : "Detail field"} value={widget.sqlDetailField ?? ""} items={options} onChange={(sqlDetailField) => onChange({ sqlDetailField })} /></Field>
       <Field label={ru ? "Положение подписи" : "Detail placement"}><Dropdown ariaLabel={ru ? "Положение подписи" : "Detail placement"} value={widget.sqlDetailPlacement ?? "above"} items={[{value:"above",label:ru?"Над значением":"Above value"},{value:"inline",label:ru?"В строке значения":"Inline"},{value:"below",label:ru?"Под значением":"Below value"}]} onChange={value => onChange({ sqlDetailPlacement: value as "above" | "inline" | "below" })} /></Field>
@@ -45,6 +49,7 @@ export function SqlWidgetOptions({ widget, fields, onChange }: { widget: Widget;
     </>}
     {widget.type === "records" ? <>
       <SqlRecordOptionsEditor widget={widget} fields={fields} onChange={onChange} />
+      <SqlFilterPresetOptions widget={widget} fields={fields} onChange={onChange}/>
       {!widget.sqlRecords ? <>
       <Field label={ru?"Колонка прогресса":"Progress column"}><Dropdown ariaLabel={ru?"Колонка прогресса":"Progress column"} value={widget.sqlProgressField ?? ""} items={[{value:"",label:"—"},...fields.filter(f=>f.type==="NUMBER").map(f=>({value:f.slug,label:f.label}))]} onChange={value=>onChange({sqlProgressField:value})}/></Field>
       {widget.sqlProgressField && <><Field label={ru?"Максимум прогресса":"Progress maximum"}><Input type="number" min={0.000001} max={1e12} aria-label={ru?"Максимум прогресса":"Progress maximum"} value={widget.sqlProgressMax ?? 100} onChange={event=>onChange({sqlProgressMax:Math.max(0.000001,Math.min(1e12,Number(event.target.value)||100))})}/></Field><Field label={ru?"Суффикс прогресса":"Progress suffix"}><Input aria-label={ru?"Суффикс прогресса":"Progress suffix"} value={widget.sqlProgressSuffix ?? ""} onChange={event=>onChange({sqlProgressSuffix:event.target.value})}/></Field></>}

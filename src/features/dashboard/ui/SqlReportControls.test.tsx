@@ -106,3 +106,13 @@ test('a dense bottom legend keeps every full label and a nonshrinking pie',()=>{
  for(const row of rows) expect(html).toContain(row.label);
  expect(html.match(/12[,.]50%/g)?.length).toBe(8);expect(html).toContain('grid-cols-[auto_minmax(0,1fr)_auto]');
 });
+
+test("unknown measures retain an explicit editable explanation while measured zero stays zero",()=>{
+ const result={columns:[{key:"minutes",type:"numeric"},{key:"coverage",type:"text"}],rows:[{minutes:null,coverage:"План известен у 34 сотрудников"}],limit:100,truncated:false};
+ const presentation={type:"chart" as const,kind:"stat" as const,group:"",value:"minutes",split:"",emptyLabel:"Перерывы отдельно не записаны",captionField:"coverage"};
+ const unknown=renderToStaticMarkup(<SqlResultView displayOnly language="ru" result={result} presentation={presentation}/>);
+ expect(unknown).toContain("Перерывы отдельно не записаны");
+ expect(unknown).not.toContain("data-sql-stat-value");expect(unknown).toContain("data-sql-stat-caption");expect(unknown).toContain("План известен у 34 сотрудников");
+ const zero=renderToStaticMarkup(<SqlResultView displayOnly language="ru" result={{...result,rows:[{minutes:0}]}} presentation={presentation}/>);
+ expect(zero).toContain("data-sql-stat-value");expect(zero).not.toContain("Перерывы отдельно не записаны</p>");
+});

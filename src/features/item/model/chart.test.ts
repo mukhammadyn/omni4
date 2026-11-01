@@ -32,6 +32,16 @@ const config = (over: Partial<ChartConfig> = {}): ChartConfig => ({
 const spread = (values: string[]): Item[] =>
   values.map((status, index) => ({ guid: String(index), status, amount: index + 1 }));
 
+test("an editable category limit retains all department series without changing default caps", () => {
+  const rows = spread(Array.from({length:10},(_,i)=>`Department ${i}`));
+  const base = config({kind:"column",measures:[{id:"a",field:"amount",aggregation:"sum"},{id:"b",field:"amount",aggregation:"count"}]});
+  expect(chartSeries(rows,base).points).toHaveLength(8);
+  const complete = {...base,appearance:{categoryLimit:20}};
+  expect(chartSeries(rows,complete).points).toHaveLength(10);
+  expect(chartSeries(rows,complete).hidden).toBe(0);
+  expect(toCharts(toChartsAttribute([complete]))[0]?.appearance?.categoryLimit).toBe(20);
+});
+
 /** Строки с двумя полями: категория и разрез. */
 const matrix = (pairs: [string, string][]): Item[] =>
   pairs.map(([status, city], index) => ({ guid: String(index), status, city, amount: index + 1 }));
