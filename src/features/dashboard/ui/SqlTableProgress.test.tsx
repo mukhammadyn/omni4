@@ -4,6 +4,7 @@ import { SqlTableProgress } from "./SqlTableProgress";
 test("table progress preserves actual numeric values and bounds the visual bar", () => {
   const html = renderToStaticMarkup(<SqlTableProgress value="120.5" maximum={100} suffix="%" language="ru" />);
   expect(html).toContain("120,5%");
+  expect(html).toContain("bg-accent-solid");
   expect(html).toContain('width:100%');
   expect(html).toContain('aria-valuenow="100"');
 });

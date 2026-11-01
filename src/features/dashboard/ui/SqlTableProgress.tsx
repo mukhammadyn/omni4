@@ -4,5 +4,5 @@ export function SqlTableProgress({ value, maximum = 100, suffix = "", language }
   if (!Number.isFinite(number) || !Number.isFinite(maximum) || maximum <= 0) return <span>—</span>;
   const percent = Math.max(0, Math.min(100, number / maximum * 100));
   const label = `${new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(number)}${suffix}`;
-  return <span className="inline-flex w-full min-w-0 items-center gap-2"><span role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={maximum} aria-valuenow={Math.max(0, Math.min(maximum, number))} aria-valuetext={label} className="h-1.5 min-w-4 max-w-20 flex-1 overflow-hidden rounded-full bg-surface-hover"><span className="block h-full rounded-full bg-primary" style={{ width: `${percent}%` }} /></span><span className="shrink-0 tabular-nums">{label}</span></span>;
+  return <span className="inline-flex w-full min-w-0 items-center gap-2"><span role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={maximum} aria-valuenow={Math.max(0, Math.min(maximum, number))} aria-valuetext={label} className="h-1.5 min-w-4 max-w-20 flex-1 overflow-hidden rounded-full bg-surface-hover"><span className="block h-full rounded-full bg-accent-solid" style={{ width: `${percent}%` }} /></span><span className="shrink-0 tabular-nums">{label}</span></span>;
 }
