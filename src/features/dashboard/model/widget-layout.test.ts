@@ -4,6 +4,23 @@ import { newDashboard, newFolder, toTree, toTreeAttribute, type Widget } from ".
 import { boxesOverlap, placeWidgets, layoutRows, layoutHeight } from "./widget-layout";
 
 const card = (id: string, column: number, row: number, rows: number, width: number): Widget => ({ ...newChart(), id, title: id, tableSlug: "", filters: {}, answers: {}, width, layout: { column, row, rows } });
+
+test("tab members share a slot, preserve independent heights and retain unrelated widgets",async()=>{
+ const {visibleTabWidgets}=await import('./widget-tabs');
+ const employees={...card('employees',1,2,4,12),tabGroup:'details',tabLabel:'Employees'};
+ const days={...card('days',1,2,2,12),tabGroup:'details',tabLabel:'By day'};
+ const packed=placeWidgets([employees,days,card('below',1,3,1,12)]);
+ expect(packed[0]!.layout!.row).toBe(packed[1]!.layout!.row);
+ expect(packed[0]!.layout!.rows).toBe(4);expect(packed[1]!.layout!.rows).toBe(2);
+ expect(packed[2]!.layout!.row).toBeGreaterThanOrEqual(6);
+ expect(visibleTabWidgets(packed,{}).map(w=>w.id)).toEqual(['employees','below']);
+ expect(visibleTabWidgets(packed,{details:'days'}).map(w=>w.id)).toEqual(['days','below']);
+ expect(visibleTabWidgets(packed,{details:'deleted'}).map(w=>w.id)).toEqual(['employees','below']);
+ const tree={folders:[{...newFolder('m','folder'),dashboards:[{...newDashboard('tabs'),widgets:packed}]}]};
+ expect(toTree(toTreeAttribute(tree))).toEqual(tree);
+ const moved=placeWidgets(packed.map(w=>w.id==='days'?{...w,width:6,layout:{...w.layout!,column:7,row:10}}:w),'days');
+ expect(moved.slice(0,2).map(w=>[w.width,w.layout!.column,w.layout!.row])).toEqual([[6,7,10],[6,7,10]]);
+});
 function noOverlap(widgets: Widget[]) {
   for (let i = 0; i < widgets.length; i++) for (let j = i + 1; j < widgets.length; j++) {
     const a = widgets[i]!, b = widgets[j]!;

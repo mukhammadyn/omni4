@@ -6,6 +6,7 @@ import { parseFieldPresentation, type FieldPresentation } from "./field-presenta
 import { toDatasets, type Dataset } from "./datasets";
 import { parseSqlSelectionRules, type SqlSelectionRule } from "./sql-result-filters";
 import { parseSqlRecordOptions, type SqlRecordOptions } from "./sql-record-options";
+import {parseSqlFilterPresets,type SqlFilterPreset} from "./sql-filter-presets";
 import type { Answer, DashFilter } from "./filters";
 
 /**
@@ -16,6 +17,9 @@ import type { Answer, DashFilter } from "./filters";
 export const WIDGET_TYPES = ["chart", "records", "pivot", "ratio", "goal", "heading", "breakdown", "transitions"] as const;
 export type WidgetType = typeof WIDGET_TYPES[number];
 export type Widget = ChartConfig & {
+  tabGroup?: string;
+  tabLabel?: string;
+  sqlFilterPresets?: SqlFilterPreset[];
   refreshInterval?: number;
   section?: WidgetSection | undefined;
   layout?: { column: number; row: number; rows: number } | undefined;
@@ -43,6 +47,8 @@ export type Widget = ChartConfig & {
   sqlReceiveSelections?: boolean;
   sqlPaginationTop?: boolean;
   sqlTableFitContent?: boolean;
+  sqlCaptionField?: string;
+  sqlEmptyLabel?: string;
   sqlProgressField?: string;
   sqlProgressMax?: number;
   sqlProgressSuffix?: string;
@@ -111,12 +117,13 @@ export function toTree(value: unknown): Tree {
             ? [
                 {
                   ...chart,
+                  ...(Array.isArray(item["sqlFilterPresets"]) ? {sqlFilterPresets:parseSqlFilterPresets(item["sqlFilterPresets"])} : {}),
                   ...(parseWidgetSection(item["section"]) ? {section:parseWidgetSection(item["section"])!} : {}),
                   ...(["buttons","select"].includes(item["sqlQuickFilterStyle"] as string) ? {sqlQuickFilterStyle:item["sqlQuickFilterStyle"] as "buttons"|"select"} : {}),
                   ...(item["sqlSelectionRules"] ? { sqlSelectionRules: parseSqlSelectionRules(item["sqlSelectionRules"]) } : {}),
                   ...(parseSqlRecordOptions(item["sqlRecords"]) ? { sqlRecords: parseSqlRecordOptions(item["sqlRecords"])! } : {}),
                   ...(isObject(item["layout"]) ? { layout: parseLayout(item["layout"]) } : {}),
-                  ...Object.fromEntries(["sqlProgressField", "sqlProgressSuffix", "sqlTitleField", "sqlDetailField", "sqlDetailSuffix", "sqlDetailSuffixFractional", "sqlDetailSeparator", "sqlSuffix", "sqlSelectionField", "sqlSelectionValueField", "sqlQuickFilterField", "sqlSearchField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
+                  ...Object.fromEntries(["tabGroup", "tabLabel", "sqlCaptionField", "sqlEmptyLabel", "sqlProgressField", "sqlProgressSuffix", "sqlTitleField", "sqlDetailField", "sqlDetailSuffix", "sqlDetailSuffixFractional", "sqlDetailSeparator", "sqlSuffix", "sqlSelectionField", "sqlSelectionValueField", "sqlQuickFilterField", "sqlSearchField", "sqlLinkField", "sqlLinkLabel", "sqlLinkTemplate"].flatMap((key) => typeof item[key] === "string" ? [[key, item[key].slice(0, 200)]] : [])),
                   ...Object.fromEntries(["sqlSuffixJoined", "sqlSuffixBelow", "sqlShowViewerFilters", "sqlTableFrame"].flatMap((key) => typeof item[key] === "boolean" ? [[key, item[key]]] : [])),
                   ...(["above", "inline", "below"].includes(item["sqlDetailPlacement"] as string) ? { sqlDetailPlacement: item["sqlDetailPlacement"] as "above" | "inline" | "below" } : {}),
                   ...(typeof item["sqlDetailDecimals"] === "number" && Number.isFinite(item["sqlDetailDecimals"]) ? {sqlDetailDecimals:Math.max(0,Math.min(4,Math.round(item["sqlDetailDecimals"])))} : {}),
@@ -183,6 +190,9 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
         widgets: placeWidgets(dashboard.widgets).map((widget) => ({
           ...toChartsAttribute([widget])[0],
           ...(widget.section ? {section:widget.section} : {}),
+          ...(widget.tabGroup !== undefined ? {tabGroup:widget.tabGroup} : {}),
+          ...(widget.tabLabel !== undefined ? {tabLabel:widget.tabLabel} : {}),
+          ...(widget.sqlFilterPresets ? {sqlFilterPresets:widget.sqlFilterPresets} : {}),
           ...(widget.sqlRecords ? { sqlRecords: widget.sqlRecords } : {}),
           table_slug: widget.tableSlug,
           ...(widget.layout ? { layout: widget.layout } : {}),
@@ -206,6 +216,8 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...(widget.sqlSelectionRules ? { sqlSelectionRules: widget.sqlSelectionRules } : {}),
           ...(widget.sqlSuffixBelow !== undefined ? { sqlSuffixBelow: widget.sqlSuffixBelow } : {}),
           ...(widget.sqlShowViewerFilters !== undefined ? { sqlShowViewerFilters: widget.sqlShowViewerFilters } : {}),
+          ...(widget.sqlCaptionField !== undefined ? {sqlCaptionField:widget.sqlCaptionField} : {}),
+          ...(widget.sqlEmptyLabel !== undefined ? {sqlEmptyLabel:widget.sqlEmptyLabel} : {}),
           ...(widget.sqlProgressField !== undefined ? {sqlProgressField:widget.sqlProgressField} : {}),
           ...(widget.sqlProgressMax !== undefined ? {sqlProgressMax:widget.sqlProgressMax} : {}),
           ...(widget.sqlProgressSuffix !== undefined ? {sqlProgressSuffix:widget.sqlProgressSuffix} : {}),

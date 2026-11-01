@@ -1,5 +1,7 @@
+import {WidgetTabBar} from "./WidgetTabBar";
+import {visibleTabWidgets} from "../model/widget-tabs";
 import { sectionCanvas } from "../model/widget-sections";
-import type { CSSProperties } from "react";
+import type { CSSProperties,ReactNode } from "react";
 import { widgetAutoHeight, widgetDisplayHeight, LAYOUT_CELL, LAYOUT_GAP, MAX_LAYOUT_ROW, MAX_LAYOUT_ROWS, layoutHeight, layoutRows, placeWidgets, swapWidgetPositions } from "../model/widget-layout";
 import type { SqlSelection } from "../model/sql-result-filters";
 import "./widget-layout.css";
@@ -56,15 +58,17 @@ export function WidgetGrid({
   const onSourceSave = (next: Widget[], sources: Dataset[], preferred?: string) => persistSource(placeWidgets(next, preferred), sources);
   const sqlParameterScope = useDashboardSqlScope();
   const [sqlCross, setSqlCross] = useState<Record<string, SqlSelection>>({});
+  const [activeTabs,setActiveTabs]=useState<Record<string,string>>({});
   const [contentHeights, setContentHeights] = useState<Record<string, number>>({});
   const [wide,setWide]=useState(false);
   const gridRoot=useRef<HTMLDivElement>(null);
   useEffect(()=>{const element=gridRoot.current;if(!element)return;const update=()=>setWide(element.clientWidth>=760 && window.innerWidth>=1024);const observer=new ResizeObserver(update);observer.observe(element);window.addEventListener('resize',update);update();return()=>{observer.disconnect();window.removeEventListener('resize',update);};},[]);
   const placed = placeWidgets(widgets, undefined, editing || widgets.some(w=>w.section) ? undefined : contentHeights);
+  const visiblePlaced=visibleTabWidgets(placed,activeTabs);
   const heightFor = (widget: Widget) => widgetDisplayHeight(widget,contentHeights[widget.id],editing);
   const positioned = widgets.some((widget) => widget.layout);
-  const arranged = positioned ? [...placed].sort((a, b) => (a.layout?.row ?? MAX_LAYOUT_ROW) - (b.layout?.row ?? MAX_LAYOUT_ROW) || (a.layout?.column ?? 1) - (b.layout?.column ?? 1)) : widgets;
-  const canvas = sectionCanvas(placed,heightFor,!editing && wide);
+  const arranged = positioned ? [...visiblePlaced].sort((a, b) => (a.layout?.row ?? MAX_LAYOUT_ROW) - (b.layout?.row ?? MAX_LAYOUT_ROW) || (a.layout?.column ?? 1) - (b.layout?.column ?? 1)) : visibleTabWidgets(widgets,activeTabs);
+  const canvas = sectionCanvas(visiblePlaced,heightFor,!editing && wide);
   const canvasHeight = canvas.height;
   const widgetIds = widgets.map((widget) => widget.id).join(",");
   useEffect(() => { setSqlCross({}); }, [menuId, widgetIds, sqlParameterScope]);
@@ -141,6 +145,7 @@ export function WidgetGrid({
       {arranged.map((widget) => { const box=canvas.cards[widget.id]!; const card = <WidgetCard
           key={widget.id}
           widget={widget}
+          tabBar={widget.tabGroup && widgets.filter(w=>w.tabGroup===widget.tabGroup).length>1 ? <WidgetTabBar members={widgets.filter(w=>w.tabGroup===widget.tabGroup)} value={widget.id} onChange={id=>setActiveTabs(current=>({...current,[widget.tabGroup!]:id}))}/> : undefined}
           sqlSelectedSeries={sqlCross[widget.id]?.series}
           sqlSelectedKey={sqlCross[widget.id]?.key ?? sqlCross[widget.id]?.value}
           fittedHeight={box.height}
@@ -194,8 +199,8 @@ export function WidgetGrid({
 }
 
 /** Card defaults are persisted; viewer constraints belong only to this card. */
-function WidgetCard({ widget, fittedHeight, onAutoHeight, sqlSelectedKey, sqlSelectedSeries, sqlSelections, onSqlPick, datasets, menuId, selection, onSelect, filters, values, editing, onChange, onEdit, onDuplicate, ...card }: {
-  widget: Widget; fittedHeight: number; onAutoHeight: (height: number) => void; sqlSelectedKey?: string | undefined; sqlSelectedSeries?: string | undefined; sqlSelections: SqlSelection[]; onSqlPick: (value: string, series?: string, label?: string) => void; datasets: Dataset[]; selection: Filters; onSelect: (table: string, filter: Filters) => void; menuId: string; filters: DashFilter[]; values: FilterValues; editing: boolean;
+function WidgetCard({ widget, tabBar, fittedHeight, onAutoHeight, sqlSelectedKey, sqlSelectedSeries, sqlSelections, onSqlPick, datasets, menuId, selection, onSelect, filters, values, editing, onChange, onEdit, onDuplicate, ...card }: {
+  tabBar?:ReactNode; widget: Widget; fittedHeight: number; onAutoHeight: (height: number) => void; sqlSelectedKey?: string | undefined; sqlSelectedSeries?: string | undefined; sqlSelections: SqlSelection[]; onSqlPick: (value: string, series?: string, label?: string) => void; datasets: Dataset[]; selection: Filters; onSelect: (table: string, filter: Filters) => void; menuId: string; filters: DashFilter[]; values: FilterValues; editing: boolean;
   dragged: boolean; over: boolean; onDragStart: () => void; onDragEnd: () => void; onDragOver: () => void; onDrop: () => void;
   onMove: (delta: number) => void; onMoveTo: (target:string) => void; onChange: (patch: Partial<Widget>) => void; onRemove: () => void; onEdit: () => void; onDuplicate: () => void;
 }) {
@@ -215,14 +220,15 @@ function WidgetCard({ widget, fittedHeight, onAutoHeight, sqlSelectedKey, sqlSel
   const data = useWidgetData(widget, filters, values, menuId, viewer, page, sorts, datasets, selection, picked);
   if (widget.type !== "heading" && (data.denied || data.forbidden) && !data.error && !editing) return null;
   const action = (label: string, icon: typeof PencilIcon, onClick: () => void) => <button type="button" aria-label={label} title={label} onClick={onClick} className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-fg-subtle hover:bg-surface-hover hover:text-fg"><Icon as={icon} size={14} /></button>;
-  return <ChartCard {...card} config={!editing && sqlTitle ? {...widget,title:sqlTitle} : widget} naturalContentHeight={(widget.sqlTableFitContent || widgetAutoHeight(widget)) && !editing ? naturalHeight : undefined} onAutoHeight={onAutoHeight} sizeRows={widget.layout || widgetAutoHeight(widget) ? { value: fittedHeight, min: 80, max: layoutHeight(MAX_LAYOUT_ROWS), unit: 1, gap: 0 } : undefined} columns={data.schema.fields} relations={data.schema.relations} rows={[]} language={language} editing={editing} onChange={onChange} inlineSetup={false} showRowCount={false} scrollContent={widget.type !== "records" || widget.sqlTableFitContent === true}
-    headerActions={<>{action(t("dashboard.duplicate"), CopyIcon, onDuplicate)}{action(t("dashboard.editWidget"), PencilIcon, onEdit)}</>}
-    viewerActions={widget.type === "heading" || data.dataset?.source.kind === "sql" ? undefined : <Popover trigger={({ open, toggle }) => <button type="button" aria-expanded={open} onClick={toggle} className="rounded-md border border-border px-2 py-1 text-xs text-fg-muted hover:bg-surface-hover">{t("dashboard.cardFilters")}{Object.keys(viewer).length ? ` (${Object.keys(viewer).length})` : ""}</button>}>{() => <div className="w-[360px] max-w-[85vw] p-2"><p className="mb-1 text-xs text-fg-muted">{t("dashboard.viewerScope")}</p><FilterBar columns={data.schema.fields} relations={data.schema.relations} language={language} filters={viewer} sorts={[]} onFilters={setViewer} onSorts={() => {}} /><Button type="button" size="sm" variant="secondary" onClick={() => { setViewer({}); setPicked({}); }}>{t("dashboard.resetViewer")}</Button></div>}</Popover>}
-    aside={data.dataset?.source.kind === "sql" ? undefined : <><WidgetStatus widget={widget} data={data} /><div aria-label={t("dashboard.effectiveFilters")} className="flex flex-wrap gap-1">{Object.entries(data.query).filter(([slug]) => slug !== "guid").map(([slug, filter]) => { const field = data.schema.fields.find((f) => f.slug === slug); return field ? <span key={slug} className="max-w-64 truncate rounded-full bg-surface-soft px-2 py-0.5 text-2xs text-fg-muted">{localized(field.labels, language, field.label)}: {field.relationId ? t("dashboard.selectedCount", { count: filter.values.length }) : filter.values.join(" — ")}</span> : null; })}</div></>}
-    content={<WidgetContents onSqlTitle={setSqlTitle} onSqlHeight={setNaturalHeight} sqlSelectedSeries={sqlSelectedSeries} sqlSelectedKey={sqlSelectedKey} sqlSelections={sqlSelections} onSqlPick={onSqlPick} widget={widget} data={data} language={language} editing={editing} page={page} sorts={data.effectiveSorts} onPage={setPage} onSorts={setSorts} onChange={onChange} onSelect={(filter) => {
+  const contents = <WidgetContents onSqlTitle={setSqlTitle} onSqlHeight={setNaturalHeight} sqlSelectedSeries={sqlSelectedSeries} sqlSelectedKey={sqlSelectedKey} sqlSelections={sqlSelections} onSqlPick={onSqlPick} widget={widget} data={data} language={language} editing={editing} page={page} sorts={data.effectiveSorts} onPage={setPage} onSorts={setSorts} onChange={onChange} onSelect={(filter) => {
       const table = data.dataset?.source.kind === "table" ? data.dataset.source.tableSlug : widget.tableSlug;
       if (widget.interaction?.scope === "dashboard") onSelect(table, filter);
       else setPicked((current) => JSON.stringify(current) === JSON.stringify(filter) ? {} : filter);
-    }} />}
+    }} />;
+  return <ChartCard {...card} config={!editing && sqlTitle ? {...widget,title:sqlTitle} : widget} naturalContentHeight={(widget.sqlTableFitContent || widgetAutoHeight(widget)) && !editing ? naturalHeight+(tabBar?48:0) : undefined} onAutoHeight={onAutoHeight} sizeRows={widget.layout || widgetAutoHeight(widget) ? { value: fittedHeight, min: 80, max: layoutHeight(MAX_LAYOUT_ROWS), unit: 1, gap: 0 } : undefined} columns={data.schema.fields} relations={data.schema.relations} rows={[]} language={language} editing={editing} onChange={onChange} inlineSetup={false} showRowCount={false} scrollContent={widget.type !== "records" || widget.sqlTableFitContent === true}
+    headerActions={<>{action(t("dashboard.duplicate"), CopyIcon, onDuplicate)}{action(t("dashboard.editWidget"), PencilIcon, onEdit)}</>}
+    viewerActions={widget.type === "heading" || data.dataset?.source.kind === "sql" ? undefined : <Popover trigger={({ open, toggle }) => <button type="button" aria-expanded={open} onClick={toggle} className="rounded-md border border-border px-2 py-1 text-xs text-fg-muted hover:bg-surface-hover">{t("dashboard.cardFilters")}{Object.keys(viewer).length ? ` (${Object.keys(viewer).length})` : ""}</button>}>{() => <div className="w-[360px] max-w-[85vw] p-2"><p className="mb-1 text-xs text-fg-muted">{t("dashboard.viewerScope")}</p><FilterBar columns={data.schema.fields} relations={data.schema.relations} language={language} filters={viewer} sorts={[]} onFilters={setViewer} onSorts={() => {}} /><Button type="button" size="sm" variant="secondary" onClick={() => { setViewer({}); setPicked({}); }}>{t("dashboard.resetViewer")}</Button></div>}</Popover>}
+    aside={data.dataset?.source.kind === "sql" ? undefined : <><WidgetStatus widget={widget} data={data} /><div aria-label={t("dashboard.effectiveFilters")} className="flex flex-wrap gap-1">{Object.entries(data.query).filter(([slug]) => slug !== "guid").map(([slug, filter]) => { const field = data.schema.fields.find((f) => f.slug === slug); return field ? <span key={slug} className="max-w-64 truncate rounded-full bg-surface-soft px-2 py-0.5 text-2xs text-fg-muted">{localized(field.labels, language, field.label)}: {field.relationId ? t("dashboard.selectedCount", { count: filter.values.length }) : filter.values.join(" — ")}</span> : null; })}</div></>}
+    content={tabBar ? <>{tabBar}<div role="tabpanel" id={`widget-tab-panel-${widget.id}`} aria-labelledby={`widget-tab-${widget.id}`} className="flex min-h-0 flex-1 flex-col">{contents}</div></> : contents}
   />;
 }

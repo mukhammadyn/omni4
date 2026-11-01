@@ -1,0 +1,12 @@
+import { useTranslation } from "react-i18next";
+import { Button } from "@/shared/ui/button";
+import { Dropdown } from "@/shared/ui/dropdown";
+import { Field, Input } from "@/shared/ui/input";
+import type { Field as TableField } from "@/features/table";
+import type { Widget } from "../model/dashboard";
+import type { SqlFilterPreset } from "../model/sql-filter-presets";
+export function SqlFilterPresetOptions({widget,fields,onChange}:{widget:Widget;fields:TableField[];onChange:(patch:Partial<Widget>)=>void}) {
+  const ru=useTranslation().i18n.language.startsWith("ru"),presets=widget.sqlFilterPresets ?? [];
+  const update=(index:number,patch:Partial<SqlFilterPreset>)=>onChange({sqlFilterPresets:presets.map((p,i)=>i===index?{...p,...patch}:p)});
+  return <details><summary className="cursor-pointer text-sm text-fg-muted">{ru?"Готовые фильтры таблицы":"Table filter presets"}</summary><div className="mt-2 flex flex-col gap-3">{presets.map((p,i)=><fieldset key={i} className="flex flex-col gap-2 rounded border border-border p-2"><legend className="text-xs">{ru?"Фильтр":"Filter"} {i+1}</legend><Field label={ru?"Название":"Label"}><Input aria-label={`Preset ${i+1} label`} maxLength={80} value={p.label} onChange={e=>update(i,{label:e.target.value})}/></Field><Field label={ru?"Поле":"Field"}><Dropdown ariaLabel={`Preset ${i+1} field`} value={p.field} items={fields.map(f=>({value:f.slug,label:f.label}))} onChange={field=>update(i,{field})}/></Field><Field label={ru?"Условие":"Condition"}><Dropdown ariaLabel={`Preset ${i+1} condition`} value={p.op} items={[{value:"is",label:ru?"Равно":"Equals"},{value:"after",label:ru?"Больше":"Greater than"},{value:"before",label:ru?"Меньше":"Less than"},{value:"contains",label:ru?"Содержит":"Contains"}]} onChange={op=>update(i,{op:op as SqlFilterPreset["op"]})}/></Field><Field label={ru?"Значение":"Value"}><Input aria-label={`Preset ${i+1} value`} value={p.value} onChange={e=>update(i,{value:e.target.value})}/></Field><Button size="sm" variant="secondary" onClick={()=>onChange({sqlFilterPresets:presets.filter((_,index)=>index!==i)})}>{ru?"Убрать фильтр":"Remove preset"} {i+1}</Button></fieldset>)}<Button size="sm" variant="secondary" disabled={presets.length>=8 || !fields.length} onClick={()=>onChange({sqlFilterPresets:[...presets,{label:ru?"Новый фильтр":"New preset",field:fields[0]?.slug ?? "",op:"is",value:""}]})}>{ru?"Добавить готовый фильтр":"Add filter preset"}</Button></div></details>;
+}
