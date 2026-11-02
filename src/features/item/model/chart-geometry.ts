@@ -3,6 +3,15 @@ import { chartFieldSlugs, MULTI_MEASURE_KINDS, RAW_CHART_KINDS, type ChartConfig
 import { NUMERIC_FIELDS, toNumber } from "./pivot";
 import type { Item } from "./types";
 
+/** Thin axis text only; every data point and its tooltip remains available. */
+export function axisLabelIndexes(labels:string[],width:number):Set<number> {
+  if(!labels.length) return new Set();
+  if(!Number.isFinite(width) || width<=0) return new Set(labels.map((_,i)=>i));
+  const textWidth=Math.max(24,Math.min(96,Math.max(...labels.map(label=>label.length*5.5+10))));
+  const stride=Math.max(1,Math.ceil(labels.length*textWidth/width));
+  return new Set(labels.flatMap((_,i)=>i===0 || i===labels.length-1 || i%stride===0 && labels.length-1-i>=stride ? [i]:[]));
+}
+
 export function chartRoleIssue(config: ChartConfig, fields: Field[]): "unavailable" | "numeric" | "units" | null {
   const bySlug = new Map(fields.map((field) => [field.slug, field]));
   if (chartFieldSlugs(config).some((slug) => !bySlug.has(slug))) return "unavailable";
