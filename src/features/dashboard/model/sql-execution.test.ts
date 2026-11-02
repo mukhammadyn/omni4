@@ -65,6 +65,22 @@ test("SQL widget and dataset survive real menu serialization without query outpu
   expect(sqlWidgetFrom(dataset, { type: "chart", kind: "column", group: "month", value: "total", split: "", sorts: [{ field: "month", direction: "asc" }] }).sorts).toEqual([{ field: "month", direction: "asc" }]);
 });
 
+test("independent report aggregates have bounded breadth and two actual derived layers",()=>{
+ const joins=(n:number,body="SELECT employee, SUM(amount) AS amount FROM ledger GROUP BY employee")=>Array.from({length:n},(_,i)=>` LEFT JOIN (${body}) a${i} ON a${i}.employee=e.guid`).join("");
+ expect(sqlSupportIssue(`SELECT e.guid FROM employees e${joins(7)}`)).toBeNull();
+ expect(sqlSupportIssue(`SELECT e.guid FROM employees e${joins(8)}`)).toBe("nested");
+ expect(sqlSupportIssue(`SELECT e.guid FROM employees e${joins(2,"SELECT employee, SUM(amount) AS amount FROM (SELECT employee, amount FROM ledger) l GROUP BY employee")}`)).toBeNull();
+ for(const sql of [
+  "SELECT e.guid FROM employees e LEFT JOIN (SELECT n FROM (SELECT n FROM (SELECT 1 AS n) x) y) z ON TRUE",
+  "SELECT e.guid FROM employees e LEFT JOIN (SELECT (SELECT 1) AS n) z ON TRUE",
+  "SELECT e.guid FROM employees e LEFT JOIN (SELECT 1 AS n) z ON TRUE)",
+  "SELECT e.guid FROM employees e LEFT JOIN (SELECT 1 AS n z ON TRUE",
+ ])expect(sqlSupportIssue(sql)).toBe("nested");
+ expect(sqlSupportIssue(`SELECT e.guid FROM employees e${joins(5)} LEFT JOIN (SELECT pg_sleep(1) AS n) bad ON TRUE`)).toBe("function");
+ expect(sqlSupportIssue(`SELECT e.guid FROM employees e${joins(5)} LEFT JOIN (DELETE FROM ledger RETURNING guid) bad ON TRUE`)).toBe("write");
+ expect(sqlSupportIssue(`SELECT e.guid FROM employees e${joins(5)} LEFT JOIN (SELECT n FROM ledger OFFSET 1) bad ON TRUE`)).toBe("clause");
+});
+
 test("reserved syntax groups pure expressions but never permits qualified or nested arbitrary calls",()=>{
  expect(sqlSupportIssue("SELECT (1 + 2) AS value FROM people WHERE (age > 20) AND (age < 30)")).toBeNull();
  expect(sqlSupportIssue("SELECT CASE WHEN (age > 20) THEN (age + 1) ELSE (0) END FROM people")).toBeNull();
