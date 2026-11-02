@@ -1,3 +1,5 @@
+import { SqlParameterControls } from "./SqlParameterControls";
+import { dashboardSqlControls, dashboardSqlValues } from "../model/sql-controls";
 import { createContext, useContext, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
@@ -11,16 +13,18 @@ import { dashboardMonthParameters, monthKey, selectedMonth, shiftMonth, validMon
 const MonthValues = createContext<Record<string, string>>({});
 export const useDashboardSqlScope = () => JSON.stringify(useContext(MonthValues));
 export function useDashboardSqlParameters(parameters: DatasetParameter[]) {
-  const values = useContext(MonthValues);
-  return Object.fromEntries(parameters.filter(p => p.type === "date" && p.dashboardControl === "month").map(p => [p.name, values[p.name] ?? `${selectedMonth()}-01`]));
+  const values = useContext(MonthValues), defaults=dashboardSqlValues(parameters.filter(p=>p.dashboardControl && p.dashboardControl!=="month"),{});
+  return Object.fromEntries(parameters.filter(p => p.dashboardControl).map(p => [p.name, values[p.name] ?? (p.dashboardControl === "month" ? `${selectedMonth()}-01` : defaults[p.name] ?? "")]));
 }
 
 /** One normal viewer control per explicitly shared parameter; SQL stays editable. */
-export function SqlMonthControls({ datasets, widgets, values, onValues, children }: { datasets: Dataset[]; widgets: Widget[]; values: FilterValues; onValues: (values: FilterValues) => void; children: ReactNode }) {
+export function SqlMonthControls({ menuId, datasets, widgets, values, onValues, children }: { menuId: string; datasets: Dataset[]; widgets: Widget[]; values: FilterValues; onValues: (values: FilterValues) => void; children: ReactNode }) {
   const { i18n } = useTranslation(), ru = i18n.language.startsWith("ru");
   const parameters = dashboardMonthParameters(datasets, new Set(widgets.flatMap(w => w.datasetId ? [w.datasetId] : [])));
+  const controls=dashboardSqlControls(datasets,new Set(widgets.flatMap(w=>w.datasetId?[w.datasetId]:[])));
   const dates = Object.fromEntries(parameters.map(p => [p.name, `${selectedMonth(values[monthKey(p.name)]?.[0])}-01`]));
-  return <MonthValues.Provider value={dates}>
+  return <MonthValues.Provider value={{...dates,...dashboardSqlValues(controls,values)}}>
+    <SqlParameterControls menuId={menuId} parameters={controls} values={values} onValues={onValues}/>
     {parameters.length > 0 && <div className="flex flex-wrap items-center gap-3" aria-label={ru ? "Месяц отчёта" : "Report month"}>{parameters.map(parameter => {
       const month = dates[parameter.name]!.slice(0, 7);
       const put = (next: string) => { if (validMonth(next)) onValues({ ...values, [monthKey(parameter.name)]: [next] }); };

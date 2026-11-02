@@ -2,7 +2,7 @@ import type { DatasetTable } from "./datasets";
 import { quoteSqlName, sqlLex, sqlSuggestions } from "./sql-assist";
 
 export type SQLSupportIssue = "star" | "cte" | "function" | "nested" | "write" | "clause" | "literal";
-const aggregates = new Set(["count", "sum", "avg", "min", "max"]);
+const aggregates = new Set(["count", "sum", "avg", "min", "max", "string_agg"]);
 const dateFunctions = new Set(["age", "extract", "round"]);
 const supportedKeywords = new Set(["SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL JOIN", "ON", "GROUP BY", "ORDER BY", "LIMIT", "AS", "AND", "COUNT", "SUM", "AVG", "MIN", "MAX"]);
 

@@ -6,11 +6,12 @@ export type QueryExecutionInput = {
   sql: string;
   parameters: { name: string; type: "text" | "number" | "date" | "boolean"; value: string }[];
   limit: number;
+  page?: { offset: number; key: string };
 };
 
 /** Reuse the existing SQL console; its existing server permissions apply unchanged. */
 export async function executeDashboardQuery(input: QueryExecutionInput, signal?: AbortSignal) {
-  const request = prepareDashboardSql(input.sql, input.parameters, input.limit);
+  const request = prepareDashboardSql(input.sql, input.parameters, input.limit, input.page);
   const deadline = Date.now() + 15000;
   const read = (sql: string) => {
     signal?.throwIfAborted();

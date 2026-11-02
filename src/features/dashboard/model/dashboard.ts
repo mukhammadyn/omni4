@@ -1,3 +1,4 @@
+import { parseSqlPivot, type SqlPivot } from "./sql-pivot";
 import { parseFilters, toCharts, toChartsAttribute, toAggregation, type ChartConfig, type ChartMeasure, type Filters, type Sort } from "@/features/item";
 import { MAX_LAYOUT_ROW, MAX_LAYOUT_ROWS, layoutRows, placeWidgets } from "./widget-layout";
 import { parseWidgetSection, type WidgetSection } from "./widget-sections";
@@ -20,6 +21,12 @@ export type WidgetType = typeof WIDGET_TYPES[number];
 export type Widget = ChartConfig & {
   tabGroup?: string;
   tabLabel?: string;
+  sqlToggleFilter?: SqlFilterPreset | undefined;
+  sqlExportExcel?: boolean;
+  sqlFormatNumbers?: boolean;
+  sqlPivot?: SqlPivot | undefined;
+  sqlLoadAllRows?: boolean;
+  sqlRowKey?: string;
   sqlFilterPresets?: SqlFilterPreset[];
   sqlSortPresets?: SqlSortPreset[];
   sqlDefaultSortPreset?: number;
@@ -120,6 +127,12 @@ export function toTree(value: unknown): Tree {
             ? [
                 {
                   ...chart,
+                  ...(parseSqlFilterPresets([item["sqlToggleFilter"]])[0] ? {sqlToggleFilter:parseSqlFilterPresets([item["sqlToggleFilter"]])[0]!} : {}),
+                  ...(typeof item["sqlFormatNumbers"] === "boolean" ? {sqlFormatNumbers:item["sqlFormatNumbers"]} : {}),
+                  ...(typeof item["sqlExportExcel"] === "boolean" ? {sqlExportExcel:item["sqlExportExcel"]} : {}),
+                  ...(parseSqlPivot(item["sqlPivot"]) ? {sqlPivot:parseSqlPivot(item["sqlPivot"])!} : {}),
+                  ...(typeof item["sqlLoadAllRows"] === "boolean" ? {sqlLoadAllRows:item["sqlLoadAllRows"]} : {}),
+                  ...(typeof item["sqlRowKey"] === "string" ? {sqlRowKey:item["sqlRowKey"]} : {}),
                   ...(Array.isArray(item["sqlSortPresets"]) ? {sqlSortPresets:parseSqlSortPresets(item["sqlSortPresets"])} : {}),
                   ...(Number.isInteger(item["sqlDefaultSortPreset"]) && Number(item["sqlDefaultSortPreset"]) >= 0 && Number(item["sqlDefaultSortPreset"]) < 8 ? {sqlDefaultSortPreset:Number(item["sqlDefaultSortPreset"])} : {}),
                   ...(Array.isArray(item["sqlFilterPresets"]) ? {sqlFilterPresets:parseSqlFilterPresets(item["sqlFilterPresets"])} : {}),
@@ -197,6 +210,12 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...(widget.section ? {section:widget.section} : {}),
           ...(widget.tabGroup !== undefined ? {tabGroup:widget.tabGroup} : {}),
           ...(widget.tabLabel !== undefined ? {tabLabel:widget.tabLabel} : {}),
+          ...(widget.sqlToggleFilter ? {sqlToggleFilter:widget.sqlToggleFilter} : {}),
+          ...(widget.sqlFormatNumbers !== undefined ? {sqlFormatNumbers:widget.sqlFormatNumbers} : {}),
+          ...(widget.sqlExportExcel !== undefined ? {sqlExportExcel:widget.sqlExportExcel} : {}),
+          ...(widget.sqlPivot ? {sqlPivot:widget.sqlPivot} : {}),
+          ...(widget.sqlLoadAllRows !== undefined ? {sqlLoadAllRows:widget.sqlLoadAllRows} : {}),
+          ...(widget.sqlRowKey ? {sqlRowKey:widget.sqlRowKey} : {}),
           ...(widget.sqlSortPresets ? {sqlSortPresets:widget.sqlSortPresets} : {}),
           ...(widget.sqlDefaultSortPreset !== undefined ? {sqlDefaultSortPreset:widget.sqlDefaultSortPreset} : {}),
           ...(widget.sqlFilterPresets ? {sqlFilterPresets:widget.sqlFilterPresets} : {}),

@@ -118,3 +118,13 @@ export function queryImageHref(value:unknown,cdnBase:string,appOrigin:string):st
     return url.href;
   } catch { return; }
 }
+
+/** Locale grouping without converting exact NUMERIC/int8 transport to a double. */
+export function formatSqlNumber(value:unknown,type:string,language:string):string{
+ if(!numericTypes.has(type)||value===null||value===undefined)return formatQueryCell(value,type,language);
+ if(typeof value==="number")return value.toLocaleString(language,{maximumFractionDigits:20});
+ const match=/^([+-]?)(\d+)(?:\.(\d+))?$/.exec(String(value));if(!match)return String(value);
+ const integer=BigInt(`${match[1] ?? ""}${match[2]}`),parts=new Intl.NumberFormat(language).formatToParts(1.1),decimal=parts.find(p=>p.type==="decimal")?.value ?? ".";
+ const whole=integer.toLocaleString(language),minus=match[1]==="-"&&integer===0n?new Intl.NumberFormat(language).formatToParts(-1).find(p=>p.type==="minusSign")?.value ?? "-":"";
+ return `${minus}${whole}${match[3]!==undefined?`${decimal}${match[3]}`:""}`;
+}
