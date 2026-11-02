@@ -1,7 +1,8 @@
+import {useLayoutEffect,useRef,useState} from "react";
 import { Tooltip } from "@/shared/ui/tooltip";
 import { useTranslation } from "react-i18next";
 import type { ChartConfig, ChartSeries } from "../model/chart";
-import { smoothChartPath, linearDomain, niceChartTicks, normalizedBands, scaleY, stackedBands, treemapRects, xyPoints, type XYPoint } from "../model/chart-geometry";
+import { axisLabelIndexes, smoothChartPath, linearDomain, niceChartTicks, normalizedBands, scaleY, stackedBands, treemapRects, xyPoints, type XYPoint } from "../model/chart-geometry";
 import type { Item } from "../model/types";
 
 const colors = ["fill-chart-1 stroke-chart-1", "fill-chart-2 stroke-chart-2", "fill-chart-3 stroke-chart-3", "fill-chart-4 stroke-chart-4", "fill-chart-5 stroke-chart-5", "fill-chart-6 stroke-chart-6", "fill-chart-7 stroke-chart-7", "fill-chart-other stroke-chart-other"];
@@ -12,6 +13,10 @@ const show = (n: number, locale: string) => n.toLocaleString(locale, { maximumFr
 /** Columns, area and combination charts share scales; right-axis measures use an explicit second scale. */
 export function CartesianChart({ config, series, locale, onPick, selectedKey, selectedSeries }: { selectedSeries?: string | undefined; selectedKey?: string | undefined; onPick?: ((key: string, series?: string) => void) | undefined; config: ChartConfig; series: ChartSeries; locale: string }) {
   const { t } = useTranslation();
+  const labelsRoot=useRef<HTMLDivElement>(null),[labelsWidth,setLabelsWidth]=useState(0);
+  useLayoutEffect(()=>{const element=labelsRoot.current;if(!element)return;const measure=()=>setLabelsWidth(element.clientWidth);const observer=new ResizeObserver(measure);observer.observe(element);measure();return()=>observer.disconnect();},[]);
+  const visibleLabels=axisLabelIndexes(series.points.map(point=>point.label),labelsWidth);
+  const labelSlotWidth=labelsWidth ? Math.max(12,Math.min(96,labelsWidth/Math.max(visibleLabels.size,1)-4)) : undefined;
   const normalized = config.kind === "column100" || config.kind === "area100";
   const area = config.kind === "area" || config.kind === "area100";
   const splits = series.splits.length ? series.splits : [{ key: "", label: "" }];
@@ -51,7 +56,7 @@ export function CartesianChart({ config, series, locale, onPick, selectedKey, se
       </svg>
       {rightAxis && <div className="flex w-14 shrink-0 flex-col justify-between text-2xs tabular-nums text-fg-subtle">{[...rightTicks].reverse().map(tick=><span key={tick}>{format(tick)}</span>)}</div>}
       {config.appearance?.axisTitleRight && <span className="text-xs text-fg-muted [writing-mode:vertical-rl]">{config.appearance.axisTitleRight}</span>}
-      <div data-cartesian-labels style={{gridColumn:plotColumn,gridRow:2,gridTemplateColumns:`repeat(${Math.max(n,1)},minmax(0,1fr))`}} className="grid min-w-0 text-2xs text-fg-muted">{series.points.map((point,at) => config.appearance?.axisTicks || onPick || n <= 8 || at === 0 || at === n - 1 ? <span key={point.key} role={onPick ? "button" : undefined} tabIndex={onPick ? 0 : undefined} onClick={onPick ? () => onPick(point.key) : undefined} onKeyDown={onPick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(point.key); } } : undefined} style={{gridColumn:at+1}} className={`min-w-0 whitespace-normal break-words text-center leading-tight ${onPick ? "cursor-pointer" : ""}`} title={point.label}>{point.label}</span> : null)}</div>
+      <div ref={labelsRoot} data-cartesian-labels style={{gridColumn:plotColumn,gridRow:2,gridTemplateColumns:`repeat(${Math.max(n,1)},minmax(0,1fr))`}} className="grid min-w-0 text-2xs text-fg-muted">{series.points.map((point,at) => config.appearance?.axisTicks || onPick || n <= 8 || at === 0 || at === n - 1 ? <span key={point.key} role={onPick ? "button" : undefined} tabIndex={onPick ? 0 : undefined} aria-label={point.label} onClick={onPick ? () => onPick(point.key) : undefined} onKeyDown={onPick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(point.key); } } : undefined} style={{gridColumn:at+1,...(visibleLabels.has(at)?{width:labelSlotWidth,justifySelf:at===0?"start":at===n-1?"end":"center"}:{pointerEvents:"none"})}} className={`relative min-w-0 whitespace-normal break-words text-center leading-tight ${onPick ? "cursor-pointer" : ""}`} title={point.label}><span className={visibleLabels.has(at)?undefined:"sr-only"}>{point.label}</span></span> : null)}</div>
     </div>
     {config.appearance?.axisTitleX && <p className="text-center text-xs text-fg-muted">{config.appearance.axisTitleX}</p>}
   </div>;

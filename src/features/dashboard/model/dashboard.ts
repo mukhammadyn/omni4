@@ -7,6 +7,7 @@ import { toDatasets, type Dataset } from "./datasets";
 import { parseSqlSelectionRules, type SqlSelectionRule } from "./sql-result-filters";
 import { parseSqlRecordOptions, type SqlRecordOptions } from "./sql-record-options";
 import {parseSqlFilterPresets,type SqlFilterPreset} from "./sql-filter-presets";
+import { parseSqlSortPresets, type SqlSortPreset } from "./sql-sort-presets";
 import type { Answer, DashFilter } from "./filters";
 
 /**
@@ -20,6 +21,8 @@ export type Widget = ChartConfig & {
   tabGroup?: string;
   tabLabel?: string;
   sqlFilterPresets?: SqlFilterPreset[];
+  sqlSortPresets?: SqlSortPreset[];
+  sqlDefaultSortPreset?: number;
   refreshInterval?: number;
   section?: WidgetSection | undefined;
   layout?: { column: number; row: number; rows: number } | undefined;
@@ -117,6 +120,8 @@ export function toTree(value: unknown): Tree {
             ? [
                 {
                   ...chart,
+                  ...(Array.isArray(item["sqlSortPresets"]) ? {sqlSortPresets:parseSqlSortPresets(item["sqlSortPresets"])} : {}),
+                  ...(Number.isInteger(item["sqlDefaultSortPreset"]) && Number(item["sqlDefaultSortPreset"]) >= 0 && Number(item["sqlDefaultSortPreset"]) < 8 ? {sqlDefaultSortPreset:Number(item["sqlDefaultSortPreset"])} : {}),
                   ...(Array.isArray(item["sqlFilterPresets"]) ? {sqlFilterPresets:parseSqlFilterPresets(item["sqlFilterPresets"])} : {}),
                   ...(parseWidgetSection(item["section"]) ? {section:parseWidgetSection(item["section"])!} : {}),
                   ...(["buttons","select"].includes(item["sqlQuickFilterStyle"] as string) ? {sqlQuickFilterStyle:item["sqlQuickFilterStyle"] as "buttons"|"select"} : {}),
@@ -192,6 +197,8 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...(widget.section ? {section:widget.section} : {}),
           ...(widget.tabGroup !== undefined ? {tabGroup:widget.tabGroup} : {}),
           ...(widget.tabLabel !== undefined ? {tabLabel:widget.tabLabel} : {}),
+          ...(widget.sqlSortPresets ? {sqlSortPresets:widget.sqlSortPresets} : {}),
+          ...(widget.sqlDefaultSortPreset !== undefined ? {sqlDefaultSortPreset:widget.sqlDefaultSortPreset} : {}),
           ...(widget.sqlFilterPresets ? {sqlFilterPresets:widget.sqlFilterPresets} : {}),
           ...(widget.sqlRecords ? { sqlRecords: widget.sqlRecords } : {}),
           table_slug: widget.tableSlug,

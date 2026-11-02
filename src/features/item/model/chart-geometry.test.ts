@@ -1,7 +1,17 @@
 import { expect, test } from "vitest";
 import type { Field } from "@/features/table";
 import { CHART_KINDS, chartReady, chartSeries, newChart, toCharts, toChartsAttribute } from "./chart";
-import { smoothChartPath, chartRoleIssue, linearDomain, normalizedBands, partValuesValid, treemapRects, xyPoints } from "./chart-geometry";
+import { axisLabelIndexes, smoothChartPath, chartRoleIssue, linearDomain, normalizedBands, partValuesValid, treemapRects, xyPoints } from "./chart-geometry";
+
+test("narrow daily axes retain their first/last labels and do not alter their data domain",()=>{
+ const labels=Array.from({length:31},(_,i)=>String(i+1).padStart(2,'0'));
+ const narrow=[...axisLabelIndexes(labels,220)];
+ expect(narrow[0]).toBe(0);expect(narrow.at(-1)).toBe(30);expect(narrow.length).toBeLessThanOrEqual(10);
+ expect(narrow.slice(1).every((n,i)=>n-narrow[i]!>=4)).toBe(true);
+ expect(axisLabelIndexes(labels,1100).size).toBe(31);expect(labels).toHaveLength(31);
+ const months=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+ expect(axisLabelIndexes(months,900).size).toBe(12);expect(axisLabelIndexes([],390).size).toBe(0);
+});
 const config = { ...newChart(), groupSlug: "category", aggregation: "sum" as const, valueSlug: "amount" };
 test("all 18 shapes serialize while legacy eight configurations remain compatible", () => {
   expect(CHART_KINDS).toHaveLength(18);

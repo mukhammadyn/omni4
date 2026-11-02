@@ -1,3 +1,4 @@
+import { SqlSortPresetOptions } from "./SqlSortPresetOptions";
 import {SqlFilterPresetOptions} from "./SqlFilterPresetOptions";
 import { WidgetSectionOptions } from "./WidgetSectionOptions";
 import { SqlSelectionOptions } from "./SqlSelectionOptions";
@@ -50,6 +51,7 @@ export function SqlWidgetOptions({ widget, fields, onChange }: { widget: Widget;
     {widget.type === "records" ? <>
       <SqlRecordOptionsEditor widget={widget} fields={fields} onChange={onChange} />
       <SqlFilterPresetOptions widget={widget} fields={fields} onChange={onChange}/>
+      <SqlSortPresetOptions widget={widget} fields={fields} onChange={onChange}/>
       {!widget.sqlRecords ? <>
       <Field label={ru?"Колонка прогресса":"Progress column"}><Dropdown ariaLabel={ru?"Колонка прогресса":"Progress column"} value={widget.sqlProgressField ?? ""} items={[{value:"",label:"—"},...fields.filter(f=>f.type==="NUMBER").map(f=>({value:f.slug,label:f.label}))]} onChange={value=>onChange({sqlProgressField:value})}/></Field>
       {widget.sqlProgressField && <><Field label={ru?"Максимум прогресса":"Progress maximum"}><Input type="number" min={0.000001} max={1e12} aria-label={ru?"Максимум прогресса":"Progress maximum"} value={widget.sqlProgressMax ?? 100} onChange={event=>onChange({sqlProgressMax:Math.max(0.000001,Math.min(1e12,Number(event.target.value)||100))})}/></Field><Field label={ru?"Суффикс прогресса":"Progress suffix"}><Input aria-label={ru?"Суффикс прогресса":"Progress suffix"} value={widget.sqlProgressSuffix ?? ""} onChange={event=>onChange({sqlProgressSuffix:event.target.value})}/></Field></>}

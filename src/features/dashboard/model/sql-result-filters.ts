@@ -48,7 +48,7 @@ export function filterSqlResult(result: QueryResult, filters: Filters, selection
 }
 
 /** Compare exact numeric text without converting int8/decimal values to rounded JS numbers. */
-function compareDecimal(a: string, b: string): number {
+export function compareDecimal(a: string, b: string): number {
   const parse = (value: string) => { const match = /^([+-]?)(\d+)(?:\.(\d+))?$/.exec(value); return match ? { negative: match[1] === "-", whole: match[2]!.replace(/^0+(?=\d)/, ""), fraction: (match[3] ?? "").replace(/0+$/, "") } : null; };
   const left = parse(a), right = parse(b); if (!left || !right) return NaN;
   const zero = (v: NonNullable<typeof left>) => v.whole === "0" && !v.fraction;
