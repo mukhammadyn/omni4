@@ -21,7 +21,19 @@ export function sqlSupportIssue(sql: string): SQLSupportIssue | null {
   // Two bounded derived-table layers support aggregation at employee/day grain
   // followed by report totals. Scalar subqueries, CTEs and unions stay excluded;
   // every token in every layer still passes the same function/write checks.
-  if (selections.length > 3 || selections.slice(1).some(index => tokens[index - 1]?.text !== "(" || !["from", "join"].some(word => keyword(index - 2, word)))) return "nested";
+  // Independent aggregates (ledger categories, monthly totals, dated rates) do
+  // not increase nesting depth. Bound both the breadth and the actual depth.
+  if (selections.length > 8 || selections.slice(1).some(index => tokens[index - 1]?.text !== "(" || !["from", "join"].some(word => keyword(index - 2, word)))) return "nested";
+  const scopes:boolean[]=[];
+  for(let index=0;index<tokens.length;index++){
+    if(tokens[index]!.text==="(")scopes.push(false);
+    else if(tokens[index]!.text===")"){if(!scopes.length)return "nested";scopes.pop();}
+    else if(index>0&&keyword(index,"select")){
+      scopes[scopes.length-1]=true;
+      if(scopes.filter(Boolean).length>2)return "nested";
+    }
+  }
+  if(scopes.length)return "nested";
   let series = 0;
   for (let index = 0; index < tokens.length; index++) {
     const token = tokens[index]!;
