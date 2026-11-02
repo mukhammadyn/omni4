@@ -468,6 +468,8 @@
   "dashboard.sampled": "по {{shown}} из {{total}}",
   "dashboard.search": "Найти дашборд",
   "dashboard.showNav": "Список дашбордов",
+  "dashboard.pickFromLeft": "Выберите дашборд в папках слева.",
+  "dashboard.manageFolders": "Управление папками и дашбордами",
   "dashboard.title": "Дашборды",
   "dashboard.unconfigured": "Виджет не настроен — откройте «Настроить» и выберите таблицу.",
   "dashboard.unfavorite": "Убрать из избранного",
