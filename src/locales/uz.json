@@ -468,6 +468,8 @@
   "dashboard.sampled": "{{total}} dan {{shown}} tasi bo'yicha",
   "dashboard.search": "Dashbord qidirish",
   "dashboard.showNav": "Dashbordlar ro'yxati",
+  "dashboard.pickFromLeft": "Chapdagi papkalardan dashboard tanlang.",
+  "dashboard.manageFolders": "Papkalar va dashboardlarni boshqarish",
   "dashboard.title": "Dashbordlar",
   "dashboard.unconfigured": "Vidjet sozlanmagan — «Sozlash»ni oching va jadvalni tanlang.",
   "dashboard.unfavorite": "Sevimlilardan olib tashlash",

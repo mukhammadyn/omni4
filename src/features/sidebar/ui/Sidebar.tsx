@@ -286,13 +286,7 @@ function SidebarPanel({
       </Link>
       */}
 
-      <div className="flex items-center justify-between px-2 pt-1">
-        <span className="text-2xs font-semibold text-fg-subtle">
-          {t("sidebar.menu")}
-        </span>
-        {/* Новый пункт — в выбранный модуль: корень занят модулями. */}
-        {!dashboardMenu&&<AddMenuButton parentId={active?.id ?? ROOT_MENU_ID} />}
-      </div>
+      {!dashboardMenu&&<div className="flex justify-end px-2"><AddMenuButton parentId={active?.id ?? ROOT_MENU_ID}/></div>}
 
       <nav className="flex-1 overflow-y-auto" aria-label={t("sidebar.menu")}>
         {isLoading && <Skeleton />}

@@ -154,7 +154,7 @@ export function DashboardsPage({
   const nav = (
       <DashNav
         tree={readableTree}
-        catalog={catalog}
+        catalog={false}
         modules={modules}
         currentId={current?.dashboard.id ?? ""}
         favorites={prefs.favorites}
@@ -187,13 +187,13 @@ export function DashboardsPage({
 
   return (
     <div className="relative flex min-h-0 flex-1">
-      {navOpen&&!catalog&&<DashboardNavigator onClose={closeNav}>{nav}</DashboardNavigator>}
+      {navOpen&&<DashboardNavigator onClose={closeNav}>{nav}</DashboardNavigator>}
       {datasetsOpen && <DatasetEditor datasets={tree.datasets ?? []} menuId={menuId} onSave={(datasets) => apply({ ...tree, datasets })} onCreateWidget={current && !editing ? (datasets,widget)=>apply(patchDashboard({...tree,datasets},current.dashboard.id,dashboard=>({...dashboard,widgets:[...dashboard.widgets,widget]}))) : undefined} onClose={() => setDatasetsOpen(false)} />}
 
       {/* Страница прокручивается целиком, полоса вкладок липнет к верху —
           как `.scroller` и `.viewbar` прототипа. */}
       <div className="min-w-0 flex-1 overflow-auto">
-        {catalog ? <div className="p-4 pb-8 md:p-6 lg:p-8"><h1 className="mb-4 text-2xl font-semibold">{t("dashboard.title")}</h1>{isLoading||root.isLoading?<p role="status">{t("common.loading")}</p>:nav}</div>:!current ? (
+        {catalog ? <div className="p-4 pb-8 md:p-6 lg:p-8"><h1 className="mb-4 text-2xl font-semibold">{t("dashboard.title")}</h1>{isLoading||root.isLoading?<p role="status">{t("common.loading")}</p>:<div className="flex max-w-lg flex-col items-start gap-4"><p className="text-sm text-fg-muted">{t("dashboard.pickFromLeft")}</p><Button type="button" variant="secondary" onClick={showNav}><Icon as={PanelLeftIcon} size={16}/>{t("dashboard.manageFolders")}</Button></div>}</div>:!current ? (
           <div className="px-4 pt-6 md:px-6 lg:px-8">
             <ShowNav onClick={showNav} />
             <Empty
@@ -461,7 +461,7 @@ function InlineText({
 function DashboardNavigator({children,onClose}:{children:ReactNode;onClose:()=>void}){
  const panel=useRef<HTMLDivElement>(null);
  useEffect(()=>{const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;const root=panel.current;root?.querySelector<HTMLElement>("button,input")?.focus();const key=(e:globalThis.KeyboardEvent)=>{if(e.key==="Escape"&&!document.querySelector('[role="menu"]'))onClose();if(e.key==="Tab"&&root){const nodes=[...root.querySelectorAll<HTMLElement>('button:not(:disabled),input,a[href],[tabindex="0"]')].filter(el=>el.getClientRects().length);const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};document.addEventListener("keydown",key);return()=>{document.removeEventListener("keydown",key);previous?.focus();};},[onClose]);
- return <Modal onClose={onClose} className="flex"><div ref={panel} role="dialog" aria-modal="true" aria-label="Dashboard navigation" className="h-full shadow-raised">{children}</div></Modal>;
+ return <Modal onClose={onClose} className="flex justify-start"><div ref={panel} role="dialog" aria-modal="true" aria-label="Dashboard navigation" className="h-full shadow-raised">{children}</div></Modal>;
 }
 
 /** Кнопка полосы вкладок — `.va-btn` прототипа: без рамки, подсветка на наведении. */

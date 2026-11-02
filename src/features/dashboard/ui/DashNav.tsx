@@ -83,8 +83,10 @@ export function DashNav({
   onFavorite,
   onHide,
   catalog=false,
+  embedded=false,
 }: {
   catalog?:boolean;
+  embedded?:boolean;
   tree: Tree;
   /** Модули проекта — папки меню с `is_tab`. */
   modules: MenuNode[];
@@ -133,7 +135,7 @@ export function DashNav({
     ...modules.map((module) => ({
       id: module.id,
       label: module.label,
-      icon: catalog ? <Icon as={FolderIcon} size={18} /> : <ModuleMark module={module} />,
+      icon: catalog || embedded ? <Icon as={FolderIcon} size={18} /> : <ModuleMark module={module} />,
       folders: tree.folders.filter((folder) => folder.moduleId === module.id),
     })),
     ...(orphans.length
@@ -224,8 +226,8 @@ export function DashNav({
   };
 
   return (
-    <nav aria-label={t("dashboard.title")} className={`flex min-h-0 shrink-0 flex-col bg-surface ${catalog?"w-full rounded-lg border border-border":"h-full w-65 max-w-[90vw] border-r border-border"}`}>
-      <div className="flex items-center gap-0.5 pt-3 pr-2.5 pb-1.5 pl-3.5">
+    <nav aria-label={t("dashboard.title")} className={`flex min-h-0 shrink-0 flex-col bg-surface ${embedded?"w-full bg-transparent":catalog?"w-full rounded-lg border border-border":"h-full w-65 max-w-[90vw] border-r border-border"}`}>
+      {!embedded&&<div className="flex items-center gap-0.5 pt-3 pr-2.5 pb-1.5 pl-3.5">
         <b className="flex-1 text-sm font-semibold">{t("dashboard.title")}</b>
         {canEdit && create("")}
         {!catalog&&<button
@@ -237,7 +239,7 @@ export function DashNav({
         >
           <Icon as={ChevronsLeftIcon} size={16} />
         </button>}
-      </div>
+      </div>}
 
       <label className="mx-2.5 mt-0.5 mb-1.5 flex h-7.5 items-center gap-1.5 rounded-md border border-border bg-bg px-2 text-fg-subtle">
         <Icon as={SearchIcon} size={14} />
@@ -249,8 +251,8 @@ export function DashNav({
         />
       </label>
 
-      <div className={`min-h-0 flex-1 ${catalog?"":"overflow-auto"} px-1.5 pb-2.5`}>
-        {!q && favs.length > 0 && (
+      <div className={`min-h-0 flex-1 ${catalog||embedded?"":"overflow-auto"} px-1.5 pb-2.5`}>
+        {!embedded && !q && favs.length > 0 && (
           <>
             <div className="px-2 pt-3 pb-1 text-xs font-semibold text-fg-subtle">{t("dashboard.favorites")}</div>
             {favs.map(({ folder, dashboard }) =>

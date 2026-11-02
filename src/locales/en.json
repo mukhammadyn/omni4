@@ -468,6 +468,8 @@
   "dashboard.sampled": "{{shown}} of {{total}}",
   "dashboard.search": "Find a dashboard",
   "dashboard.showNav": "Dashboard list",
+  "dashboard.pickFromLeft": "Choose a dashboard from the folders on the left.",
+  "dashboard.manageFolders": "Manage folders and dashboards",
   "dashboard.title": "Dashboards",
   "dashboard.unconfigured": "Widget isn’t set up — open “Manage” and pick a table.",
   "dashboard.unfavorite": "Remove from favorites",
