@@ -335,6 +335,52 @@ export function useUpdateItem(tableSlug: string | undefined) {
 }
 
 /**
+ * Одно и то же значение во все отмеченные строки — панель выделения
+ * (SelectionBar). Запрос на строку, как и у доски: в multiple-update
+ * отдельной проверки прав и authBypass нет, а PUT /v2/items — та же
+ * ручка, что правит ячейку.
+ *
+ * Сопровождающая запись связи (`<слаг>_data`) только в кэш — из неё
+ * ячейка берёт подпись до перезапроса; на сервер не уезжает.
+ * ponytail: N запросов параллельно; на сотнях строк — multiple-update.
+ */
+export function useUpdateItems(tableSlug: string | undefined) {
+  const queryClient = useQueryClient();
+  const slug = tableSlug ?? "";
+
+  return useMutation({
+    mutationFn: async ({ guids, values }: { guids: string[]; values: Record<string, unknown> }) => {
+      const table = await fetchTableSettings(queryClient, slug);
+      const sent = Object.fromEntries(Object.entries(values).filter(([key]) => !key.endsWith("_data")));
+      return Promise.all(
+        guids.map((guid) =>
+          api.put<unknown>(`/v2/items/${slug}`, { data: { guid, ...sent, ...authBypass(sent, table) } }),
+        ),
+      );
+    },
+
+    onMutate: async ({ guids, values }) => {
+      await queryClient.cancelQueries({ queryKey: keys.items.all });
+
+      const snapshot = queryClient.getQueriesData({ queryKey: keys.items.all });
+      const picked = new Set(guids);
+      queryClient.setQueriesData({ queryKey: keys.items.all }, (page: unknown) =>
+        mapRows(page, (row) => (picked.has(String(row["guid"])) ? { ...row, ...values } : row)),
+      );
+
+      return snapshot;
+    },
+
+    onError: (error, _edit, snapshot) => {
+      snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      reportError(error, "common.saveFailed");
+    },
+
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.items.all }),
+  });
+}
+
+/**
  * Номера колонок доски — SORT_ORDER в записях связанной таблицы
  * (`tableSlug`), по запросу на запись.
  *

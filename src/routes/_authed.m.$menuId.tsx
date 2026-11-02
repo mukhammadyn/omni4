@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDownIcon, FileIcon, UploadIcon, Trash2Icon } from "lucide-react";
+import { ChevronDownIcon, FileIcon, UploadIcon } from "lucide-react";
 import { z } from "zod";
 import {
   BOARD_ORDER,
@@ -47,6 +47,8 @@ import {
   ValueChips,
   useItems,
   useUpdateItem,
+  useUpdateItems,
+  SelectionBar,
   dayKey,
   periodRange,
   formatPivotSort,
@@ -203,7 +205,6 @@ import { nowLocal } from "@/shared/lib/date-value";
 import { toast } from "@/shared/lib/toast";
 import { useUi } from "@/shared/lib/ui-store";
 import type { TranslationKey } from "@/shared/lib/i18n";
-import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
@@ -1540,6 +1541,7 @@ function MenuPage() {
   const [deletingRow, setDeletingRow] = useState<string | null>(null);
   const remove = useDeleteItems(view?.tableSlug);
   const update = useUpdateItem(view?.tableSlug);
+  const updateMany = useUpdateItems(view?.tableSlug);
   const create = useCreateItem(view?.tableSlug);
   const createField = useCreateField(view?.tableSlug);
   const updateField = useUpdateField(view?.tableSlug);
@@ -1891,24 +1893,6 @@ function MenuPage() {
                 />
               )} */}
 
-              {/* Удаление отмеченных — тут же, у поиска и действий, а не
-                  внизу под таблицей: строку выделяют здесь же, в шапке,
-                  и убирать её отсюда логичнее, чем ехать взглядом в подвал.
-                  Кнопка появляется вместе с выделением и раздвигает
-                  остальное влево — панели действий не место, когда
-                  выделять нечего. */}
-              {supportedView && can.delete && selected.size > 0 && (
-                <Button
-                  variant="danger"
-                  size="sm"
-                  disabled={remove.isPending}
-                  onClick={() => setConfirming(true)}
-                  className="ml-2"
-                >
-                  <Icon as={Trash2Icon} size={14} />
-                  {t("table.deleteSelected", { count: selected.size })}
-                </Button>
-              )}
 
               {/* Настройки — самые правые в ряду: «Свойства», затем «Создать»
                   (кнопку передаём внутрь, beforeMenu), затем «⋮». Это вход
@@ -2213,10 +2197,9 @@ function MenuPage() {
             {...(can.addField
               ? { onAddField: (anchor: DOMRect) => setFieldPanel({ field: null, anchor }) }
               : {})}
-            /* Тот же диалог подтверждения, что и у таблицы. */
+            /* Удаление отмеченных — в SelectionBar, как у таблицы. */
             {...(can.delete
               ? {
-                  onDeleteSelected: () => setConfirming(true),
                   onDeleteRow: setDeletingRow,
                   deleting: remove.isPending,
                 }
@@ -3247,6 +3230,40 @@ function MenuPage() {
               },
             })
           }
+        />
+      )}
+
+      {/* Действия над отмеченными — плавающей панелью снизу, как
+          `.bulkbar` прототипа: правка выбора во всех строках, экспорт
+          отмеченного, удаление. */}
+      {supportedView && view && selected.size > 0 && (
+        <SelectionBar
+          count={selected.size}
+          columns={columns}
+          relations={schema.relations}
+          tableSlug={view.tableSlug}
+          locale={i18n.language}
+          language={language}
+          /* Только удаление: правка «в работе», пока перезапрашиваются
+             все списки (onSettled ждёт invalidate), — на тяжёлом view
+             это десятки секунд, и кнопки полей стояли бы серыми. */
+          busy={remove.isPending}
+          onClear={() => setSelected(new Set())}
+          {...(can.update
+            ? { onEdit: (values: Record<string, unknown>) => updateMany.mutate({ guids: [...selected], values }) }
+            : {})}
+          {...(can.delete ? { onDelete: () => setConfirming(true) } : {})}
+          /* Выгружаются только отмеченные — условием по guid поверх отбора. */
+          {...(ownExcel
+            ? {}
+            : {
+                onExport: () =>
+                  exportExcel.mutate({
+                    fieldIds: columns.map((field) => field.id),
+                    filters: { ...effectiveFilters, guid: { op: "is", values: [...selected] } },
+                    search: "",
+                  }),
+              })}
         />
       )}
 

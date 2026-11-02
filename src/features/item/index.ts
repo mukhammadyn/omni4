@@ -1,4 +1,4 @@
-export { patchRow, useDeleteItems, useItem, useItemCounts, useItems, useUpdateItem } from "./api/items";
+export { patchRow, useDeleteItems, useItem, useItemCounts, useItems, useUpdateItem, useUpdateItems } from "./api/items";
 export { BOARD_ORDER, groupValue, relatedEntry } from "./model/board";
 export { Board } from "./ui/Board";
 export { useDisabledDays } from "./api/calendar";
@@ -81,3 +81,4 @@ export { SearchBox, TableToolbar } from "./ui/TableToolbar";
 export { MineToggle, type WhoField } from "./ui/MineToggle";
 
 export { chartRoleIssue } from "./model/chart-geometry";
+export { SelectionBar } from "./ui/SelectionBar";
