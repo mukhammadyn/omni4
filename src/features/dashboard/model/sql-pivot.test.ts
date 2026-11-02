@@ -13,3 +13,9 @@ test("missing values stay unknown unless explicitly zero-filled; conflicting dim
 test("total fields can exclude rates while retaining monetary category sums",()=>{
  const out=pivotSqlResult({...source,columns:source.columns.map(c=>c.key==="Salary"?{...c,type:"numeric"}:c),rows:source.rows.map(r=>({...r,Salary:"100.00"}))},{...p,totalFields:["Net"]});expect(out.totals.Salary).toBeUndefined();expect(out.totals.pivot_0).toBe("9007199254740993.02");
 });
+
+test("category order is independent of unique-ID page order and keeps header groups contiguous",()=>{
+ const source:QueryResult={columns:[{key:"id",type:"text"},{key:"name",type:"text"},{key:"stage",type:"text"},{key:"group",type:"text"},{key:"order",type:"int4"},{key:"n",type:"numeric"}],rows:[{id:"v",name:"Vacancy",stage:"Interview",group:"A",order:2,n:"2"},{id:"v",name:"Vacancy",stage:"Offer",group:"B",order:0,n:"0"},{id:"v",name:"Vacancy",stage:"Screening",group:"A",order:0,n:"3"}],limit:1000,truncated:false};
+ const p:SqlPivot={rowKey:"id",rows:["name"],column:"stage",group:"group",sortField:"order",value:"n",after:[],zeroFill:true,totals:true};const out=pivotSqlResult(source,p);
+ expect(out.result.columns.map(c=>c.label || c.key)).toEqual(["id","name","Screening","Interview","Offer"]);expect(out.result.rows[0]).toMatchObject({pivot_0:"2",pivot_1:"0",pivot_2:"3"});expect(parseSqlPivot(p)?.sortField).toBe("order");
+});

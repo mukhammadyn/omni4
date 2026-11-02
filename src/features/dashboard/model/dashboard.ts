@@ -24,6 +24,7 @@ export type Widget = ChartConfig & {
   sqlToggleFilter?: SqlFilterPreset | undefined;
   sqlExportExcel?: boolean;
   sqlFormatNumbers?: boolean;
+  sqlHideSinglePagePagination?: boolean;
   sqlPivot?: SqlPivot | undefined;
   sqlLoadAllRows?: boolean;
   sqlRowKey?: string;
@@ -128,6 +129,7 @@ export function toTree(value: unknown): Tree {
                 {
                   ...chart,
                   ...(parseSqlFilterPresets([item["sqlToggleFilter"]])[0] ? {sqlToggleFilter:parseSqlFilterPresets([item["sqlToggleFilter"]])[0]!} : {}),
+                  ...(typeof item["sqlHideSinglePagePagination"] === "boolean" ? {sqlHideSinglePagePagination:item["sqlHideSinglePagePagination"]} : {}),
                   ...(typeof item["sqlFormatNumbers"] === "boolean" ? {sqlFormatNumbers:item["sqlFormatNumbers"]} : {}),
                   ...(typeof item["sqlExportExcel"] === "boolean" ? {sqlExportExcel:item["sqlExportExcel"]} : {}),
                   ...(parseSqlPivot(item["sqlPivot"]) ? {sqlPivot:parseSqlPivot(item["sqlPivot"])!} : {}),
@@ -211,6 +213,7 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
           ...(widget.tabGroup !== undefined ? {tabGroup:widget.tabGroup} : {}),
           ...(widget.tabLabel !== undefined ? {tabLabel:widget.tabLabel} : {}),
           ...(widget.sqlToggleFilter ? {sqlToggleFilter:widget.sqlToggleFilter} : {}),
+          ...(widget.sqlHideSinglePagePagination !== undefined ? {sqlHideSinglePagePagination:widget.sqlHideSinglePagePagination} : {}),
           ...(widget.sqlFormatNumbers !== undefined ? {sqlFormatNumbers:widget.sqlFormatNumbers} : {}),
           ...(widget.sqlExportExcel !== undefined ? {sqlExportExcel:widget.sqlExportExcel} : {}),
           ...(widget.sqlPivot ? {sqlPivot:widget.sqlPivot} : {}),
