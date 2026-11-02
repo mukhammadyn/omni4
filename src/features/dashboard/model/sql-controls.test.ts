@@ -14,3 +14,7 @@ test("period bounds, week/year navigation and all-time use complete calendar dat
  expect(dashboardSqlValues(parameters,{[sqlPeriodKey("tasks")]:["all","2026-11-02"]})).toMatchObject({start:"0001-01-01",end:"9999-12-31"});
  expect(dashboardSqlValues(parameters,{[sqlPeriodKey("tasks")]:["custom"],"sql-param:start":["2024-02-29"],"sql-param:end":["2024-03-01"],"sql-param:employee":["id"]})).toEqual({start:"2024-02-29",end:"2024-03-01",employee:"id"});
 });
+
+test("calendar input labels use the report locale without changing the UTC date",async()=>{
+ const {sqlCalendarLabel}=await import("./sql-controls");expect(sqlCalendarLabel("2026-11-02","ru")).toBe("02.11.2026");expect(sqlCalendarLabel("2026-11-02","en-US")).toBe("11/02/2026");expect(sqlCalendarLabel("2024-02-29","ru")).toBe("29.02.2024");expect(sqlCalendarLabel("2026-02-31","ru")).toBe("—");
+});

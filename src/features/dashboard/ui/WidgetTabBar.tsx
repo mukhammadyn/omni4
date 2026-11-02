@@ -1,5 +1,13 @@
+import {useLayoutEffect,useRef,type ReactNode} from "react";
 import type { Widget } from "../model/dashboard";
 export function WidgetTabBar({members,value,onChange}:{members:Widget[];value:string;onChange:(id:string)=>void}) {
   const pick=(id:string,focus=false)=>{onChange(id);if(focus)requestAnimationFrame(()=>document.getElementById(`widget-tab-${id}`)?.focus());};
   return <div role="tablist" aria-label={members[0]?.tabGroup} className="mb-2 flex min-h-10 shrink-0 flex-wrap items-center gap-1 border-b border-border px-3">{members.map((member,index)=><button key={member.id} id={`widget-tab-${member.id}`} role="tab" aria-selected={member.id===value} aria-controls={`widget-tab-panel-${value}`} tabIndex={member.id===value?0:-1} className={`rounded-md px-3 py-2 text-sm ${member.id===value?"bg-accent-subtle font-medium text-accent-text":"text-fg-muted hover:bg-surface-hover"}`} onClick={()=>pick(member.id)} onKeyDown={event=>{const next=event.key==="ArrowRight"?members[(index+1)%members.length]:event.key==="ArrowLeft"?members[(index+members.length-1)%members.length]:event.key==="Home"?members[0]:event.key==="End"?members.at(-1):undefined;if(next){event.preventDefault();pick(next.id,true);}}}>{member.tabLabel || member.title || `Tab ${index+1}`}</button>)}</div>;
+}
+
+/** Includes wrapped tab rows and their own margin in fitted card geometry. */
+export function WidgetTabFrame({children,onHeight}:{children:ReactNode;onHeight:(height:number)=>void}){
+ const root=useRef<HTMLDivElement>(null);
+ useLayoutEffect(()=>{const element=root.current;if(!element)return;const measure=()=>onHeight(Math.ceil(element.getBoundingClientRect().height));const observer=new ResizeObserver(measure);observer.observe(element);measure();return()=>observer.disconnect();},[onHeight]);
+ return <div ref={root} data-widget-tab-frame className="flow-root shrink-0">{children}</div>;
 }
