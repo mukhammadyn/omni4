@@ -19,3 +19,8 @@ test("category order is independent of unique-ID page order and keeps header gro
  const p:SqlPivot={rowKey:"id",rows:["name"],column:"stage",group:"group",sortField:"order",value:"n",after:[],zeroFill:true,totals:true};const out=pivotSqlResult(source,p);
  expect(out.result.columns.map(c=>c.label || c.key)).toEqual(["id","name","Screening","Interview","Offer"]);expect(out.result.rows[0]).toMatchObject({pivot_0:"2",pivot_1:"0",pivot_2:"3"});expect(parseSqlPivot(p)?.sortField).toBe("order");
 });
+
+test("an explicit empty domain retains real categories without fabricating record rows",()=>{
+ const empty={...source,rows:[{...source.rows[0],ID:null,Amount:"0"}]};expect(()=>pivotSqlResult(empty,p)).toThrow("identifiers");const out=pivotSqlResult(empty,{...p,domainRows:true});expect(out.result.rows).toEqual([]);expect(out.result.columns.some(c=>c.label==="Bonus")).toBe(true);
+ const unknown=pivotSqlResult({...source,rows:[{...source.rows[0],Amount:null}]},p);expect(unknown.result.rows[0]?.pivot_0).toBeNull();
+});

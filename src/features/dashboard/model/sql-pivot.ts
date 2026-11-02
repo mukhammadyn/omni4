@@ -1,12 +1,12 @@
 import {sortSqlResult} from "./sql-sort-presets";
 import type {QueryResult} from "./query-result";
-export type SqlPivot={rowKey:string; rows:string[]; column:string; sortField?:string|undefined; group?:string|undefined; value:string; after:string[]; zeroFill:boolean; totalFields?:string[]|undefined; totals:boolean};
+export type SqlPivot={rowKey:string; rows:string[]; column:string; sortField?:string|undefined; group?:string|undefined; value:string; after:string[]; zeroFill:boolean; domainRows?:boolean|undefined; totalFields?:string[]|undefined; totals:boolean};
 export function parseSqlPivot(raw:unknown):SqlPivot|undefined{
  if(!raw||typeof raw!=="object")return;
  const p=raw as Record<string,unknown>;
  const keys=(v:unknown)=>Array.isArray(v)?v.filter((s):s is string=>typeof s==="string"&&s.length>0).slice(0,32):[];
  if(typeof p["rowKey"]!=="string"||typeof p["column"]!=="string"||typeof p["value"]!=="string")return;
- return {rowKey:p["rowKey"],rows:keys(p["rows"]),column:p["column"],value:p["value"],after:keys(p["after"]),...(typeof p["sortField"]==="string"?{sortField:p["sortField"]}:{}),...(typeof p["group"]==="string"?{group:p["group"]}:{}),zeroFill:p["zeroFill"]===true,...(Array.isArray(p["totalFields"])?{totalFields:keys(p["totalFields"])}:{}),totals:p["totals"]===true};
+ return {rowKey:p["rowKey"],rows:keys(p["rows"]),column:p["column"],value:p["value"],after:keys(p["after"]),...(typeof p["sortField"]==="string"?{sortField:p["sortField"]}:{}),...(typeof p["group"]==="string"?{group:p["group"]}:{}),zeroFill:p["zeroFill"]===true,...(typeof p["domainRows"]==="boolean"?{domainRows:p["domainRows"]}:{}),...(Array.isArray(p["totalFields"])?{totalFields:keys(p["totalFields"])}:{}),totals:p["totals"]===true};
 }
 /** Exact decimal addition keeps payroll values out of binary floating-point sums. */
 export function addSqlDecimal(a:string,b:string):string{
@@ -20,15 +20,21 @@ export function pivotSqlResult(source:QueryResult,p:SqlPivot):{result:QueryResul
  if(!["numeric","int2","int4","int8","float4","float8"].includes(source.columns.find(c=>c.key===p.value)!.type))throw new Error("Pivot value must be numeric");
  const dimensions=[...new Set([p.rowKey,...p.rows,...p.after])],groups:Record<string,string>={},dynamic=new Map<string,{key:string;type:string;label:string}>(),rows=new Map<string,QueryResult["rows"][number]>(),totals:Record<string,string>={};
  for(const row of source.rows){
-  const id=row[p.rowKey];if(id===null||id===undefined||id==="")throw new Error("Pivot row identifiers must be non-empty");
+  let key:string|undefined;
+  if(row[p.column]!==null&&row[p.column]!==undefined){
+   const group=p.group?String(row[p.group] ?? ""):"",label=String(row[p.column]),category=JSON.stringify([group,label]);
+   if(!dynamic.has(category)){let next=`pivot_${dynamic.size}`;while(source.columns.some(c=>c.key===next))next=`_${next}`;dynamic.set(category,{key:next,type:"numeric",label});groups[next]=group;}
+   key=dynamic.get(category)!.key;
+  }
+  const id=row[p.rowKey];if(id===null&&p.domainRows)continue;
+  if(id===null||id===undefined||id==="")throw new Error("Pivot row identifiers must be non-empty");
   const identity=String(id),previous=rows.get(identity);
   if(previous&&dimensions.some(k=>previous[k]!==row[k]))throw new Error("Pivot row dimensions changed within one identifier");
   const target=previous ?? Object.fromEntries(dimensions.map(k=>[k,row[k] ?? null]));rows.set(identity,target);
-  if(row[p.column]===null||row[p.column]===undefined)continue;
-  const group=p.group?String(row[p.group] ?? ""):"",label=String(row[p.column]),category=JSON.stringify([group,label]);
-  if(!dynamic.has(category)){let key=`pivot_${dynamic.size}`;while(source.columns.some(c=>c.key===key))key=`_${key}`;dynamic.set(category,{key,type:"numeric",label});groups[key]=group;}
-  const key=dynamic.get(category)!.key,value=row[p.value];
-  if(value!==null&&value!==undefined)target[key]=addSqlDecimal(String(target[key] ?? "0"),String(value));
+  if(!key)continue;
+  const value=row[p.value];
+  if(value===null||value===undefined)target[key]=null;
+  else if(target[key]!==null)target[key]=addSqlDecimal(String(target[key] ?? "0"),String(value));
  }
  let categorySource=p.sortField?sortSqlResult(source,{label:"",field:p.sortField,direction:"asc",nulls:"last"},"en"):source;
  if(p.group)categorySource=sortSqlResult(categorySource,{label:"",field:p.group,direction:"asc",nulls:"last"},"en");
@@ -36,7 +42,7 @@ export function pivotSqlResult(source:QueryResult,p:SqlPivot):{result:QueryResul
  for(const row of categorySource.rows){if(row[p.column]===null||row[p.column]===undefined)continue;const category=JSON.stringify([p.group?String(row[p.group] ?? ""):"",String(row[p.column])]);const column=dynamic.get(category);if(column)ordered.set(category,column);}
  const columns=[...new Set([p.rowKey,...p.rows])].map(k=>source.columns.find(c=>c.key===k)!).concat([...ordered.values()],p.after.filter(k=>k!==p.rowKey&&!p.rows.includes(k)).map(k=>source.columns.find(c=>c.key===k)!));
  if(columns.length>64)throw new Error("Pivot exceeds 64 columns; narrow its scope");
- const output=[...rows.values()].map(row=>Object.fromEntries(columns.map(c=>[c.key,row[c.key] ?? (p.zeroFill&&[...dynamic.values()].some(d=>d.key===c.key)?"0":null)])));
+ const output=[...rows.values()].map(row=>Object.fromEntries(columns.map(c=>[c.key,Object.hasOwn(row,c.key)?row[c.key]:(p.zeroFill&&[...dynamic.values()].some(d=>d.key===c.key)?"0":null)])));
  if(p.totals)for(const c of columns)if((!p.totalFields?.length || p.totalFields.includes(c.key) || Object.hasOwn(groups,c.key)) && ["numeric","int2","int4","int8","float4","float8"].includes(c.type))for(const row of output)if(row[c.key]!==null)totals[c.key]=addSqlDecimal(totals[c.key] ?? "0",String(row[c.key]));
  return {result:{...source,columns,rows:output},groups,totals};
 }
