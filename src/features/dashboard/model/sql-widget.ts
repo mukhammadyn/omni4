@@ -11,7 +11,7 @@ export function sqlWidgetFrom(dataset: Dataset, presentation?: SqlPresentation):
 }
 
 /** SQL results use the shared picker with the renderers supported for returned columns. */
-export const SQL_VISUALIZATIONS = ["records", "stat", "column", "bar", "line", "donut", "pie", "area", "combo"] as const;
+export const SQL_VISUALIZATIONS = ["records", "stat", "column", "bar", "line", "donut", "pie", "area", "combo", "funnel"] as const;
 
 export function stageSqlWidget(datasets: Dataset[], widget: Widget, dataset: Dataset) {
   const previous = datasets.find((item) => item.id === widget.datasetId);

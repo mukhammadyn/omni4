@@ -1,3 +1,4 @@
+import { niceChartTicks } from "./chart-geometry";
 import { expect, test } from "vitest";
 import type { Field } from "@/features/table";
 import { CHART_KINDS, chartReady, chartSeries, newChart, toCharts, toChartsAttribute } from "./chart";
@@ -11,6 +12,8 @@ test("narrow daily axes retain their first/last labels and do not alter their da
  expect(axisLabelIndexes(labels,1100).size).toBe(31);expect(labels).toHaveLength(31);
  const months=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
  expect(axisLabelIndexes(months,900).size).toBe(12);expect(axisLabelIndexes([],390).size).toBe(0);
+ const dates=labels.map(day=>`${day}.10.2026`);
+ expect([...axisLabelIndexes(dates,226)]).toEqual([0,15,30]);
 });
 const config = { ...newChart(), groupSlug: "category", aggregation: "sum" as const, valueSlug: "amount" };
 test("all 18 shapes serialize while legacy eight configurations remain compatible", () => {
@@ -61,4 +64,15 @@ test("monotone line smoothing preserves endpoints and a zero plateau without ove
  const coordinates=[...path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(match=>Number(match[2]));
  expect(coordinates.every(y=>y>=0 && y<=100)).toBe(true);
  expect(smoothChartPath([])).toBe("");
+});
+
+test("integer quantity axes never repeat rounded fractional tick labels",()=>{
+ expect(niceChartTicks(0,2,1)).toEqual([0,1,2]);
+ expect(niceChartTicks(0,0,1)).toEqual([0,1]);
+ expect(niceChartTicks(-1,2,1)).toEqual([-1,0,1,2]);
+});
+
+test("funnel presentation survives normal save and reopen",()=>{
+ const config={...newChart(),kind:"funnel" as const,appearance:{funnelStyle:"tapered" as const}};
+ expect(toCharts(toChartsAttribute([config]))[0]?.appearance?.funnelStyle).toBe("tapered");
 });

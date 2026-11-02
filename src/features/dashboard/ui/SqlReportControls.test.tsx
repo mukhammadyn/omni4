@@ -116,3 +116,21 @@ test("unknown measures retain an explicit editable explanation while measured ze
  const zero=renderToStaticMarkup(<SqlResultView displayOnly language="ru" result={{...result,rows:[{minutes:0}]}} presentation={presentation}/>);
  expect(zero).toContain("data-sql-stat-value");expect(zero).not.toContain("Перерывы отдельно не записаны</p>");
 });
+
+test("categorical SQL lines share numeric axes, adaptive label slots and point interactions",()=>{
+ const rows=[{day:"16.06.2026",source:"A",n:1},{day:"16.06.2026",source:"B",n:2},{day:"01.09.2026",source:"A",n:2},{day:"01.09.2026",source:"B",n:0}];
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="ru" onPick={()=>{}} result={{columns:[{key:"day",type:"text"},{key:"source",type:"text"},{key:"n",type:"int4"}],rows,limit:100,truncated:false}} presentation={{type:"chart",kind:"line",group:"day",split:"source",value:"n",appearance:{axisTicks:true,axisTitleLeft:"Кандидаты",sharedTooltip:true,smoothLine:true,decimals:0}}}/>);
+ expect(html).toContain("data-cartesian-labels");expect(html).toContain("Кандидаты");expect(html).toContain("16.06.2026");expect(html).toContain("01.09.2026");
+ expect(html.match(/<circle/g)?.length).toBe(4);expect(html).not.toContain("<rect");expect(html.match(/fill="none"/g)?.length).toBe(2);
+ expect(html).toContain('aria-label="16.06.2026 · A: 1"');
+});
+test("SQL funnels retain long stage labels, zero stages, tooltips and gray unselected targets",()=>{
+ const rows=[{stage:"Очень длинное название этапа собеседования",n:3},{stage:"Оффер",n:1},{stage:"Найм",n:0}];
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="ru" onPick={()=>{}} selectedKey="Оффер" result={{columns:[{key:"stage",type:"text"},{key:"n",type:"int4"}],rows,limit:100,truncated:false}} presentation={{type:"chart",kind:"funnel",group:"stage",split:"",value:"n"}}/>);
+ expect(html).toContain(rows[0]!.stage);expect(html).toContain('role="button"');expect(html).toContain('bg-border-strong');expect(html).toContain('aria-label="Найм: 0"');
+});
+
+test("editable tapered funnels retain readable HTML labels and all stage counts",()=>{
+ const html=renderToStaticMarkup(<SqlResultView displayOnly language="ru" onPick={()=>{}} selectedKey="Оффер" result={{columns:[{key:"stage",type:"text"},{key:"n",type:"int4"}],rows:[{stage:"Очень длинный этап интервью с руководителем",n:4},{stage:"Оффер",n:2}],limit:100,truncated:false}} presentation={{type:"chart",kind:"funnel",group:"stage",split:"",value:"n",appearance:{funnelStyle:"tapered"}}}/>);
+ expect(html).toContain("data-funnel-tapered");expect(html.match(/data-funnel-step/g)?.length).toBe(2);expect(html).toContain("<polygon");expect(html).toContain("Очень длинный этап интервью с руководителем</p>");expect(html).toContain("fill-border-strong");expect(html).not.toContain("<text");
+});

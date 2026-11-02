@@ -847,13 +847,13 @@ export function ChartCard({
         ) : config.kind === "heatmap" ? (
           <Heatmap series={series} locale={i18n.language} />
         ) : config.kind === "funnel" ? (
-          <Funnel series={series} locale={i18n.language} />
+          <Funnel series={series} locale={i18n.language} onPick={onPick} selectedKey={selectedKey} appearance={config.appearance} />
         ) : config.kind === "stream" ? (
           <Stream series={series} locale={i18n.language} />
         ) : config.kind === "stack" ? (
           <Stack series={series} locale={i18n.language} />
         ) : config.kind === "line" ? (
-          <Line series={series} locale={i18n.language} showGrid={config.showGrid === true} />
+          <Line config={config} series={series} locale={i18n.language} onPick={onPick} selectedKey={selectedKey} selectedSeries={selectedSeries} />
         ) : (
           <Bars series={series} locale={i18n.language} config={config} onPick={onPick} selectedKey={selectedKey} />
         )}
@@ -1341,8 +1341,20 @@ function Stack({ series, locale }: { series: ChartSeries; locale: string }) {
  * стадиями в наших данных нет — в строке лежит только текущая стадия,
  * а история переходов живёт в журнале, которого у графика нет.
  */
-function Funnel({ series, locale }: { series: ChartSeries; locale: string }) {
+function Funnel({ series, locale, onPick, selectedKey, appearance }: { appearance?: ChartConfig["appearance"] | undefined; series: ChartSeries; locale: string; onPick?: ((key: string) => void) | undefined; selectedKey?: string | undefined }) {
   const top = Math.max(...series.points.map((point) => point.value), 0);
+
+  if (appearance?.funnelStyle === "tapered") return <div className="flex flex-col gap-1.5" data-funnel-tapered>{series.points.map((point,index)=>{
+    const width=(value:number)=>top>0 ? Math.max(1.3,value/top*98) : 1.3;
+    const upper=width(point.value),lower=series.points[index+1] ? width(series.points[index+1]!.value) : upper*0.8;
+    const share=series.total>0 ? point.value/series.total*100 : 0;
+    const muted=selectedKey!==undefined && selectedKey!==point.key;
+    const fill=muted ? "fill-border-strong" : seriesStroke(point.key,index).replaceAll("stroke-","fill-");
+    return <Tooltip key={point.key} label={`${point.label}: ${show(point.value,locale)} · ${percent(share)}`}><div data-funnel-step tabIndex={0} role={onPick?"button":undefined} aria-label={`${point.label}: ${show(point.value,locale)}`} onClick={onPick?()=>onPick(point.key):undefined} onKeyDown={onPick?event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();onPick(point.key);}}:undefined} className="grid min-h-11 grid-cols-[minmax(72px,40%)_minmax(0,1fr)] items-center gap-4">
+      <svg viewBox="0 0 100 44" preserveAspectRatio="none" className="h-11 w-full" aria-hidden="true"><polygon points={`${50-upper/2},0 ${50+upper/2},0 ${50+lower/2},44 ${50-lower/2},44`} className={fill}/></svg>
+      <div className="min-w-0"><p className="break-words text-sm font-semibold">{point.label}</p><p className="text-xs tabular-nums text-fg-muted">{show(point.value,locale)} · {percent(share)}</p></div>
+    </div></Tooltip>;
+  })}</div>;
 
   return (
     <div className="flex flex-col gap-1">
@@ -1351,14 +1363,14 @@ function Funnel({ series, locale }: { series: ChartSeries; locale: string }) {
 
         return (
           <div key={point.key} className="flex items-center gap-2">
-            <span className="w-28 shrink-0 truncate text-xs text-fg-muted" title={point.label}>
+            <span className="w-36 max-w-[40%] shrink-0 break-words text-xs text-fg-muted" title={point.label}>
               {point.label}
             </span>
 
             <Tooltip label={`${point.label}: ${show(point.value, locale)} · ${percent(share)}`}>
-              <div tabIndex={0} className="h-5 min-w-0 flex-1">
+              <div tabIndex={0} role={onPick ? "button" : undefined} aria-label={`${point.label}: ${show(point.value, locale)}`} onClick={onPick ? () => onPick(point.key) : undefined} onKeyDown={onPick ? event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(point.key); } } : undefined} className="h-5 min-w-0 flex-1">
                 <div
-                  className="h-full rounded-r-[4px] bg-chart-1"
+                  className={`h-full rounded-r-[4px] ${selectedKey !== undefined && selectedKey !== point.key ? "bg-border-strong" : "bg-chart-1"}`}
                   style={{ width: `${top > 0 ? Math.max(0, point.value / top) * 100 : 0}%` }}
                 />
               </div>
@@ -1710,122 +1722,8 @@ function Legend({ splits, appearance }: { splits: ChartSplit[]; appearance?: Cha
  * системы. Текста внутри поэтому нет вовсе: он растянулся бы вместе
  * с осями. Подписи — обычной разметкой вокруг.
  */
-function Line({ series, locale, showGrid = false }: { series: ChartSeries; locale: string; showGrid?: boolean }) {
-  const multi = series.splits.length > 1;
-  /* Ось общая для всех линий: у каждой своя означало бы, что рядом
-     нарисованы графики с разной ценой деления. */
-  const values = multi
-    ? series.points.flatMap((point) => series.splits.map((split) => point.cells.get(split.key) ?? 0))
-    : series.points.map((point) => point.value);
-
-  const top = Math.max(...values, 0);
-  const bottom = Math.min(...values, 0);
-  const span = top - bottom || 1;
-  const count = series.points.length;
-
-  /*
-   * Поле сверху и снизу: линия по краю коробки обрезается своей же
-   * толщиной пополам — ровно это и видно, когда все значения равны
-   * и линия ложится на верхнюю границу.
-   */
-  const PAD = 4;
-
-  const path = (valueAt: (index: number) => number) =>
-    series.points
-      .map((_, index) => {
-        const x = count > 1 ? (index / (count - 1)) * 100 : 50;
-        const y = PAD + (1 - (valueAt(index) - bottom) / span) * (100 - PAD * 2);
-        return `${x},${y}`;
-      })
-      .join(" ");
-
-  const lines = multi
-    ? series.splits.map((split, index) => ({
-        key: split.key,
-        color: seriesStroke(split.key, index),
-        points: path((at) => series.points[at]?.cells.get(split.key) ?? 0),
-      }))
-    : [{ key: "", color: "stroke-chart-1", points: path((at) => series.points[at]?.value ?? 0) }];
-
-  const first = series.points[0];
-  const last = series.points[count - 1];
-
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-1">
-      <div className="flex min-h-0 flex-1 items-stretch gap-2">
-        <span className="w-14 shrink-0 text-right text-2xs tabular-nums text-fg-subtle">
-          {show(top, locale)}
-        </span>
-
-        {/* Поле графика — весь остаток по высоте: у линии форма читается
-            именно по вертикали, и растянуть её значит показать больше. */}
-        <div className="relative min-h-0 min-w-0 flex-1 border-b border-chart-grid">
-          <svg
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            className="size-full"
-            role="presentation"
-          >
-            {showGrid && [4, 27, 50, 73, 96].map((position) => <line key={position} data-chart-grid x1="0" x2="100" y1={position} y2={position} className="stroke-chart-grid" vectorEffect="non-scaling-stroke" />)}
-            {lines.map((line) => (
-              <polyline
-                key={line.key}
-                points={line.points}
-                fill="none"
-                strokeWidth="2"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                vectorEffect="non-scaling-stroke"
-                className={line.color}
-              />
-            ))}
-          </svg>
-
-          {/*
-           * Подсказка по наведению — полосами поверх линии: попасть
-           * в саму линию мышью нельзя.
-           * ponytail: полосы равной ширины, а точки стоят по краям, —
-           * у первой и последней подсказка срабатывает на полполосы
-           * в сторону. Считать точные границы — когда станет мешать.
-           */}
-          <div className="absolute inset-0 flex">
-            {series.points.map((point) => (
-              <Tooltip
-                key={point.key}
-                label={
-                  multi ? (
-                    /* У мульти-линии в одной точке несколько значений:
-                       подсказка перечисляет все, иначе она отвечает
-                       за одну линию, а навели на все сразу. Разметкой,
-                       а не переводом строки: подсказка рисует текст
-                       в одну строку, и «\n» в ней схлопывается. */
-                    <span className="flex flex-col gap-0.5">
-                      <span className="font-medium">{point.label}</span>
-                      {series.splits.map((split) => (
-                        <span key={split.key}>
-                          {splitName(split)}: {show(point.cells.get(split.key) ?? 0, locale)}
-                        </span>
-                      ))}
-                    </span>
-                  ) : (
-                    `${point.label}: ${show(point.value, locale)}`
-                  )
-                }
-              >
-                <div tabIndex={0} className="h-full flex-1" />
-              </Tooltip>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Ось времени: края подписаны, середину читают подсказкой. */}
-      <div className="flex gap-2 pl-16 text-2xs text-fg-subtle">
-        <span className="min-w-0 flex-1 truncate">{first?.label}</span>
-        {count > 1 && <span className="min-w-0 flex-1 truncate text-right">{last?.label}</span>}
-      </div>
-    </div>
-  );
+function Line(props: { config: ChartConfig; series: ChartSeries; locale: string; onPick?: ((key: string, series?: string) => void) | undefined; selectedKey?: string | undefined; selectedSeries?: string | undefined }) {
+  return <CartesianChart {...props}/>;
 }
 
 /**

@@ -8,7 +8,8 @@ export function axisLabelIndexes(labels:string[],width:number):Set<number> {
   if(!labels.length) return new Set();
   if(!Number.isFinite(width) || width<=0) return new Set(labels.map((_,i)=>i));
   const textWidth=Math.max(24,Math.min(96,Math.max(...labels.map(label=>label.length*5.5+10))));
-  const stride=Math.max(1,Math.ceil(labels.length*textWidth/width));
+  const capacity=Math.max(2,Math.floor(width/textWidth));
+  const stride=Math.max(1,Math.ceil((labels.length-1)/(capacity-1)));
   return new Set(labels.flatMap((_,i)=>i===0 || i===labels.length-1 || i%stride===0 && labels.length-1-i>=stride ? [i]:[]));
 }
 
@@ -99,9 +100,9 @@ export function stackedBands(series: ChartSeries) {
 }
 
 /** A readable dynamic scale; never fixes the report to today's maximum. */
-export function niceChartTicks(minimum: number, maximum: number): number[] {
+export function niceChartTicks(minimum: number, maximum: number, minimumStep = 0): number[] {
   const span = Math.max(maximum - minimum, 1), raw = span / 5, power = 10 ** Math.floor(Math.log10(raw)), ratio = raw / power;
-  const step = (ratio < 1.5 ? 1 : ratio < 3.5 ? 2 : ratio < 7.5 ? 5 : 10) * power;
+  const step = Math.max(minimumStep, (ratio < 1.5 ? 1 : ratio < 3.5 ? 2 : ratio < 7.5 ? 5 : 10) * power);
   const min = Math.floor(minimum / step) * step, max = Math.ceil(maximum / step) * step;
   return Array.from({ length: Math.max(2, Math.round((max - min) / step) + 1) }, (_, index) => Number((min + index * step).toPrecision(12)));
 }
