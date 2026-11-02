@@ -134,3 +134,8 @@ test("editable tapered funnels retain readable HTML labels and all stage counts"
  const html=renderToStaticMarkup(<SqlResultView displayOnly language="ru" onPick={()=>{}} selectedKey="Оффер" result={{columns:[{key:"stage",type:"text"},{key:"n",type:"int4"}],rows:[{stage:"Очень длинный этап интервью с руководителем",n:4},{stage:"Оффер",n:2}],limit:100,truncated:false}} presentation={{type:"chart",kind:"funnel",group:"stage",split:"",value:"n",appearance:{funnelStyle:"tapered"}}}/>);
  expect(html).toContain("data-funnel-tapered");expect(html.match(/data-funnel-step/g)?.length).toBe(2);expect(html).toContain("<polygon");expect(html).toContain("Очень длинный этап интервью с руководителем</p>");expect(html).toContain("fill-border-strong");expect(html).not.toContain("<text");
 });
+
+test("single-page navigation may be hidden without removing rows or multi-page controls",()=>{
+ const render=(n:number)=>renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:"label",type:"text"}],rows:Array.from({length:n},(_,i)=>({label:`Row ${i}`})),limit:1000,truncated:false}} presentation={{type:"table",kind:"bar",group:"",value:"",split:"",pageSize:10,hideSinglePagePagination:true,fitContent:true}}/>);
+ expect(render(1)).toContain("Row 0");expect(render(1)).not.toContain("1 / 1");expect(render(11)).toContain("1 / 2");expect(render(11)).not.toContain("Row 10");
+});
