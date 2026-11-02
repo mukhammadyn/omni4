@@ -46,7 +46,7 @@ export function ModuleSwitcher({
 }) {
   const { t } = useTranslation();
   const row = useRef<HTMLDivElement>(null);
-  const pill = useRef<HTMLSpanElement>(null);
+  const pill = useRef<HTMLButtonElement>(null);
   /** Невидимая копия ряда: все модули с подписями, в натуральную ширину. */
   const probe = useRef<HTMLDivElement>(null);
   const [fits, setFits] = useState(modules.length);
@@ -103,7 +103,7 @@ export function ModuleSwitcher({
         {measureCopy}
         {modules.map((module) =>
           module.id === activeId ? (
-            <span
+            <button type="button" onClick={()=>onSelect(module.id)}
               key={module.id}
               aria-current="true"
               className={`${TAB} min-w-0 flex-1 justify-center bg-surface-active font-semibold text-fg`}
@@ -112,7 +112,7 @@ export function ModuleSwitcher({
                 <MenuIcon name={module.icon} type={module.type} />
               </span>
               <span className="truncate">{module.label}</span>
-            </span>
+            </button>
           ) : (
             <button
               key={module.id}
@@ -141,7 +141,7 @@ export function ModuleSwitcher({
     <div ref={row} role="group" aria-label={t("sidebar.modules")} className="relative flex min-w-0 items-center">
       {measureCopy}
       {active && (
-        <span
+        <button type="button" onClick={()=>onSelect(active.id)}
           ref={pill}
           aria-current="true"
           /* Подпись сжимается последней: пока в ряду есть значки, она
@@ -156,7 +156,7 @@ export function ModuleSwitcher({
             <MenuIcon name={active.icon} type={active.type} />
           </span>
           <span className="truncate">{active.label}</span>
-        </span>
+        </button>
       )}
 
       {shown.map((module) => (

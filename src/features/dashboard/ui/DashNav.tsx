@@ -82,7 +82,9 @@ export function DashNav({
   onRemoveDashboard,
   onFavorite,
   onHide,
+  catalog=false,
 }: {
+  catalog?:boolean;
   tree: Tree;
   /** Модули проекта — папки меню с `is_tab`. */
   modules: MenuNode[];
@@ -131,7 +133,7 @@ export function DashNav({
     ...modules.map((module) => ({
       id: module.id,
       label: module.label,
-      icon: <ModuleMark module={module} />,
+      icon: catalog ? <Icon as={FolderIcon} size={18} /> : <ModuleMark module={module} />,
       folders: tree.folders.filter((folder) => folder.moduleId === module.id),
     })),
     ...(orphans.length
@@ -222,11 +224,11 @@ export function DashNav({
   };
 
   return (
-    <nav aria-label={t("dashboard.title")} className="flex h-full w-65 shrink-0 flex-col border-r border-border bg-surface-soft">
+    <nav aria-label={t("dashboard.title")} className={`flex min-h-0 shrink-0 flex-col bg-surface ${catalog?"w-full rounded-lg border border-border":"h-full w-65 max-w-[90vw] border-r border-border"}`}>
       <div className="flex items-center gap-0.5 pt-3 pr-2.5 pb-1.5 pl-3.5">
         <b className="flex-1 text-sm font-semibold">{t("dashboard.title")}</b>
         {canEdit && create("")}
-        <button
+        {!catalog&&<button
           type="button"
           onClick={onHide}
           title={t("dashboard.hideNav")}
@@ -234,7 +236,7 @@ export function DashNav({
           className="grid size-7 place-items-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg"
         >
           <Icon as={ChevronsLeftIcon} size={16} />
-        </button>
+        </button>}
       </div>
 
       <label className="mx-2.5 mt-0.5 mb-1.5 flex h-7.5 items-center gap-1.5 rounded-md border border-border bg-bg px-2 text-fg-subtle">
@@ -247,7 +249,7 @@ export function DashNav({
         />
       </label>
 
-      <div className="min-h-0 flex-1 overflow-auto px-1.5 pb-2.5">
+      <div className={`min-h-0 flex-1 ${catalog?"":"overflow-auto"} px-1.5 pb-2.5`}>
         {!q && favs.length > 0 && (
           <>
             <div className="px-2 pt-3 pb-1 text-xs font-semibold text-fg-subtle">{t("dashboard.favorites")}</div>
