@@ -1,3 +1,5 @@
+import {CalendarIcon} from "lucide-react";
+import {Icon} from "@/shared/ui/icon";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
@@ -5,9 +7,13 @@ import { Input } from "@/shared/ui/input";
 import { Dropdown } from "@/shared/ui/dropdown";
 import type { DatasetParameter } from "../model/datasets";
 import type { FilterValues } from "../model/filters";
-import { dashboardSqlValues, PERIODS, sqlParameterKey, sqlPeriodKey, shiftPeriod, validSqlDate, type SqlPeriod } from "../model/sql-controls";
+import { dashboardSqlValues, sqlCalendarLabel, PERIODS, sqlParameterKey, sqlPeriodKey, shiftPeriod, validSqlDate, type SqlPeriod } from "../model/sql-controls";
 import { useSqlRunner } from "../api/sql-runner";
 
+/** Native picker and keyboard semantics with an unambiguous localized visible value. */
+export function SqlDateInput({label,value,language,onValue}:{label:string;value:string;language:string;onValue:(value:string)=>void}){
+ return <label style={{width:160,maxWidth:"100%"}} className="relative inline-flex h-8 items-center gap-2 rounded-md border border-border-strong bg-input px-2.5 text-sm focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent"><Icon as={CalendarIcon} size={15}/><span className="pointer-events-none tabular-nums">{sqlCalendarLabel(value,language)}</span><input type="date" aria-label={label} value={value} onInput={e=>onValue(e.currentTarget.value)} onChange={e=>onValue(e.currentTarget.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0"/></label>;
+}
 function SelectParameter({menuId,parameter,value,onValue}:{menuId:string;parameter:DatasetParameter;value:string;onValue:(v:string)=>void}){
  const {i18n}=useTranslation(),ru=i18n.language.startsWith("ru");
  const runner=useSqlRunner(menuId,parameter.optionsSql ?? "",[],{},1000);
@@ -29,7 +35,7 @@ function PeriodControls({parameters,values,onValues}:{parameters:DatasetParamete
  return <div className="flex max-w-full flex-wrap items-center gap-2" aria-label={start.controlLabel || group}>
  {PERIODS.map(p=><Button key={p} size="sm" variant={mode===p?"primary":"secondary"} aria-pressed={mode===p} onClick={()=>putPeriod(p)}>{label[p]}</Button>)}
  {mode!=="all"&&mode!=="custom"&&<><Button size="sm" variant="secondary" aria-label={ru?"Предыдущий период":"Previous period"} onClick={()=>putPeriod(mode,shiftPeriod(mode,anchor,-1))}>←</Button><span className="text-sm tabular-nums">{current[start.name]} — {current[end.name]}</span><Button size="sm" variant="secondary" aria-label={ru?"Следующий период":"Next period"} onClick={()=>putPeriod(mode,shiftPeriod(mode,anchor,1))}>→</Button></>}
- {mode==="custom"&&<><Input style={{width:160,maxWidth:"100%"}} type="date" aria-label={ru?"Начало периода":"Period start"} value={draft[start.name] ?? ""} onInput={e=>setDraft({...draft,[start.name]:e.currentTarget.value})}/><Input style={{width:160,maxWidth:"100%"}} type="date" aria-label={ru?"Конец периода":"Period end"} value={draft[end.name] ?? ""} onInput={e=>setDraft({...draft,[end.name]:e.currentTarget.value})}/><Button size="sm" disabled={!validSqlDate(draft[start.name])||!validSqlDate(draft[end.name])||draft[start.name]!>draft[end.name]!} onClick={()=>onValues({...values,[sqlPeriodKey(group)]:["custom",anchor],[sqlParameterKey(start.name)]:[draft[start.name]!],[sqlParameterKey(end.name)]:[draft[end.name]!]})}>{ru?"Применить":"Apply"}</Button></>}
+ {mode==="custom"&&<><SqlDateInput language={i18n.language} label={ru?"Начало периода":"Period start"} value={draft[start.name] ?? ""} onValue={value=>setDraft({...draft,[start.name]:value})}/><SqlDateInput language={i18n.language} label={ru?"Конец периода":"Period end"} value={draft[end.name] ?? ""} onValue={value=>setDraft({...draft,[end.name]:value})}/><Button size="sm" disabled={!validSqlDate(draft[start.name])||!validSqlDate(draft[end.name])||draft[start.name]!>draft[end.name]!} onClick={()=>onValues({...values,[sqlPeriodKey(group)]:["custom",anchor],[sqlParameterKey(start.name)]:[draft[start.name]!],[sqlParameterKey(end.name)]:[draft[end.name]!]})}>{ru?"Применить":"Apply"}</Button></>}
  <Button size="sm" variant="ghost" onClick={reset}>{ru?"Сбросить период":"Reset period"}</Button></div>;
 }
 export function SqlParameterControls({menuId,parameters,values,onValues}:{menuId:string;parameters:DatasetParameter[];values:FilterValues;onValues:(v:FilterValues)=>void}){

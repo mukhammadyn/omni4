@@ -39,3 +39,8 @@ export function dashboardSqlValues(parameters:DatasetParameter[],values:FilterVa
    return [p.name,value];
  }));
 }
+
+/** Date-only report inputs show the app language, independent of Chrome/OS locale. */
+export function sqlCalendarLabel(value:string,language:string):string{
+ return validSqlDate(value)?new Intl.DateTimeFormat(language,{day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"}).format(new Date(`${value}T12:00:00Z`)):"—";
+}

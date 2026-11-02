@@ -1,4 +1,4 @@
-import {WidgetTabBar} from "./WidgetTabBar";
+import {WidgetTabBar,WidgetTabFrame} from "./WidgetTabBar";
 import {visibleTabWidgets} from "../model/widget-tabs";
 import { sectionCanvas } from "../model/widget-sections";
 import type { CSSProperties,ReactNode } from "react";
@@ -206,7 +206,7 @@ function WidgetCard({ widget, tabBar, fittedHeight, onAutoHeight, sqlSelectedKey
 }) {
   const { t } = useTranslation();
   const { current: language } = useDataLanguages();
-  const [naturalHeight, setNaturalHeight] = useState(0);
+  const [naturalHeight, setNaturalHeight] = useState(0),[tabHeight,setTabHeight]=useState(0);
   const [sqlTitle,setSqlTitle] = useState<string>();
   useEffect(()=>{setSqlTitle(undefined);},[widget.datasetId,widget.sqlTitleField]);
   const [picked, setPicked] = useState<Filters>({});
@@ -225,10 +225,10 @@ function WidgetCard({ widget, tabBar, fittedHeight, onAutoHeight, sqlSelectedKey
       if (widget.interaction?.scope === "dashboard") onSelect(table, filter);
       else setPicked((current) => JSON.stringify(current) === JSON.stringify(filter) ? {} : filter);
     }} />;
-  return <ChartCard {...card} config={!editing && sqlTitle ? {...widget,title:sqlTitle} : widget} naturalContentHeight={(widget.sqlTableFitContent || widgetAutoHeight(widget)) && !editing ? naturalHeight+(tabBar?48:0) : undefined} onAutoHeight={onAutoHeight} sizeRows={widget.layout || widgetAutoHeight(widget) ? { value: fittedHeight, min: 80, max: layoutHeight(MAX_LAYOUT_ROWS), unit: 1, gap: 0 } : undefined} columns={data.schema.fields} relations={data.schema.relations} rows={[]} language={language} editing={editing} onChange={onChange} inlineSetup={false} showRowCount={false} scrollContent={widget.type !== "records" || widget.sqlTableFitContent === true}
+  return <ChartCard {...card} config={!editing && sqlTitle ? {...widget,title:sqlTitle} : widget} naturalContentHeight={(widget.sqlTableFitContent || widgetAutoHeight(widget)) && !editing ? naturalHeight+(tabBar?tabHeight:0) : undefined} onAutoHeight={onAutoHeight} sizeRows={widget.layout || widgetAutoHeight(widget) ? { value: fittedHeight, min: 80, max: layoutHeight(MAX_LAYOUT_ROWS), unit: 1, gap: 0 } : undefined} columns={data.schema.fields} relations={data.schema.relations} rows={[]} language={language} editing={editing} onChange={onChange} inlineSetup={false} showRowCount={false} scrollContent={widget.type !== "records" || widget.sqlTableFitContent === true}
     headerActions={<>{action(t("dashboard.duplicate"), CopyIcon, onDuplicate)}{action(t("dashboard.editWidget"), PencilIcon, onEdit)}</>}
     viewerActions={widget.type === "heading" || data.dataset?.source.kind === "sql" ? undefined : <Popover trigger={({ open, toggle }) => <button type="button" aria-expanded={open} onClick={toggle} className="rounded-md border border-border px-2 py-1 text-xs text-fg-muted hover:bg-surface-hover">{t("dashboard.cardFilters")}{Object.keys(viewer).length ? ` (${Object.keys(viewer).length})` : ""}</button>}>{() => <div className="w-[360px] max-w-[85vw] p-2"><p className="mb-1 text-xs text-fg-muted">{t("dashboard.viewerScope")}</p><FilterBar columns={data.schema.fields} relations={data.schema.relations} language={language} filters={viewer} sorts={[]} onFilters={setViewer} onSorts={() => {}} /><Button type="button" size="sm" variant="secondary" onClick={() => { setViewer({}); setPicked({}); }}>{t("dashboard.resetViewer")}</Button></div>}</Popover>}
     aside={data.dataset?.source.kind === "sql" ? undefined : <><WidgetStatus widget={widget} data={data} /><div aria-label={t("dashboard.effectiveFilters")} className="flex flex-wrap gap-1">{Object.entries(data.query).filter(([slug]) => slug !== "guid").map(([slug, filter]) => { const field = data.schema.fields.find((f) => f.slug === slug); return field ? <span key={slug} className="max-w-64 truncate rounded-full bg-surface-soft px-2 py-0.5 text-2xs text-fg-muted">{localized(field.labels, language, field.label)}: {field.relationId ? t("dashboard.selectedCount", { count: filter.values.length }) : filter.values.join(" — ")}</span> : null; })}</div></>}
-    content={tabBar ? <>{tabBar}<div role="tabpanel" id={`widget-tab-panel-${widget.id}`} aria-labelledby={`widget-tab-${widget.id}`} className="flex min-h-0 flex-1 flex-col">{contents}</div></> : contents}
+    content={tabBar ? <><WidgetTabFrame onHeight={setTabHeight}>{tabBar}</WidgetTabFrame><div role="tabpanel" id={`widget-tab-panel-${widget.id}`} aria-labelledby={`widget-tab-${widget.id}`} className="flex min-h-0 flex-1 flex-col">{contents}</div></> : contents}
   />;
 }
