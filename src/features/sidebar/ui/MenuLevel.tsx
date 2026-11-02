@@ -50,12 +50,12 @@ const activeRow = "row-active text-fg";
  * и отступ (длина), и родителя (последний элемент), и защиту от переноса
  * папки внутрь собственного потомка.
  */
-export function MenuLevel({ items, path }: { items: MenuNode[]; path: string[] }) {
+export function MenuLevel({ items, path,dashboardHubId }: { items: MenuNode[]; path: string[];dashboardHubId?:string|undefined }) {
   return (
     /* Пункты — встык, как `.sb-item` прототипа (margin 0). */
     <ul className="flex flex-col">
-      {items.map((node, index) => (
-        <MenuRow key={node.id} node={node} siblings={items} path={path} first={index === 0} />
+      {items.filter(node=>!dashboardHubId||node.type!=="DASHBOARDS").map((node, index) => (
+        <MenuRow key={node.id} node={node} siblings={items} path={path} first={index === 0} dashboardHubId={dashboardHubId}/>
       ))}
     </ul>
   );
@@ -66,11 +66,13 @@ function MenuRow({
   siblings,
   path,
   first,
+  dashboardHubId,
 }: {
   node: MenuNode;
   siblings: MenuNode[];
   path: string[];
   first: boolean;
+  dashboardHubId?:string|undefined;
 }) {
   const parentId = path[path.length - 1] ?? "";
   const depth = path.length - 1;
@@ -84,7 +86,7 @@ function MenuRow({
    */
   const open = useUi((state) => !state.collapsedMenus.includes(node.id));
   const toggleMenu = useUi((state) => state.toggleMenu);
-  const moduleId = useUi((state) => state.moduleId);
+  const moduleId = useUi((state) => state.moduleId),setModule=useUi(state=>state.setModule);
 
   /*
    * Детей папки читаем и у свёрнутой: иначе не узнать, что в ней одни
@@ -198,7 +200,8 @@ function MenuRow({
        вход (ADR-0013). Своего экрана у пункта нет. */
     <Link
       to="/dashboards"
-      search={{ module: moduleId }}
+      search={node.screen==="dashboards-hub"?{}:{ module: moduleId }}
+      onClick={()=>{if(dashboardHubId)setModule(dashboardHubId);}}
       draggable={false}
       className={inner_row}
       style={style}
@@ -220,6 +223,7 @@ function MenuRow({
   );
 
   if (expandable && children.onlyHidden) return null;
+  if(expandable&&dashboardHubId&&children.items.length>0&&children.items.every(n=>n.type==="DASHBOARDS"))return null;
 
   return (
     /* Над группой — воздух, как `.sb-section` прототипа (6px), кроме
@@ -247,7 +251,7 @@ function MenuRow({
       {expandable && open && (
         <>
           {children.isLoading && <LevelSkeleton depth={depth + 1} />}
-          <MenuLevel items={children.items} path={[...path, node.id]} />
+          <MenuLevel items={children.items} path={[...path, node.id]} dashboardHubId={dashboardHubId}/>
         </>
       )}
     </li>

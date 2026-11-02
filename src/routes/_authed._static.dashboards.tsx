@@ -36,6 +36,7 @@ function DashboardsRoute() {
       moduleId={module ?? ""}
       values={f ?? {}}
       onOpen={(id) => void navigate({ search: (prev) => ({ ...prev, d: id }) })}
+      onCatalog={()=>void navigate({search:{}})}
       onValues={(values) =>
         void navigate({ search: (prev) => ({ ...prev, f: Object.keys(values).length ? values : undefined }), replace: true })
       }

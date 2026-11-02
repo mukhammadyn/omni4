@@ -1,5 +1,7 @@
 import { kindOf, type MenuNode } from "../model/types";
 import type { MenuDto } from "./dto";
+import {SYSTEM_MENUS} from "../model/system-menus";
+import {isDashboardHubHref} from "../model/dashboard-entry";
 
 /**
  * Один сырой пункт → доменный. Дерева здесь нет: бэкенд отдаёт меню
@@ -145,10 +147,13 @@ export function toMenuNode(
   dto: MenuDto,
   languages: string | string[],
   index = 0,
+  origin = typeof window === "undefined" ? undefined : window.location.origin,
 ): MenuNode {
-  const screen = typeof dto.attributes?.["screen"] === "string" ? dto.attributes["screen"] : "";
-  const type = screen === "dashboards-entry" ? "DASHBOARDS" : (dto.type ?? "");
   const href = pickHref(dto);
+  const configuredScreen = typeof dto.attributes?.["screen"] === "string" ? dto.attributes["screen"] : "";
+  const rootEntry = configuredScreen === "dashboards-entry" && dto.parent_id === SYSTEM_MENUS.ROOT;
+  const screen = rootEntry ? "dashboards-hub" : configuredScreen || (dto.type==="LINK"&&!pickEmbed(dto)&&isDashboardHubHref(href,origin)?"dashboards-hub":"");
+  const type = ["dashboards-entry","dashboards-hub"].includes(screen) ? "DASHBOARDS" : (dto.type ?? "");
 
   return {
     id: dto.id ?? "",

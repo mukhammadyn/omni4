@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState,type ReactNode } from "react";
+import {useLocation,useNavigate} from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ChevronsRightIcon, SearchIcon } from "lucide-react";
 import { errorText } from "@/shared/api/client";
@@ -27,8 +28,9 @@ import { WorkspaceHeader } from "./WorkspaceHeader";
  * разошлась бы строка поиска), а снять и вернуть — значит показывать
  * рывком: у снятого с экрана нечему ехать обратно.
  */
-export function Sidebar() {
+export function Sidebar({dashboardMenu}:{dashboardMenu?:ReactNode}) {
   const { sidebarCollapsed, moduleId, setModule } = useUi();
+  const pathname=useLocation({select:location=>location.pathname}),navigate=useNavigate();
   // Корневой уровень: бэкенд требует parent_id всегда, без него он вернёт
   // не список, а сам корневой пункт.
   const root = useMenuChildren(ROOT_MENU_ID);
@@ -37,14 +39,19 @@ export function Sidebar() {
    * дерево показывает содержимое выбранного, а сами папки уходят в ряд
    * над деревом. Нет — меню как было, от корня.
    */
-  const modules = root.items.filter((node) => node.isModule);
+  const hub=root.items.find(node=>node.screen==="dashboards-hub");
+  const modules = root.items.filter((node) => node.isModule||node.screen==="dashboards-hub");
   const active = modules.find((node) => node.id === moduleId) ?? modules[0];
-  const level = useMenuChildren(active?.id ?? ROOT_MENU_ID, Boolean(active));
-  const items = active ? level.items : root.items;
-  const isLoading = root.isLoading || (Boolean(active) && level.isLoading);
+  const hubActive=active?.screen==="dashboards-hub";
+  const level = useMenuChildren(active?.id ?? ROOT_MENU_ID, Boolean(active)&&!hubActive);
+  const items = hubActive?[]:active ? level.items : root.items;
+  const isLoading = root.isLoading || (Boolean(active)&&!hubActive && level.isLoading);
   const error = root.error ?? (active ? level.error : null);
   const [peeking, setPeeking] = useState(false);
   const stopPeek = useCallback(() => setPeeking(false), []);
+  const hubId=hub?.id;
+  useEffect(()=>{if(pathname==="/dashboards"&&hubId)setModule(hubId);},[pathname,hubId,setModule]);
+  const selectModule=(id:string)=>{setModule(id);if(id===hub?.id)void navigate({to:"/dashboards",search:{}});};
 
   useEffect(() => {
     if (!sidebarCollapsed) setPeeking(false);
@@ -68,7 +75,9 @@ export function Sidebar() {
         error={error}
         modules={modules}
         active={active}
-        onModule={setModule}
+        onModule={selectModule}
+        dashboardHubId={hub?.id}
+        dashboardMenu={hubActive?dashboardMenu:undefined}
         collapsed={sidebarCollapsed}
         peeking={sidebarCollapsed && peeking}
         onLeave={stopPeek}
@@ -116,7 +125,11 @@ function SidebarPanel({
   collapsed,
   peeking,
   onLeave,
+  dashboardMenu,
+  dashboardHubId,
 }: {
+  dashboardMenu?:ReactNode;
+  dashboardHubId?:string|undefined;
   menus: MenuNode[];
   isLoading: boolean;
   error: Error | null;
@@ -278,20 +291,20 @@ function SidebarPanel({
           {t("sidebar.menu")}
         </span>
         {/* Новый пункт — в выбранный модуль: корень занят модулями. */}
-        <AddMenuButton parentId={active?.id ?? ROOT_MENU_ID} />
+        {!dashboardMenu&&<AddMenuButton parentId={active?.id ?? ROOT_MENU_ID} />}
       </div>
 
       <nav className="flex-1 overflow-y-auto" aria-label={t("sidebar.menu")}>
         {isLoading && <Skeleton />}
         {error && <LoadError error={error} />}
-        {!isLoading && !error && menus.length === 0 && (
+        {!dashboardMenu&&!isLoading && !error && menus.length === 0 && (
           <p className="px-2 py-1 text-xs text-fg-subtle">{t("sidebar.empty")}</p>
         )}
-        <MenuDndProvider>
+        {dashboardMenu??<MenuDndProvider>
           {/* Путь начинается с модуля, а не с корня: уровень модуля — это
               верхний уровень дерева, без лишнего отступа. */}
-          <MenuLevel items={menus} path={[active?.id ?? ROOT_MENU_ID]} />
-        </MenuDndProvider>
+          <MenuLevel items={menus} path={[active?.id ?? ROOT_MENU_ID]} dashboardHubId={dashboardHubId}/>
+        </MenuDndProvider>}
       </nav>
 
       <SidebarFooter />

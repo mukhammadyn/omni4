@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {useCallback, useEffect,useLayoutEffect, useRef, useState, type ReactNode,type ChangeEvent,type KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CheckIcon,
@@ -13,12 +13,12 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ROOT_MENU_ID, useMenuChildren } from "@/features/sidebar";
-import { useSession } from "@/shared/api/use-session";
 import { keys } from "@/shared/lib/query-keys";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
 import { Tabs } from "@/shared/ui/tabs";
+import {Modal} from "@/shared/ui/modal";
 import { useDashboardTree } from "../api/tree";
 import {
   findDashboard,
@@ -33,7 +33,9 @@ import {
   type Tree,
 } from "../model/dashboard";
 import type { DashFilter, FilterValues } from "../model/filters";
-import { readPrefs, toggle, writePrefs, type Prefs } from "../model/prefs";
+import {toggle} from "../model/prefs";
+import {useDashboardPreferences} from "../api/preferences";
+import {accessibleDashboardTree} from "../model/navigation";
 import { DashFilters } from "./DashFilters";
 import { DashNav, ModuleMark } from "./DashNav";
 import type { Dataset } from "../model/datasets";
@@ -54,6 +56,7 @@ export function DashboardsPage({
   values,
   onOpen,
   onValues,
+  onCatalog,
 }: {
   dashboardId: string;
   moduleId: string;
@@ -61,20 +64,18 @@ export function DashboardsPage({
   values: FilterValues;
   onOpen: (id: string) => void;
   onValues: (values: FilterValues) => void;
+  onCatalog:()=>void;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const session = useSession();
   const root = useMenuChildren(ROOT_MENU_ID);
   const modules = root.items.filter((node) => node.isModule);
-  const { tree, menuId, isLoading, isSaving, saveError, retrySave, canRead, canEdit, save } = useDashboardTree();
-
-  const prefsKey = `omni4.dashboards.${session.getProjectId() ?? ""}.${session.getUserId()}`;
-  const [prefs, setPrefs] = useState<Prefs>(() => readPrefs(prefsKey));
-  const updatePrefs = (next: Prefs) => {
-    setPrefs(next);
-    writePrefs(prefsKey, next);
-  };
+  const { tree, menuId, isLoading, isSaving, saveError, retrySave, canRead, canEdit:canEditStore, save } = useDashboardTree();
+  const canEdit=canEditStore&&!root.isLoading&&!root.error;
+  const readableTree=accessibleDashboardTree(tree,modules);
+  const {prefs,updatePrefs}=useDashboardPreferences();
+  const [navOpen,setNavOpen]=useState(false);
+  const closeNav=useCallback(()=>setNavOpen(false),[]);
 
   /*
    * Раскладка в правке — черновик, как «Настроить» в professio:
@@ -87,7 +88,8 @@ export function DashboardsPage({
   const [removing, setRemoving] = useState<{ kind: "dashboard" | "folder"; id: string } | null>(null);
 
   const home = moduleId || modules[0]?.id || "";
-  const current = openedDashboard(tree, dashboardId, home, Boolean(moduleId));
+  const catalog=!dashboardId&&!moduleId;
+  const current = catalog||root.isLoading ? null:openedDashboard(readableTree, dashboardId, home, Boolean(moduleId));
 
   /*
    * Путь к дашборду раскрывается ОДИН раз — когда его открыли. Раньше
@@ -149,18 +151,17 @@ export function DashboardsPage({
   const patchCurrent = (patch: Partial<Dashboard>) =>
     current && apply(patchDashboard(tree, current.dashboard.id, (dashboard) => ({ ...dashboard, ...patch })));
 
-  const nav = prefs.hidden ? null : (
-    /* На узком экране сайдбар выезжает поверх, а не теснит дашборд. */
-    <div className="max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:z-20 max-lg:shadow-raised">
+  const nav = (
       <DashNav
-        tree={tree}
+        tree={readableTree}
+        catalog={catalog}
         modules={modules}
         currentId={current?.dashboard.id ?? ""}
         favorites={prefs.favorites}
         closed={closed}
         canEdit={canEdit}
         onToggle={(key) => updatePrefs({ ...prefs, closed: toggle(prefs.closed, key) })}
-        onOpen={onOpen}
+        onOpen={id=>{setNavOpen(false);onOpen(id);}}
         onNewDashboard={addDashboard}
         onNewFolder={addFolder}
         onRenameFolder={(id, title) => apply(patchFolder(tree, id, (folder) => ({ ...folder, title })))}
@@ -168,9 +169,8 @@ export function DashboardsPage({
         onRenameDashboard={(id, title) => apply(patchDashboard(tree, id, (dashboard) => ({ ...dashboard, title })))}
         onRemoveDashboard={(id) => setRemoving({ kind: "dashboard", id })}
         onFavorite={(id) => updatePrefs({ ...prefs, favorites: toggle(prefs.favorites, id) })}
-        onHide={() => updatePrefs({ ...prefs, hidden: true })}
+        onHide={() => setNavOpen(false)}
       />
-    </div>
   );
 
   if (!canRead) {
@@ -181,21 +181,21 @@ export function DashboardsPage({
   const editing = canEdit && layout !== null && layout.id === current?.dashboard.id;
   const favorite = Boolean(current && prefs.favorites.includes(current.dashboard.id));
 
-  const showNav = () => updatePrefs({ ...prefs, hidden: false });
+  const showNav = () => setNavOpen(true);
   const removingDashboard = removing?.kind === "dashboard" ? findDashboard(tree, removing.id) : null;
   const removingFolder = removing?.kind === "folder" ? tree.folders.find((folder) => folder.id === removing.id) : undefined;
 
   return (
     <div className="relative flex min-h-0 flex-1">
-      {nav}
+      {navOpen&&!catalog&&<DashboardNavigator onClose={closeNav}>{nav}</DashboardNavigator>}
       {datasetsOpen && <DatasetEditor datasets={tree.datasets ?? []} menuId={menuId} onSave={(datasets) => apply({ ...tree, datasets })} onCreateWidget={current && !editing ? (datasets,widget)=>apply(patchDashboard({...tree,datasets},current.dashboard.id,dashboard=>({...dashboard,widgets:[...dashboard.widgets,widget]}))) : undefined} onClose={() => setDatasetsOpen(false)} />}
 
       {/* Страница прокручивается целиком, полоса вкладок липнет к верху —
           как `.scroller` и `.viewbar` прототипа. */}
       <div className="min-w-0 flex-1 overflow-auto">
-        {!current ? (
-          <div className="px-6 pt-9 lg:px-24">
-            {prefs.hidden && <ShowNav onClick={showNav} />}
+        {catalog ? <div className="p-4 pb-8 md:p-6 lg:p-8"><h1 className="mb-4 text-2xl font-semibold">{t("dashboard.title")}</h1>{isLoading||root.isLoading?<p role="status">{t("common.loading")}</p>:nav}</div>:!current ? (
+          <div className="px-4 pt-6 md:px-6 lg:px-8">
+            <ShowNav onClick={showNav} />
             <Empty
               title={
                 isLoading
@@ -216,10 +216,10 @@ export function DashboardsPage({
             />
           </div>
         ) : (
-          <div className="px-6 pb-30 lg:px-24">
+          <div className="px-4 pb-8 md:px-6 lg:px-8" data-dashboard-content>
             {/* Шапка — `.page-head` прототипа: путь, крупный значок,
                 заголовок и описание правятся прямо на месте. */}
-            <div className="pt-9">
+            <div className="pt-6">
               <div className="mb-2.5 flex items-center gap-1.5 text-[13px] text-fg-muted">
                 {module && <ModuleMark module={module} small />}
                 <span>{module?.label ?? t("dashboard.noModule")}</span>
@@ -235,7 +235,7 @@ export function DashboardsPage({
                 editable={canEdit}
                 maxLength={4}
                 onCommit={(emoji) => emoji && patchCurrent({ emoji })}
-                className="mb-2 w-[1.6em] text-center text-[52px] leading-[1.1]"
+                className="mb-2 w-[1.6em] text-center text-[40px] leading-[1.1]"
               />
               <InlineText
                 key={`${current.dashboard.id}-title`}
@@ -243,8 +243,9 @@ export function DashboardsPage({
                 placeholder={t("dashboard.untitled")}
                 label={t("dashboard.dashboardTitle")}
                 editable={canEdit}
+                multiline
                 onCommit={(title) => patchCurrent({ title })}
-                className="mb-1 w-full text-[26px] font-bold leading-tight tracking-[-0.01em] lg:text-[32px]"
+                className="mb-1 w-full text-[24px] font-bold leading-tight tracking-[-0.01em] lg:text-[28px]"
               />
               <InlineText
                 key={`${current.dashboard.id}-description`}
@@ -252,14 +253,16 @@ export function DashboardsPage({
                 placeholder={canEdit ? t("dashboard.descriptionPlaceholder") : ""}
                 label={t("dashboard.description")}
                 editable={canEdit}
+                multiline
                 onCommit={(description) => patchCurrent({ description })}
-                className="mb-4.5 w-full max-w-190 text-sm text-fg-muted"
+                className="mb-3 w-full text-sm text-fg-muted"
               />
             </div>
 
             {/* Полоса вкладок — `.viewbar`: вкладки папки слева, действия справа. */}
             <div className="sticky top-0 z-10 flex min-h-10 flex-wrap items-center gap-1 border-b border-border bg-surface">
-              {prefs.hidden && <ShowNav onClick={showNav} />}
+              <ShowNav onClick={showNav} />
+              <ViewAction label={t("dashboard.title")} onClick={onCatalog}><Icon as={LayoutDashboardIcon} size={16}/></ViewAction>
               <div className="flex min-w-0 flex-1 items-center gap-1 max-sm:basis-full">
                 <Tabs
                   tabs={current.folder.dashboards.map((dashboard) => ({
@@ -418,7 +421,9 @@ function InlineText({
   maxLength,
   onCommit,
   className,
+  multiline=false,
 }: {
+  multiline?:boolean;
   value: string;
   placeholder?: string;
   label: string;
@@ -428,9 +433,11 @@ function InlineText({
   className: string;
 }) {
   const [text, setText] = useState(value);
+  const area=useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(()=>{const el=area.current;if(!el)return;const measure=()=>{el.style.height="auto";el.style.height=`${el.scrollHeight}px`;};let width=el.clientWidth;const observer=new ResizeObserver(()=>{if(el.clientWidth!==width){width=el.clientWidth;measure();}});observer.observe(el);measure();return()=>observer.disconnect();},[text,multiline]);
 
   if (!editable) {
-    return value ? <div className={`${className} truncate`}>{value}</div> : null;
+    return value ? <div className={`${className} ${multiline?"whitespace-pre-wrap break-words":"truncate"}`}>{value}</div> : null;
   }
 
   const commit = () => {
@@ -438,27 +445,23 @@ function InlineText({
     if (next !== value) onCommit(next);
   };
 
-  return (
-    <input
-      value={text}
-      placeholder={placeholder}
-      aria-label={label}
-      maxLength={maxLength}
-      spellCheck={false}
-      onChange={(event) => setText(event.target.value)}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") event.currentTarget.blur();
-        if (event.key === "Escape") {
-          const input = event.currentTarget;
-          setText(value);
-          // Сначала откат, потом blur: иначе blur отправит набранное.
-          requestAnimationFrame(() => input.blur());
-        }
-      }}
-      className={`block rounded-md bg-transparent text-fg outline-none transition-colors placeholder:text-fg-subtle hover:bg-surface-hover focus:bg-transparent focus-visible:ring-2 focus-visible:ring-accent/40 ${className}`}
-    />
-  );
+  const props={
+      value:text,placeholder,"aria-label":label,maxLength,spellCheck:false,
+      onChange:(event:ChangeEvent<HTMLInputElement|HTMLTextAreaElement>)=>setText(event.target.value),
+      onBlur:commit,
+      onKeyDown:(event:KeyboardEvent<HTMLInputElement|HTMLTextAreaElement>)=>{
+        if(event.key==="Enter"&&(!multiline||!event.shiftKey)){event.preventDefault();event.currentTarget.blur();}
+        if(event.key==="Escape"){const input=event.currentTarget;setText(value);requestAnimationFrame(()=>input.blur());}
+      },
+      className:`block rounded-md bg-transparent text-fg outline-none transition-colors placeholder:text-fg-subtle hover:bg-surface-hover focus:bg-transparent focus-visible:ring-2 focus-visible:ring-accent/40 ${className}`,
+  };
+  return multiline?<textarea ref={area} rows={1} {...props} className={`${props.className} resize-none overflow-hidden`}/>:<input {...props}/>;
+}
+
+function DashboardNavigator({children,onClose}:{children:ReactNode;onClose:()=>void}){
+ const panel=useRef<HTMLDivElement>(null);
+ useEffect(()=>{const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;const root=panel.current;root?.querySelector<HTMLElement>("button,input")?.focus();const key=(e:globalThis.KeyboardEvent)=>{if(e.key==="Escape"&&!document.querySelector('[role="menu"]'))onClose();if(e.key==="Tab"&&root){const nodes=[...root.querySelectorAll<HTMLElement>('button:not(:disabled),input,a[href],[tabindex="0"]')].filter(el=>el.getClientRects().length);const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};document.addEventListener("keydown",key);return()=>{document.removeEventListener("keydown",key);previous?.focus();};},[onClose]);
+ return <Modal onClose={onClose} className="flex"><div ref={panel} role="dialog" aria-modal="true" aria-label="Dashboard navigation" className="h-full shadow-raised">{children}</div></Modal>;
 }
 
 /** Кнопка полосы вкладок — `.va-btn` прототипа: без рамки, подсветка на наведении. */
