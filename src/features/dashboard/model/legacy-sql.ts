@@ -6,7 +6,7 @@ import { toQueryResult } from "./query-result";
 type Parameter = { name: string; type: "text" | "number" | "date" | "boolean"; value: string };
 
 /** Client shaping only: existing ExecuteSQL does not enforce dashboard read-only/bounds. */
-export function prepareDashboardSql(sql: string, parameters: Parameter[], limit: number) {
+export function prepareDashboardSql(sql: string, parameters: Parameter[], limit: number, page?: { offset: number; key: string }) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 1000 || sql.length > 32768) throw new Error("Invalid dashboard preview limits");
   if (sqlSupportIssue(sql)) throw new Error("Dashboard preview accepts one SELECT query with supported JOINs and aggregates");
   const tokens = sqlLex(sql), params: string[] = [], names = new Map<string, number>();
@@ -27,8 +27,9 @@ export function prepareDashboardSql(sql: string, parameters: Parameter[], limit:
   text += sql.slice(end);
   const terminal = sqlLex(text).filter((token) => token.kind !== "comment").at(-1);
   if (terminal?.text === ";") text = text.slice(0, terminal.start) + text.slice(terminal.end);
+  if (page && (!Number.isInteger(page.offset) || page.offset < 0 || page.offset >= 20000 || !page.key || page.key.length > 63 || ["__proto__", "constructor", "prototype"].includes(page.key))) throw new Error("Invalid dashboard page");
   // One extra row reports clipping. This changes only the sent statement, never the draft.
-  return { sql: `SELECT * FROM (\n${text}\n) AS "dashboard_preview" LIMIT ${limit + 1}`, params };
+  return { sql: `SELECT * FROM (\n${text}\n) AS "dashboard_preview"${page ? ` ORDER BY "dashboard_preview".${quoteSqlName(page.key)} ASC` : ""} LIMIT ${limit + 1}${page ? ` OFFSET ${page.offset}` : ""}`, params };
 }
 
 const exactNumeric = new Set(["numeric", "int8"]);

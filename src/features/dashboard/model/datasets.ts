@@ -6,7 +6,7 @@ import { parseJoinDraft, type JoinDraft } from "./sql-join-builder";
 export type DatasetField = { slug: string; label: string; type: string; target?: string; joinable?: boolean };
 /** Table sources use normal role metadata; SQL sources reuse SQL-console schema metadata. */
 export type DatasetTable = { slug: string; label: string; fields: DatasetField[] };
-export type DatasetParameter = { name: string; type: "text" | "number" | "date" | "boolean"; required: boolean; dashboardControl?: "month" | undefined; defaultValue?: string };
+export type DatasetParameter = { name: string; type: "text" | "number" | "date" | "boolean"; required: boolean; dashboardControl?: "month" | "select" | "input" | "date" | "period_start" | "period_end" | undefined; controlLabel?: string | undefined; optionsSql?: string | undefined; controlGroup?: string | undefined; defaultPeriod?: "week" | "month" | "year" | "all" | "custom" | undefined; dynamicDefault?: "today" | "year_start" | "two_years_start" | undefined; defaultValue?: string };
 export type DatasetJoin = { fromTable: string; field: string; toTable: string; kind: "left" | "inner" };
 export type Dataset = {
   id: string; name: string;
@@ -59,7 +59,7 @@ export function toDatasets(value: unknown): Dataset[] {
     if (source["kind"] === "sql" && typeof source["sql"] === "string") return [{ ...identity, source: { kind: "sql", sql: source["sql"], columns: [], ...(source["sqlMode"] === "visual" || source["sqlMode"] === "manual" ? { sqlMode: source["sqlMode"] } : {}), ...(parseJoinDraft(source["visual"]) ? { visual: parseJoinDraft(source["visual"])! } : {}), parameters: Array.isArray(source["parameters"]) ? source["parameters"].flatMap((raw): DatasetParameter[] => {
       if (!raw || typeof raw !== "object") return [];
       const p = raw as Record<string, unknown>;
-      return typeof p["name"] === "string" && ["text", "number", "date", "boolean"].includes(p["type"] as string) ? [{ name: p["name"], type: p["type"] as DatasetParameter["type"], required: p["required"] === true, ...(p["type"] === "date" && p["dashboardControl"] === "month" ? {dashboardControl: "month" as const} : {}), ...(typeof p["defaultValue"] === "string" ? { defaultValue: p["defaultValue"] } : {}) }] : [];
+      return typeof p["name"] === "string" && ["text", "number", "date", "boolean"].includes(p["type"] as string) ? [{ name: p["name"], type: p["type"] as DatasetParameter["type"], required: p["required"] === true, ...(["select","input"].includes(String(p["dashboardControl"])) || p["type"] === "date" && ["month","date","period_start","period_end"].includes(String(p["dashboardControl"])) ? {dashboardControl:p["dashboardControl"] as DatasetParameter["dashboardControl"]} : {}), ...Object.fromEntries(["controlLabel","optionsSql","controlGroup"].flatMap(key=>typeof p[key]==="string"?[[key,p[key]]]:[])), ...(["week","month","year","all","custom"].includes(String(p["defaultPeriod"]))?{defaultPeriod:p["defaultPeriod"] as DatasetParameter["defaultPeriod"]}:{}), ...(["today","year_start","two_years_start"].includes(String(p["dynamicDefault"]))?{dynamicDefault:p["dynamicDefault"] as DatasetParameter["dynamicDefault"]}:{}), ...(typeof p["defaultValue"] === "string" ? { defaultValue: p["defaultValue"] } : {}) }] : [];
     }) : [] } }];
     return [];
   });

@@ -346,7 +346,7 @@ export function DashboardsPage({
                 onValues={onValues}
                 onFilters={(filters) => editing && setLayout({ ...layout, filters })}
               />
-              <SqlMonthControls datasets={editing ? layout.datasets ?? tree.datasets ?? [] : tree.datasets ?? []} widgets={editing ? layout.widgets : current.dashboard.widgets} values={values} onValues={onValues}>
+              <SqlMonthControls menuId={menuId} datasets={editing ? layout.datasets ?? tree.datasets ?? [] : tree.datasets ?? []} widgets={editing ? layout.widgets : current.dashboard.widgets} values={values} onValues={onValues}>
               <WidgetGrid
                 key={current.dashboard.id}
                 menuId={menuId}

@@ -39,3 +39,9 @@ test("SUM/AVG and large integers preserve decimal text while charts reject round
   const safe = legacyQueryResult(restoreNumericSchema({ ...schema, columns: ["average"], types: { average: "numeric" } }, { ...schema, columns: ["average"], types: { average: "text" }, rows: [{ average: "56.1700000000000000" }] }, ["average"]), 100);
   expect(queryChartRows(safe)).toEqual([{ average: 56.17 }]);
 });
+
+test("internal paging validates output ID and bounds while user OFFSET remains unsupported",()=>{
+ expect(prepareDashboardSql('SELECT guid FROM tasks',[],1000,{key:'ID" quoted',offset:1000}).sql).toContain('ORDER BY "dashboard_preview"."ID"" quoted" ASC LIMIT 1001 OFFSET 1000');
+ for(const offset of [-1,1.5,20000])expect(()=>prepareDashboardSql('SELECT guid FROM tasks',[],1000,{key:'guid',offset})).toThrow('Invalid');
+ expect(()=>prepareDashboardSql('SELECT guid FROM tasks OFFSET 1000',[],1000)).toThrow('one SELECT');
+});

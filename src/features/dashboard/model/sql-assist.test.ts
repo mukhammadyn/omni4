@@ -1,3 +1,4 @@
+import { sqlSupportIssue } from "./sql-query-guidance";
 import { expect, test } from "vitest";
 import { CLIENT_SQL_CAPABILITY, joinGuidance, type DatasetTable } from "./datasets";
 import { insertJoinGuidance, joinSqlGuidance, namedSqlParameters, quoteSqlName, sqlLex, sqlSuggestions } from "./sql-assist";
@@ -80,4 +81,10 @@ test("repeated guidance and self joins never add duplicate unaliased sources", (
   const inserted = insertJoinGuidance("SELECT * FROM events", join, "events")!;
   expect(insertJoinGuidance(inserted, join, "events")).toBeNull();
   expect(insertJoinGuidance("SELECT * FROM events", 'LEFT JOIN "events" ON "events"."parent" = "events"."guid"', "events")).toBeNull();
+});
+
+test("pure string aggregation supports assignment labels without arbitrary function access",()=>{
+ expect(sqlSupportIssue("SELECT a.hr_tasks_id,STRING_AGG(u.full_name, ', ' ORDER BY u.full_name) AS names FROM hr_task_assignees a LEFT JOIN core_users u ON u.guid=a.core_users_id GROUP BY a.hr_tasks_id")).toBeNull();
+ expect(sqlSupportIssue("SELECT public.string_agg(title, ',') FROM tasks")).toBe("function");
+ expect(sqlSupportIssue("SELECT string_agg(pg_read_file(title), ',') FROM tasks")).toBe("function");
 });

@@ -52,3 +52,7 @@ test("record links stay internal and encode identifiers", async () => {
   for (const template of ['https://other.example/{value}', '//other.example/{value}', 'javascript:{value}', '/\\other.example/{value}', '/records/{value}\n']) expect(queryRecordHref(template, 'id')).toBeUndefined();
   expect(queryRecordHref('/employees/{value}', null)).toBeUndefined();
 });
+
+test("localized table numbers retain exact large values and trailing decimal digits",async()=>{
+ const {formatSqlNumber}=await import("./query-result");expect(formatSqlNumber("9007199254740993.01","numeric","en")).toBe("9,007,199,254,740,993.01");expect(formatSqlNumber("-0.10","numeric","ru")).toBe("-0,10");expect(formatSqlNumber(null,"numeric","ru")).toBe("—");
+});

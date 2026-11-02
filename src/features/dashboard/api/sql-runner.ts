@@ -4,14 +4,15 @@ import { ApiError } from "@/shared/api/client";
 import { useSession } from "@/shared/api/use-session";
 import type { DatasetParameter } from "../model/datasets";
 import type { QueryResult } from "../model/query-result";
+import { executeDashboardPages } from "./query-pages";
 import { executeDashboardQuery } from "./query-execution";
 
 type Output = { context: string; signature: string; result: QueryResult | null; busy: boolean; error: string | null };
 
-export function useSqlRunner(menuId: string, sql: string, parameters: DatasetParameter[], values: Record<string, string>, limit: number) {
+export function useSqlRunner(menuId: string, sql: string, parameters: DatasetParameter[], values: Record<string, string>, limit: number, loadKey?: string) {
   const session = useSession();
   const context = JSON.stringify([session.getProjectId(), session.getEnvironmentId(), session.getUserId(), session.getProfile()?.role, session.getPermissions(), menuId, session.getVersion()]);
-  const signature = JSON.stringify([sql, parameters, values, limit]);
+  const signature = JSON.stringify([sql, parameters, values, limit, loadKey]);
   const latest = useRef({ context, signature }); latest.current = { context, signature };
   const controller = useRef<AbortController | null>(null);
   const enabled = Boolean(session.getAccess() && session.getProjectId() && session.getEnvironmentId() && menuId);
@@ -25,7 +26,8 @@ export function useSqlRunner(menuId: string, sql: string, parameters: DatasetPar
     controller.current?.abort(); const abort = new AbortController(); controller.current = abort;
     setOutput({ context, signature, result: null, busy: true, error: null });
     try {
-      const result = await executeDashboardQuery({ menu_id: menuId, sql, limit, parameters: parameters.map((parameter) => ({ name: parameter.name, type: parameter.type, value: Object.hasOwn(values, parameter.name) ? values[parameter.name] ?? "" : "" })) }, abort.signal);
+      const input = { menu_id: menuId, sql, limit, parameters: parameters.map((parameter) => ({ name: parameter.name, type: parameter.type, value: Object.hasOwn(values, parameter.name) ? values[parameter.name] ?? "" : "" })) };
+      const result = await (loadKey !== undefined ? executeDashboardPages(input, loadKey, abort.signal) : executeDashboardQuery(input, abort.signal));
       if (!abort.signal.aborted && latest.current.context === context && latest.current.signature === signature) setOutput({ context, signature, result, busy: false, error: null });
     } catch (error) { if (!abort.signal.aborted && latest.current.context === context && latest.current.signature === signature) setOutput({ context, signature, result: null, busy: false, error: queryFailure(error) }); }
   }, [context, signature, enabled, menuId]);
