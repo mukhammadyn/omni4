@@ -4,7 +4,7 @@ import { CopilotPanel } from "@/features/copilot";
 import { SoftphoneProvider } from "@/features/pbx";
 import { useProfile, useProject, useUpdateTimezone, useUserTimezone } from "@/features/settings";
 import { Sidebar } from "@/features/sidebar";
-import {DashboardMenuShortcuts} from "@/features/dashboard";
+import {DashboardMenuShortcuts,DashboardFavorites,DashboardAddMenuRow} from "@/features/dashboard";
 import { ensureAccessToken } from "@/shared/api/client";
 import { session } from "@/shared/api/session";
 import { browserTimeZone, setTimeZone, timeZone } from "@/shared/lib/date-value";
@@ -48,7 +48,7 @@ function AppShell() {
      */
     <SoftphoneProvider>
       <div className="flex h-dvh overflow-x-clip">
-        <Sidebar dashboardMenu={<DashboardMenuShortcuts/>}/>
+        <Sidebar dashboardMenu={<DashboardMenuShortcuts/>} dashboardFavorites={<DashboardFavorites/>} dashboardAdd={<DashboardAddMenuRow/>}/>
         {/*
           Раскладка плоская, как у прототипа (docs/REDESIGN.md, 4.1): контент
           белый во всю высоту, сайдбар — на фоне приложения, линия между

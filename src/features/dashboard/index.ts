@@ -1,2 +1,2 @@
 export { DashboardsPage } from "./ui/DashboardsPage";
-export {DashboardMenuShortcuts} from "./ui/DashboardMenuShortcuts";
+export {DashboardMenuShortcuts,DashboardFavorites,DashboardAddMenuRow} from "./ui/DashboardMenuShortcuts";

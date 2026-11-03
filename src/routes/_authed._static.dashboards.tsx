@@ -1,3 +1,4 @@
+import {useCallback} from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LayoutDashboardIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -9,6 +10,7 @@ import { DashboardsPage } from "@/features/dashboard";
  * пришли, — в поиске: ссылка на дашборд пересылается как есть.
  */
 const searchSchema = z.object({
+  manage: z.boolean().optional().catch(undefined),
   d: z.string().optional().catch(undefined),
   module: z.string().optional().catch(undefined),
   /** Общие фильтры по ключу фильтра: «period», слаг таблицы. */
@@ -27,15 +29,18 @@ function useCrumbs() {
 }
 
 function DashboardsRoute() {
-  const { d, module, f } = Route.useSearch();
+  const { d, module, f, manage } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
+  const closeManage=useCallback(()=>void navigate({search:prev=>({...prev,manage:undefined}),replace:true}),[navigate]);
   return (
     <DashboardsPage
+      manage={Boolean(manage)}
+      onManageClose={closeManage}
       dashboardId={d ?? ""}
       moduleId={module ?? ""}
       values={f ?? {}}
-      onOpen={(id) => void navigate({ search: (prev) => ({ ...prev, d: id }) })}
+      onOpen={(id) => void navigate({ search: (prev) => ({ ...prev, d: id,manage:undefined }) })}
       onCatalog={()=>void navigate({search:{}})}
       onValues={(values) =>
         void navigate({ search: (prev) => ({ ...prev, f: Object.keys(values).length ? values : undefined }), replace: true })

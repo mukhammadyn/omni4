@@ -1,6 +1,6 @@
 import {useLayoutEffect,useRef,useState} from "react";
 import {useTranslation} from "react-i18next";
-import {CheckIcon,LayoutGridIcon,LayoutDashboardIcon} from "lucide-react";
+import {CheckIcon,LayoutGridIcon,GaugeIcon} from "lucide-react";
 import {MODULE_PILL} from "@/shared/ui/module-pill";
 import {Icon} from "@/shared/ui/icon";
 import {Popover,PopoverItem} from "@/shared/ui/popover";
@@ -18,10 +18,10 @@ export function ModuleSwitcher({modules,activeId,onSelect}:{modules:MenuNode[];a
  useLayoutEffect(()=>{const el=row.current;if(!el)return;const measure=()=>{setWidth(el.clientWidth);setSpread((probe.current?.scrollWidth??Infinity)<=el.clientWidth);};measure();const observer=new ResizeObserver(measure);observer.observe(el);return()=>observer.disconnect();},[signature]);
  const {shown,overflow}=moduleSlots(modules,width);
  const button=(module:MenuNode,label:boolean)=><button key={module.id} type="button" data-module-id={module.id} aria-label={module.label} aria-current={module.id===activeId?"true":undefined} onClick={()=>onSelect(module.id)} className={`${MODULE_PILL} min-w-0 flex-1 justify-center transition-colors ${module.id===activeId?"bg-surface-active font-semibold text-fg":"font-medium text-fg-muted hover:bg-surface-hover hover:text-fg"}`}><span className="flex shrink-0"><ModuleIcon module={module}/></span>{label&&<span className="truncate">{module.label}</span>}</button>;
- return <div ref={row} role="group" aria-label={t("sidebar.modules")} className="relative flex min-w-0 items-center">
+ return <div ref={row} role="group" aria-label={t("sidebar.modules")} className="relative flex min-w-0 flex-1 items-center">
  <div ref={probe} aria-hidden className="pointer-events-none invisible absolute flex whitespace-nowrap">{modules.map(module=><span key={module.id} className={`${MODULE_PILL} shrink-0`}><ModuleIcon module={module}/>{module.label}</span>)}</div>
  {spread?modules.map(m=>button(m,true)):shown.map(m=><Tooltip key={m.id} label={m.label}>{button(m,false)}</Tooltip>)}
  {!spread&&overflow&&<Popover align="end" className="ml-auto shrink-0" trigger={({open,toggle})=><button type="button" onClick={toggle} aria-expanded={open} aria-label={t("sidebar.allModules")} className={`grid h-8 min-w-7.5 place-items-center rounded-lg text-fg-muted hover:bg-surface-hover ${open?"bg-surface-hover text-fg":""}`}><Icon as={LayoutGridIcon} size={17}/></button>}>{close=>modules.map(module=><PopoverItem key={module.id} icon={<ModuleIcon module={module}/>} onClick={()=>{onSelect(module.id);close();}} {...(module.id===activeId?{trailing:<Icon as={CheckIcon} size={14}/>}:{})}>{module.label}</PopoverItem>)}</Popover>}
  </div>;
 }
-function ModuleIcon({module}:{module:MenuNode}){return module.screen==="dashboards-hub"?<Icon as={LayoutDashboardIcon}/>:<MenuIcon name={module.icon} type={module.type}/>;}
+function ModuleIcon({module}:{module:MenuNode}){return module.screen==="dashboards-hub"?<Icon as={GaugeIcon}/>:<MenuIcon name={module.icon} type={module.type}/>;}
