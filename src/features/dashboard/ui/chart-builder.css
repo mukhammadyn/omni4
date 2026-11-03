@@ -47,9 +47,14 @@
 
 [data-chart-builder] .builder-table-source .builder-source-kind > span { min-width:0; }
 [data-chart-builder] .builder-table-fields .builder-field-toolbar { flex-wrap:wrap;margin-left:0;max-width:100%; }
+[data-chart-builder] .builder-source-menu-compact code { display:none; }
+[data-chart-builder] .builder-source-menu-compact [aria-pressed] { padding:5px 8px; }
+[data-chart-builder] .builder-source-menu-compact [aria-pressed] > svg { display:none; }
+[data-chart-builder] .builder-table-response [data-builder-filter] { width:auto;border:0;padding:6px 10px; }
 @media(max-width:767px) {
   [data-chart-builder] .builder-data:has(.builder-table-source:not([hidden])) { overflow:auto; }
   [data-chart-builder] .builder-table-source { flex:none; }
-  [data-chart-builder] .builder-table-list { max-height:240px; }
-  [data-chart-builder] .builder-table-fields { min-height:540px; }
+  [data-chart-builder] .builder-table-list { max-height:190px; }
+  [data-chart-builder] .builder-table-fields { height:560px;min-height:560px; }
+  [data-chart-builder] .builder-table-response[data-builder-rows] { height:auto;min-height:0; }
 }
