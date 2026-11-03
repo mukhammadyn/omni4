@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState,type ReactNode } from "react";
 import {useLocation,useNavigate} from "@tanstack/react-router";
+import { useSession } from "@/shared/api/use-session";
 import { useTranslation } from "react-i18next";
 import { ChevronsRightIcon, SearchIcon } from "lucide-react";
 import { errorText } from "@/shared/api/client";
@@ -30,7 +31,10 @@ import { WorkspaceHeader } from "./WorkspaceHeader";
  */
 export function Sidebar({dashboardMenu,dashboardFavorites,dashboardAdd}:{dashboardMenu?:ReactNode;dashboardFavorites?:ReactNode;dashboardAdd?:ReactNode}) {
   const { sidebarCollapsed, moduleId, setModule } = useUi();
-  const pathname=useLocation({select:location=>location.pathname}),navigate=useNavigate();
+  const location=useLocation(), pathname=location.pathname, navigate=useNavigate();
+  const session=useSession(), scope=JSON.stringify([session.getProjectId(),session.getEnvironmentId(),session.getUserId()]);
+  const returnTo=useRef<{scope:string;location:typeof location;moduleId:string} | undefined>(undefined);
+  if(returnTo.current?.scope!==scope)returnTo.current=undefined;
   // Корневой уровень: бэкенд требует parent_id всегда, без него он вернёт
   // не список, а сам корневой пункт.
   const root = useMenuChildren(ROOT_MENU_ID);
@@ -50,8 +54,17 @@ export function Sidebar({dashboardMenu,dashboardFavorites,dashboardAdd}:{dashboa
   const [peeking, setPeeking] = useState(false);
   const stopPeek = useCallback(() => setPeeking(false), []);
   const hubId=hub?.id;
+  if(pathname!=="/dashboards" && active && !hubActive)returnTo.current={scope,location,moduleId:active.id};
+  useEffect(()=>{if(pathname!=="/dashboards" && hubActive && returnTo.current?.scope===scope)setModule(returnTo.current.moduleId);},[pathname,hubActive,scope,setModule]);
   useEffect(()=>{if(pathname==="/dashboards"&&hubId)setModule(hubId);},[pathname,hubId,setModule]);
-  const selectModule=(id:string)=>{setModule(id);if(id===hub?.id)void navigate({to:"/dashboards",search:{}});};
+  const selectModule=(id:string)=>{
+    setModule(id);
+    if(id===hub?.id){void navigate({to:"/dashboards",search:{}});}
+    else if(pathname==="/dashboards" && returnTo.current?.scope===scope){
+      const previous=returnTo.current.location;
+      void navigate({to:previous.pathname,search:()=>previous.search,hash:previous.hash});
+    }
+  };
 
   useEffect(() => {
     if (!sidebarCollapsed) setPeeking(false);

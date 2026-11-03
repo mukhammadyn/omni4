@@ -4,7 +4,7 @@ import {
   ChevronsLeftIcon,
   EllipsisIcon,
   FolderIcon,
-  FolderOpenIcon,
+  UsersIcon, CalendarCheckIcon, UserSearchIcon, ListTodoIcon, WalletIcon, ChartNoAxesCombinedIcon,
   FolderPlusIcon,
   LayoutDashboardIcon,
   PencilIcon,
@@ -135,7 +135,7 @@ export function DashNav({
     ...modules.map((module) => ({
       id: module.id,
       label: module.label,
-      icon: catalog || embedded ? <Icon as={FolderIcon} size={embedded?14:18} /> : <ModuleMark module={module} />,
+      icon: catalog || embedded ? <span className={embedded ? "flex shrink-0 [&_svg]:size-3.5 [&_img]:size-3.5" : "flex shrink-0"}><MenuIcon name={module.icon} type={module.type} /></span> : <ModuleMark module={module} />,
       folders: tree.folders.filter((folder) => folder.moduleId === module.id),
     })),
     ...(orphans.length
@@ -310,7 +310,7 @@ export function DashNav({
                             className="flex min-w-0 flex-1 items-center gap-1.5"
                           >
                             <Chevron open={folderOpen} />
-                            <Icon as={folderOpen ? FolderOpenIcon : FolderIcon} size={15} className="shrink-0 text-fg-subtle" />
+                            <CategoryIcon folder={folder} />
                             <span className="truncate">{name(folder.title)}</span>
                           </button>
                         )}
@@ -436,4 +436,12 @@ function RenameInput({ value, label, onDone }: { value: string; label: string; o
       className="h-6 min-w-0 flex-1 rounded border border-border bg-bg px-1.5 text-sm text-fg outline-none"
     />
   );
+}
+
+/** Semantic defaults apply across projects. Explicit saved category icons win. */
+export function CategoryIcon({folder}:{folder:Folder}) {
+  if(folder.icon) return <span className="flex shrink-0 text-fg-subtle [&_svg]:size-3.5 [&_img]:size-3.5"><MenuIcon name={folder.icon} type="FOLDER" /></span>;
+  const title=folder.title.toLocaleLowerCase();
+  const icon=/кадров|personnel|staff|xodim/.test(title)?UsersIcon:/посещ|attendance|davomat/.test(title)?CalendarCheckIcon:/рекрут|recruit|hiring/.test(title)?UserSearchIcon:/задач|task|vazifa/.test(title)?ListTodoIcon:/финанс|finance|moliya/.test(title)?WalletIcon:ChartNoAxesCombinedIcon;
+  return <Icon as={icon} size={14} className="shrink-0 text-fg-subtle" />;
 }
