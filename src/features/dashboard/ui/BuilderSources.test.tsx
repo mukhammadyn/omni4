@@ -9,11 +9,12 @@ vi.mock("@/features/table", async (original) => ({ ...await original<typeof impo
 vi.mock("@/features/auth", async (original) => ({ ...await original<typeof import("@/features/auth")>(), useTablePermissions: vi.fn() }));
 vi.mock("@/features/sidebar", async (original) => ({ ...await original<typeof import("@/features/sidebar")>(), useMenuTree: vi.fn() }));
 vi.mock("../api/widget-data", () => ({ useWidgetData: vi.fn() }));
-vi.mock("react-i18next", async (original) => ({ ...await original<typeof import("react-i18next")>(), useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }) }));
+const uiLanguage = vi.hoisted(() => ({ value: "en" }));
+vi.mock("react-i18next", async (original) => ({ ...await original<typeof import("react-i18next")>(), useTranslation: () => ({ t: (key: string) => key, i18n: { language: uiLanguage.value } }) }));
 const table = (slug: string, label = slug) => ({ id: slug, slug, label, labels: {}, icon: "" });
 const render = () => renderToStaticMarkup(<BuilderSources value="crm_late_page" language="en" onPick={vi.fn()} />);
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.clearAllMocks(); uiLanguage.value = "en";
   vi.mocked(useMenuTree).mockReturnValue({ items: [], isLoading: false, error: null });
   vi.mocked(useTablePermissions).mockReturnValue(((slug: string) => ({ read: slug !== "hr_private" })) as ReturnType<typeof useTablePermissions>);
   vi.mocked(useTableCatalog).mockReturnValue({ items: [...Array.from({ length: 65 }, (_, i) => table(`hr_${i}`)), table("crm_late_page", "Last CRM source"), table("core_regions"), table("hr_private", "Private")], isLoading: false, error: null, retry: vi.fn() });
@@ -32,6 +33,12 @@ describe("complete chart Source catalog UI", () => {
     expect(html).toContain("Last CRM source"); expect(html).toContain("Change table"); expect(html).not.toContain("hr_64");
     const denied = renderToStaticMarkup(<BuilderSources compactSelection value="hr_private" language="en" onPick={vi.fn()} />);
     expect(denied).not.toContain("Private"); expect(denied).not.toContain("hr_private");
+  });
+  it("uses the UI language for source controls independently of field-label language", () => {
+    uiLanguage.value = "ru";
+    const html = renderToStaticMarkup(<BuilderSources compactSelection value="crm_late_page" language="en" onPick={vi.fn()} />);
+    expect(html).toContain("Сменить таблицу"); expect(html).not.toContain("Change table");
+    expect(html).toContain("Last CRM source");
   });
   it("shows catalog errors and explicit retry without pretending the catalog is empty", () => {
     vi.mocked(useTableCatalog).mockReturnValue({ items: [], isLoading: false, error: new Error("page failed"), retry: vi.fn() });
