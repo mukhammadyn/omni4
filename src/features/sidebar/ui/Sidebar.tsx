@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState,type ReactNode } from "react";
 import {useLocation,useNavigate} from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import {useGlobalRight} from "@/features/auth";
 import { ChevronsRightIcon, SearchIcon } from "lucide-react";
 import { errorText } from "@/shared/api/client";
 import { Icon } from "@/shared/ui/icon";
@@ -145,6 +146,7 @@ function SidebarPanel({
   onLeave: () => void;
 }) {
   const { t } = useTranslation();
+  const canCreateMenu=useGlobalRight("menu_button");
   const { sidebarWidth, setSidebarWidth } = useUi();
   const aside = useRef<HTMLElement>(null);
   /* ⌘K / Ctrl+K — окно «Поиск или AI», как подсказывает `kbd` на кнопке.
@@ -262,9 +264,14 @@ function SidebarPanel({
       </button>
       {palette && <CommandPalette onClose={() => setPalette(false)} />}
 
-      {modules.length > 0 && (
-        <ModuleSwitcher modules={modules} activeId={active?.id ?? ""} onSelect={onModule} />
-      )}
+      {modules.length > 0 ? (
+        <div data-sidebar-module-bar className="flex min-w-0 items-center gap-1">
+          <div className="min-w-0 flex-1"><ModuleSwitcher modules={modules} activeId={active?.id ?? ""} onSelect={onModule}/></div>
+          {/* Reserve one horizontal slot across selections so adding/removing
+              the creation control cannot shift the configured module slots. */}
+          {canCreateMenu&&<span data-menu-add-slot className="grid size-6 shrink-0 place-items-center">{!dashboardMenu&&<AddMenuButton parentId={active?.id ?? ROOT_MENU_ID}/>}</span>}
+        </div>
+      ) : !dashboardMenu&&<AddMenuButton parentId={ROOT_MENU_ID}/>}
 
       {/* ВРЕМЕННО СКРЫТО. Строка помощника — над меню и вне его: это не
           раздел проекта, а вход в отдельный экран, и в дереве меню он
@@ -285,8 +292,6 @@ function SidebarPanel({
         <span className="truncate">{t("copilot.title")}</span>
       </Link>
       */}
-
-      {!dashboardMenu&&<div className="flex justify-end px-2"><AddMenuButton parentId={active?.id ?? ROOT_MENU_ID}/></div>}
 
       <nav className="flex-1 overflow-y-auto" aria-label={t("sidebar.menu")}>
         {isLoading && <Skeleton />}

@@ -241,7 +241,7 @@ export function DashNav({
         </button>}
       </div>}
 
-      <label className="mx-2.5 mt-0.5 mb-1.5 flex h-7.5 items-center gap-1.5 rounded-md border border-border bg-bg px-2 text-fg-subtle">
+      {!embedded&&<label className="mx-2.5 mt-0.5 mb-1.5 flex h-7.5 items-center gap-1.5 rounded-md border border-border bg-bg px-2 text-fg-subtle">
         <Icon as={SearchIcon} size={14} />
         <input
           value={query}
@@ -249,7 +249,7 @@ export function DashNav({
           placeholder={t("dashboard.search")}
           className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none"
         />
-      </label>
+      </label>}
 
       <div className={`min-h-0 flex-1 ${catalog||embedded?"":"overflow-auto"} px-1.5 pb-2.5`}>
         {!embedded && !q && favs.length > 0 && (
