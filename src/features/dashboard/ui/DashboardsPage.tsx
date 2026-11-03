@@ -2,7 +2,6 @@ import {useCallback, useEffect,useLayoutEffect, useRef, useState, type ReactNode
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CheckIcon,
-  FolderIcon,
   LayoutDashboardIcon,
   PanelLeftIcon,
   Settings2Icon,
@@ -24,7 +23,6 @@ import {
   findDashboard,
   folderForNew,
   newDashboard,
-  openedDashboard,
   newFolder,
   patchDashboard,
   patchFolder,
@@ -37,7 +35,7 @@ import {toggle} from "../model/prefs";
 import {useDashboardPreferences} from "../api/preferences";
 import {accessibleDashboardTree} from "../model/navigation";
 import { DashFilters } from "./DashFilters";
-import { DashNav, ModuleMark } from "./DashNav";
+import { DashNav } from "./DashNav";
 import type { Dataset } from "../model/datasets";
 import { DatasetEditor } from "./DatasetEditor";
 import { WidgetGrid } from "./WidgetGrid";
@@ -47,8 +45,8 @@ import { SqlMonthControls } from "./SqlMonthControls";
  * Экран дашбордов (ADR-0013): свой сайдбар с деревом «модуль → папка →
  * дашборд», над дашбордом — вкладки его папки, ниже — виджеты.
  *
- * `moduleId` — модуль, из которого пришли: без выбранного дашборда
- * открывается первый дашборд этого модуля.
+ * Без явного id правая область остаётся пустой; ссылки открывают только
+ * выбранный доступный дашборд.
  */
 export function DashboardsPage({
   dashboardId,
@@ -57,7 +55,11 @@ export function DashboardsPage({
   onOpen,
   onValues,
   onCatalog,
+  manage=false,
+  onManageClose,
 }: {
+  manage?:boolean;
+  onManageClose?:()=>void;
   dashboardId: string;
   moduleId: string;
   /** Значения общих фильтров — из адреса (ADR-0013). */
@@ -75,7 +77,8 @@ export function DashboardsPage({
   const readableTree=accessibleDashboardTree(tree,modules);
   const {prefs,updatePrefs}=useDashboardPreferences();
   const [navOpen,setNavOpen]=useState(false);
-  const closeNav=useCallback(()=>setNavOpen(false),[]);
+  useEffect(()=>setNavOpen(manage),[manage]);
+  const closeNav=useCallback(()=>{setNavOpen(false);onManageClose?.();},[onManageClose]);
 
   /*
    * Раскладка в правке — черновик, как «Настроить» в professio:
@@ -88,8 +91,8 @@ export function DashboardsPage({
   const [removing, setRemoving] = useState<{ kind: "dashboard" | "folder"; id: string } | null>(null);
 
   const home = moduleId || modules[0]?.id || "";
-  const catalog=!dashboardId&&!moduleId;
-  const current = catalog||root.isLoading ? null:openedDashboard(readableTree, dashboardId, home, Boolean(moduleId));
+  const catalog=!dashboardId;
+  const current = catalog||root.isLoading ? null:findDashboard(readableTree,dashboardId);
 
   /*
    * Путь к дашборду раскрывается ОДИН раз — когда его открыли. Раньше
@@ -161,7 +164,7 @@ export function DashboardsPage({
         closed={closed}
         canEdit={canEdit}
         onToggle={(key) => updatePrefs({ ...prefs, closed: toggle(prefs.closed, key) })}
-        onOpen={id=>{setNavOpen(false);onOpen(id);}}
+        onOpen={id=>{closeNav();onOpen(id);}}
         onNewDashboard={addDashboard}
         onNewFolder={addFolder}
         onRenameFolder={(id, title) => apply(patchFolder(tree, id, (folder) => ({ ...folder, title })))}
@@ -169,7 +172,7 @@ export function DashboardsPage({
         onRenameDashboard={(id, title) => apply(patchDashboard(tree, id, (dashboard) => ({ ...dashboard, title })))}
         onRemoveDashboard={(id) => setRemoving({ kind: "dashboard", id })}
         onFavorite={(id) => updatePrefs({ ...prefs, favorites: toggle(prefs.favorites, id) })}
-        onHide={() => setNavOpen(false)}
+        onHide={closeNav}
       />
   );
 
@@ -193,7 +196,7 @@ export function DashboardsPage({
       {/* Страница прокручивается целиком, полоса вкладок липнет к верху —
           как `.scroller` и `.viewbar` прототипа. */}
       <div className="min-w-0 flex-1 overflow-auto">
-        {catalog ? <div className="p-4 pb-8 md:p-6 lg:p-8"><h1 className="mb-4 text-2xl font-semibold">{t("dashboard.title")}</h1>{isLoading||root.isLoading?<p role="status">{t("common.loading")}</p>:<div className="flex max-w-lg flex-col items-start gap-4"><p className="text-sm text-fg-muted">{t("dashboard.pickFromLeft")}</p><Button type="button" variant="secondary" onClick={showNav}><Icon as={PanelLeftIcon} size={16}/>{t("dashboard.manageFolders")}</Button></div>}</div>:!current ? (
+        {catalog ? null:!current ? (
           <div className="px-4 pt-6 md:px-6 lg:px-8">
             <ShowNav onClick={showNav} />
             <Empty
@@ -220,14 +223,6 @@ export function DashboardsPage({
             {/* Шапка — `.page-head` прототипа: путь, крупный значок,
                 заголовок и описание правятся прямо на месте. */}
             <div className="pt-6">
-              <div className="mb-2.5 flex items-center gap-1.5 text-[13px] text-fg-muted">
-                {module && <ModuleMark module={module} small />}
-                <span>{module?.label ?? t("dashboard.noModule")}</span>
-                <span className="text-fg-subtle">/</span>
-                <Icon as={FolderIcon} size={13} className="text-fg-subtle" />
-                <span>{current.folder.title || t("dashboard.untitled")}</span>
-              </div>
-
               <InlineText
                 key={`${current.dashboard.id}-emoji`}
                 value={current.dashboard.emoji}
@@ -247,7 +242,7 @@ export function DashboardsPage({
                 onCommit={(title) => patchCurrent({ title })}
                 className="mb-1 w-full text-[24px] font-bold leading-tight tracking-[-0.01em] lg:text-[28px]"
               />
-              <InlineText
+              {editing&&<InlineText
                 key={`${current.dashboard.id}-description`}
                 value={current.dashboard.description}
                 placeholder={canEdit ? t("dashboard.descriptionPlaceholder") : ""}
@@ -256,7 +251,7 @@ export function DashboardsPage({
                 multiline
                 onCommit={(description) => patchCurrent({ description })}
                 className="mb-3 w-full text-sm text-fg-muted"
-              />
+              />}
             </div>
 
             {/* Полоса вкладок — `.viewbar`: вкладки папки слева, действия справа. */}
@@ -272,11 +267,6 @@ export function DashboardsPage({
                   activeId={current.dashboard.id}
                   onSelect={onOpen}
                 />
-                {canEdit && (
-                  <ViewAction label={t("dashboard.addToFolder")} onClick={() => addDashboard(current.folder.id)}>
-                    <Icon as={PlusIcon} size={16} />
-                  </ViewAction>
-                )}
               </div>
 
               <div className="flex shrink-0 flex-wrap items-center gap-0.5 max-sm:w-full max-sm:min-w-0 max-sm:pb-1">
@@ -297,7 +287,7 @@ export function DashboardsPage({
                 </ViewAction>
                 {canEdit && (
                   <>
-                    <ViewAction label={t("dashboard.datasets")} text onClick={() => setDatasetsOpen(true)}><Icon as={Settings2Icon} size={16} /></ViewAction>
+                    {editing&&<ViewAction label={t("dashboard.datasets")} text onClick={() => setDatasetsOpen(true)}><Icon as={Settings2Icon} size={16} /></ViewAction>}
                     <ViewAction label={t("dashboard.remove")} danger onClick={() => current && setRemoving({ kind: "dashboard", id: current.dashboard.id })}>
                       <Icon as={Trash2Icon} size={16} />
                     </ViewAction>

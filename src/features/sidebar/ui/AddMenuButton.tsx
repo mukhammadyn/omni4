@@ -30,7 +30,7 @@ const itemIcon = (icon: (typeof byType)[string]) => (
  * 24px на нём не найти. Меню под ней одно и то же: заводить пункт двумя
  * разными списками было бы двумя правдами о том, что бывает в меню.
  */
-export function AddMenuButton({ parentId, label }: { parentId: string; label?: string }) {
+export function AddMenuButton({ parentId, label,menuRow=false }: { parentId: string; label?: string;menuRow?:boolean }) {
   const { t } = useTranslation();
   /*
    * Заводить пункты верхнего уровня разрешает глобальное право роли —
@@ -66,9 +66,10 @@ export function AddMenuButton({ parentId, label }: { parentId: string; label?: s
   return (
     <>
       <Popover
-        align="end"
+        align={menuRow?"start":"end"}
+        {...(menuRow?{className:"w-full"}:{})}
         trigger={({ open, toggle }) =>
-          label ? (
+          menuRow ? <button type="button" onClick={toggle} aria-expanded={open} className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm text-fg-muted hover:bg-surface-hover hover:text-fg"><Icon as={PlusIcon} size={16}/>{label??t("sidebar.add")}</button> : label ? (
             <Button type="button" onClick={toggle}>
               <Icon as={PlusIcon} size={16} />
               {label}
