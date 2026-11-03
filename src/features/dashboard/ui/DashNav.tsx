@@ -135,7 +135,7 @@ export function DashNav({
     ...modules.map((module) => ({
       id: module.id,
       label: module.label,
-      icon: catalog || embedded ? <Icon as={FolderIcon} size={18} /> : <ModuleMark module={module} />,
+      icon: catalog || embedded ? <Icon as={FolderIcon} size={embedded?14:18} /> : <ModuleMark module={module} />,
       folders: tree.folders.filter((folder) => folder.moduleId === module.id),
     })),
     ...(orphans.length
@@ -272,18 +272,19 @@ export function DashNav({
 
           return (
             <div key={group.id}>
-              <div className={`${ROW} group/row font-semibold text-fg`}>
-                <button type="button" onClick={() => onToggle(group.id)} className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <Chevron open={groupOpen} />
+              <div className={embedded?"group/row flex h-5.5 w-full items-center gap-1 rounded-md px-1.5 text-fg-subtle hover:bg-surface-hover":`${ROW} group/row font-semibold text-fg`}>
+                <button type="button" onClick={() => onToggle(group.id)} aria-expanded={groupOpen} className={embedded?"flex h-5.5 min-w-0 flex-1 items-center gap-1 text-left text-[11.5px] font-semibold":"flex min-w-0 flex-1 items-center gap-1.5"}>
+                  {!embedded&&<Chevron open={groupOpen} />}
                   <span className="flex shrink-0">{group.icon}</span>
-                  <span className="truncate">{group.label}</span>
+                  <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                  {embedded&&<Chevron open={groupOpen} />}
                 </button>
                 {/* Модуль без папок иначе не заполнить: «+» в шапке кладёт
                     в модуль открытого дашборда. */}
                 {canEdit && group.id !== NO_MODULE && (
                   <RowMenu label={t("dashboard.addToModule")} icon={PlusIcon} actions={createActions(group.id)} />
                 )}
-                <span className="text-xs font-medium text-fg-subtle">{count}</span>
+                <span className={`${embedded?"text-2xs":"text-xs"} font-medium text-fg-subtle`}>{count}</span>
               </div>
 
               {groupOpen &&

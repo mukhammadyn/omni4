@@ -1,18 +1,14 @@
 import {useCallback, useEffect,useLayoutEffect, useRef, useState, type ReactNode,type ChangeEvent,type KeyboardEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   CheckIcon,
   LayoutDashboardIcon,
   PanelLeftIcon,
   Settings2Icon,
   PlusIcon,
-  RefreshCwIcon,
-  StarIcon,
   Trash2Icon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ROOT_MENU_ID, useMenuChildren } from "@/features/sidebar";
-import { keys } from "@/shared/lib/query-keys";
 import { Button } from "@/shared/ui/button";
 import { ConfirmDialog } from "@/shared/ui/confirm-dialog";
 import { Icon } from "@/shared/ui/icon";
@@ -54,7 +50,6 @@ export function DashboardsPage({
   values,
   onOpen,
   onValues,
-  onCatalog,
   manage=false,
   onManageClose,
 }: {
@@ -66,10 +61,8 @@ export function DashboardsPage({
   values: FilterValues;
   onOpen: (id: string) => void;
   onValues: (values: FilterValues) => void;
-  onCatalog:()=>void;
 }) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const root = useMenuChildren(ROOT_MENU_ID);
   const modules = root.items.filter((node) => node.isModule);
   const { tree, menuId, isLoading, isSaving, saveError, retrySave, canRead, canEdit:canEditStore, save } = useDashboardTree();
@@ -182,7 +175,6 @@ export function DashboardsPage({
 
   const module = modules.find((item) => item.id === (current?.folder.moduleId ?? home));
   const editing = canEdit && layout !== null && layout.id === current?.dashboard.id;
-  const favorite = Boolean(current && prefs.favorites.includes(current.dashboard.id));
 
   const showNav = () => setNavOpen(true);
   const removingDashboard = removing?.kind === "dashboard" ? findDashboard(tree, removing.id) : null;
@@ -220,8 +212,7 @@ export function DashboardsPage({
           </div>
         ) : (
           <div className="px-4 pb-8 md:px-6 lg:px-8" data-dashboard-content>
-            {/* Шапка — `.page-head` прототипа: путь, крупный значок,
-                заголовок и описание правятся прямо на месте. */}
+            {/* Значок и заголовок правятся прямо на месте. */}
             <div className="pt-6">
               <InlineText
                 key={`${current.dashboard.id}-emoji`}
@@ -242,22 +233,10 @@ export function DashboardsPage({
                 onCommit={(title) => patchCurrent({ title })}
                 className="mb-1 w-full text-[24px] font-bold leading-tight tracking-[-0.01em] lg:text-[28px]"
               />
-              {editing&&<InlineText
-                key={`${current.dashboard.id}-description`}
-                value={current.dashboard.description}
-                placeholder={canEdit ? t("dashboard.descriptionPlaceholder") : ""}
-                label={t("dashboard.description")}
-                editable={canEdit}
-                multiline
-                onCommit={(description) => patchCurrent({ description })}
-                className="mb-3 w-full text-sm text-fg-muted"
-              />}
             </div>
 
             {/* Полоса вкладок — `.viewbar`: вкладки папки слева, действия справа. */}
             <div className="sticky top-0 z-10 flex min-h-10 flex-wrap items-center gap-1 border-b border-border bg-surface">
-              <ShowNav onClick={showNav} />
-              <ViewAction label={t("dashboard.title")} onClick={onCatalog}><Icon as={LayoutDashboardIcon} size={16}/></ViewAction>
               <div className="flex min-w-0 flex-1 items-center gap-1 max-sm:basis-full">
                 <Tabs
                   tabs={current.folder.dashboards.map((dashboard) => ({
@@ -270,21 +249,6 @@ export function DashboardsPage({
               </div>
 
               <div className="flex shrink-0 flex-wrap items-center gap-0.5 max-sm:w-full max-sm:min-w-0 max-sm:pb-1">
-                <ViewAction
-                  label={t(favorite ? "dashboard.unfavorite" : "dashboard.favorite")}
-                  pressed={favorite}
-                  onClick={() => updatePrefs({ ...prefs, favorites: toggle(prefs.favorites, current.dashboard.id) })}
-                >
-                  <Icon as={StarIcon} size={16} className={favorite ? "fill-current text-warning" : ""} />
-                </ViewAction>
-                {/* ponytail: «Обновить» сбрасывает кэш строк всех таблиц, а не
-                    только этого дашборда — дешевле, чем собирать его запросы. */}
-                <ViewAction
-                  label={t("dashboard.refresh")}
-                  onClick={() => void queryClient.invalidateQueries({ queryKey: keys.items.all })}
-                >
-                  <Icon as={RefreshCwIcon} size={16} />
-                </ViewAction>
                 {canEdit && (
                   <>
                     {editing&&<ViewAction label={t("dashboard.datasets")} text onClick={() => setDatasetsOpen(true)}><Icon as={Settings2Icon} size={16} /></ViewAction>}

@@ -1,18 +1,17 @@
-import { BellIcon, EllipsisIcon, LinkIcon, StarIcon, UserIcon, type LucideIcon } from "lucide-react";
+import { BellIcon, UserIcon, type LucideIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useSession } from "@/shared/api/use-session";
-import { toast } from "@/shared/lib/toast";
 import { Icon } from "@/shared/ui/icon";
 import { Popover, PopoverItem, PopoverSeparator } from "@/shared/ui/popover";
 import { Tooltip } from "@/shared/ui/tooltip";
 
 /**
  * Правая часть верхней полосы — как у `.topbar` прототипа
- * (docs/REDESIGN.md, 4.3): колокольчик, «в избранное», аватар, «…».
+ * (docs/REDESIGN.md, 4.3): уведомления и меню профиля.
  *
- * Уведомлений и избранного у нас пока нет — кнопки стоят заглушками со
- * «скоро», как ряд модулей. Красной точки на колокольчике нет: она
+ * Уведомлений у нас пока нет — кнопка остаётся заглушкой со «скоро».
+ * Красной точки на колокольчике нет: она
  * сообщала бы о непрочитанном, которого не бывает.
  *
  * Аватар — меню профиля: кто вошёл и «Мой профиль». Тема, язык и выход
@@ -28,7 +27,6 @@ export function TopbarActions() {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
       <Soon icon={BellIcon} label={t("topbar.notificationsSoon")} />
-      <Soon icon={StarIcon} label={t("topbar.favoritesSoon")} />
 
       <Popover
         align="end"
@@ -71,57 +69,7 @@ export function TopbarActions() {
           </div>
         )}
       </Popover>
-
-      <Popover
-        align="end"
-        trigger={({ open, toggle }) => (
-          <TopbarButton icon={EllipsisIcon} label={t("topbar.more")} open={open} onClick={toggle} />
-        )}
-      >
-        {(close) => (
-          <PopoverItem
-            icon={<Icon as={LinkIcon} />}
-            onClick={() => {
-              close();
-              void navigator.clipboard.writeText(window.location.href).then(
-                () => toast.success(t("topbar.linkCopied")),
-                () => toast.error(t("topbar.linkCopyFailed")),
-              );
-            }}
-          >
-            {t("topbar.copyLink")}
-          </PopoverItem>
-        )}
-      </Popover>
     </div>
-  );
-}
-
-/** `.tb-btn.icon` прототипа: 28px, приглушённая, подложка при наведении. */
-function TopbarButton({
-  icon,
-  label,
-  open = false,
-  onClick,
-}: {
-  icon: LucideIcon;
-  label: string;
-  open?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      aria-expanded={open}
-      title={label}
-      className={`grid size-7 place-items-center rounded-[5px] text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg ${
-        open ? "bg-surface-hover text-fg" : ""
-      }`}
-    >
-      <Icon as={icon} />
-    </button>
   );
 }
 
