@@ -13,6 +13,19 @@ export function resetWidgetSource(widget: Widget, tableSlug: string): Widget {
   return next;
 }
 
+/** Plain source browsing is immediate; confirm only before clearing field configuration. */
+export function sourceChangeNeedsConfirmation(widget: Widget): boolean {
+  return Boolean(
+    widget.datasetId || widget.groupSlug || widget.splitSlug || widget.valueSlug || widget.currencySlug ||
+    widget.xSlug || widget.ySlug || widget.sizeSlug || widget.latitudeSlug || widget.longitudeSlug ||
+    widget.interaction || widget.pivotSkipEmpty || widget.pivotRows?.some(Boolean) ||
+    widget.ratio?.numerator.field || widget.ratio?.denominator.field || widget.measures?.length ||
+    widget.columns?.length || widget.sorts?.length || widget.calculatedFields?.length ||
+    Object.keys(widget.filters).length || Object.keys(widget.answers).length ||
+    Object.keys(widget.fieldPresentation ?? {}).length || Object.keys(widget.columnWidths ?? {}).length
+  );
+}
+
 /** Identity comes from the session and actual relation metadata, not a guessed slug. */
 export function resolveWidgetIdentities(filters: Filters, fields: Field[], relations: Relation[], identities: Record<string, string>): Filters {
   return Object.fromEntries(Object.entries(filters).map(([slug, filter]) => {

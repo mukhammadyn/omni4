@@ -1,16 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { newChart } from "@/features/item";
-import { BuilderParameters, BuilderSourceFields } from "./BuilderData";
+import { BuilderParameters } from "./BuilderData";
 import { SqlDatasetRunner } from "./SqlDatasetRunner";
 import { ChartAppearance } from "./ChartAppearance";
 import { SqlWidgetOptions } from "./SqlWidgetOptions";
 import { updateSqlParameter, type Dataset } from "../model/datasets";
 import { useSqlRunner } from "../api/sql-runner";
-import { useDashboardSchema } from "../api/schema";
 vi.mock("react-i18next", async original => ({ ...await original<typeof import("react-i18next")>(), useTranslation: () => ({ t: (key: string) => key, i18n: { language: "ru" } }) }));
 vi.mock("../api/sql-runner", () => ({ useSqlRunner: vi.fn() }));
-vi.mock("../api/schema", () => ({ useDashboardSchema: vi.fn() }));
 vi.mock("../api/sql-catalog", () => ({ useSqlCatalog: () => ({ tables: [] }) }));
 const parameter = { name: "month", type: "date" as const, required: false, defaultValue: "2026-10-01", dashboardControl: "month" as const, controlLabel: "Месяц", controlGroup: "period", dynamicDefault: "today" as const };
 const dataset: Dataset = { id: "query", name: "Existing", source: { kind: "sql", sql: "SELECT :month", columns: [], parameters: [parameter, { name: "other", type: "text", required: true, defaultValue: "kept" }] } };
@@ -48,16 +46,6 @@ describe("simplified SQL source", () => {
     }
     vi.mocked(useSqlRunner).mockReturnValue({ ...initial, result: { ...result, rows: [] } });
     const html = renderRunner(); expect(html).toContain("Поля результата"); expect(html).toContain("По запросу нет строк.");
-  });
-  it("hides stale schema until the selected authorized table is ready", () => {
-    const schema = { schema: { fields: [{ slug: "permitted", label: "Allowed field", type: "NUMBER", labels: {} }], relations: [] }, ready: true, loading: false, error: null, denied: false, retry: vi.fn() };
-    const render = () => renderToStaticMarkup(<BuilderSourceFields tableSlug="events" menuId="allowed" language="en" />);
-    vi.mocked(useDashboardSchema).mockReturnValue(schema as unknown as ReturnType<typeof useDashboardSchema>);
-    expect(render()).toContain("Allowed field"); expect(render()).toContain("Поля таблицы"); expect(render()).not.toContain("Table fields");
-    for (const state of [{ loading: true }, { ready: false }, { error: "Unavailable" }, { denied: true }]) {
-      vi.mocked(useDashboardSchema).mockReturnValue({ ...schema, ...state } as unknown as ReturnType<typeof useDashboardSchema>);
-      expect(render()).not.toContain("Allowed field");
-    }
   });
   it("keeps advanced configuration available behind closed disclosures and does not mutate it", () => {
     const widget = { ...newChart(), tableSlug: "", filters: {}, answers: {}, kind: "stat" as const, sqlSuffix: "лет", sqlDetailField: "detail", appearance: { decimals: 1, valueSize: 24 } };

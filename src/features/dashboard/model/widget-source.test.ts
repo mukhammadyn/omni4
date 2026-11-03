@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { newChart, ME } from "@/features/item";
 import type { Field, Relation } from "@/features/table";
 import { mergeFilters, NOBODY } from "./filters";
-import { planWidgetReads, resetWidgetSource, resolveWidgetIdentities } from "./widget-source";
+import { planWidgetReads, resetWidgetSource, resolveWidgetIdentities, sourceChangeNeedsConfirmation } from "./widget-source";
 
 test("Me and a matching global identity intersect after trusted identity resolution", () => {
   const fields = [{ slug: "owner", relationId: "person" }] as Field[];
@@ -43,4 +43,11 @@ test("mandatory dataset and selection fields cannot be masked by inactive card f
   expect(plan.lookups).toEqual([]);
   const selected = { private_status: { op: "is" as const, values: ["Done"] } };
   expect(planWidgetReads(widget, {}, [], {}, [], [], {}, () => true, {}, undefined, [selected]).forbidden).toBe(true);
+});
+
+test("source browsing is immediate until there is field-dependent configuration to preserve", () => {
+  const widget = { ...newChart(), tableSlug: "events", kind: "stat" as const, filters: {}, answers: {}, appearance: { valueSize: 24 }, title: "Keep title", refreshInterval: 900000 };
+  expect(sourceChangeNeedsConfirmation(widget)).toBe(false);
+  for (const patch of [{ groupSlug: "category" }, { fieldPresentation: { amount: { label: "Edited label" } } }, { columns: ["name"] }, { datasetId: "saved" }, { filters: { status: { op: "is" as const, values: ["active"] } } }]) expect(sourceChangeNeedsConfirmation({ ...widget, ...patch })).toBe(true);
+  expect(resetWidgetSource(widget, "other")).toMatchObject({ title: "Keep title", refreshInterval: 900000, appearance: { valueSize: 24 } });
 });
