@@ -51,9 +51,9 @@ describe("simplified SQL source", () => {
   });
   it("hides stale schema until the selected authorized table is ready", () => {
     const schema = { schema: { fields: [{ slug: "permitted", label: "Allowed field", type: "NUMBER", labels: {} }], relations: [] }, ready: true, loading: false, error: null, denied: false, retry: vi.fn() };
-    const render = () => renderToStaticMarkup(<BuilderSourceFields tableSlug="events" menuId="allowed" language="ru" />);
+    const render = () => renderToStaticMarkup(<BuilderSourceFields tableSlug="events" menuId="allowed" language="en" />);
     vi.mocked(useDashboardSchema).mockReturnValue(schema as unknown as ReturnType<typeof useDashboardSchema>);
-    expect(render()).toContain("Allowed field");
+    expect(render()).toContain("Allowed field"); expect(render()).toContain("Поля таблицы"); expect(render()).not.toContain("Table fields");
     for (const state of [{ loading: true }, { ready: false }, { error: "Unavailable" }, { denied: true }]) {
       vi.mocked(useDashboardSchema).mockReturnValue({ ...schema, ...state } as unknown as ReturnType<typeof useDashboardSchema>);
       expect(render()).not.toContain("Allowed field");
