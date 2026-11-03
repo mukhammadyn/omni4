@@ -64,3 +64,10 @@ export function toDatasets(value: unknown): Dataset[] {
     return [];
   });
 }
+
+/** Editing one parameter never reorders or drops its existing control metadata. */
+export function updateSqlParameter(dataset: Dataset, parameter: DatasetParameter): Dataset {
+  if (dataset.source.kind !== "sql") return dataset;
+  const source = dataset.source;
+  return { ...dataset, source: { ...source, parameters: source.parameters.some(p => p.name === parameter.name) ? source.parameters.map(p => p.name === parameter.name ? parameter : p) : [...source.parameters, parameter] } };
+}

@@ -93,7 +93,7 @@ export type Dashboard = {
 };
 
 /** Папка дашбордов. Модуль — id папки меню с `is_tab` (ADR-0010). */
-export type Folder = { id: string; moduleId: string; title: string; dashboards: Dashboard[] };
+export type Folder = { id: string; moduleId: string; title: string; icon?: string; dashboards: Dashboard[] };
 
 export type Tree = { folders: Folder[]; datasets?: Dataset[] };
 
@@ -114,6 +114,7 @@ export function toTree(value: unknown): Tree {
       id: text(folder["id"]) || `folder-${index}`,
       moduleId: text(folder["module_id"]),
       title: text(folder["title"]),
+      ...(text(folder["icon"]) ? { icon: text(folder["icon"]) } : {}),
       dashboards: list(folder["dashboards"]).map((dashboard, at) => ({
         id: text(dashboard["id"]) || `dashboard-${index}-${at}`,
         title: text(dashboard["title"]),
@@ -191,6 +192,7 @@ export function toTreeAttribute(tree: Tree): Record<string, unknown> {
       id: folder.id,
       module_id: folder.moduleId,
       title: folder.title,
+      ...(folder.icon ? { icon: folder.icon } : {}),
       dashboards: folder.dashboards.map((dashboard) => ({
         id: dashboard.id,
         title: dashboard.title,

@@ -27,6 +27,12 @@ describe("complete chart Source catalog UI", () => {
     expect(html).not.toContain("hr_private"); expect(html).not.toContain("Load more"); expect(html).not.toContain("action.more");
     expect(useWidgetData).not.toHaveBeenCalled();
   });
+  it("shows the chosen source compactly for immediate fields preview without exposing denied metadata", () => {
+    const html = renderToStaticMarkup(<BuilderSources compactSelection value="crm_late_page" language="en" onPick={vi.fn()} />);
+    expect(html).toContain("Last CRM source"); expect(html).toContain("Change table"); expect(html).not.toContain("hr_64");
+    const denied = renderToStaticMarkup(<BuilderSources compactSelection value="hr_private" language="en" onPick={vi.fn()} />);
+    expect(denied).not.toContain("Private"); expect(denied).not.toContain("hr_private");
+  });
   it("shows catalog errors and explicit retry without pretending the catalog is empty", () => {
     vi.mocked(useTableCatalog).mockReturnValue({ items: [], isLoading: false, error: new Error("page failed"), retry: vi.fn() });
     const html = render();

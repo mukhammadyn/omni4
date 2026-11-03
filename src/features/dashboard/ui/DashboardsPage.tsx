@@ -1,6 +1,7 @@
 import {useCallback, useEffect,useLayoutEffect, useRef, useState, type ReactNode,type ChangeEvent,type KeyboardEvent } from "react";
 import {
   CheckIcon,
+  StarIcon,
   LayoutDashboardIcon,
   PanelLeftIcon,
   Settings2Icon,
@@ -249,6 +250,9 @@ export function DashboardsPage({
               </div>
 
               <div className="flex shrink-0 flex-wrap items-center gap-0.5 max-sm:w-full max-sm:min-w-0 max-sm:pb-1">
+                <ViewAction label={t(prefs.favorites.includes(current.dashboard.id) ? "dashboard.unfavorite" : "dashboard.favorite")} pressed={prefs.favorites.includes(current.dashboard.id)} onClick={() => updatePrefs({ ...prefs, favorites: toggle(prefs.favorites, current.dashboard.id) })}>
+                  <Icon as={StarIcon} size={16} className={prefs.favorites.includes(current.dashboard.id) ? "fill-current text-warning" : ""} />
+                </ViewAction>
                 {canEdit && (
                   <>
                     {editing&&<ViewAction label={t("dashboard.datasets")} text onClick={() => setDatasetsOpen(true)}><Icon as={Settings2Icon} size={16} /></ViewAction>}
