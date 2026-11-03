@@ -139,3 +139,12 @@ test("single-page navigation may be hidden without removing rows or multi-page c
  const render=(n:number)=>renderToStaticMarkup(<SqlResultView displayOnly language="en" result={{columns:[{key:"label",type:"text"}],rows:Array.from({length:n},(_,i)=>({label:`Row ${i}`})),limit:1000,truncated:false}} presentation={{type:"table",kind:"bar",group:"",value:"",split:"",pageSize:10,hideSinglePagePagination:true,fitContent:true}}/>);
  expect(render(1)).toContain("Row 0");expect(render(1)).not.toContain("1 / 1");expect(render(11)).toContain("1 / 2");expect(render(11)).not.toContain("Row 10");
 });
+
+test("builder charts fill a bounded preview without changing source-response table layout",()=>{
+ const result={columns:[{key:"month",type:"text"},{key:"n",type:"int4"}],rows:[{month:"January",n:2},{month:"December",n:4}],limit:100,truncated:false};
+ const view={type:"chart" as const,kind:"column" as const,group:"month",value:"n",split:""};
+ const bounded=renderToStaticMarkup(<SqlResultView fitContainer hidePicker language="en" result={result} presentation={view}/>);
+ expect(bounded).toContain('data-sql-fit-container="true"');expect(bounded).toContain("min-h-0 flex-1");expect(bounded).toContain("January");expect(bounded).toContain("December");
+ const source=renderToStaticMarkup(<SqlResultView hidePicker language="en" result={result} presentation={{...view,type:"table"}}/>);
+ expect(source).not.toContain("data-sql-fit-container");expect(source).toContain('scope="col"');
+});
