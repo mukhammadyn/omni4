@@ -177,6 +177,16 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       }
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
+        {/* Сначала вход через Google, ниже — почтой или телефоном,
+            как в прототипе сайта. */}
+        <GoogleButton
+          disabled={busy}
+          label="Google"
+          onToken={(token) => token && google.mutate(token, { onSuccess: handle })}
+        />
+
+        <Divider>{t("auth.or")}</Divider>
+
         {/* Пароль, код в SMS, код на почту — способы, а не поля одной
             формы. */}
         <div className="grid grid-cols-3 gap-1 rounded-lg bg-surface-hover p-1 text-sm">
@@ -305,13 +315,6 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           </button>
         )}
 
-        <Divider>{t("auth.orContinueWith")}</Divider>
-
-        <GoogleButton
-          disabled={busy}
-          label="Google"
-          onToken={(token) => token && google.mutate(token, { onSuccess: handle })}
-        />
       </form>
     </AuthCard>
   );

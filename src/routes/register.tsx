@@ -14,7 +14,7 @@ function RegisterPage() {
 
   // Регистрация не выдаёт токены — она создаёт компанию. Дальше обычный вход.
   return (
-    <AuthLayout>
+    <AuthLayout aside="signup">
       <RegisterForm onSuccess={() => void navigate({ to: "/login" })} />
     </AuthLayout>
   );
