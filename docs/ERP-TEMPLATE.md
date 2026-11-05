@@ -5,17 +5,23 @@
 готовым ERP — с модулями в сайдбаре, нашими экранами и настройками,
 без ручной донастройки через API.
 
-Составлено 2026-10-15. Источники:
+Составлено 2026-10-15, сверено заново 2026-11-05. Источники:
 
-- живой проект omni4 — дерево меню и view сняты по API-ключу
-  (`GET /v3/menus`, `GET /v3/menus/{id}/views`, `GET /v2/fields`,
-  `GET /v2/relations`) — только чтение;
-- код omni4 (ветка `feat/schema-v2`) — какие слаги, типы и атрибуты он читает;
+- живые проекты omni4 и omni5 — меню, view, таблицы и поля сняты
+  по API-ключу (`GET /v3/menus`, `GET /v3/menus/{id}/views`, `GET /v1/table`,
+  `GET /v2/fields`) — только чтение;
+- код omni4 (`main`) — какие слаги, типы и атрибуты он читает (§7);
 - [STATUS.md](STATUS.md) — что заводилось руками и зачем;
 - `FRONTEND_RU.md` (схема v2 от 2026-10-14) — имена таблиц и колонок.
 
-Все слаги ниже — **схемы v2**. В omni4 они пока старые (таблица
-соответствий — `FRONTEND_RU.md`, §3–4).
+**Как читать.** §1–6 — общий шаблон: что должно быть в любом проекте,
+чтобы экраны omni4 работали. Он не равен ни omni4, ни omni5 —
+это цель для обоих. §7 — справочник: какие настройки меню, таблиц,
+view и полей фронт вообще читает и кто их пишет. §8 — чем живые omni4
+и omni5 отличаются от шаблона и друг от друга. Новое знание о проекте
+пишется в §8, а не пометкой «пока только omni5» в теле шаблона.
+
+Все слаги ниже — схемы v2; omni4 и omni5 оба на ней.
 
 ## 0. Главное правило: всё по слагам, ни одного id
 
@@ -40,9 +46,11 @@ Id меню, view, полей и связей в каждом проекте с�
    Модуль, которого у клиента нет, не заводится целиком (§5.5
    `FRONTEND_RU.md`).
 2. **`attributes.protected: true`** — у каждой таблицы модулей
-   (`core_*`, `crm_*`, `hr_*`). Структура заперта, записи правятся
-   (CONTEXT.md, Protected). Исключение — `core_users`: таблица входа
-   флаг не держит (backend-notes), её запирает пункт меню.
+   (`core_*`, `crm_*`, `hr_*`, `pbx_*`). Структура заперта, записи
+   правятся (CONTEXT.md, Protected). Запрет держит только фронт —
+   бэкенд флага не знает. Исключение — `core_users`: таблица входа
+   флаг не держит (backend-notes), её запирает пункт меню. Часть новых
+   таблиц флаг пока не получила (§8.1).
 3. **Подписи LOOKUP-полей** (`attributes.label`) — **у всех**. Фронт
    берёт подпись LOOKUP только оттуда (`table/api/normalize.ts`,
    `pickLabel`): колонка `label` у связи обычно служебная («FROM x TO y»).
@@ -72,11 +80,16 @@ Id меню, view, полей и связей в каждом проекте с�
    2026-10-08), статусы `hr_candidates.status` (`active`, `hired`,
    `rejected`, `reserve`), `hr_requests.status` (`pending`, `approved`,
    `rejected`, `cancelled`), `hr_employees.status` (`active`, `dismissed`),
-   `hr_vacancies.status` (`closed` и др.), `hr_attendance_days.status`
+   `hr_vacancies.status` (`active`, `closed`), `hr_attendance_days.status`
    (`on_time`, `late`, `absent`, `excused`, `remote`, `day_off`,
-   `holiday`, `not_employed`), `hr_attendance_days.review` (`pending`).
+   `holiday`, `not_employed`), `hr_attendance_days.review` (`pending`,
+   `approved`, `rejected`). Полный список ключей, которые код сравнивает
+   строкой, — §7.5.
    Берутся из dbml как есть — ключи менять нельзя, экраны сравнивают
-   с ними строкой.
+   с ними строкой. У PICK_LIST в строке лежит `value`, у MULTISELECT —
+   `slug` варианта: менять нельзя ни то, ни другое.
+   Цвет плашки — только `options[].color`; `has_color` фронт пишет,
+   но не читает. Нет цвета — тег серый.
 5. **`core_users.timezone_id`** (SINGLE_LINE) — личный часовой пояс
    (ADR-0014). В v2 его нет; без колонки пояс не сохраняется.
    Строку DEFAULT ADMIN заводить не нужно (added 2026-10-26): фронт
@@ -164,8 +177,7 @@ Id меню, view, полей и связей в каждом проекте с�
    `child`, `parent`, `sibling`), `full_name`, `phone` (SINGLE_LINE),
    `birth_date` (DATE). Many2One на `hr_employees` (`hr_employees_id`).
    Пункт меню не нужен.
-15. **`hr_timesheets`** — «Табели» (added 2026-10-27, в v2 нет; omni4
-   и omni5): документ «табель за месяц по отделу», `timesheets.html`
+15. **`hr_timesheets`** — «Табели» (added 2026-10-27, в v2 нет): документ «табель за месяц по отделу», `timesheets.html`
    прототипа. С 2026-10-28 — табель компании за месяц или неделю,
    `hr_departments_id` у него пуст (у табелей отделов первой версии задан);
    поле не обязательное. Пункт меню — HRMS → Время, после «Графика работы».
@@ -180,18 +192,18 @@ Id меню, view, полей и связей в каждом проекте с�
    заголовком строки первую колонку. Список — `title`,
    `hr_departments_id`, `worked_hours`, `status`; доска — `title`,
    `hr_departments_id`, `people`, `worked_hours`.
-16. **`hr_timesheet_events`** — история табеля (added 2026-10-27, omni4
-   и omni5; вкладка «История» страницы табеля). Поля: `action` (PICK_LIST
+16. **`hr_timesheet_events`** — история табеля (added 2026-10-27;
+   вкладка «История» страницы табеля). Поля: `action` (PICK_LIST
    `filled`, `approved`, `returned`, `edited`, `comment` — экран
    сравнивает строкой), `field`, `before`, `after` (SINGLE_LINE, для
    `edited` — подпись поля и значения текстом), `comment` (MULTI_LINE).
    Many2One: `hr_timesheets_id` («Табель»), `core_users_id` («Кто»).
    Пункт меню не нужен. Пишут только наши экраны — правка через общую
    таблицу в историю не попадает.
-   Many2One `hr_timesheet_days_id` («День», added 2026-10-27, пока только
-   omni5) — у события `edited`: какой день правили.
+   Many2One `hr_timesheet_days_id` («День», added 2026-10-27) — у события
+   `edited`: какой день правили.
 17. **`hr_timesheet_days`** — строки дня табеля, «сотрудник × день»
-   (added 2026-10-27, пока только omni5; ADR-0018). Копия табеля
+   (added 2026-10-27; ADR-0018). Копия табеля
    посещаемости в момент «Заполнить», вход функции расчёта. Поля:
    `date` (DATE), `outside_period` (CHECKBOX, «вне месяца» — день
    соседнего месяца в неделе на стыке), `check_in`, `check_out`
@@ -208,11 +220,11 @@ Id меню, view, полей и связей в каждом проекте с�
    Many2One: `hr_timesheets_id`, `hr_employees_id`, `hr_absence_types_id`.
    Пункт меню не нужен.
 18. **`hr_timesheet_norms`** — норма месяца по сотруднику для табеля
-   (added 2026-10-27, пока только omni5): `month` (DATE, первое число),
+   (added 2026-10-27): `month` (DATE, первое число),
    `shifts_in_month`, `minutes_per_day` (NUMBER). Many2One:
    `hr_timesheets_id`, `hr_employees_id`. По строке на каждый задетый
    периодом месяц.
-19. **Табель → «Зарплата»** (added 2026-10-27, пока только omni5):
+19. **Табель → «Зарплата»** (added 2026-10-27):
    у `hr_timesheets` — `period_kind` (PICK_LIST `month`/`week`; `period`
    — первое число месяца или понедельник). У `hr_payroll_lines` —
    вариант `timesheet` в `source`; Many2One `hr_timesheets_id`
@@ -293,18 +305,24 @@ hr_employees ──hr_employees_id── core_users ──user_id_auth── use
 `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@16.0.0/img/apple/64/<код>.png`
 (в таблице — сам знак и код).
 
-Что фронт читает в меню:
+Что из меню шаблон обязан завести (полный список того, что фронт читает
+в меню, — §7.1):
 
 | Атрибут | Значение | Что делает |
 |---|---|---|
-| `is_tab: true` | у папки в корне | папка — **модуль**: плитка в переключателе сайдбара (ADR-0010) |
-| `screen: "dashboards-entry"` | `LINK` | вход в дашборды модуля → `/dashboards` |
-| `screen: "settings"` | `LINK` | вход в настройки проекта → `/settings` |
-| `screen: "dashboards"` | `LINK` в корне | хранилище всех дашбордов (`attributes.dashboards`), в сайдбаре не виден; фронт заводит его сам при первой записи |
-| `protected: true` | папки и пункты | перенос и удаление заперты |
+| `is_tab: true` | у папки в корне | папка — **модуль**: плитка в переключателе сайдбара (ADR-0010); в дереве — дети активного модуля |
+| `screen: "dashboards-entry"` | `LINK` в группе модуля | вход в дашборды модуля → `/dashboards?module=…` |
+| `screen: "dashboards-entry"` | `LINK` в корне | общий вход в дашборды — плитка «Дашборды» в переключателе рядом с модулями (ADR-0013, 2026-11-02). Тот же эффект даёт обычный LINK на `/dashboards` своего origin |
+| `screen: "settings"` | `LINK` | вход в настройки проекта → `/settings`; в дереве не рисуется — у настроек одна кнопка внизу сайдбара |
+| `screen: "dashboards"` | `LINK` в корне | хранилище всех дашбордов (`attributes.dashboards`), в сайдбаре не виден; фронт заводит его сам при первой записи — в шаблон не входит |
+| `protected: true` | папки и пункты | перенос и удаление заперты; имя и иконку меняет суперадмин |
 
-Подпись модуля задаёт цвет в дашбордах: «CRM» и «HRMS» узнаются по имени
-(`DashNav`, `MODULE_TINTS`). Не переименовывать.
+Порядок пунктов — порядок ответа бэкенда, фронт их не пересортировывает.
+Пункт без права `read` (`data.permission.read`) не показывается.
+
+Подпись модуля задаёт цвет в дашбордах: `crm`, `hrms`, `склад`,
+`финансы`, `проекты` (без учёта регистра) узнаются по имени
+(`DashNav.tsx:31`, `MODULE_TINTS`). Не переименовывать.
 
 **Три уровня меню модуля:**
 
@@ -328,6 +346,13 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
   `collapsedMenus`);
 - «Основное» — первой, «Система» — последней (в ней только LINK
   «Настройки»).
+
+**Корень по порядку:** CRM, HRMS, Проекты, затем скрытые папки (§3.4)
+и LINK «Дашборды» (`screen: "dashboards-entry"`, 📊 `1f4ca`, protected) —
+общий вход в дашборды, плитка в переключателе модулей. Системные папки
+ucode (`Settings`, `Files`, `Content`, `Users`) фронт прячет сам
+(`sidebar/model/system-menus.ts`); их место в корне не важно. Пунктов
+вне папок в корне быть не должно.
 
 ### 3.1 CRM — `FOLDER`, `is_tab`, иконка `lucide:handshake`
 
@@ -353,11 +378,13 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 |---|---|---|---|---|
 | Основное | Дашборды | LINK | `screen: "dashboards-entry"` | 📊 `1f4ca` |
 | Люди | Сотрудники | TABLE | `hr_employees` | 🧑‍💼 `1f9d1-200d-1f4bc` |
+| | Оргструктура | TABLE | `hr_employees`, один view `ORG` (§4.2) | 🌳 `1f333` |
 | | Образование и сертификаты | TABLE | `hr_qualifications` | 🎓 `1f393` |
 | Рекрутинг | Вакансии | TABLE | `hr_vacancies` | 💼 `1f4bc` |
 | | Кандидаты | TABLE | `hr_candidates` | 🧾 `1f9fe` |
 | Время | Посещаемость | TABLE | `hr_attendance_days` | 📅 `1f4c5` |
 | | График работы | TABLE | `hr_shifts` | 🔁 `1f501` |
+| | Табели | TABLE | `hr_timesheets` — строка открывает свою страницу табеля | ⏱️ `23f1-fe0f` |
 | Обучение | Тренинги | TABLE | `hr_trainings` | 🎓 `1f393` |
 | | База знаний | TABLE | `hr_kb_articles` | 📚 `1f4da` |
 | | Опросы | TABLE | `hr_surveys` | 📋 `1f4cb` |
@@ -365,8 +392,13 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | | Бюджет | TABLE | `hr_budget_lines` | 💰 `1f4b0` |
 | | KPI | TABLE | `hr_kpi_scorecards` | 🎯 `1f3af` |
 | Система | Имущество | TABLE | `hr_assets` | 📦 `1f4e6` |
-| Система | Документы | TABLE | `hr_documents` | 🗂️ `1f5c2-fe0f`; view `DOCUMENTS` |
+| | Документы | TABLE | `hr_documents` | 🗂️ `1f5c2-fe0f`; view `DOCUMENTS` |
 | | Настройки | LINK | `screen: "settings"` | ⚙️ `2699-fe0f` |
+
+Где-то пункт «Оргструктура» — отдельный, где-то ORG стоит вкладкой
+у «Сотрудников» (§8.2); работают оба. В шаблоне — отдельный пункт:
+так ORG не мешает странице сотрудника брать вкладки из view пункта
+«Сотрудники».
 
 Таблицы без пункта меню (`hr_job_history`, `hr_career_site`,
 `hr_attendance_events`, `hr_requests`, `hr_absence_balance`,
@@ -405,7 +437,8 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 **«Ядро»** — общие таблицы: `core_settings` (Настройки организации),
 `core_currency_rates` (Курсы валют), `core_notifications` (Уведомления),
 `core_audit_log` (Журнал аудита), `core_users` (Пользователи),
-`core_business_units` (Бизнес-юниты).
+`core_business_units` (Бизнес-юниты, иконка `lucide:briefcase-business`),
+`core_regions` (Регионы, `lucide:map`).
 Плюс дочерние таблицы модулей, которые в omni4 лежат здесь:
 `crm_legal_entities`, `crm_product_categories`, `crm_units`,
 `crm_invoice_items`, `crm_payments`, `hr_locations`, `hr_departments`,
@@ -444,21 +477,33 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 - `CRM / Служебные`: `crm_deal_items`, `crm_deal_stage_history`,
   `crm_messages`;
 - `HRMS` (прямо в папке): `hr_work_schedules` (Шаблоны графиков, 📐 `1f4d0`);
-- `HRMS / Система`: `hr_documents`, `hr_assets`, `hr_grade_matrices`,
+- `HRMS / Система`: `hr_documents`, `hr_assets`, `hr_salary_bands`
+  (не читается, ниже), `hr_shift_kinds` (Виды смен),
   `hr_dismissal_reasons`, `hr_document_folders`, `hr_document_templates`,
   `hr_holidays`, `hr_absence_types`, `hr_approval_routes`,
   `hr_penalty_policies`, `hr_penalty_rules`, `hr_recruiting_pipelines`,
   `hr_recruiting_stages`, `hr_candidate_sources`, `hr_rejection_reasons`,
-  `hr_pay_types`, `hr_kpi_metrics`;
+  `hr_pay_types`, `hr_kpi_metrics`, `hr_notification_settings`
+  (Настройки уведомлений), `hr_notification_group_settings`
+  (Уведомления групп);
 - `HRMS / Служебные`: `hr_asset_movements`, `hr_work_schedule_days`,
   `hr_approval_route_steps`, `hr_request_approvals`,
   `hr_candidate_stage_history`, `hr_candidate_evaluations`,
   `hr_training_materials`, `hr_training_participants`,
   `hr_survey_participants`, `hr_survey_responses`, `hr_budget_amounts`,
-  `hr_kpi_results`, `hr_grade_matrix_columns`, `hr_grade_matrix_rows`,
-  `hr_grade_matrix_cells`.
+  `hr_kpi_results`, `hr_notification_outbox` (Очередь Telegram),
+  `hr_telegram_group_links` (Коды привязки групп), `hr_broadcasts`
+  (Рассылки), `hr_penalty_assignment_locations` (Филиалы назначения
+  штрафов).
 
-**Матрица грейдов (2026-10-22, только omni4).** Четыре таблицы вместо
+Таблицы, которые экраны читают только по слагу и которым view не нужен,
+пункта не имеют: `hr_job_history`, `hr_requests`, `hr_absence_balance`,
+`hr_penalty_assignments`, `hr_employee_contacts`, `hr_employee_family`,
+`hr_timesheet_events`, `hr_timesheet_days`, `hr_timesheet_norms`,
+`hr_attendance_events`, `hr_career_site`, `pbx_settings`, `pbx_operators`,
+четыре таблицы матрицы грейдов (ниже).
+
+**Матрица грейдов (2026-10-22).** Четыре таблицы вместо
 `hr_salary_bands`, которая матрицу не выражала (SYSTEM-TABLES-AUDIT):
 
 - `hr_grade_matrices` — версия: `name`, `is_active` (опубликована;
@@ -477,8 +522,9 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
   соседние ячейки с одной должностью роста.
 
 Каскада у ucode нет — удаляет фронт (`features/hrms/api/grade-matrix`).
-`hr_salary_bands` в omni4 осталась с 6 строками и не читается; удалить
-после проверки матрицы.
+Экран — Настройки → HRMS → Зарплата; пунктов меню у таблиц нет.
+`hr_salary_bands` («Вилки окладов») не читается; удалить после проверки
+матрицы.
 
 Какие из них где во вкладках настроек — `src/features/settings/ui/directories.ts`.
 
@@ -514,7 +560,15 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 | `BUDGET` | `hr_budget_lines` (+ `hr_budget_amounts`) | — | «Бюджет» ФОТ: отделы → строки, план и факт по месяцам/кварталам года, правка в ячейке |
 | `KPI` | `hr_kpi_scorecards` (+ `hr_kpi_results`, `hr_kpi_metrics`) | — | «KPI»: отделы → сотрудники → показатели, вид неделя/месяц/квартал/год, «Цель · Факт · %» по периодам, правка факта; «Создать» — «Добавить KPI». Подробно — §4.2 «HRMS / KPI» |
 | `PBX_CALLS` | `pbx_calls` | — | «Журнал» onlinePBX: когда, сотрудник, телефон, статус, длительность, запись в строке (added 2026-10-30) |
+| `DOCUMENTS` | `hr_documents` | — | «Документы»: папки, файлы, шаблоны (`DocumentBrowser`) |
+| `COMMENTS` | любая, только вкладка карточки | — | лента комментариев (`kind: comment`, `body`) |
 | `LIST` | любая | — | список |
+
+Фиксированные типы в интерфейсе не создаются и не выбираются —
+только через API (`view/model/types.ts:94`). Стандартные TABLE, BOARD,
+LIST, GALLERY, CALENDAR, TIMELINE, TREE, PIVOT, CHART человек заводит
+сам. «Табели» — не тип view: строку `hr_timesheets` фронт открывает
+своей страницей по слагу таблицы.
 
 `attributes.pivot` у `PIVOT` — раскладка, с которой сводная открывается
 (ключ наш, бэкенд про него не знает): `row` — слаги полей строк через
@@ -525,7 +579,8 @@ CRM                    FOLDER в корне, is_tab: true, protected   ← мо�
 не сохраняется — только через API.
 
 Общий атрибут `chips_by_id` — полоса значений над таблицей (TABLE,
-LIST, GALLERY); значение — поле или колонка-связь (см. §0).
+LIST, GALLERY); значение — поле или колонка-связь (см. §0). Что ещё
+во view пишет только шаблон, а что человек настраивает сам, — §7.2.
 
 **View может стоять на чужой таблице:** у view своя `table_slug`,
 и экран берёт схему, права и карточку по ней, а не по таблице пункта.
@@ -591,7 +646,7 @@ LIST, GALLERY); значение — поле или колонка-связь (
 
 | Тип | Настройки |
 |---|---|
-| CANDIDATES | `group_fields: ["status"]` (вкладки Активные · Нанятые · Отказ · Резерв); `chips_by_id` → `hr_recruiting_stages_id`; колонки: `full_name`, `level`, `hr_vacancies_id`, `hr_recruiting_stages_id`, `score`, `hr_candidate_sources_id`, `salary_expectation`, `stage_changed_at`, `applied_at`, `hr_rejection_reasons_id` |
+| CANDIDATES «Кандидаты» | `group_fields: ["status"]` (вкладки Активные · Нанятые · Отказ · Резерв); `chips_by_id` → `hr_recruiting_stages_id`; колонки: `full_name`, `level`, `hr_vacancies_id`, `hr_recruiting_stages_id`, `score`, `hr_candidate_sources_id`, `salary_expectation`, `stage_changed_at`, `applied_at`, `hr_rejection_reasons_id` |
 
 **HRMS / Посещаемость** (`hr_attendance_days`)
 
@@ -601,7 +656,7 @@ LIST, GALLERY); значение — поле или колонка-связь (
 | 2 | ATTENDANCE | Список | | `layout: "list"` |
 | 3 | ATTENDANCE | Табель | | `layout: "sheet"` |
 | 4 | ABSENCES | Отсутствия | `hr_requests` | |
-| 5 | TABLE | — | | |
+| 5 | TABLE | — | | по желанию: экранам не нужен |
 
 **HRMS / График работы** (`hr_shifts`)
 
@@ -609,7 +664,15 @@ LIST, GALLERY); значение — поле или колонка-связь (
 |---|---|---|---|
 | 1 | SCHEDULE | Календарь | |
 | 2 | WORK_SCHEDULES | Шаблоны | `hr_work_schedules` |
-| 3 | TABLE | — | |
+| 3 | TABLE | — | | (по желанию) |
+
+**HRMS / Табели** (`hr_timesheets`) — строка открывается страницей
+табеля, «Создать» — его формой. Колонки и доска — §1.15.
+
+| # | Тип | Имя | Настройки |
+|---|---|---|---|
+| 1 | TABLE | — | колонки: `title`, `hr_departments_id`, `worked_hours`, `status` |
+| 2 | BOARD | По статусу | `group_fields` → `status`; колонки: `title`, `hr_departments_id`, `people`, `worked_hours` |
 
 **HRMS / Тренинги** (`hr_trainings`)
 
@@ -667,15 +730,15 @@ LIST, GALLERY); значение — поле или колонка-связь (
 | 2 | TABLE | — |
 
 **HRMS / Зарплата** (`hr_payroll_lines`) — колонки сводной — виды
-из `hr_pay_types` (`kind` — начисление или удержание, порядок —
-`sort_order`). `PAYROLL` и `PIVOT` стоят оба, пока их сравнивают
-(2026-10-16, в omni4 и omni5); потом один уберут.
+из `hr_pay_types` (`kind` — `accrual` или `deduction`, порядок —
+`sort_order`). PAYROLL сам прячет общий импорт и экспорт Excel — у него
+свой шаблон. PIVOT, который стоял рядом для сравнения (2026-10-16),
+снят в обоих проектах; тип `PIVOT` остаётся общим (§4.1).
 
-| # | Тип | Имя | Атрибуты |
-|---|---|---|---|
-| 1 | TABLE | Таблица | |
-| 2 | PAYROLL | Сводная | |
-| 3 | PIVOT | Сводная (PIVOT) | `pivot: {row: "hr_employees_id", col: "hr_pay_types_id", value: "amount", agg: "sum", skipEmpty: true}` |
+| # | Тип | Имя |
+|---|---|---|
+| 1 | PAYROLL | Сводная |
+| 2 | TABLE | — (по желанию) |
 
 **HRMS / Бюджет** (`hr_budget_lines`) — суммы лежат
 в `hr_budget_amounts`: строка на месяц, `month` — первое число,
@@ -819,13 +882,8 @@ Udevs. Воронка — выпадающий список в панели, в�
 | 2 | TABLE | — |
 | 3 | SECTION | — |
 
-**Настройки модулей / CRM / Воронки** (`crm_pipelines`) — в omni4 у TABLE
-группировка по `business_units_id`. В v2 этой колонки нет: группировку
-не ставить.
-
-Остальные пункты — только стандартные SECTION + TABLE.
-(У `hr_holidays` в omni4 есть ещё LIST и BOARD без настроек — похоже
-на пробу, в шаблон не нужны.)
+Остальные пункты — только стандартные SECTION + TABLE, без группировок
+и своих атрибутов.
 
 ## 5. Справочные данные
 
@@ -867,55 +925,251 @@ Udevs. Воронка — выпадающий список в панели, в�
 меню открывают `/settings` со справочниками модулей; «Дашборды» —
 `/dashboards`.
 
-## 7. omni5 против этого списка
+## 7. Что фронт читает: меню, таблицы, view, поля
 
-**2026-10-15, после применения шаблона.** Сверено скриптом по API
-(ключ omni5, только чтение) и глазами в omni4 (`feat/schema-v2`,
-localhost) под ADMIN.
+Справочник к §3–4, снят с кода 2026-11-05. Всё, чего здесь нет, фронт
+у этих объектов не читает. Нормализация — в
+`sidebar/api/normalize.ts` (меню), `view/api/views.ts` (view),
+`table/api/normalize.ts` и `table-settings.ts` (таблицы и поля).
 
-| § | Что | Итог |
+Кто пишет: **шаблон** — в omni4 нет экрана, который это пишет, заводится
+только через API; **UI** — человек настраивает сам в omni4, шаблону
+заводить не обязательно; **браузер** — хранится не в проекте.
+
+### 7.1 Меню
+
+| Что | Что делает | Кто пишет |
 |---|---|---|
-| 1.1 | Таблицы v2 | все 103 |
-| 1.2 | `protected` у таблиц | у всех, кроме `core_users` — как и задумано |
-| 1.3 | `attributes.label` у LOOKUP | 220 из 222. Нет у `core_users.client_type_id` и `core_users.role_id` — их заводит сам ucode, на экранах подпишутся слагом |
-| 1.5 | `core_users.timezone_id` | есть, SINGLE_LINE |
-| 2 | Тип клиента «Сотрудник» | есть, таблица входа `core_users` |
-| 3 | Меню | совпадает полностью: модули, группы, пункты, порядок, иконки, `protected`, LINK — 304 проверки, 0 расхождений, дублей нет |
-| 4 | View | совпадают — 131 проверка. Вкладки связей сотрудника — все 11, связи верные, «Задачи» — через `hr_tasks.core_users_id`. Имена «Кандидаты» и «Доска» у двух view вместо пустых — лучше, чем в спецификации |
-| 5 | Справочные данные | на месте, кроме **`crm_legal_entities` — 0 строк**: «Профиль компании» пуст |
+| `attributes.is_tab` | папка в корне — модуль | шаблон |
+| `attributes.protected` | пункт и его таблица заперты (только во фронте) | шаблон |
+| `attributes.screen` | `settings`, `dashboards-entry`, `dashboards` — §3 | шаблон (`dashboards` — фронт сам) |
+| `attributes.dashboards` | дерево дашбордов в пункте-хранилище | UI |
+| `attributes.label_<язык>` | подпись на языке данных; нет — колонка `label` | UI |
+| `attributes.link` | внешняя ссылка, новая вкладка | UI |
+| `attributes.website_link` | страница во фрейме | UI |
+| `attributes.path` | папка MinIO (`MINIO_FOLDER`) | UI |
+| `attributes.params[]` | параметры микрофронтенда | UI |
+| `type` | `FOLDER`, `WIKI_FOLDER` — группа; `LINK` — ссылка; `TABLE` или `LINK` с `table_id` — таблица; `MICROFRONTEND`, `MINIO_FOLDER`, `WEBPAGE`, `WIKI` и др. — свой экран | UI |
+| `icon` | `https://…` — картинка (так ставятся emoji Apple); `lucide:имя` и любой набор Iconify — иконка цветом текста; `имя.svg` — с CDN иконок; пусто — встроенная по имени или типу | UI |
+| `data.permission` | `read` — виден; `write` — «Создать» внутри; `menu_settings` — настройки сайдбара | Роли |
+| `is_static` | системный пункт ucode, не удаляется | бэкенд |
 
-В браузере открыты и работают: сайдбар с модулями CRM и HRMS
-и группами; «Сотрудники» — таблица, «Сетка», «Оргструктура» (оба
-дерева; клик по отделу открывает страницу руководителя через
-`core_users.hr_employees_id`); страница сотрудника со всеми вкладками,
-«Задачи» показывают задачи его пользователя; «Вакансии» —
-Планирование, Таблица, Карточки; «Кандидаты» — вкладки статусов;
-«Посещаемость» — Календарь, Список, Табель, Отсутствия; «График работы»
-— Календарь и Шаблоны; доска сделок по этапам; настройки со
-справочниками модулей; «Дашборды». Ошибок в консоли нет.
+Пункт сотрудников ищется по таблице (`GET /v3/menus?table_id=` → первый
+`TABLE`), настройки и хранилище дашбордов — по `screen`. Свёрнутые папки
+и личные ярлыки дашбордов — браузер.
 
-Не проверено:
+### 7.2 View
 
-- **«Я» и «Все | Мои»** — вход был под ADMIN, своей строки `core_users`
-  у него нет. Нужен вход пользователем `core_users` (`Omni5test1@`).
-- Запись: создание и правка ничего не делались.
+Атрибуты (`view.attributes`):
 
-Данные, не шаблон: у всех сотрудников пуст руководитель (дерево
-«Сотрудники» плоское; в omni4 так же), у вакансий пусты рекрутер
-и нанимающий менеджер, у шаблонов графика перерыв 300 минут (в omni4
-исправлен на 60). Дашборды omni4 в omni5 не переносились.
+| Ключ | Что делает | Кто пишет |
+|---|---|---|
+| `name_<язык>` | имя вкладки (сначала язык интерфейса) | UI |
+| `icon` | иконка вкладки | UI |
+| `card` | `person` / `asset` у GALLERY | шаблон |
+| `layout` | `list` / `sheet` у ATTENDANCE (нет — календарь) | шаблон |
+| `pivot` | раскладка PIVOT при открытии (§4.1) | шаблон |
+| `period` | `MONTH` / `WEEK` / `DAY` у CALENDAR | шаблон |
+| `chips_by_id` | полоса значений над видом (id поля или связи) | UI |
+| `chips_menu` | полоса — выпадающий список, выбор общий для всех view таблицы; у BOARD всегда так | шаблон |
+| `chips_default` | значение полосы до первого выбора (guid строки) | шаблон |
+| `quick_filters[]` | фильтры-чипы при открытии (поля целиком, `is_checked`) | UI |
+| `default_filters` | закреплённый фильтр view | UI |
+| `fixedColumns` | закреплённые колонки (`{id поля: true}`) | UI |
+| `group_by_columns[]` | группировка строк по уровням | UI |
+| `sub_group_by_id` | дорожки у BOARD | UI |
+| `infinite_scroll` | подгрузка прокруткой вместо страниц | UI |
+| `navigate` / `url_object` | куда ведёт клик по строке / «Создать» | UI |
+| `pdf_url` | PDF записи | UI |
+| `charts[]` | графики CHART | UI |
+| `view_permission` | права роли на view | Роли |
 
-**2026-10-16, меню omni5 → omni4.** Меню правили в omni5; omni4
-выровнен по нему: убраны 7 пунктов HRMS (§3.2) и LINK «Dashboards»
-в корне, «Начисления» → «Зарплата», «Строки бюджета» → «Бюджет».
-Обход дерева по API — расхождений нет, кроме места системных папок
-(Content, Settings, Files, Users) в корне. В omni5 заведены вкладки
-`PAYROLL`, `PIVOT` и `BUDGET` (§4.2). В браузере не проверено.
-Иконки тоже по omni5: «Тренинги» 🎓, «Опросы» 📋, «Зарплата» 💵,
-«Бюджет» 💰. Расходится одна — «Воронки» в настройках CRM: в omni4 🛒,
-в omni5 иконки нет; шаблон её не задаёт.
+Поля самого view:
 
-## 8. Открыто
+| Поле | Что делает | Кто пишет |
+|---|---|---|
+| `type`, `name`, `order`, `table_slug` | основа; `table_slug` может быть чужой таблицей (§4.1) | UI |
+| `columns[]` | видимые колонки, по порядку (id полей и связей) | UI |
+| `group_fields[0]` | поле, по которому вид делится на вкладки или колонки доски | UI |
+| `calendar_from_slug`, `calendar_to_slug` | даты у CALENDAR и TIMELINE | UI |
+| `status_field_slug` | поле, чьи цвета красят события календаря и таймлайна | шаблон |
+| `disable_dates` | нерабочие дни календаря | шаблон |
+| `default_limit` | строк на странице | шаблон (PUT его не берёт) |
+| `is_relation_view`, `relation_table_slug`, `relation_id` | вкладка карточки записи | UI |
+
+BOARD требует поле `board_order` (бэкенд заводит его с доской), TREE —
+`<слаг таблицы>_id`. Ширина колонок, последние фильтры, размер страницы,
+состояние своих экранов — браузер; сортировка, страница и раскладка
+сводной — адрес. Высоты строк, переноса текста и итогов под таблицей
+во фронте нет — заводить нечего.
+
+### 7.3 Таблицы
+
+| Ключ | Что делает | Кто пишет |
+|---|---|---|
+| `attributes.protected` | структура заперта: поля, связи, настройки, раскладка | шаблон |
+| `attributes.label_<язык>` | подпись таблицы | UI |
+| `is_login_table`, `attributes.auth_info.login_strategy[]`, `attributes.last_activity` | таблица входа и способы входа | UI (у `core_users` — шаблон) |
+| `is_cached`, `soft_delete`, `order_by` | флаги таблицы | UI |
+
+Тип клиента для «Пользователей» фронт ищет по `table_slug: "core_users"`.
+
+### 7.4 Поля
+
+| Ключ | Что делает | Кто пишет |
+|---|---|---|
+| `attributes.label` | подпись LOOKUP — только отсюда (§1.3) | шаблон |
+| `attributes.label_<язык>` | подпись на языке данных | UI |
+| `attributes.disabled` | поле только для чтения (§1.8) | шаблон / UI |
+| `attributes.options[]` | варианты: `value` (PICK_LIST) или `slug` (MULTISELECT), `label`, `color`, `icon` | шаблон (ключи), UI (цвета) |
+| `attributes.{todo,progress,complete}.options` | варианты STATUS по стадиям | шаблон |
+| `attributes.has_color` | пишется, не читается — цвет только из `options[].color` | — |
+| `attributes.defaultValue` | значение новой записи | UI |
+| `attributes.validation`, `validation_message` | регулярка и текст ошибки | UI |
+| `attributes.hide_path_field`, `hide_path` | условная видимость | UI |
+| `attributes.number_display: "progress"` | NUMBER рисуется полосой | UI |
+| `attributes.formula`, `table_from`, `sum_field`, `type`, `number_of_rounds`, `formula_filters` | формулы | UI |
+| `attributes.path`, `ratio` | папка загрузки и кадр PHOTO / FILE | UI |
+| `attributes.text_true` / `text_false` | подписи CHECKBOX и SWITCH в фильтре | UI |
+| `attributes.function`, `icon` | BUTTON | UI |
+| `attributes.field_hide_layout` | скрыто в раскладке карточки | UI |
+| `attributes.field_permission` | правка поля по роли | Роли |
+| `required`, `unique`, `enable_multilanguage`, `autofill_*`, `automatic` | колонки поля, не атрибуты | UI |
+
+Раскладка карточки (`/v2/collections/{slug}/layout`): заголовок —
+`layout_heading` вкладки, имя секции — `section.attributes.label`.
+Писать её — токеном пользователя (§4.2, «Сделки»).
+
+### 7.5 Ключи, которые код сравнивает строкой
+
+| Таблица.поле | Ключи |
+|---|---|
+| `hr_employees.status` | `active`, `dismissed` (уволенные скрыты фильтром по умолчанию) |
+| `hr_candidates.status` | `active`, `hired`, `rejected`, `reserve` |
+| `hr_vacancies.status` | `active`, `closed` |
+| `hr_requests.type` / `.status` | `absence` / `pending`, `approved`, `rejected`, `cancelled` |
+| `hr_attendance_days.review` | `pending`, `approved`, `rejected` |
+| `hr_timesheets.status` | `draft`, `review`, `approved` |
+| `hr_kpi_scorecards.status` | `draft`, `self_review`, `manager_review`, `approved` |
+| `hr_assets.status` | `in_stock`, `assigned`, `repair`, `written_off` |
+| `hr_asset_movements.action` | `received`, `issued`, `returned`, `sent_to_repair`, `returned_from_repair`, `written_off` |
+| `hr_surveys.status` / `hr_survey_participants.status` | `draft`, `active`, `completed`, `archived` / `pending`, `completed`, `skipped` |
+| `hr_training_participants.homework_status` | `not_required`, `not_submitted`, `submitted`, `accepted`, `rejected` |
+| `hr_recruiting_stages.container`, `crm_stages.container` | `new`, `in_progress`, `done` |
+| `hr_pay_types.kind` | `accrual`, `deduction` |
+| `hr_work_schedules.type` | `cycle`, `weekly` |
+| `hr_documents.signature_status` | `not_required` |
+
+Плюс ключи §1.4 и §1.12–19. Настройки → HRMS правят варианты
+`employment_type` (`hr_employees`, `hr_job_history`, `hr_vacancies`),
+`skills` (`hr_employees`, `hr_vacancies`, `hr_candidates`) и
+`change_reason` (`hr_job_history`) — у трёх таблиц список должен
+совпадать.
+
+## 8. omni4 и omni5 против шаблона (2026-11-05)
+
+Снято по API обоих проектов (только чтение). ✅ — как в шаблоне.
+Ничего из этого не правилось: каждая правка живого проекта — отдельно,
+с подтверждением.
+
+### 8.1 Таблицы и поля
+
+| Что | omni4 | omni5 |
+|---|---|---|
+| Таблиц всего | 127 | 125 |
+| `hr_grade_matrices` и ещё три таблицы матрицы (§3.4) | есть | **нет** — Настройки → HRMS → Зарплата пуст |
+| `hr_timesheet_days`, `hr_timesheet_norms` (§1.17–18) | **нет** | есть |
+| `hr_timesheets.period_kind`, табель → «Зарплата» (§1.19: 10 полей и вариант `timesheet` у `hr_payroll_lines.source`) | **нет** | есть |
+| `core_business_units.core_business_units_id` (дерево юнитов, §1.7) | есть | **нет** — «Организация» без родителей |
+| `hr_grades.hr_grades_id` (группа грейдов, §1.10) | есть | **нет** |
+| `hr_holidays.board_order` | есть — след доски-пробы | нет ✅ |
+| Цвета вариантов `hr_absence_types.limit_period`, `hr_candidate_sources.type`, `hr_rejection_reasons.side`, `hr_dismissal_reasons.dismissal_type`, `employment_type` (`hr_employees`, `hr_vacancies`), `level` (`hr_grades`, `hr_positions`) | есть ✅ | **пусты** — теги серые |
+| Варианты `skills` (`hr_employees`, `hr_vacancies`, `hr_candidates`), `hr_employees.languages` | ~46 навыков, 4 языка | **пусто** |
+| `attributes.label` у `crm_companies.core_users_id` | «Ответственный» ✅ | нет — подпись «Пользователи» |
+| `protected` нет у `hr_employee_contacts`, `hr_employee_family`, `hr_timesheets`, `hr_timesheet_events` | так | так, плюс `hr_timesheet_days`, `hr_timesheet_norms` |
+| то же у таблиц матрицы грейдов | так | — |
+
+У `hr_vacancies.channels` и `languages` (MULTISELECT) `value` в omni5 —
+подписи, в omni4 — ключи; `slug` совпадает, а в строке лежит именно он,
+так что экраны это не задевает.
+
+### 8.2 Меню
+
+| Что | omni4 | omni5 |
+|---|---|---|
+| CRM / Основное / Дашборды | **нет** (и группы «Основное») | есть ✅ |
+| CRM: Счета, План продаж, КП, Чаты, Задачи, Звонки, Товары и услуги | **нет** — таблицы есть, пунктов нет | есть ✅ |
+| HRMS / Люди / Оргструктура (отдельный пункт) | есть ✅ | нет — ORG вкладкой у «Сотрудников» |
+| HRMS / Люди / Образование и сертификаты | **нет** | есть ✅ |
+| HRMS / Система / Имущество, Документы | есть ✅ | **нет** — только копии в «Настройках модулей» |
+| Настройки модулей / HRMS / Система / Виды смен | **нет** — справочник без view | есть ✅ |
+| LINK «Дашборды» в корне | есть ✅ | **нет** — плитки дашбордов в переключателе нет |
+| Хранилище дашбордов (`screen: "dashboards"`) | есть | нет (заведётся при первой записи) ✅ |
+| Лишнее | пустая папка «Настройки модулей / CRM / Служебные / Основное» | пункт «Отметки» (`hr_attendance_events`) прямо в корне |
+| `protected` у пунктов | нет у «Журнала звонков», «Табелей», «KPI», «Документов» (HRMS), «Оргструктуры» | нет у «Журнала звонков», «Табелей», «KPI» |
+
+У пункта «Сотрудники» в omni4 — `auth_info` и `last_activity`: туда
+скопированы настройки таблицы входа; фронт их у меню не читает.
+
+### 8.3 View
+
+| Пункт | omni4 | omni5 |
+|---|---|---|
+| Сделки | BOARD без имени; у CALENDAR лишняя колонка `crm_sources_id` | BOARD «Доска» ✅; у TABLE `infinite_scroll` |
+| Контакты | только TABLE и вкладка «Сделки» | ✅ все четыре вида |
+| Компании | только TABLE и вкладки | ✅ все три вида |
+| Сотрудники / «Сетка» | **все поля в колонках** — карточка ломается (§4.2) | 9 колонок ✅ |
+| Сотрудники / TABLE | `fixedColumns: {}`, `infinite_scroll: false` (пустые, от UI) | ✅ |
+| Сотрудники / ORG | отдельным пунктом ✅ | вкладкой у «Сотрудников» |
+| Вакансии | **нет TABLE «Таблица»** | ✅ |
+| Кандидаты | CANDIDATES без имени | «Кандидаты» ✅ |
+| Посещаемость, График работы | без TABLE ✅ | с TABLE (по желанию) |
+| Табели | TABLE, BOARD по `status`, LIST без имён | только TABLE — **нет доски** |
+| Опросы | «Список» + SURVEY_TEMPLATES ✅ | **только TABLE без имени** — нет «Шаблонов» |
+| База знаний | только KNOWLEDGE | KNOWLEDGE + TABLE |
+| Зарплата | TABLE + PAYROLL без имени | PAYROLL «Сводная» ✅ |
+| Бюджет | BUDGET + TABLE | BUDGET ✅ |
+| KPI | у KPI `chips_by_id` → `hr_employees_id` | без атрибутов |
+| Праздники | ещё LIST и BOARD без настроек — проба | ✅ |
+| Вкладки сотрудника (11) | ✅ | ✅ |
+| Журнал звонков, Сделки (вкладки «Задачи», «Комментарии») | ✅ | ✅ |
+
+Порядок колонок в одних и тех же видах у проектов разный — бэкенд
+дописывает новое поле в конец каждого view (`POST /v2/fields`), а поля
+заводились в разном порядке. Экраны, которым порядок важен (§4.2), это
+не задевает, пока колонки выставлены явно.
+
+### 8.4 Что из этого выравнивать
+
+Решение за владельцем, здесь — только список:
+
+- **omni4 → шаблон:** пункты CRM (§8.2), «Образование и сертификаты»,
+  «Виды смен»; таблицы табеля (§1.17–19); TABLE у «Вакансий»; виды
+  «Контактов» и «Компаний»; колонки «Сетки».
+- **omni5 → шаблон:** матрица грейдов, дерево юнитов, группа грейдов;
+  цвета и варианты (§8.1); «Имущество», «Документы», «Оргструктура»
+  пунктами; LINK «Дашборды» в корне; «Шаблоны» опросов; доска табелей;
+  «Отметки» из корня — в «Ядро» или удалить.
+- **Оба:** `protected` у новых таблиц и пунктов (§8.1, §8.2).
+
+## 9. История сверок
+
+**2026-10-15** — шаблон применён к omni5 и сверен скриптом: 103 таблицы
+v2, 304 проверки меню и 131 проверка view без расхождений; не было
+строки `crm_legal_entities`. В браузере открыты модули, сотрудники
+со всеми вкладками, вакансии, посещаемость, график, доска сделок,
+настройки, дашборды. Не проверялись «Я» и «Все | Мои» (вход был под
+ADMIN) и запись.
+
+**2026-10-16** — меню omni5 перенесено в omni4: убраны 7 пунктов HRMS
+(§3.2), «Начисления» → «Зарплата», «Строки бюджета» → «Бюджет», иконки
+по omni5.
+
+**2026-11-05** — разошлись снова (§8): CRM omni4 урезан до Сделок,
+Контактов, Компаний и Журнала звонков; HRMS-фичи после 2026-10-22
+заведены каждая в одном проекте.
+
+## 10. Открыто
 
 - **Как шаблон применяется** — механизм на стороне ucode (копия
   проекта, функция при создании компании, скрипт) не выбран. От него
