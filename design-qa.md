@@ -142,3 +142,27 @@ empty and hidden fields. Existing drag/query/save contracts remain under regress
 Implementation checklist: all requested correction controls present; Fields result
 path and states verified; paired comparisons inspected after fixes; responsive and
 keyboard walkthrough complete; final automated checks passed; release not performed.
+
+## CRM reference correction — 2026-11-06
+
+Target: the existing CRM folder in ERP dashboards, with its existing access, shared date/branch controls and HRMS reports preserved. References: all eight user-supplied 2048×1280 images were materialized and opened. Images 1–5 cover Funnel, 6 Tasks, 7–8 Calls. There is no image evidence for AI Call, Ads or My analytics in this revision; their existing functionality remains available.
+
+Comparison method: Chrome local QA fixture at a 2400×1200 viewport, with source content crops and the rendered implementation together in each comparison screenshot. The fixture is explicitly synthetic, has no production authentication and is excluded from the application entry/build. The originals and crops are local QA inputs, not published repository assets. Report widths were matched side by side. Each of references 1–8 was compared; source text and icons, card borders/radii/padding, columns, chart type, colors and row spacing were checked.
+
+Implemented from the original CRM sources and measured references:
+
+- 1: four KPIs, pipeline selector/chips, continuous symmetric ribbon, reached counts and percentages, alternate Stages view and stage-to-list drilldown.
+- 2: donut with a right-hand expandable category/source legend, empty revenue state, grouped vertical lead/won bars, months/weekdays toggle. Fixed the initial legend placement and adjacent-bar substitution after comparison.
+- 3: source table with inline bars and conversion, expandable pipeline time table, summary headers and stage detail rows. Currency amounts are not combined across currencies; missing amounts remain unavailable.
+- 4: seven weekday rows by 24 hours, source-blue intensity cells, row totals, left-hand intensity legend; cell and weekday drilldowns.
+- 5: created date/name/stage/amount/owner columns, stage-color pills, date sort, overdue filter, record links.
+- 6: five KPI cards in one row at desktop, owner/status filters, overdue-first task table, task details.
+- 7–8: 3×2 KPI grid, blue incoming/orange outgoing stacked columns, horizontal status progress bars and operator breakdown/drilldowns.
+
+Typography: the original Inter family is bundled from Google Fonts as WOFF2, with its OFL license. All report styling is scoped to `.crm-analytics`; the three named report IDs alone select the renderer. General dashboards and the other modules retain their normal renderer and editor.
+
+Validation: TypeScript, targeted ESLint, production Vite build and six relevant test suites (37 tests) passed. New source queries passed the existing SELECT grammar and paging/binding contract. The exact queries were run read-only through the authenticated ERP SQL console: deals 920, stages 32, history 0, tasks 17, calls 628. No CRM or HRMS business records or permissions were changed by this correction.
+
+Remaining source limitations: ERP has no stage-transition records, whereas the source screenshots show transition history. Historical reach, stage duration and transition totals therefore cannot reproduce those image numbers; the report explicitly identifies missing history and renders its current-stage distribution. ERP's imported deal/task/call population also differs from the live original CRM, so example KPI values, names, counts and chart geometry are data-dependent and cannot be made identical by a presentation change. AI Call/Ads/My analytics have no supplied reference images in this revision.
+
+Final result: blocked for an unconditional one-to-one data/fidelity claim by the missing ERP transition history and different source population. The requested chart types and principal layouts are implemented and source comparisons were performed; no claim of identical underlying records is made. Production deployment and live verification are recorded below when completed.

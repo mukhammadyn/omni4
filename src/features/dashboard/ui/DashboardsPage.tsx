@@ -7,6 +7,7 @@ import {
   Settings2Icon,
   PlusIcon,
   Trash2Icon,
+  FunnelIcon, ListChecksIcon, PhoneCallIcon, SparklesIcon, MegaphoneIcon, ChartNoAxesCombinedIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ROOT_MENU_ID, useMenuChildren } from "@/features/sidebar";
@@ -37,6 +38,8 @@ import type { Dataset } from "../model/datasets";
 import { DatasetEditor } from "./DatasetEditor";
 import { WidgetGrid } from "./WidgetGrid";
 import { SqlMonthControls } from "./SqlMonthControls";
+import { CRM_REPORTS } from "../model/crm-analytics";
+import { CrmAnalytics } from "./CrmAnalytics";
 
 /**
  * Экран дашбордов (ADR-0013): свой сайдбар с деревом «модуль → папка →
@@ -87,6 +90,15 @@ export function DashboardsPage({
   const home = moduleId || modules[0]?.id || "";
   const catalog=!dashboardId;
   const current = catalog||root.isLoading ? null:findDashboard(readableTree,dashboardId);
+  const crmReport = current?.folder.moduleId === "720ae8df-2ded-4862-9837-2709ef45977e" ? CRM_REPORTS[dashboardId] : undefined;
+  const crmTabs = [
+    ["ab663efb-fcf4-4ec1-a7c1-e9814dde89ad", "Funnel", FunnelIcon],
+    ["87eb9515-cbaf-462c-aef2-87e82ed26888", "Tasks", ListChecksIcon],
+    ["b012d84e-0408-4fe1-a19d-b2da697dd711", "Calls", PhoneCallIcon],
+    ["45ad1e43-e541-4f09-a08a-d20376ff20e6", "AI Call", SparklesIcon],
+    ["7a7dfa1c-ae86-4362-ac77-6ce1832405f3", "Ads", MegaphoneIcon],
+    ["d077edbd-150c-4e1d-a3f0-db6cf6cce841", "My analytics", ChartNoAxesCombinedIcon],
+  ] as const;
 
   /*
    * Путь к дашборду раскрывается ОДИН раз — когда его открыли. Раньше
@@ -215,7 +227,7 @@ export function DashboardsPage({
           <div className="px-4 pb-8 md:px-6 lg:px-8" data-dashboard-content>
             {/* Значок и заголовок правятся прямо на месте. */}
             <div className="pt-6">
-              <InlineText
+              {!crmReport && <InlineText
                 key={`${current.dashboard.id}-emoji`}
                 value={current.dashboard.emoji}
                 label={t("dashboard.emoji")}
@@ -223,8 +235,8 @@ export function DashboardsPage({
                 maxLength={4}
                 onCommit={(emoji) => emoji && patchCurrent({ emoji })}
                 className="mb-2 w-[1.6em] text-center text-[40px] leading-[1.1]"
-              />
-              <InlineText
+              />}
+              {crmReport ? <h1 className="mb-3 text-[24px] font-semibold">Dashboard</h1> : <InlineText
                 key={`${current.dashboard.id}-title`}
                 value={current.dashboard.title}
                 placeholder={t("dashboard.untitled")}
@@ -233,14 +245,17 @@ export function DashboardsPage({
                 multiline
                 onCommit={(title) => patchCurrent({ title })}
                 className="mb-1 w-full text-[24px] font-bold leading-tight tracking-[-0.01em] lg:text-[28px]"
-              />
+              />}
             </div>
 
             {/* Полоса вкладок — `.viewbar`: вкладки папки слева, действия справа. */}
             <div className="sticky top-0 z-10 flex min-h-10 flex-wrap items-center gap-1 border-b border-border bg-surface">
               <div className="flex min-w-0 flex-1 items-center gap-1 max-sm:basis-full">
                 <Tabs
-                  tabs={current.folder.dashboards.map((dashboard) => ({
+                  variant={crmReport ? "segment" : "underline"}
+                  tabs={current.folder.dashboards.map((dashboard) => crmReport && crmTabs.some(tab => tab[0] === dashboard.id) ? {
+                    id: dashboard.id, label: crmTabs.find(tab => tab[0] === dashboard.id)![1], icon: crmTabs.find(tab => tab[0] === dashboard.id)![2],
+                  } : ({
                     id: dashboard.id,
                     label: `${dashboard.emoji} ${dashboard.title || t("dashboard.untitled")}`,
                   }))}
@@ -277,7 +292,7 @@ export function DashboardsPage({
                         </Button>
                       </>
                     ) : (
-                      <ViewAction
+                      !crmReport && <ViewAction
                         label={t("dashboard.manage")}
                         onClick={() =>
                           setLayout({
@@ -308,7 +323,7 @@ export function DashboardsPage({
                 onFilters={(filters) => editing && setLayout({ ...layout, filters })}
               />
               <SqlMonthControls menuId={menuId} datasets={editing ? layout.datasets ?? tree.datasets ?? [] : tree.datasets ?? []} widgets={editing ? layout.widgets : current.dashboard.widgets} values={values} onValues={onValues}>
-              <WidgetGrid
+              {crmReport ? <CrmAnalytics key={current.dashboard.id} menuId={menuId} view={crmReport} values={values}/> : <WidgetGrid
                 key={current.dashboard.id}
                 menuId={menuId}
                 datasets={editing ? layout.datasets ?? tree.datasets ?? [] : tree.datasets ?? []}
@@ -324,7 +339,7 @@ export function DashboardsPage({
                   editing ? setLayout({ ...layout, widgets }) : patchCurrent({ widgets })
                 }
                 onSourceSave={(widgets, datasets) => editing ? setLayout({ ...layout, widgets, datasets }) : void apply(patchDashboard({ ...tree, datasets }, current.dashboard.id, (dashboard) => ({ ...dashboard, widgets })))}
-              />
+              />}
               </SqlMonthControls>
             </div>
           </div>

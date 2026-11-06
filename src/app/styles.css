@@ -869,3 +869,46 @@ main:has(> [data-fullbleed]) {
   --color-chart-cool-5: #f59e0b;
   --color-chart-cool-6: #22c55e;
 }
+
+/* Original CRM dashboard chart palette, scoped so other module reports are unchanged. */
+.crm-analytics {
+  --crm-bg: #fff;
+  --crm-fg: #0f172a;
+  --crm-muted: #737b8c;
+  --crm-border: #e2e5eb;
+  --crm-soft: #f3f4f6;
+  --crm-tint: #f9fafb;
+  --crm-control: #f0f1f3;
+  --crm-primary: #006f9f;
+  --crm-primary-soft: #e8f1f7;
+  --crm-blue: #2d7cda;
+  --crm-orange: #f5652c;
+  --crm-green: #079966;
+  --crm-green-soft: #e6fbf3;
+  --crm-red: #dc171b;
+  --crm-red-soft: #ffedf0;
+  --crm-amber: #db7d00;
+  --crm-yellow-soft: #fff9df;
+  --crm-seq5: #0f172a;
+  --crm-seq4: #40567a;
+  --crm-seq3: #8999b4;
+  --crm-seq2: #bfc9db;
+}
+.dark .crm-analytics, [data-theme="dark"] .crm-analytics {
+  --crm-bg: var(--color-surface);
+  --crm-fg: var(--color-fg);
+  --crm-muted: var(--color-fg-muted);
+  --crm-border: var(--color-border);
+  --crm-soft: var(--color-surface-hover);
+  --crm-tint: var(--color-surface-soft);
+  --crm-control: var(--color-surface-soft);
+  --crm-primary-soft: #173448;
+  --crm-primary: #65bfe7;
+  --crm-green-soft: #12352c;
+  --crm-red-soft: #3c2029;
+  --crm-yellow-soft: #3c321b;
+  --crm-seq5: #e0e6ed;
+  --crm-seq4: #a6bcd4;
+  --crm-seq3: #72859f;
+  --crm-seq2: #4c5d76;
+}
